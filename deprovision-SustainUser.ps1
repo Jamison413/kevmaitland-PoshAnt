@@ -1,4 +1,8 @@
-﻿#region functions
+﻿Import-Module .\_PS_Library_Databases.psm1
+Import-Module .\_PS_Library_MSOL.psm1
+Import-Module .\_REST_Library-SPO.psm1
+
+#region functions
 function add-emailAddressesToPublicFolder($publicFolder, $emailAddressArray){
     $tempPF = $publicFolder #Bodge to get [Microsoft.Exchange.Data.ProxyAddressCollection] without Library
     foreach ($externalEmailAddress in $emailAddressArray){$tempPF.EmailAddresses += $externalEmailAddress}
@@ -24,38 +28,6 @@ function take-ownership([String]$folderPath, $newOwner){
 	$SystemAccessRule = new-object System.Security.AccessControl.FileSystemAccessRule $AdminACLPermission
 	$CurrentACL.AddAccessRule($SystemAccessRule)
 	Set-Acl -Path $folderPath -AclObject $CurrentACL
-    }
-function connect-toSqlServer($SQLServer,$SQLDBName){
-    #SQL Server connection string
-    $connDB = New-Object System.Data.SqlClient.SqlConnection
-    $connDB.ConnectionString = "Server = $SQLServer; Database = $SQLDBName; Integrated Security = True" #This relies on the current user having the appropriate Login/Role Membership ont he DB
-    $connDB.Open()
-    $connDB
-    }
-function Execute-SQLQueryOnSQLDB([string]$query, [string]$queryType, $sqlServerConnection) { 
-  # NonQuery - Insert/Update/Delete query where no return data is required
-    $sql = New-Object System.Data.SqlClient.SqlCommand
-    $sql.Connection = $sqlServerConnection
-    $sql.CommandText = $query
-    switch ($queryType){
-        "NonQuery" {$sql.ExecuteNonQuery()}
-        "Scalar" {$sql.ExecuteScalar()}
-        "Reader" {    
-            $oReader = $sql.ExecuteReader()
-            $results = @()
-            while ($oReader.Read()){
-                $result = New-Object PSObject
-                for ($i = 0; $oReader.FieldCount -gt $i; $i++){
-                        $columnName = ($query.Replace(",","") -split '\s+')[$i+1]
-                        if (1 -lt $columnName.Split(".").Length){$columnName = $columnName.Split(".")[1]} #Trim off any table names
-                        $result | Add-Member NoteProperty $columnName $oReader[$i]
-                        }
-                 $results += $result
-                }
-            $oReader.Close()
-            return $results
-            }
-        }
     }
 function get-msolUpn($userSAM){
     try{$oUser = Get-MsolUser -SearchString $userSAM.Replace("."," ")
@@ -152,26 +124,53 @@ function delete-userAccounts($userSAM){
         try{delete-msolAccount -userSAM $newUserSAM Write-Host -ForegroundColor DarkYellow "MSOL Account deleted!"}
         catch{Write-Host -ForegroundColor Red "Failed to delete MSOL Account!";$Error[0]}
         }
-    }#endregion
+    }
+#endregion
 
-$credential = get-credential -Credential kevin.maitland@anthesisgroup.com
-Import-Module MSOnline
-Connect-MsolService -Credential $credential
-$ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://outlook.office365.com/powershell-liveid/" -Credential $credential -Authentication "Basic" -AllowRedirection
-Import-PSSession $ExchangeSession
+$creds = set-MsolCredentials
+connect-ToMsol -credential $creds
+connect-ToExo -credential $creds
+Set-SPORestCredentials -Credential $creds
 
-$exportAdmin = "kevin.maitland@anthesisgroup.com"
-$usersToDeprovision = @('Colette.Ford') 
-$usersToReassign = @{'Richard.Hopkins'='Tilly.Shaw'}
-    $plaintextPassword = "Ttfn123!"
+$plaintextPassword = "Ttfn123!"
+$usersToReassign = @{}
 
-
-    $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
-    #region deprovision
-    foreach ($userSAM in $usersToDeprovision){
-        Write-Host -ForegroundColor Yellow "Deprovisioning $userSAM"
-        deprovision-user -userSAM $userSAM -plaintextPassword $plaintextPassword -exportAdmin $exportAdmin -reassignEmailAddressesTo $null
+$sharePointServerUrl = "https://anthesisllc.sharepoint.com"
+$hrSite = "/teams/hr"
+$leavingUserListName = "Leaving User Requests"
+$oDataUnprocessedUsers = '$filter=Status ne ''Completed'''
+$oDataUnprocessedUsers = '$select=User_x0020_to_x0020_deprovision/Name,User_x0020_to_x0020_deprovision/Title,Last_x0020_day_x0020_of_x0020_em,Mailbox_x0020_action,E_x002d_mail_x0020_address_x0020,Reassign_x0020_e_x002d_mail_x002/Name,Reassign_x0020_e_x002d_mail_x002/Title,Additional_x0020_e_x002d_mail_x0,Title&$expand=User_x0020_to_x0020_deprovision/Id,Reassign_x0020_e_x002d_mail_x002/Id'
+$unprocessedLeavers = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $leavingUserListName -oDataQuery $oDataUnprocessedUsers -suppressProgress $false
+$unprocessedLeavers | %{
+    $leavingUser = New-Object -TypeName PSObject
+    $leavingUser | Add-Member -MemberType NoteProperty -Name "LeavingUserId" -Value $_.User_x0020_to_x0020_deprovision.Name.Replace("i:0#.f|membership|","")
+    $leavingUser | Add-Member -MemberType NoteProperty -Name "LeavingUserName" -Value $_.User_x0020_to_x0020_deprovision.Title
+    $leavingUser | Add-Member -MemberType NoteProperty -Name "LeavingDate" -Value $_.Last_x0020_day_x0020_of_x0020_em
+    $leavingUser | Add-Member -MemberType NoteProperty -Name "MailboxAction" -Value $_.Mailbox_x0020_action
+    $leavingUser | Add-Member -MemberType NoteProperty -Name "UpnAction" -Value $_.E_x002d_mail_x0020_address_x0020
+    if($_.Reassign_x0020_e_x002d_mail_x002.__deferred -eq $null){
+        $leavingUser | Add-Member -MemberType NoteProperty -Name "RedirectToId" -Value $_.Reassign_x0020_e_x002d_mail_x002.Name.Replace("i:0#.f|membership|","")
+        $leavingUser | Add-Member -MemberType NoteProperty -Name "RedirectToName" -Value $_.Reassign_x0020_e_x002d_mail_x002.Title
         }
+        else{
+            $leavingUser | Add-Member -MemberType NoteProperty -Name "RedirectToId" -Value ""
+            $leavingUser | Add-Member -MemberType NoteProperty -Name "RedirectToName" -Value ""
+            }
+    $leavingUser | Add-Member -MemberType NoteProperty -Name "AliasAction" -Value $_.Additional_x0020_e_x002d_mail_x0
+    $leavingUser | Add-Member -MemberType NoteProperty -Name "AdditionalDetails" -Value $_.Title
+    $unprocessedLeaversFormatted += $leavingUser
+    }
+
+$selectedLeavers = $unprocessedLeaversFormatted | Out-GridView -PassThru
+$usersToDeprovision = $selectedLeavers | ?{$_.UpnAction -ne "Reassign to another user"}
+$selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToReassign.Add($_.LeavingUserId.Split("@")[0],$_.RedirectToId.Split("@")[0])}
+
+$sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
+#region deprovision
+foreach ($userSAM in $usersToDeprovision){
+    Write-Host -ForegroundColor Yellow "Deprovisioning $userSAM"
+    deprovision-user -userSAM $userSAM -plaintextPassword $plaintextPassword -exportAdmin $exportAdmin -reassignEmailAddressesTo $null
+    }
 foreach($userSAM in $usersToReassign.Keys){
     Write-Host -ForegroundColor Yellow "Deprovisioning $userSAM"
     deprovision-user -userSAM $userSAM -plaintextPassword $plaintextPassword -exportAdmin $exportAdmin -reassignEmailAddressesTo $usersToReassign[$userSAM] 

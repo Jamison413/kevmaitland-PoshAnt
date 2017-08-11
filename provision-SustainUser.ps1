@@ -1,10 +1,13 @@
 ﻿Import-Module -Name ActiveDirectory
-$userSAM = "Claudia.Amos"
-$userFirstName = "Claudia"
-$userSurname = "Amos"
-$userManagerSAM = "Tilly.Shaw"
-$userDepartment = "Anthesis UK"
-$userJobTitle = "Anthesis UK"
+Import-Module .\_PS_Library_MSOL.psm1
+Import-Module .\_REST_Library-SPO.psm1
+
+$userSAM = "Ali.Midhani"
+$userFirstName = "Ali"
+$userSurname = "Midhani"
+$userManagerSAM = "Duncan.Faulkes"
+$userDepartment = "Sustain"
+$userJobTitle = "Associate"
 $plaintextPassword = "Welcome123"
 $licenses = @("E1")
 
@@ -12,17 +15,56 @@ $logFile = "C:\Scripts\Logs\provision-User.log"
 $errorLogFile = "C:\Scripts\Logs\provision-User_Errors.log"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $msolAdmin = "kevin.maitland@anthesisgroup.com"
-$credential = get-credential -Credenti
-#region functions
-function connectTo-msol($credential){
-    Import-Module MSOnline
-    Connect-MsolService -Credential $credential
-    } 
-function connectTo-MsolMail($credential){
-    Get-PSSession | ? {$_.ConfigurationName -eq "Microsoft.Exchange"} | Remove-PSSession
-    $ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://outlook.office365.com/powershell-liveid/" -Credential $credential -Authentication "Basic" -AllowRedirection
-    Import-PSSession $ExchangeSession
+
+$creds = set-MsolCredentials
+connect-ToMsol -credential $creds
+connect-ToExo -credential $creds
+Set-SPORestCredentials -Credential $creds
+
+
+$sharePointServerUrl = "https://anthesisllc.sharepoint.com"
+$hrSite = "/teams/hr"
+$taxonomyListName = "TaxonomyHiddenList"
+$taxononmyData = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $taxonomyListName -suppressProgress $false 
+
+$newUserListName = "New User Requests"
+#$oDataUnprocessedUsers = '$filter=Current_x0020_Status eq ''1 - Waiting for IT Team to set up accounts'''
+#$oDataUnprocessedUsers = '$select=*&$filter=Current_x0020_Status eq ''1 - Waiting for IT Team to set up accounts''&$expand=Line_x0020_Manager/Id'
+$oDataUnprocessedUsers = '$select=*,Line_x0020_Manager/Name,Line_x0020_Manager/Title,Prinicpal_x0020_Community_x0020_/Name,Prinicpal_x0020_Community_x0020_/Title&$filter=Current_x0020_Status eq ''1 - Waiting for IT Team to set up accounts''&$expand=Line_x0020_Manager/Id,Prinicpal_x0020_Community_x0020_/Id'
+$unprocessedStarters = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $newUserListName -suppressProgress $false -oDataQuery $oDataUnprocessedUsers 
+#$unprocessedStarters | %{
+foreach($unprocessedStarter in $unprocessedStarters){
+    $startingUser = New-Object -TypeName PSObject
+    #These are read directly from the List:
+    $startingUser | Add-Member -MemberType NoteProperty -Name "DisplayName" -Value $unprocessedStarter.Title
+    if($unprocessedStarter.Employee_x0020_Legal_x0020_Name.__deferred -eq $null){
+        $startingUser | Add-Member -MemberType NoteProperty -Name "LegalName" -Value $unprocessedStarter.Employee_x0020_Legal_x0020_Name
+        }
+        else {$startingUser | Add-Member -MemberType NoteProperty -Name "LegalName" -Value $unprocessedStarter.Title}
+    $startingUser | Add-Member -MemberType NoteProperty -Name "JobTitle" -Value $unprocessedStarter.Job_x0020_title
+    #These are taxonomy fields and the Ids need to cross-referenced with the TaxonomyHiddenList to get the labels
+    $startingUser | Add-Member -MemberType NoteProperty -Name "Region" -Value $($taxononmyData | ?{$_.IdForTerm -eq $unprocessedStarter.Region.TermGuid} | %{$_.Term})
+    $startingUser | Add-Member -MemberType NoteProperty -Name "NearestOffice" -Value $($taxononmyData | ?{$_.IdForTerm -eq $unprocessedStarters[0].Nearest_x0020_Office.TermGuid} | %{$_.Term})
+    $startingUser | Add-Member -MemberType NoteProperty -Name "Community" -Value $($taxononmyData | ?{$_.IdForTerm -eq $unprocessedStarters[0].Community.TermGuid} | %{$_.Term})
+    $startingUser | Add-Member -MemberType NoteProperty -Name "Company" -Value $($taxononmyData | ?{$_.IdForTerm -eq $unprocessedStarters[0].Finance_x0020_Cost_x0020_Attribu.TermGuid} | %{$_.Term})
+    #These are People/Group fields and need expanding
+    if($unprocessedStarter.Line_x0020_Manager.__deferred -eq $null){
+        $startingUser | Add-Member -MemberType NoteProperty -Name "LineManager" -Value $unprocessedStarter.Line_x0020_Manager.Name.Replace("i:0#.f|membership|","")
+        }
+        else{$startingUser | Add-Member -MemberType NoteProperty -Name "LineManager" -Value ""}
+    if($unprocessedStarter.Prinicpal_x0020_Community_x0020_.__deferred -eq $null){
+        $startingUser | Add-Member -MemberType NoteProperty -Name "CommunityManager" -Value $unprocessedStarter.Prinicpal_x0020_Community_x0020_.Name.Replace("i:0#.f|membership|","")
+        }
+        else{$startingUser | Add-Member -MemberType NoteProperty -Name "CommunityManager" -Value ""}
+
+    $unprocessedStartersFormatted += $startingUser
     }
+
+$selectedStartersrs = $unprocessedStartersFormatted | Out-GridView -PassThru
+
+
+
+#region functions
 function create-ADUser([string]$userSAM, [string]$userFirstName, [string]$userSurname, [string]$userManagerSAM, [string]$userDepartment, [string]$userJobTitle, $plaintextPassword){
     New-ADUser `
         -AccountPassword (ConvertTo-SecureString $plaintextPassword -AsPlainText -force) `
@@ -43,6 +85,7 @@ function create-ADUser([string]$userSAM, [string]$userFirstName, [string]$userSu
         -Surname $userSurname `
         -Title $userJobTitle `
         -UserPrincipalName "$userSAM@sustain.co.uk" `
+        -
         -OtherAttributes @{'ipPhone'="XXX";'pager'="0117 403 2700"} | Out-Null 
     }
 function create-msolUser($userSAM){
@@ -65,13 +108,13 @@ function update-MsolUser([string]$userSAM, [string]$userFirstName, [string]$user
         -LastName $userSurname `
         -DisplayName $userDisplayName `
         -Title $userJobTitle `
-        -Department "SPARKE (Energy)" `
-        -Office "Bristol, UK" `
+        -Department "Sustain" `
+        -Office "Bristol, GBR" `
         -PhoneNumber "+44 117 430 2$userPhoneExtension" `
         -StreetAddress "42-46 Baldwin Street" `
-        -City "Bristol" `
+        -City "Bristol, GBR" `
         -PostalCode "BS1 1PN" `
-        -Country "UK" `
+        -Country "United Kingdom" `
         -UsageLocation "GB" `
         -StrongPasswordRequired $true 
         #-Password "Welcome123" `
@@ -79,6 +122,7 @@ function update-MsolUser([string]$userSAM, [string]$userFirstName, [string]$user
     }
 function update-msolMailbox($userSAM,$userFirstName,$userSurname,$userDisplayName){
     Get-Mailbox $userSAM@anthesisgroup.com | Set-Mailbox  -CustomAttribute1 "Sustain" -Alias $userSAM -DisplayName $userDisplayName -Name "$userFirstName $userSurname" -Office "Bristol, UK"
+    Get-Mailbox $userSAM@anthesisgroup.com | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
     }
 function update-msolSharePointProfileFromAnotherProfile($sourceSpProfile,$destSpProfile,$destContext,$destPeopleManager){
     if($sourceSpProfile.UserProfileProperties["AboutMe"] -ne $null){$destPeopleManager.SetSingleValueProfileProperty($destSpProfile.AccountName, "AboutMe", $sourceSpProfile.UserProfileProperties["AboutMe"])}
@@ -211,9 +255,7 @@ function update-msolUserFromAd($userSAM){
 
 
 
-al $msolAdmin
-connectTo-msol -credential $credential
-connectTo-MsolMail -credential $credential
+
 
 provision-user -userSAM $userSAM -userFirstName $userFirstName -userSurname $userSurname -userManagerSAM $userManagerSAM -userDepartment $userDepartment -userJobTitle $userJobTitle -plaintextPassword $plaintextPassword
 #Now assign the user a phone number via http://shoretel/shorewaredirector and set their ipPhone and telephoneNumber AD attributes
