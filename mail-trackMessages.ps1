@@ -1,11 +1,6 @@
 ﻿#anthesisgroup-com.mail.protection.outlook.com
-$credential = get-credential -Credential kevin.maitland@anthesisgroup.com
-Import-Module MSOnline
-Connect-MsolService -Credential $credential
-
-$ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://outlook.office365.com/powershell-liveid/" -Credential $credential -Authentication "Basic" -AllowRedirection
-Import-PSSession $ExchangeSession
-
+Import-Module _PS_Library_MSOL.psm1
+connect-ToExo
 
 function get-allMailLastXHours($hoursAgo){
     $dateEnd = get-date
@@ -29,3 +24,5 @@ function format-MailTracePrettily($traceBlob){
     
 $trace = get-allFromAddressXHours -senderAddress "xerox9303main@sustain.co.uk" -hoursAgo 10
 $trace = get-allToAddressXHours -recipientAddress "bidstenders@sustain.co.uk" -hoursAgo 10
+
+format-MailTracePrettily $trace

@@ -1,13 +1,10 @@
-﻿$credential = get-credential -Credential kevin.maitland@anthesisgroup.com
-Import-Module MSOnline
-Connect-MsolService -Credential $credential
+﻿Import-Module .\_PS_Library_MSOL.psm1
+connect-ToExo
 
-$ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://outlook.office365.com/powershell-liveid/" -Credential $credential -Authentication "Basic" -AllowRedirection
-Import-PSSession $ExchangeSession
 
-$members = @("Graeme.Hadley","Polly.Stebbings","Yvonne.Ngo","Hannah.Dick","Pearl.Nemeth","Harriet.Bell","Rosie.Sibley","Chloe.McCloskey","lucy.welch","Georgie.Edwards","Beth.Simpson","Ellen.Upton","Sophie.Taylor")
-$memberOf = @()
-$name = "STEP Team"
+$members = @("Alan Spray","Andrew Noone", "Carl van Tonder", "Craig Simmons", "Erika Bata", "Helen Kean", "Helen Tyrrell", "Ian Forrester", "Laura Thompson", "Lorna Kelly", "Lucy Boreham", "Lucy Richardson", "Maggie Weglinski", "Mary Short", "Rosanna Collorafi", "Sophie Sapienza", "Stuart McLachlan", "Tecla Castella", "Tobias Parker")
+$memberOf = @("")
+$name = "Recruitment Team"
 $hideFromGal = $false
 $blockExternalMail = $true
 New-DistributionGroup -Name $name -Type Security -Members $members -PrimarySmtpAddress $($name.Replace(" ","")+"@anthesisgroup.com")
