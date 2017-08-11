@@ -1,578 +1,26 @@
-﻿#region SPO functions
-<#
-.Synopsis
-    Stores the credentials for Invoke-SPORestMethod.
-.DESCRIPTION
-    Stores the credentials for Invoke-SPORestMethod. This is done so that you
-    don't have to provide your credentials on every call to Invoke-SPORestMethod.
-.EXAMPLE
-   Set-SPORestCredentials
-.EXAMPLE
-   Set-SPORestCredentials -Credential $cred
-#>
-function global:Set-SPORestCredentials {
-    Param (
-        [Parameter(ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        $Credential = (Get-Credential -Message "Enter your credentials for SharePoint Online:")
-    )
-    Begin {
-        if ((Get-Module Microsoft.Online.SharePoint.PowerShell -ListAvailable) -eq $null) {
-            throw "The Microsoft SharePoint Online PowerShell cmdlets have not been installed."
-        }
-        [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
-    }
-    Process {
-        $global:spoCred = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($Credential.UserName, $Credential.Password)
-    }
-} 
-<#
-.Synopsis
-    Clears the SharePoint Online credentials stored in the global variable.
-.DESCRIPTION
-    Clears the SharePoint Online credentials stored in the global variable.
-    You can also manually clear the variable by explicitly setting 
-    $global:spoCred = $null.
-.EXAMPLE
-   Clear-SPORestCredentials
-#>
-function global:Clear-SPORestCredentials {
-    $global:spoCred = $null
-}
-<#
-.Synopsis
-    Sends an HTTP or HTTPS request to a SharePoint Online REST-compliant web service.
-.DESCRIPTION
-    This function sends an HTTP or HTTPS request to a Representational State 
-    Transfer (REST)-compliant ("RESTful") SharePoint Online web service.
-    When connecting, if Set-SPORestCredentials is not called then you will be
-    prompted for your credentials. Those credentials are stored in a global
-    variable $global:spoCred so that it will be available on subsequent calls.
-    Call Clear-SPORestCredentials to clear the variable.
-.EXAMPLE
-   Invoke-SPORestMethod -Url "https://contoso.sharepoint.com/_api/web"
-.EXAMPLE
-   Invoke-SPORestMethod -Url "https://contoso.sharepoint.com/_api/contextinfo" -Method "Post"
-#>
-function global:Invoke-SPORestMethod {
-    [CmdletBinding()]
-    [OutputType([int])]
-    Param (
-        # The REST endpoint URL to call.
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0)]
-        [ValidateNotNullOrEmpty()]
-        [System.Uri]$Url,
+﻿Start-Transcript "$($MyInvocation.MyCommand.Definition)_$(Get-Date -Format "yyMMdd").log" -Append
 
-        # Specifies the method used for the web request. The default value is "Get".
-        [Parameter(Mandatory = $false, Position = 1)]
-        [ValidateNotNullOrEmpty()]
-        [ValidateSet("Get", "Head", "Post", "Put", "Delete", "Trace", "Options", "Merge", "Patch")]
-        [string]$Method = "Get",
-
-        # Additional metadata that should be provided as part of the Body of the request.
-        [Parameter(Mandatory = $false, Position = 2)]
-        [ValidateNotNullOrEmpty()]
-        [object]$Metadata,
-
-        # The "X-RequestDigest" header to set. This is most commonly used to provide the form digest variable. Use "(Invoke-SPORestMethod -Url "https://contoso.sharepoint.com/_api/contextinfo" -Method "Post").GetContextWebInformation.FormDigestValue" to get the Form Digest value.
-        [Parameter(Mandatory = $false, Position = 3)]
-        [ValidateNotNullOrEmpty()]
-        [string]$RequestDigest,
-        
-        # The "If-Match" header to set. Provide this to make sure you are not overwritting an item that has changed since you retrieved it.
-        [Parameter(Mandatory = $false, Position = 4)]
-        [ValidateNotNullOrEmpty()]
-        [string]$ETag, 
-        
-        # To work around the fact that many firewalls and other network intermediaries block HTTP verbs other than GET and POST, specify PUT, DELETE, or MERGE requests for -XHTTPMethod with a POST value for -Method.
-        [Parameter(Mandatory = $false, Position = 5)]
-        [ValidateNotNullOrEmpty()]
-        [ValidateSet("Get", "Head", "Post", "Put", "Delete", "Trace", "Options", "Merge", "Patch")]
-        [string]$XHTTPMethod,
-
-        [Parameter(Mandatory = $false, Position = 6)]
-        [ValidateNotNullOrEmpty()]
-        [ValidateSet("Verbose", "MinimalMetadata", "NoMetadata")]
-        [string]$JSONVerbosity = "Verbose",
-
-        # If the returned data is a binary data object such as a file from a SharePoint site specify the output file name to save the data to.
-        [Parameter(Mandatory = $false, Position = 7)]
-        [ValidateNotNullOrEmpty()]
-        [string]$OutFile
-    )
-
-    Begin {
-        if ((Get-Module Microsoft.Online.SharePoint.PowerShell -ListAvailable) -eq $null) {
-            throw "The Microsoft SharePoint Online PowerShell cmdlets have not been installed."
-        }
-        if ($global:spoCred -eq $null) {
-            [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
-            $cred = Get-Credential -Message "Enter your credentials for SharePoint Online:"
-        } 
-
-    }
-    Process {
-        $request = [System.Net.WebRequest]::Create($Url)
-        $request.Credentials = $global:spoCred
-        $odata = ";odata=$($JSONVerbosity.ToLower())"
-        $request.Accept = "application/json$odata"
-        $request.ContentType = "application/json;charset=UTF-8$odata"   
-        $request.Headers.Add("X-FORMS_BASED_AUTH_ACCEPTED", "f")   
-        $request.Method = $Method.ToUpper()
-
-        if(![string]::IsNullOrEmpty($RequestDigest)) {
-            $request.Headers.Add("X-RequestDigest", $RequestDigest)
-        }
-        if(![string]::IsNullOrEmpty($ETag)) {
-            $request.Headers.Add("If-Match", $ETag)
-        }
-        if($XHTTPMethod -ne $null) {
-            $request.Headers.Add("X-HTTP-Method", $XHTTPMethod.ToUpper())
-        }
-        if ($Metadata -is [string] -and ![string]::IsNullOrEmpty($Metadata)) {
-            $body = [System.Text.Encoding]::UTF8.GetBytes($Metadata)
-            $request.ContentLength = $body.Length
-            $stream = $request.GetRequestStream()
-            $stream.Write($body, 0, $body.Length)
-        } elseif ($Metadata -is [byte[]] -and $Metadata.Count -gt 0) {
-            $request.ContentLength = $Metadata.Length
-            $stream = $request.GetRequestStream()
-            $stream.Write($Metadata, 0, $Metadata.Length)
-        } else {
-            $request.ContentLength = 0
-        }
- 
-        $response = $request.GetResponse()
-        try {
-            $streamReader = New-Object System.IO.StreamReader $response.GetResponseStream()
-            try {
-                # If the response is a file (a binary stream) then save the file our output as-is.
-                if ($response.ContentType.Contains("application/octet-stream")) {
-                    if (![string]::IsNullOrEmpty($OutFile)) {
-                        $fs = [System.IO.File]::Create($OutFile)
-                        try {
-                            $streamReader.BaseStream.CopyTo($fs)
-                        } finally {
-                            $fs.Dispose()
-                        }
-                        return
-                    }
-                    $memStream = New-Object System.IO.MemoryStream
-                    try {
-                        $streamReader.BaseStream.CopyTo($memStream)
-                        Write-Output $memStream.ToArray()
-                    } finally {
-                        $memStream.Dispose()
-                    }
-                    return
-                }
-                # We don't have a file so assume JSON data.
-                $data = $streamReader.ReadToEnd()
-                # In many cases we might get two ID properties with different casing.
-                # While this is legal in C# and JSON it is not with PowerShell so the
-                # duplicate ID value must be renamed before we convert to a PSCustomObject.
-                if ($data.Contains("`"ID`":") -and $data.Contains("`"Id`":")) {
-                    $data = $data.Replace("`"ID`":", "`"ID-dup`":");
-                }
-
-                $results = ConvertFrom-Json -InputObject $data
-                $global:results2 = $results
-                # The JSON verbosity setting changes the structure of the object returned.
-                if ($JSONVerbosity -ne "verbose" -or $results.d -eq $null) {
-                    Write-Output $results
-                } else {
-                    Write-Output $results.d 
-                }
-            } finally {
-                $streamReader.Dispose()
-            }
-        } finally {
-            $response.Dispose()
-        }
-    }
-    End {
-    }
-} 
-#endregion
-#region Ant functions
-function check-digestExpiry($serverUrl, $sitePath){
-    $sitePath = format-path $sitePath
-    if(($digestExpiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){get-newDigest $serverUrl $sitePath}
-    }
-function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite){
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
-    #$sourceFile = get-fileInLibrary -sitePath $sourceSitePath -libraryAndFolderPath $sourceLibraryAndFolderPath -fileName $sourceFileName
-    if(!$destinationSitePath -and !$destinationLibraryAndFolderPath -and !$destinationFileName){$destinationSitePath = $sourceSitePath;$destinationLibraryAndFolderPath = $sourceLibraryAndFolderPath;$destinationFileName = $sourceFileName+"_copy"}
-    if(!$destinationSitePath){$destinationSitePath = $sourceSitePath}
-    if(!$destinationLibraryAndFolderPath){$destinationLibraryAndFolderPath = $sourceLibraryAndFolderPath}
-    if(!$destinationFileName){$destinationFileName = $sourceFileName}
-    $sourceSitePath = format-path (sanitise-forSharePointUrl $sourceSitePath)
-    $sourceLibraryAndFolderPath = format-path (sanitise-forSharePointUrl $sourceLibraryAndFolderPath)
-    $sourceFileName = sanitise-forSharePointFileName $sourceFileName
-    $destinationSitePath = format-path (sanitise-forSharePointUrl $destinationSitePath)
-    $destinationLibraryAndFolderPath = format-path (sanitise-forSharePointUrl $destinationLibraryAndFolderPath)
-    $destinationFileName = sanitise-forSharePointFileName $destinationFileName
-
-    $destinationUrl = $destinationSitePath+$destinationLibraryAndFolderPath+"/"+$destinationFileName
-    $url = $serverUrl+$sourceSitePath+"/_api/web/GetFileByServerRelativeUrl('$sourceSitePath$sourceLibraryAndFolderPath/$sourceFileName')/CopyTo('$destinationUrl')"
-    $url
-    try{
-        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-        Invoke-SPORestMethod -Url $url -Method "POST" -RequestDigest $digest.GetContextWebInformation.FormDigestValue
-        if($verboseLogging){log-result "FILE COPIED: $destinationFileName"}
-        }
-    catch{
-        if($verboseLogging){log-error -myError $Error -myFriendlyMessage "Failed to copy-FileInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function delete-folderInLibrary($sitePath,$libraryName,$folderPathAndNameToBeDeleted){
-    #This needs tidying up
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $folderPathAndNameToBeDeleted = format-path $folderPathAndNameToBeDeleted
-    $url = "$serverUrl$sitePath/_api/web/GetFolderByServerRelativeUrl('$sitePath$libraryName$folderPathAndNameToBeDeleted')"
-    #$dummy = Invoke-SPORestMethod -Url $url 
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
-    try{
-        if($verboseLogging){log-action "delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
-        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "DELETE" -RequestDigest $digest.GetContextWebInformation.FormDigestValue -ETag "*"
-        if($verboseLogging){log-result "FOLDER DELETED: $sitePath$libraryName$folderPathAndNameToBeDeleted"}
-        }
-    catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function format-path($dirtyPath){
-    #All "path" variables should be prefixed with a "/", but not suffixed
-    if($dirtyPath.Substring(0,1) -ne "/"){$dirtyPath = "/"+$dirtyPath}
-    if($dirtyPath.Substring(($dirtyPath.Length-1),1) -eq "/"){$dirtyPath = $dirtyPath.Substring(0,$dirtyPath.Length-1)}
-    $dirtyPath
-    }
-function get-fileInLibrary($sitePath, $libraryAndFolderPath, $fileName){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $libraryAndFolderPath = format-path (sanitise-forSharePointUrl $libraryAndFolderPath)
-    $fileName = sanitise-forSharePointFileName $fileName
-    #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/GetFileByServerRelativeUrl('$sitePath$libraryAndFolderPath/$fileName"+"')"
-    try{
-        if($verboseLogging){log-action "get-fileInLibrary: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
-        if($verboseLogging){log-result "SUCCESS: File found in Library"}
-        }
-    catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-fileInLibrary: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function get-folderInLibrary($sitePath, $libraryAndFolderPath, $folderName){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $libraryAndFolderPath = format-path (sanitise-forSharePointUrl  $libraryAndFolderPath)
-    $folderName = sanitise-forSharePointFileName $folderName
-    #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativeUrl('$sitePath$libraryAndFolderPath/$folderName"+"')"
-    try{
-        if($verboseLogging){log-action "get-folderInLibrary: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
-        if($verboseLogging){log-result "FOLDER IN LIBRARY FOUND"}
-        }
-    catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-folderInLibrary: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue){
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $listName = sanitise-forSharePointUrl $listName
-    $query = "?filter=$propertyName eq $propertyValue"
-    #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items"
-    try{
-        if($verboseLogging){log-action "get-itemInListFromProperty: Invoke-SPORestMethod -Url ($url$query)"}
-        $item = Invoke-SPORestMethod -Url ($url+$query)
-        if($item){
-            if($verboseLogging){log-result "FOUND ITEM IN LIST FROM PROPERTY"}
-            $item.results
-            }
-        else{
-            if($verboseLogging){log-result -myFriendlyMessage "WARNING: get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue) returned no items"}
-            $false
-            }
-        }
-    catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue) failed to execute" -doNotLogToEmail $true}
-        $false
-        }
-    }    
-function get-itemsInList($sitePath, $listName, $oDataQuery, $suppressProgress){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $listName = sanitise-forSharePointUrl $listName
-    if($oDataQuery){if($oDataQuery.SubString(0,1) -ne "?"){$oDataQuery = "?$oDataQuery"}} #Prefix with ? if user hasn't done so already
-    #Build the query
-    $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items$oDataQuery"
-    #Run the query
-    try{
-        if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $url"}
-        $partialItems = Invoke-SPORestMethod -Url $url
-        if($partialItems){
-            if($verboseLogging){log-result "SUCCESS: Initial $($partialItems.results.Count) items returned"}
-            $queryResults = $partialItems.results
-            }
-        else{
-            if($verboseLogging){log-result -myFriendlyMessage "WARNING: get-itemsInList($sitePath, $listName) returned no items"}
-            $false
-            }
-        }
-    catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemsInList($sitePath, $listName) failed to execute" -doNotLogToEmail $true}
-        $false
-        }
-    $i=$partialItems.results.Count
-    #Check for additional results
-    while($partialItems.__next){
-        try{
-            if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $($partialItems.__next)"}
-            $partialItems = Invoke-SPORestMethod -Url $partialItems.__next
-            if($partialItems){
-                if($verboseLogging){log-result "SUCCESS: Subsequent $($partialItems.results.Count) items returned"}
-                $queryResults += $partialItems.results
-                }
-            else{
-                if($verboseLogging){log-result "WARNING: get-itemsInList($sitePath, $listName) returned no items"}
-                $false
-                }
-            }
-        catch{
-            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemsInList($sitePath, $listName) failed to execute"}
-            $false
-            }
-        $i+=$partialItems.results.Count
-        if(!$suppressProgress){Write-Host $i}
-        }
-    $queryResults
-    }
-function get-library($sitePath, $libraryName){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    #sanitise-forSharePointUrl $libraryName
-    $libraryName = sanitise-forSharePointFileName $libraryName
-    #Build and execute REST statement
-    #$url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativePath(decodedurl='$sitePath/$libraryName')"
-    $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativeUrl('"+(sanitise-forSharePointUrl "$sitePath/$libraryName")+"')"
-    try{
-        if($verboseLogging){log-action "get-library: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
-        if($verboseLogging){log-result "SUCCESS: Library found"}
-        }
-    catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-library($sitePath, $libraryName)" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function get-list($sitePath, $listName){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $listName = (sanitise-forSharePointUrl $listName).Replace("Lists/","")
-    #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')"
-    try{
-        if($verboseLogging){log-action "get-list: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
-        if($verboseLogging){log-result "SUCCESS: List found"}
-        }
-    catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-list: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function get-newDigest($serverUrl, $sitePath){
-    $global:digest = (Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -Method "POST")#.GetContextWebInformation.FormDigestValue
-    $global:digestExpiryTime = (Get-Date).AddSeconds($global:digest.GetContextWebInformation.FormDigestTimeoutSeconds)
-    }
-function new-folderInLibrary($sitePath, $libraryAndFolderPath, $folderName){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $folderName = sanitise-forSharePointFileName $folderName
-    $libraryAndFolderPath = format-path (sanitise-forSharePointUrl $libraryAndFolderPath)
-    #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
-    #Build and execute REST statement
-    $metadata = "{'__metadata':{'type':'SP.Folder'},'ServerRelativeUrl':`"$sitePath$libraryAndFolderPath/$folderName`"}"
-    $url = $serverUrl+$sitePath+"/_api/web/folders"
-    if((get-folderInLibrary -sitePath $sitePath -libraryAndFolderPath $libraryAndFolderPath -folderName $folderName) -eq $false){
-        try{
-            if($verboseLogging){log-action -myMessage "new-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-            Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue
-            if($verboseLogging){log-result "SUCCESS: Created folder $sitePath$libraryAndFolderPath/$folderName"}
-            }
-        catch{
-            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to create new folder: new-folderInLibrary($sitePath, $libraryAndFolderPath, $folderName)" -doNotLogToEmail $true}
-            $false
-            }
-        }
-    else{
-        if($verboseLogging){log-result "WARNING: Folder already exists: $sitePath$libraryAndFolderPath/$folderName"}
-        $false
-        }
-    }
-function new-itemInList($sitePath,$listName,$predeterminedItemType,$hashTableOfItemData){
-    #Error handling for no DataType?
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
-    #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
-    log-action "new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})"
-    #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items"
-    foreach($key in $hashTableOfItemData.Keys){
-        $formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "
-        }
-    $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
-    $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
-    try{
-        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-        Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue
-        if($verboseLogging){log-result "SUCCESS: New item created"}
-        }
-    catch{
-        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to create new list item: new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function new-library($sitePath, $libraryName, $libraryDesc){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $libraryName = sanitise-forSharePointFileName $libraryName
-    #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
-    #Build and execute REST statement
-    $metadata = "{'__metadata':{'type':'SP.List'},'Description':`"$libraryDesc`",'BaseTemplate':101,'ContentTypesEnabled':true,'Title':`"$libraryName`",'AllowContentTypes':true}"
-    $url = $serverUrl+$sitePath+"/_api/web/lists"
-    if((get-library -sitePath $sitePath -libraryName $libraryName) -eq $false){
-        try{
-            if($verboseLogging){log-action -myMessage "new-library: Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-            Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue
-            if($verboseLogging){log-result "SUCCESS: Library created: $sitePath/$libraryName"}
-            }
-        catch{
-            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to create new Library: new-library($sitePath, $libraryName, $libraryDesc)" -doNotLogToEmail $true}
-            $false
-            }
-        }
-        else{if($verboseLogging){log-result "WARNING: Library already exists: $sitePath/$libraryName"}}
-    }
-function update-list($sitePath, $listName,$hashTableOfUpdateData){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $listName = sanitise-forSharePointUrl $listName
-    #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
-    #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')"
-    foreach($key in $hashTableOfUpdateData.Keys){
-        $formattedItemData += "`'$key`':`'$($hashTableOfUpdateData[$key])`', "
-        }
-    $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
-    #$metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
-    $metadata = "{'__metadata':{'type':'SP.List'},$formattedItemData}"
-    try{
-        if($verboseLogging){log-action "update-list: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
-        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue -ETag "*"
-        if($verboseLogging){log-result "SUCCESS: List updated: $formattedItemData"}
-        }
-    catch{
-        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to update-list($sitePath, $listName,$($hashTableOfUpdateData.Keys | %{"$_=$($hashTableOfUpdateData[$_]);"})" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData){
-    #Sanitise parameters
-    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
-    #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath
-    #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items($itemId)"
-    foreach($key in $hashTableOfItemData.Keys){
-        $formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "
-        }
-    $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
-    $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
-    try{
-        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
-        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue -ETag "*"
-        if($verboseLogging){log-result "SUCCESS: Updated list item: $formattedItemData"}
-        }
-    catch{
-        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to update item in List: update-itemInList($sitePath,$listName,$predeterminedItemType,$itemId,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -doNotLogToEmail $true}
-        $false
-        }
-    }
-function log-action($myMessage, $doNotLogToFile, $doNotLogToScreen){
-    if($logActions){
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`t$myMessage") -Path $logfile}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Yellow $myMessage}
-        }
-    }
-function log-error($myError, $myFriendlyMessage, $doNotLogToFile, $doNotLogToScreen, $doNotLogToEmail, $overrideErrorLogFile){
-    if($logErrors){
-        if($overrideErrorLogFile){$myErrorLogFile = $overrideErrorLogFile} else{$myErrorLogFile = $logFile}
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value "`t`tERROR:`t$myFriendlyMessage" -Path $myErrorLogFile}
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value "`t`t$($myError.Exception.Message)" -Path $myErrorLogFile}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Red $myFriendlyMessage}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Red $myError}
-        if(!$doNotLogToEmail -or $logErrorsToEmail){Send-MailMessage -To $mailTo -From $mailFrom -Subject "Error in update-SpoClientsFolders - $myFriendlyMessage" -Body $myError -SmtpServer $smtpServer}
-        }
-    }
-function log-result($myMessage, $doNotLogToFile, $doNotLogToScreen){
-    if($logResults){
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value ("`t$myMessage") -Path $logfile}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor DarkYellow "`t$myMessage"}
-        }
-    }
-function sanitise-forSharePointFileName($dirtyString){ 
-    $dirtyString = $dirtyString.Trim()
-    $dirtyString.Replace("`"","").Replace("#","").Replace("%","").Replace("?","").Replace("<","").Replace(">","").Replace("\","").Replace("/","").Replace("...","").Replace("..","").Replace("'","`'")
-    if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
-    }
-function sanitise-forSharePointUrl($dirtyString){ 
-    $dirtyString = $dirtyString.Trim()
-    $dirtyString = $dirtyString -creplace '[^a-zA-Z0-9 /]+', ''
-    #$dirtyString = $dirtyString.Replace("`"","").Replace("#","").Replace("%","").Replace("?","").Replace("<","").Replace(">","").Replace("\","/").Replace("//","/").Replace(":","")
-    #$dirtyString = $dirtyString.Replace("$","`$").Replace("``$","`$").Replace("(","").Replace(")","").Replace("-","").Replace(".","").Replace("&","").Replace(",","").Replace("'","").Replace("!","")
-    $cleanString =""
-    for($i= 0;$i -lt $dirtyString.Split("/").Count;$i++){ #Examine each virtual directory in the URL
-        if($i -gt 0){$cleanString += "/"}
-        if($dirtyString.Split("/")[$i].Length -gt 50){$tempString = $dirtyString.Split("/")[$i].SubString(0,50)} #Truncate long folder names to 50 characters
-            else{$tempString = $dirtyString.Split("/")[$i]}
-        if($tempString.Length -gt 0){
-            if(@(".", " ") -contains $tempString.Substring(($tempString.Length-1),1)){$tempString = $tempString.Substring(0,$tempString.Length-1)} #Trim trailing "." and " ", even if this results in a truncation <50 characters
-            }
-        $cleanString += $tempString
-        }
-    $cleanString = $cleanString.Replace("//","/").Replace("https/","https://") #"//" is duplicated to catch trailing "/" that might now be duplicated. https is an exception that needs specific handling
-    $cleanString
-    }
-#endregion
+Import-Module .\_REST_Library-SPO.psm1
+Import-Module .\_REST_Library-Kimble.psm1
 
 ##################################
 #
 #Get ready
 #
 ##################################
+
 $serverUrl = "https://anthesisllc.sharepoint.com" 
 $sitePath = "/clients"
+$listOfClientFolders = @("_Kimble automatically creates Lead & Project folders","Background","Non-specific BusDev")
+$listOfOppProjSubFolders = @("Admin & contracts", "Analysis","Data & refs","Meetings","Proposal","Reports","Summary (marketing) - end of project")
+
 $o365user = "kevin.maitland@anthesisgroup.com"
 $o365Pass = ConvertTo-SecureString (Get-Content 'C:\New Text Document.txt') -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $o365user, $o365Pass
 
 Set-SPORestCredentials -Credential $credential
 get-newDigest -serverUrl $serverUrl -sitePath $sitePath
-$digest.GetContextWebInformation.FormDigestValue
+
 #Log what
 $logErrors = $true
 $logActions = $true
@@ -581,33 +29,47 @@ $verboseLogging = $false
 #Log to where
 $logToScreen = $true
 $logToFile = $true
-#$logFile = $($MyInvocation.MyCommand.Definition.Replace($MyInvocation.MyCommand.Name,"Logs\"+$MyInvocation.MyCommand.Name+".log"))
-$logFile = "C:\Scripts\Logs\update-SpoClientsFolders.log"
+$logfile = "C:\Scripts\Logs\update-spoClientsAndProjectFolders_$(Get-Date -Format "yyMMdd").log"
+#$logFile = "C:\Scripts\Logs\update-SpoProjectsFolders.log"
 $logErrorsToEmail = $true
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 #$mailFrom = $MyInvocation.MyCommand.Name+"@sustain.co.uk"
 $mailFrom = "scriptrobot@sustain.co.uk"
 $mailTo = "kevin.maitland@anthesisgroup.com"
-$listOfClientFolders = @("_Kimble automatically creates Lead & Project folders","Background","Non-specific BusDev")
-$listOfOppProjSubFolders = @("Admin & contracts", "Analysis","Data & refs","Meetings","Proposal","Reports","Summary (marketing) - end of project")
 
-#$spClients = get-itemsInList -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?&`$filter=IsDirty eq 1"
-#$dirtySpClients = $spClients | ?{$_.IsDirty -eq $true}
+#region Sync Clients
+#$allSpClients = get-itemsInList -sitePath $sitePath -listName "Kimble Clients"
+#$dirtySpClients = get-itemsInList -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?&`$filter=Title eq 'Hussmann Corporation'"
 $dirtySpClients = get-itemsInList -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?&`$filter=IsDirty eq 1"
 
+#$recreateAllFolders = $true
 foreach($dirtyClient in $dirtySpClients){
-    if(!$dirtyClient.PreviousName -and !$dirtyClient.PreviousDescription){
+    if((!$dirtyClient.PreviousName -and !$dirtyClient.PreviousDescription) -OR $recreateAllFolders -eq $true){
         #Create a new Library and hope the user hasn't just deleted the Description
         try{
             log-action "new-library -sitePath $sitePath -libraryName $($dirtyClient.Title) -libraryDesc $($dirtyClient.ClientDescription)"
-            new-library -sitePath $sitePath -libraryName $dirtyClient.Title -libraryDesc $dirtyClient.ClientDescription | Out-Null
-            log-result "SUCCESS: Library is there!"
-            foreach($sub in $listOfClientFolders){
-                log-action "new-FolderInLibrary -site $sitePath -libraryAndFolderPath (/$($dirtyClient.Title)) -folderName $sub"
-                new-FolderInLibrary -site $sitePath -libraryAndFolderPath ("/"+$dirtyClient.Title) -folderName $sub
-                log-result "SUCCESS: $($dirtyClient.Title)\$sub created!"
+            $newLibrary = new-library -sitePath $sitePath -libraryName $dirtyClient.Title -libraryDesc $dirtyClient.ClientDescription
+            if($newLibrary){
+                log-result "SUCCESS: Library is there!"
+                foreach($sub in $listOfClientFolders){
+                    log-action "new-FolderInLibrary -site $sitePath -libraryName (/$($dirtyClient.Title)) -folderName $sub"
+                    $newFolder = new-FolderInLibrary -site $sitePath -libraryName ("/"+$dirtyClient.Title) -folderName $sub
+                    if ($newFolder){log-result "SUCCESS: $($dirtyClient.Title)\$sub created!"}
+                    else{log-result "FAILURE: $($dirtyClient.Title)\$sub was not created!"}
+                    }
                 }
-
+            else{log-result "FAILURE: $($dirtyClient.Title) was not created!"}
+            }
+        catch{log-error $_ -myFriendlyMessage "Failed to create new Library or subfolder for $($dirtyClient.Title)"}
+        #Now try to add the new ClientName to the TermStore
+        try{
+            log-action "add-termToStore -pGroup Kimble -pSet Clients -pTerm $($dirtyClient.Title)"
+            add-termToStore -pGroup "Kimble" -pSet "Clients" -pTerm $($dirtyClient.Title)
+            log-result "SUCCESS: $($dirtyClient.Title) added to Managed MetaData Term Store"
+            }
+        catch{log-error $_ -myFriendlyMessage "Failed to add $($dirtyClient.Title) to Term Store"}
+        #If we've got this far, try to update the Client in [Kimble Clients]
+        try{
             if((get-library -sitePath $sitePath -libraryName $dirtyClient.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
                 log-result "Successfully validated!"
                 log-action "update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName `"Kimble Clients`" -predeterminedItemType $($dirtyClient.__metadata.type) -itemId $($dirtyClient.Id) -hashTableOfItemData @{IsDirty=$false}"
@@ -616,24 +78,37 @@ foreach($dirtyClient in $dirtySpClients){
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just created: [$($dirtyClient.Title)] this will stay as IsDirty=true forever :("}
             }
-        catch{log-error $_ -myFriendlyMessage "Failed to create new Library or subfolder for $($dirtyClient.Title)"}
+        catch{log-error $_ -myFriendlyMessage "Failed to update $($dirtyClient.Title) in [Kimble Clients] List - this will stay as IsDirty=true forever :("}
         }
     elseif(($dirtyClient.PreviousName) -and ($dirtyClient.PreviousName -ne $dirtyClient.Title)){
         #Update the folder name
         try{
+            log-action "update-list -sitePath $sitePath -listName $($dirtyClient.PreviousName) -hashTableOfUpdateData @{Title=$($dirtyClient.Title)}"
             update-list -sitePath $sitePath -listName $dirtyClient.PreviousName -hashTableOfUpdateData @{Title=$dirtyClient.Title} | Out-Null
+            log-result "SUCCESS: $($dirtyClient.PreviousName) updated to $($dirtyClient.Title)"
+            }
+        catch{log-error $Error[0] -myFriendlyMessage "Failed to update Library Title $($dirtyClient.PreviousName) to $($dirtyClient.Title)"}
+        #Update teh Managed MetaData in the TermStore
+        try{
+            log-action "rename-termInStore -pGroup Kimble -pSet Clients -pOldTerm $($dirtyClient.PreviousName) -pNewTerm $($dirtyClient.Title)"
+            rename-termInStore -pGroup "Kimble" -pSet "Clients" -pOldTerm $($dirtyClient.PreviousName) -pNewTerm $($dirtyClient.Title)
+            log-result "SUCCESS: Term $($dirtyClient.PreviousName) renamed to $($dirtyClient.Title)"
+            }
+        catch{log-error $Error[0] -myFriendlyMessage "Failed to rename ManagedMetadata term $($dirtyClient.PreviousName) to $($dirtyClient.Title)"}
+        #Update the Client in [Kimble Clients]
+        try{
             if((get-list -sitePath $sitePath -listName $dirtyClient.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
                 update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Clients" -predeterminedItemType $dirtyClient.__metadata.type -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtyClient.Title)] this will stay as IsDirty=true forever :("}
             }
-        catch{log-error $Error[0] -myFriendlyMessage "Failed to update Library Title $($dirtyClient.PreviousName) to $($dirtyClient.Title)"}
+        catch{log-error $Error[0] -myFriendlyMessage "Error while renaming $($dirtyClient.PreviousName) to $($dirtyClient.Title) in [Kimble Clients] List - this will stay as IsDirty=true forever :("}
         }
-    elseif($dirtyClient.PreviousDescription -ne $dirtyClient.ClientDescription){
+    elseif(((sanitise-stripHtml $dirtyClient.PreviousDescription) -ne (sanitise-stripHtml $dirtyClient.ClientDescription)) -or ((sanitise-stripHtml $dirtyClient.ClientDescription) -ne ($dirtyClient.ClientDescription))){
         #Update the Library's Description
         try{
-            update-list -sitePath $sitePath -listName $dirtyClient.Title -hashTableOfUpdateData @{ClientDescription=$dirtyClient.ClientDescription} | Out-Null
-            if((get-list -sitePath $sitePath -listName $dirtyClient.Title).ClientDescription -eq $dirtyClient.ClientDescription){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
+            update-list -sitePath $sitePath -listName $dirtyClient.Title -hashTableOfUpdateData @{Description=$(sanitise-stripHtml $dirtyClient.ClientDescription)} | Out-Null
+            if(sanitise-stripHtml $((get-list -sitePath $sitePath -listName $dirtyClient.Title).ClientDescription) -eq $(sanitise-stripHtml $dirtyClient.ClientDescription)){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
                 update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Clients" -predeterminedItemType $dirtyClient.__metadata.type -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtyClient.Title)] this will stay as IsDirty=true forever :("}
@@ -642,3 +117,168 @@ foreach($dirtyClient in $dirtySpClients){
         }
     
     }
+#endregion
+
+#region Sync Projects
+    #$dirtySpProjects = get-itemsInList -sitePath $sitePath -listName "Kimble Projects" -oDataQuery "?&`$filter=Title eq '210717_Equitix_Gaia/Wrexham GMO wood waste sales strategy (E002556)'"
+    $dirtySpProjects = get-itemsInList -sitePath $sitePath -listName "Kimble Projects" -oDataQuery "?&`$filter=IsDirty eq 1"
+    
+    $spClients = get-itemsInList -sitePath $sitePath -listName "Kimble Clients"
+    $kimbleClientHashTable = @{}
+    foreach ($spC in $spClients){$kimbleClientHashTable.Add($spC.KimbleId,$(sanitise-forSharePointListName $spc.Title))}
+
+foreach($dirtyProject in $dirtySpProjects){
+    if(!$dirtyProject.PreviousName -and (!$dirtyProject.PreviousKimbleClientId -or $dirtyProject.PreviousKimbleClientId -eq $dirtyProject.KimbleClientId)){
+        #Create a new folder tree under the Client Library
+        Write-Host -ForegroundColor Magenta "Creating New Project folders for $($kimbleClientHashTable[$dirtyProject.KimbleClientId])"
+        try{
+            log-action "new-folderInLibrary -sitePath $sitePath -libraryName $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderName $($dirtyProject.Title)"
+            if ($kimbleClientHashTable[$dirtyProject.KimbleClientId] -eq $null){
+                log-result "FAILURE: Client could not be found in [Kimble Clients]";
+                log-error -myError $null -myFriendlyMessage "The Client with Id:$($dirtyProject.KimbleClientId) could not be determined for project [$($dirtyProject.Title)] (Id:$($dirtyProject.KimbleId))" -doNotLogToEmail $true
+                continue
+                }
+            $foo = new-folderInLibrary -sitePath $sitePath -libraryName ("/"+ $kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderName $dirtyProject.Title.Replace("/","")
+            if($foo){
+                log-result "SUCCESS: Folder is there!"
+                foreach($sub in $listOfOppProjSubFolders){
+                    log-action "new-FolderInLibrary -site $sitePath -libraryName $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderPath $("/"+$dirtyProject.Title.Replace("/",'')) -folderName $sub"
+                    $foo = new-FolderInLibrary -site $sitePath -libraryName ("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderPath ("/"+$dirtyProject.Title.Replace("/","")) -folderName $sub
+                    if($foo){log-result "SUCCESS: $($kimbleClientHashTable[$dirtyProject.KimbleClientId]+"\"+$dirtyProject.Title)\$sub is there!"}
+                    else{log-result "FAILURE: SubFolder $sub was not created/retrievable"
+                        log-Error -myError $null -myFriendlyMessage "new-folderInLibrary -sitePath $sitePath -libraryname $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderPath $("/"+$dirtyProject.Title.Replace("/",'')) -folderName $($sub) failed to create a retrieavble folder"
+                        }
+                    }
+                }
+            else{log-result "FAILURE: Folder was not created/retrievable"
+                log-Error -myError $null -myFriendlyMessage "new-folderInLibrary -sitePath $sitePath -libraryName $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderName $($dirtyProject.Title) failed to create a retrieavble folder"
+                }
+                
+            if((get-folderInLibrary -sitePath $sitePath -libraryName $kimbleClientHashTable[$dirtyProject.KimbleClientId] -folderName $dirtyProject.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
+                log-result "Project folder successfully validated!"
+                log-action "update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName `"Kimble Projects`" -predeterminedItemType $($dirtyProject.__metadata.type) -itemId $($dirtyProject.Id) -hashTableOfItemData @{IsDirty=$false}"
+                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $dirtyProject.__metadata.type -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                log-result "Successfully updated!"
+                }
+            else{log-result -myMessage "Uh-oh, I couldn't find the Project Folder I (allegedly) just created: [$($dirtyProject.Title)] this will stay as IsDirty=true forever :("}
+            }
+        catch{log-error $_ -myFriendlyMessage "Failed to create new Folder or subfolder for $($dirtyProject.Title)"}
+        }
+    elseif(($dirtyProject.PreviousName) -and ($dirtyProject.PreviousName -ne $dirtyProject.Title)){
+        #Update the folder name
+        Write-Host -ForegroundColor Magenta "Updating Project name"
+        try{
+            update-list -sitePath $sitePath -listName $dirtyProject.PreviousName -hashTableOfUpdateData @{Title=$dirtyProject.Title} | Out-Null
+            if((get-folderInLibrary -sitePath $sitePath -libraryName $kimbleClientHashTable[$dirtyProject.KimbleClientId] -folderName $dirtyProject.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
+                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $dirtyProject.__metadata.type -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                }
+            else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtyProject.Title)] this will stay as IsDirty=true forever :("}
+            }
+        catch{log-error $Error[0] -myFriendlyMessage "Failed to update Library Title $($dirtyProject.PreviousName) to $($dirtyProject.Title)"}
+        }
+    elseif($dirtyProject.PreviousKimbleClientId -ne $dirtyProject.KimbleClientId){
+        #Move the folder to the new Client
+        Write-Host -ForegroundColor Magenta "Moving Project to different Client"
+        try{
+            #Yeah Kev, you actually need to write some code to *do* this. Move $kimbleClientHashTable[$dirtyProject.PreviousKimbleClientId]/$dirtyProject.Title to $kimbleClientHashTable[$dirtyProject.KimbleClientId]
+            if((get-folderInLibrary -sitePath $sitePath -libraryName $kimbleClientHashTable[$dirtyProject.KimbleClientId] -folderName $dirtyProject.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
+                #update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $dirtyProject.__metadata.type -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                }
+            else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtyProject.Title)] this will stay as IsDirty=true forever :("}
+            }
+        catch{log-error $Error[0] -myFriendlyMessage "Failed to update Library Description $($dirtyProject.PreviousName) to $($dirtyProject.Title)"}
+        }
+    }
+#endregion
+
+#region Sync Leads
+    $dirtySpLeads = get-itemsInList -sitePath $sitePath -listName "Kimble Leads" -oDataQuery "?&`$filter=IsDirty eq 1"
+    
+    #$spClients = get-itemsInList -sitePath $sitePath -listName "Kimble Clients" #No need to requery this after the Projects region
+    #$kimbleClientHashTable = @{}
+    #foreach ($spC in $spClients){$kimbleClientHashTable.Add($spC.KimbleId,$(sanitise-forSharePointListName $spc.Title))}
+
+foreach($dirtyLead in $dirtySpLeads){
+    $leadFoldername = "BD_"+$dirtyLead.Title
+    if(!$dirtyLead.PreviousName -and (!$dirtyLead.PreviousKimbleClientId -or $dirtyLead.PreviousKimbleClientId -eq $dirtyLead.KimbleClientId)){
+        #Create a new folder tree under the Client Library
+        Write-Host -ForegroundColor Magenta "Creating New Lead folders"
+        try{
+            log-action "new-folderInLibrary -sitePath $sitePath -libraryName $("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderName $leadFoldername"
+            if ($kimbleClientHashTable[$dirtyLead.KimbleClientId] -eq $null){
+                log-result "FAILURE: Client could not be found in [Kimble Clients]";
+                log-error -myError $null -myFriendlyMessage "The Client with Id:$($dirtyLead.KimbleClientId) could not be determined for Lead [$($dirtyLead.Title)] (Id:$($dirtyLead.KimbleId))" -doNotLogToEmail $true
+                continue
+                }
+            $foo = new-folderInLibrary -sitePath $sitePath -libraryName ("/"+ $kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderName $leadFoldername
+            if($foo){
+                log-result "SUCCESS: Folder is there!"
+                foreach($sub in $listOfOppProjSubFolders){
+                    log-action "new-FolderInLibrary -site $sitePath -libraryName $("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderPath $("/"+$leadFoldername.Replace("/",'')) -folderName $sub"
+                    $foo = new-FolderInLibrary -site $sitePath -libraryName ("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderPath ("/"+$leadFoldername.Replace("/","")) -folderName $sub
+                    if($foo){log-result "SUCCESS: $($kimbleClientHashTable[$dirtyLead.KimbleClientId]+"\"+$leadFoldername)\$sub is there!"}
+                    else{log-result "FAILURE: SubFolder $sub was not created/retrievable"
+                        log-Error -myError $null -myFriendlyMessage "new-folderInLibrary -sitePath $sitePath -libraryname $("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderPath $("/"+$leadFoldername.Replace("/",'')) -folderName $($sub) failed to create a retrieavble folder"
+                        }
+                    }
+                }
+            else{log-result "FAILURE: Folder was not created/retrievable"
+                log-Error -myError $null -myFriendlyMessage "new-folderInLibrary -sitePath $sitePath -libraryName $("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderName $($leadFoldername) failed to create a retrieavble folder"
+                }
+                
+            if((get-folderInLibrary -sitePath $sitePath -libraryName $kimbleClientHashTable[$dirtyLead.KimbleClientId] -folderName $leadFoldername) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
+                log-result "Lead folder successfully validated!"
+                log-action "update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName `"Kimble Leads`" -predeterminedItemType $($dirtyLead.__metadata.type) -itemId $($dirtyLead.Id) -hashTableOfItemData @{IsDirty=$false}"
+                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $dirtyLead.__metadata.type -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                log-result "Successfully updated!"
+                }
+            else{log-result -myMessage "Uh-oh, I couldn't find the Lead Folder I (allegedly) just created: [$($leadFoldername)] this will stay as IsDirty=true forever :("}
+            }
+        catch{log-error $_ -myFriendlyMessage "Failed to create new Folder or subfolder for $($leadFoldername)"}
+        }
+    elseif(($dirtyLead.PreviousName) -and ($dirtyLead.PreviousName -ne $dirtyLead.Title)){
+        #Update the folder name
+        Write-Host -ForegroundColor Magenta "Updating Lead name"
+        try{
+            #update-list -sitePath $sitePath -listName $dirtyLead.PreviousName -hashTableOfUpdateData @{Title=$dirtyLead.Title} | Out-Null
+            if((get-folderInLibrary -sitePath $sitePath -libraryName $kimbleClientHashTable[$dirtyLead.KimbleClientId] -folderName $leadFoldername) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
+                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $dirtyLead.__metadata.type -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                }
+            else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtyLead.Title)] this will stay as IsDirty=true forever :("}
+            }
+        catch{log-error $Error[0] -myFriendlyMessage "Failed to update Library Title $($dirtyLead.PreviousName) to $($dirtyLead.Title)"}
+        }
+    elseif($dirtyLead.PreviousKimbleClientId -ne $dirtyLead.KimbleClientId){
+        #Move the folder to the new Client
+        Write-Host -ForegroundColor Magenta "Moving Lead to different Client"
+        try{
+            #Yeah Kev, you actually need to write some code to *do* this. Move $kimbleClientHashTable[$dirtyLead.PreviousKimbleClientId]/$dirtyLead.Title to $kimbleClientHashTable[$dirtyLead.KimbleClientId]
+            if((get-folderInLibrary -sitePath $sitePath -libraryName $kimbleClientHashTable[$dirtyLead.KimbleClientId] -folderName $dirtyLead.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
+                #update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $dirtyLead.__metadata.type -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                }
+            else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtyLead.Title)] this will stay as IsDirty=true forever :("}
+            }
+        catch{log-error $Error[0] -myFriendlyMessage "Failed to update Library Description $($dirtyLead.PreviousName) to $($dirtyLead.Title)"}
+        }
+    }
+#endregion
+
+
+
+#new-folderInLibrary -sitePath "/clients" -libraryAndFolderPath "/Waste & Resources Action Programme (WRAP)" -folderName "20160705_WRAP_Raw_Materials_Tool_Workshop (E001372)"
+#new-library -sitePath "/clients" -libraryName "Waste & Resources Action Programme (WRAP)" -libraryDesc "Client folder for Waste & Resources Action Programme (WRAP)"
+
+<#$usefulShit =@()
+foreach($proj in $dirtySpProjects){
+    $obj = New-Object psobject
+    $obj | Add-Member NoteProperty AccountName $kimbleClientHashTable[$proj.KimbleClientId]
+    $obj | Add-Member NoteProperty AccountId $kimbleClientHashTable[$proj.KimbleClientId]["Id"]
+    $obj | Add-Member NoteProperty AccountType $kimbleClientHashTable[$proj.KimbleClientId]["Type"]
+    $obj | Add-Member NoteProperty IsClient $kimbleClientHashTable[$proj.KimbleClientId]["IsClient"]
+    $obj | Add-Member NoteProperty ProjectName $proj.Name
+    $obj | Add-Member NoteProperty ProjectId $proj.Id
+
+    $usefulShit += $obj
+    }
+#>
+Stop-Transcript

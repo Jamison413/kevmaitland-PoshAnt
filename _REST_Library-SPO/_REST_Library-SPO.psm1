@@ -1,4 +1,5 @@
-﻿<#
+﻿#region SPO functions
+<#
 .Synopsis
     Stores the credentials for Invoke-SPORestMethod.
 .DESCRIPTION
@@ -9,7 +10,6 @@
 .EXAMPLE
    Set-SPORestCredentials -Credential $cred
 #>
-#region SPO functions
 function global:Set-SPORestCredentials {
     Param (
         [Parameter(ValueFromPipeline = $true)]
@@ -195,6 +195,7 @@ function global:Invoke-SPORestMethod {
 } 
 #endregion
 #region Ant functions
+
 function check-digestExpiry($serverUrl, $sitePath){
     $sitePath = format-path $sitePath
     if(($digestExpiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){get-newDigest $serverUrl $sitePath}
@@ -226,7 +227,7 @@ function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceF
         $false
         }
     }
-function delete-folderInLibrary($sitePath,$libraryName,$folderPathAndNameToBeDeleted){
+function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAndNameToBeDeleted){
     #This needs tidying up
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $folderPathAndNameToBeDeleted = format-path $folderPathAndNameToBeDeleted
@@ -249,7 +250,7 @@ function format-path($dirtyPath){
     if($dirtyPath.Substring(($dirtyPath.Length-1),1) -eq "/"){$dirtyPath = $dirtyPath.Substring(0,$dirtyPath.Length-1)}
     $dirtyPath
     }
-function get-fileInLibrary($sitePath, $libraryAndFolderPath, $fileName){
+function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName){
     #Sanitise parameters
     $sitePath = format-path $sitePath
     $libraryAndFolderPath = format-path $libraryAndFolderPath
@@ -267,7 +268,7 @@ function get-fileInLibrary($sitePath, $libraryAndFolderPath, $fileName){
         $false
         }
     }
-function get-folderInLibrary($sitePath, $libraryName, $folderPathAndOrName){
+function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName)
@@ -288,7 +289,7 @@ function get-folderInLibrary($sitePath, $libraryName, $folderPathAndOrName){
         $false
         }
     }
-function get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue){
+function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyName, $propertyValue){
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
     $query = "?filter=$propertyName eq $propertyValue"
@@ -311,7 +312,7 @@ function get-itemInListFromProperty($sitePath, $listName, $propertyName, $proper
         $false
         }
     }    
-function get-itemsInList($sitePath, $listName, $oDataQuery, $suppressProgress){
+function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppressProgress){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
@@ -359,7 +360,7 @@ function get-itemsInList($sitePath, $listName, $oDataQuery, $suppressProgress){
         }
     $queryResults
     }
-function get-library($sitePath, $libraryName){
+function get-library($serverUrl, $sitePath, $libraryName){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName) #The LibraryName cannot contain specific characters
@@ -375,7 +376,7 @@ function get-library($sitePath, $libraryName){
         $false
         }
     }
-function get-list($sitePath, $listName){
+function get-list($serverUrl, $sitePath, $listName){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = (sanitise-forSharePointUrl $listName).Replace("Lists/","")
@@ -395,7 +396,7 @@ function get-newDigest($serverUrl, $sitePath){
     $global:digest = (Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -Method "POST")#.GetContextWebInformation.FormDigestValue
     $global:digestExpiryTime = (Get-Date).AddSeconds($global:digest.GetContextWebInformation.FormDigestTimeoutSeconds)
     }
-function new-folderInLibrary($sitePath, $libraryName, $folderPathAndOrName){
+function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName){
     #$libraryName = $kimbleClientHashTable[$dirtyProject.KimbleClientId]
     #$libraryName = "Shared Documents"
     #$folderPathAndOrName = $dirtyProject.Title
@@ -426,7 +427,7 @@ function new-folderInLibrary($sitePath, $libraryName, $folderPathAndOrName){
         $folderExists
         }
     }
-function new-itemInList($sitePath,$listName,$predeterminedItemType,$hashTableOfItemData){
+function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$hashTableOfItemData){
     #Error handling for no DataType?
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
@@ -451,7 +452,7 @@ function new-itemInList($sitePath,$listName,$predeterminedItemType,$hashTableOfI
         $false
         }
     }
-function new-library($sitePath, $libraryName, $libraryDesc){
+function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = sanitise-forSharePointFileName $libraryName
@@ -477,7 +478,7 @@ function new-library($sitePath, $libraryName, $libraryDesc){
         $libraryExists
         }
     }
-function update-list($sitePath, $listName,$hashTableOfUpdateData){
+function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
@@ -579,4 +580,3 @@ function sanitise-forResourcePath($dirtyString){
     }
 #endregion
 
-get-help Invoke-WebRequest 
