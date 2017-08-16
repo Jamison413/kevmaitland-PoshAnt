@@ -1,13 +1,14 @@
-﻿Import-Module .\_PS_Library_MSOL.psm1
+﻿Import-Module _PS_Library_MSOL.psm1
 connect-ToExo
 
 
-$members = @("Alan Spray","Andrew Noone", "Carl van Tonder", "Craig Simmons", "Erika Bata", "Helen Kean", "Helen Tyrrell", "Ian Forrester", "Laura Thompson", "Lorna Kelly", "Lucy Boreham", "Lucy Richardson", "Maggie Weglinski", "Mary Short", "Rosanna Collorafi", "Sophie Sapienza", "Stuart McLachlan", "Tecla Castella", "Tobias Parker")
+$members = @("Amy.Dartington","Georgie.Edwards","Stuart.Gray","Sion.Fenwick","Tom.Willis")
 $memberOf = @("")
-$name = "Recruitment Team"
+$name = "Smart Islans Energy Team"
 $hideFromGal = $false
-$blockExternalMail = $true
+$blockExternalMail = $false
 New-DistributionGroup -Name $name -Type Security -Members $members -PrimarySmtpAddress $($name.Replace(" ","")+"@anthesisgroup.com")
 Set-DistributionGroup $name -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail
 
 
+Add-MailboxPermission -AccessRights fullaccess -Identity nigel.arnott -User mary.short -AutoMapping $true
