@@ -22,7 +22,7 @@ function format-MailTracePrettily($traceBlob){
     }
 
     
-$trace = get-allFromAddressXHours -senderAddress "xerox9303main@sustain.co.uk" -hoursAgo 10
-$trace = get-allToAddressXHours -recipientAddress "bidstenders@sustain.co.uk" -hoursAgo 10
+$trace = get-allToAddressXHours -recipientAddress "mik@anthesisllc.onmicrosoft.com" -hoursAgo 720
+$trace = get-allFromAddressXHours -senderAddress "focalpoint@sustain.co.uk" -hoursAgo 1
 
 format-MailTracePrettily $trace

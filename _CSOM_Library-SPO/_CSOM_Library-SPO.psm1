@@ -34,7 +34,7 @@ function add-site($credentials, $webUrl, $siteCollection, $sitePath, $siteName, 
     $ctx.Load($newWeb)
     $nNav = $newWeb.Navigation
     $ctx.Load($nNav)
-    $nNav.usUseShared = $inheritTopNav
+    $nNav.UseShared = $inheritTopNav
     $ctx.ExecuteQuery()
     #$newWeb.Navigation.UseShared = $inheritTopNav
     
@@ -294,8 +294,9 @@ function delete-termFromStore($credentials, $webUrl, $siteCollection, $pGroup,$p
         }
     }
 function get-webTempates($credentials, $webUrl, $siteCollection, $site){
-    $ctx = New-Object Microsoft.SharePoint.Client.ClientContext($webUrl+$siteCollection+$site) 
-    $ctx.Credentials = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($o365Admin, $o365AdminPassword)
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$site) -sharePointCredentials $credentials
+    #New-Object Microsoft.SharePoint.Client.ClientContext($webUrl+$siteCollection+$site) 
+    #$ctx.Credentials = $credentials
     $web = $ctx.Web
     $ctx.Load($web)
     $templateCollection = $web.GetAvailableWebTemplates("1033",$false)
