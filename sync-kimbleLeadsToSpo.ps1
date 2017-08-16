@@ -12,7 +12,7 @@ Import-Module _REST_Library-SPO.psm1
 $o365user = "kevin.maitland@anthesisgroup.com"
 $o365Pass = ConvertTo-SecureString (Get-Content 'C:\New Text Document.txt') -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $o365user, $o365Pass
-$logfile = ".\Logs\sync-KimbleLeadsToSpo.log"
+$logfile = "$env:USERPROFILE\Documents\ScriptLogs\sync-KimbleLeadsToSpo.log"
 $logErrors = $true
 $logMethodMain = $true
 $logFunctionCalls = $true
