@@ -1,7 +1,7 @@
 ﻿Start-Transcript "$($MyInvocation.MyCommand.Definition)_$(Get-Date -Format "yyMMdd").log" -Append
 
-Import-Module .\_REST_Library-SPO.psm1
-Import-Module .\_REST_Library-Kimble.psm1
+Import-Module _REST_Library-SPO.psm1
+Import-Module _REST_Library-Kimble.psm1
 
 ##################################
 #
@@ -128,6 +128,10 @@ foreach($dirtyClient in $dirtySpClients){
     foreach ($spC in $spClients){$kimbleClientHashTable.Add($spC.KimbleId,$(sanitise-forSharePointListName $spc.Title))}
 
 foreach($dirtyProject in $dirtySpProjects){
+    if($dirtyProject.DoNotProcess){#Just mark it as processed and move on
+        update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $dirtyProject.__metadata.type -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+        continue
+        }
     if(!$dirtyProject.PreviousName -and (!$dirtyProject.PreviousKimbleClientId -or $dirtyProject.PreviousKimbleClientId -eq $dirtyProject.KimbleClientId)){
         #Create a new folder tree under the Client Library
         Write-Host -ForegroundColor Magenta "Creating New Project folders for $($kimbleClientHashTable[$dirtyProject.KimbleClientId])"

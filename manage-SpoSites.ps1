@@ -1,40 +1,26 @@
-﻿Import-Module .\_CSOM_Library-SPO.psm1
+﻿Import-Module _CSOM_Library-SPO.psm1
 
 #region Statics - don't change these.
-$internalTeamTemplate = "{7FD4CC3D-B615-4930-A041-3ADB8C6509EA}#Default Community Site"
-$externalSharingTemplate = "{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site "
+$webUrl = "https://anthesisllc.sharepoint.com"
+#$internalTeamTemplate = "{7FD4CC3D-B615-4930-A041-3ADB8C6509EA}#Default Community Site"
+$internalTeamTemplate = "{32C80FAC-E19D-495E-B923-6216EE14A571}#AnthesisTeamSite_v1.1"
+$externalSharingTemplate = "{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site"
 $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
 $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
 #endregion
 #region Variables - change these to create new sites
-$webUrl = "https://anthesisllc.sharepoint.com/"
-$siteCollection = "/teams/communities" 
+#$siteCollection = "/teams/communities" 
+$siteCollection = "/sites/external" 
 $sitePath = "/" 
-$siteName = "UK Staff Conference 2017" 
-$siteUrlEndStub = "ukstaffcon17" 
-$siteTemplate = $internalTeamTemplate
+$siteName = "IKEA CAT18 - external site" 
+$siteUrlEndStub = "fishwick-ikea" 
+#$siteTemplate = $internalTeamTemplate
+$siteTemplate = $externalSharingTemplate
 $inheritPermissions = $false 
 $inheritTopNav = $true
-$owner = "Laura Thompson"
-$precreatedSecurityGroupForMembers = "Senior Mangement Team"
-#region Statics - don't change these.
-$internalTeamTemplate = "{7FD4CC3D-B615-4930-A041-3ADB8C6509EA}#Default Community Site"
-$externalSharingTemplate = "{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site "
-$colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
-$spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
+$owner = "Ellen Upton"
+$precreatedSecurityGroupForMembers = ""
 #endregion
-#region Variables - change these to create new sites
-$webUrl = "https://anthesisllc.sharepoint.com/"
-$siteCollection = "/teams/communities" 
-$sitePath = "/" 
-$siteName = "UK Staff Conference 2017" 
-$siteUrlEndStub = "ukstaffcon17" 
-$siteTemplate = $internalTeamTemplate
-$inheritPermissions = $false 
-$owner = "Laura Thompson"
-$precreatedSecurityGroupForMembers = "Senior Mangement Team"
-#endregion
-
 
 
 #Build and customise a new Site
@@ -44,7 +30,7 @@ add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection 
 add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName "$siteName Members" -memberToAdd $precreatedSecurityGroupForMembers
 apply-theme -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath -colorPaletteUrl $colorPaletteUrl -fontSchemeUrl $spFontUrl -backgroundImageUrl $null -shareGenerated $false
 
-
+get-webTempates -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath
 
 #Brand multiple Sites:
 $siteCollection = "/sites/external" #Main Site Collections are "/", "/teams/communities", "/teams/sym" Full list available here: https://anthesisllc-admin.sharepoint.com/_layouts/15/online/SiteCollections.aspx
