@@ -1,0 +1,99 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20170831134719
+Username: SUSTAINLTD\kevin.maitland
+RunAs User: SUSTAINLTD\kevin.maitland
+Machine: NETMON (Microsoft Windows NT 10.0.15063.0)
+Host Application: C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 9668
+PSVersion: 5.1.15063.483
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.15063.483
+BuildVersion: 10.0.15063.483
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-kimbleLeadsToSpo.ps1_170831.log
+WARNING: The names of some imported commands from the module '_CSOM_Library-SPO' include unapproved verbs that might make them less discoverable. To find the commands with unapproved verbs, run the Import-Module command again with the Verbose parameter. For a list of approved verbs, type Get-Verb.
+WARNING: The names of some imported commands from the module '_REST_Library-SPO' include unapproved verbs that might make them less discoverable. To find the commands with unapproved verbs, run the Import-Module command again with the Verbose parameter. For a list of approved verbs, type Get-Verb.
+0 1
+
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "GetResponse" with "0" argument(s): "The remote server returned an error: (400) Bad Request.""
+False
+PS>TerminatingError(Invoke-SPORestMethod): "Exception calling "Create" with "1" argument(s): "This operation is not supported for a relative URI.""
+PS>TerminatingError(): "The pipeline has been stopped."
+>> TerminatingError(): "The pipeline has been stopped."
+>> TerminatingError(): "The pipeline has been stopped."
+>> TerminatingError(): "The pipeline has been stopped."
