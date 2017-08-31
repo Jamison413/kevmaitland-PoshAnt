@@ -61,7 +61,7 @@ $cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddHours(-1) -Format
 $soqlQuery = "SELECT Name,Id,KimbleOne__Account__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted,Community__c,Project_Type__c FROM KimbleOne__SalesOpportunity__c WHERE LastModifiedDate > $cutoffDate`Z"
 
 $kimbleModifiedLeads = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
-$kimbleChangedLeads = $kimbleModifiedLeads | ?{$_.LastModifiedDate -ge $cutoffDate}
+$kimbleChangedLeads = $kimbleModifiedLeads | ?{$_.LastModifiedDate -ge $cutoffDate -and $_.CreatedDate -lt $cutoffDate}
 $kimbleNewLeads = $kimbleModifiedLeads | ?{$_.CreatedDate -ge $cutoffDate}
 #Check any other Leads for changes
 #At what point does it become more efficent to dump the whole [Kimble Leads] List from SP, rather than query individual items?
@@ -83,7 +83,7 @@ foreach($kimbleChangedLead in $kimbleChangedLeads){
 #>
 #Otherwise, use this:
 foreach($kimbleChangedLead in $kimbleChangedLeads){
-    $kpListItem = get-itemsInList -sitePath $sitePath -listName "Kimble Leads" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedLead.Id)`'"
+    $kpListItem = get-itemsInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Leads" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedLead.Id)`'"
     if($kpListItem){
         #Check whether the data has changed
         if($kpListItem.Title -ne $kimbleChangedLead.Name `
@@ -107,7 +107,7 @@ foreach ($kimbleNewLead in $kimbleNewLeads){
     if(($kimbleNewLead.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleNewLead.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleNewLead.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
         else{$doNotProcess = $false} #Everyone else wants Project folders set up
     $kimbleNewLeadData = @{KimbleId=$kimbleNewLead.Id;Title=$kimbleNewLead.Name;KimbleClientId=$kimbleNewLead.KimbleOne__Account__c;IsDeleted=$kimbleNewLead.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
-    try{new-itemInList -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewLeadData}
+    try{new-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewLeadData}
     catch{$false;log-error -myError $Error[0] -myFriendlyMessage "Failed to create new [Kimble Leads].$($kimbleNewLead.Id) with $kimbleNewLeadData"}
     }
 
