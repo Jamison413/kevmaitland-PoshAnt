@@ -106,7 +106,7 @@ foreach ($kimbleNewProject in $kimbleNewProjects){
     if(($kimbleNewProject.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleNewProject.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleNewProject.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
         else{$doNotProcess = $false} #Everyone else wants Project folders set up
     $kimbleNewProjectData = @{KimbleId=$kimbleNewProject.Id;Title=$kimbleNewProject.Name;KimbleClientId=$kimbleNewProject.KimbleOne__Account__c;IsDeleted=$kimbleNewProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
-    try{new-itemInList -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewProjectData}
+    try{new-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewProjectData}
     catch{$false;log-error -myError $Error[0] -myFriendlyMessage "Failed to create new [Kimble Projects].$($kimbleNewProject.Id) with $kimbleNewProjectData"}
     }
 
