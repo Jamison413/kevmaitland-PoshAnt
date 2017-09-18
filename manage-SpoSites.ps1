@@ -1,34 +1,207 @@
-﻿Import-Module _CSOM_Library-SPO.psm1
+﻿Import-Module _PS_Library_MSOL
+Import-Module _CSOM_Library-SPO.psm1
+Import-Module _REST_Library-SPO.psm1
 
-#region Statics - don't change these.
+$msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
+$csomCredentials = set-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
+Set-SPORestCredentials -Credential $msolCredentials
+
+#region Get the Admin to pick the request/s to process
+#Get the Taxonomy Data for the Site Collection as there's Managed MetaData fields to retrieve 
 $webUrl = "https://anthesisllc.sharepoint.com"
-#$internalTeamTemplate = "{7FD4CC3D-B615-4930-A041-3ADB8C6509EA}#Default Community Site"
-$internalTeamTemplate = "{32C80FAC-E19D-495E-B923-6216EE14A571}#AnthesisTeamSite_v1.1"
-$externalSharingTemplate = "{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site"
+$taxonomyListName = "TaxonomyHiddenList"
+$taxononmyData = get-itemsInList -serverUrl $webUrl -sitePath "/" -listName $taxonomyListName -suppressProgress $true
+
+#Get the Client Site requests that have a status of "Awaiting creation"
+$clientsSite = "/clients"
+$clientSiteRequestListName = "External Client Site Requests"
+#$oDataUnprocessedClientRequests = '$select=*'
+$oDataUnprocessedClientRequests = '$select=ClientName,Id,Title,Site_x0020_AdminId,Site_x0020_Admin/Name,Site_x0020_Admin/Title'
+$oDataUnprocessedClientRequests += ',Site_x0020_OwnersId,Site_x0020_Owners/Id,Site_x0020_Owners/Title'
+$oDataUnprocessedClientRequests += ',Site_x0020_MembersId,Site_x0020_Members/Id,Site_x0020_Members/Title'
+$oDataUnprocessedClientRequests += ',Site_x0020_VisitorsId,Site_x0020_Visitors/Id,Site_x0020_Visitors/Title'
+$oDataUnprocessedClientRequests += '&$expand=Site_x0020_Admin/Id,Site_x0020_Owners/Id,Site_x0020_Members/Id,Site_x0020_Visitors/Id'    #,Site_x0020_Members,Site_x0020_Visitors
+$oDataUnprocessedClientRequests += '&$filter=Status eq ''Awaiting creation'''
+$unprocessedClientRequests = get-itemsInList -serverUrl $webUrl -sitePath $clientsSite -listName $clientSiteRequestListName -suppressProgress $false -oDataQuery $oDataUnprocessedClientRequests -debug $true
+#Standardise the Requests:
+foreach($request in $unprocessedClientRequests){
+    $req = New-Object -TypeName PSObject
+    $req | Add-Member -MemberType NoteProperty -Name RequestType -Value "Client"
+    #These are read directly from the List:
+    $req | Add-Member -MemberType NoteProperty -Name "SiteName" -Value $request.Title
+    #These are taxonomy fields and the Ids need to cross-referenced with the TaxonomyHiddenList to get the labels
+    $req | Add-Member -MemberType NoteProperty -Name "For" -Value $($taxononmyData | ?{$_.IdForTerm -eq $request.ClientName.TermGuid} | %{$_.Term})
+    #These are People/Group fields and need expanding
+    if($request.Site_x0020_Admin.__deferred -eq $null){
+        $req | Add-Member -MemberType NoteProperty -Name "SiteAdminId" -Value $request.Site_x0020_Admin.Name
+        $req | Add-Member -MemberType NoteProperty -Name "SiteAdminName" -Value $request.Site_x0020_Admin.Title
+        }
+    #These are Multi People/Group fields and need expanding and iterating through
+    $owners = @{}
+    if($request.Site_x0020_Owners.__deferred -eq $null){
+        foreach($userOrGroup in $request.Site_x0020_Owners.results){[hashtable]$owners.Add($userOrGroup.id,$userOrGroup.Title)}
+        }
+    $members = @{}
+    if($request.Site_x0020_Members.__deferred -eq $null){
+        foreach($userOrGroup in $request.Site_x0020_Members.results){[hashtable]$members.Add($userOrGroup.id,$userOrGroup.Title)}
+        }
+    $visitors = @{}
+    if($request.Site_x0020_Visitors.__deferred -eq $null){
+        foreach($userOrGroup in $request.Site_x0020_Visitors.results){[hashtable]$visitors.Add($userOrGroup.id,$userOrGroup.Title)}
+        }
+
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Owners" -Value $owners
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Members" -Value $members
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Visitors" -Value $visitors
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Id" -Value $request.id
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "listContentType" -Value $request.__metadata.type
+
+    [array]$clientRequests += $req
+    }
+
+#Get the Supplier Site requests that have a status of "Awaiting creation"
+$suppliersSite = "/subs"
+$supplierSiteRequestListName = "External Subcontractor Site Requests"
+$oDataUnprocessedSupplierRequests = '$select=Subcontractor_x002f_Supplier_x00,Title,Id,Site_x0020_AdminId,Site_x0020_Admin/Name,Site_x0020_Admin/Title'
+$oDataUnprocessedSupplierRequests += ',Site_x0020_OwnersId,Site_x0020_Owners/Id,Site_x0020_Owners/Title'
+$oDataUnprocessedSupplierRequests += ',Site_x0020_MembersId,Site_x0020_Members/Id,Site_x0020_Members/Title'
+$oDataUnprocessedSupplierRequests += ',Site_x0020_VisitorsId,Site_x0020_Visitors/Id,Site_x0020_Visitors/Title'
+$oDataUnprocessedSupplierRequests += '&$expand=Site_x0020_Admin/Id,Site_x0020_Owners/Id,Site_x0020_Members/Id,Site_x0020_Visitors/Id'    #,Site_x0020_Members,Site_x0020_Visitors
+$oDataUnprocessedSupplierRequests += '&$filter=Status eq ''Awaiting creation'''
+$unprocessedSupplierRequests = get-itemsInList -serverUrl $webUrl -sitePath $suppliersSite -listName $supplierSiteRequestListName -suppressProgress $false -oDataQuery $oDataUnprocessedSupplierRequests -debug $true
+#Standardise the Requests:
+foreach($request in $unprocessedSupplierRequests){
+    $req = New-Object -TypeName PSObject
+    $req | Add-Member -MemberType NoteProperty -Name RequestType -Value "Supplier"
+    #These are read directly from the List:
+    $req | Add-Member -MemberType NoteProperty -Name "SiteName" -Value $request.Title
+    #These are taxonomy fields and the Ids need to cross-referenced with the TaxonomyHiddenList to get the labels
+    $req | Add-Member -MemberType NoteProperty -Name "For" -Value $($taxononmyData | ?{$_.IdForTerm -eq $request.Subcontractor_x002f_Supplier_x00.TermGuid} | %{$_.Term})
+    #These are People/Group fields and need expanding
+    if($request.Site_x0020_Admin.__deferred -eq $null){
+        $req | Add-Member -MemberType NoteProperty -Name "SiteAdminId" -Value $request.Site_x0020_Admin.Name
+        $req | Add-Member -MemberType NoteProperty -Name "SiteAdminName" -Value $request.Site_x0020_Admin.Title
+        }
+    #These are Multi People/Group fields and need expanding and iterating through
+    $owners = @{}
+    if($request.Site_x0020_Owners.__deferred -eq $null){
+        foreach($userOrGroup in $request.Site_x0020_Owners.results){[hashtable]$owners.Add($userOrGroup.id,$userOrGroup.Title)}
+        }
+    $members = @{}
+    if($request.Site_x0020_Members.__deferred -eq $null){
+        foreach($userOrGroup in $request.Site_x0020_Members.results){[hashtable]$members.Add($userOrGroup.id,$userOrGroup.Title)}
+        }
+    $visitors = @{}
+    if($request.Site_x0020_Visitors.__deferred -eq $null){
+        foreach($userOrGroup in $request.Site_x0020_Visitors.results){[hashtable]$visitors.Add($userOrGroup.id,$userOrGroup.Title)}
+        }
+
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Owners" -Value $owners
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Members" -Value $members
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Visitors" -Value $visitors
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "Id" -Value $request.Id
+    Add-Member -InputObject $req -MemberType NoteProperty -Name "listContentType" -Value $request.__metadata.type
+
+    [array]$supplierRequests += $req
+    }
+
+#Combine all the Requests into a signle list to present to the Admin
+$allRequests = $clientRequests
+$allRequests += $supplierRequests
+
+#Present them and record any selections
+$selectedRequests = $allRequests | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"
+
+#endregion
+
+
+#Now process any requests authorised by the Admin
+foreach ($currentRequest in $selectedRequests){
+    switch ($currentRequest.RequestType){
+        {$_ -in 'Client',"Supplier"} {
+            #These define the specifics for External Client/Supplier Sites
+            $sitePath = "/" 
+            $siteName = $currentRequest.SiteName 
+            $alphaNumericRegexPattern = '[^a-zA-Z0-9]'
+            $siteUrlEndStub = $currentRequest.SiteName -replace $alphaNumericRegexPattern, ""
+            $inheritPermissions = $false 
+            $inheritTopNav = $false
+            $siteTemplate = "{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site"
+            $siteCollection = "/sites/external" 
+            $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
+            $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
+
+            #Create the Site (branded automatically) then create and configure the membership groups
+            add-site -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -siteName $siteName -siteUrlEndStub $siteUrlEndStub -siteTemplate $siteTemplate -inheritPermissions $inheritPermissions -inheritTopNav $inheritTopNav -owner $currentRequest.SiteAdminName
+            add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName "$siteName Owners" -memberToAdd $currentRequest.SiteAdminName
+            $currentRequest.Owners.Keys | % {add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName "$siteName Owners" -memberToAdd $currentRequest.Owners[$_]}
+            $currentRequest.Members.Keys | % {add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName "$siteName Members" -memberToAdd $currentRequest.Members[$_]}
+            $currentRequest.Visitors.Keys | % {add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName "$siteName Visitors" -memberToAdd $currentRequest.Members[$_]}
+
+            #Then update the Request to show that it's been processed
+            #(there should be a check here to ensure no errors occurred during the Site creation)
+            switch ($currentRequest.RequestType){
+                'Client' {
+                    $requestSite = $clientsSite
+                    $requestListName = $clientSiteRequestListName
+                    }
+                'Supplier' {
+                    $requestSite = $suppliersSite
+                    $requestListName = $supplierSiteRequestListName
+                    }
+                }
+            #Get the Id of the current Admin (no error checking required as we won't get this far if the Admin hasn't authenticated successfully)
+            $ctx = new-csomContext -fullSitePath $($webUrl+$requestSite) -sharePointCredentials $csomCredentials
+            $admin = $ctx.Web.EnsureUser($csomCredentials.UserName)
+            $ctx.Load($admin)
+            $ctx.ExecuteQuery()
+            $ctx.Dispose()
+            get-newDigest -serverUrl $webUrl -sitePath $requestSite
+            update-itemInList -serverUrl $webUrl -sitePath $requestSite -listName $requestListName -predeterminedItemType $currentRequest.listContentType -itemId $currentRequest.Id -hashTableOfItemData @{Status="Created";Site_x0020_Created_x0020_ById=$admin.Id}
+            }
+        'Confidential' {}
+        'Team' {}
+        default {}
+        }
+    }
+#endregion
+
+
+
+
+
+
+<#
+#region Statics - don't change these.
+################
+#    Confidential Site settings
+$siteTemplate = "{4527360C-CD78-4F36-BE30-DFBE2EAF34E6}#ConfidentialSiteTemplate"
+$siteCollection = "/teams/confidential" 
 $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
 $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
-#endregion
-#region Variables - change these to create new sites
-#$siteCollection = "/teams/communities" 
-$siteCollection = "/sites/external" 
-$sitePath = "/" 
-$siteName = "IKEA CAT18 - external site" 
-$siteUrlEndStub = "fishwick-ikea" 
-#$siteTemplate = $internalTeamTemplate
-$siteTemplate = $externalSharingTemplate
-$inheritPermissions = $false 
-$inheritTopNav = $true
-$owner = "Ellen Upton"
-$precreatedSecurityGroupForMembers = ""
-#endregion
+$owner = "kev maitland" #Override anything else to prevent numpties tinkering with the security settings
+################
+#    Internal Team Site settings
+#$internalTeamTemplate = "{7FD4CC3D-B615-4930-A041-3ADB8C6509EA}#Default Community Site"
+$siteTemplate = "{32C80FAC-E19D-495E-B923-6216EE14A571}#AnthesisTeamSite_v1.1"
+$siteCollection = "/teams/communities" 
+$colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
+$spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
+
+
+
+#$precreatedSecurityGroupForMembers = "uk software team"
+
 
 
 #Build and customise a new Site
-$csomCredentials = set-csomCredentials 
 add-site -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -siteName $siteName -siteUrlEndStub $siteUrlEndStub -siteTemplate $siteTemplate -inheritPermissions $inheritPermissions -inheritTopNav $inheritTopNav -owner $owner
 add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName "$siteName Owners" -memberToAdd $owner
 add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName "$siteName Members" -memberToAdd $precreatedSecurityGroupForMembers
-apply-theme -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath -colorPaletteUrl $colorPaletteUrl -fontSchemeUrl $spFontUrl -backgroundImageUrl $null -shareGenerated $false
+
+#Rolled into add-site
+#remove-userFromSite -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath$siteUrlEndStub -memberToRemove ("Kev Maitland")
+#apply-theme -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath$siteUrlEndStub -colorPaletteUrl $colorPaletteUrl -fontSchemeUrl $spFontUrl -backgroundImageUrl $null -shareGenerated $false
 
 get-webTempates -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath
 
@@ -60,3 +233,5 @@ foreach ($site in $sitesToUpdate){
 
 $extGroups  = $groups | ? {$_.Users -match "ext"} | select Title
 $groups | ? {$_.users -eq "Admin Info"}
+
+#>

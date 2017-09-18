@@ -6,10 +6,14 @@ $userSAM = "Ali.Midhani"
 $userFirstName = "Ali"
 $userSurname = "Midhani"
 $userManagerSAM = "Duncan.Faulkes"
+$userCommunity = "SPARK"
 $userDepartment = "Sustain"
 $userJobTitle = "Associate"
 $plaintextPassword = "Welcome123"
 $licenses = @("E1")
+$timeZone = "GMT Standard Time"
+$countryLocale = "2057"
+
 
 $logFile = "C:\Scripts\Logs\provision-User.log"
 $errorLogFile = "C:\Scripts\Logs\provision-User_Errors.log"
@@ -85,7 +89,7 @@ function create-ADUser([string]$userSAM, [string]$userFirstName, [string]$userSu
         -Surname $userSurname `
         -Title $userJobTitle `
         -UserPrincipalName "$userSAM@sustain.co.uk" `
-        -
+        -EmailAddress "$userSAM@anthesisgroup.com"
         -OtherAttributes @{'ipPhone'="XXX";'pager'="0117 403 2700"} | Out-Null 
     }
 function create-msolUser($userSAM){
@@ -121,8 +125,10 @@ function update-MsolUser([string]$userSAM, [string]$userFirstName, [string]$user
         #-ForceChangePassword $true
     }
 function update-msolMailbox($userSAM,$userFirstName,$userSurname,$userDisplayName){
-    Get-Mailbox $userSAM@anthesisgroup.com | Set-Mailbox  -CustomAttribute1 "Sustain" -Alias $userSAM -DisplayName $userDisplayName -Name "$userFirstName $userSurname" -Office "Bristol, UK"
+    Get-Mailbox $userSAM@anthesisgroup.com | Set-Mailbox  -CustomAttribute1 "Sustain" -Alias $userSAM -DisplayName $userDisplayName -Name "$userFirstName $userSurname" -Office "Bristol, UK" -EmailAddresses @{add="$userSAM@sustain.co.uk"}
     Get-Mailbox $userSAM@anthesisgroup.com | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
+    Set-User -Identity $userSAM@anthesisgroup.com -Company "Sustain"
+    Set-MailboxRegionalConfiguration -Identity $userSAM@anthesisgroup.com  -TimeZone $timeZone
     }
 function update-msolSharePointProfileFromAnotherProfile($sourceSpProfile,$destSpProfile,$destContext,$destPeopleManager){
     if($sourceSpProfile.UserProfileProperties["AboutMe"] -ne $null){$destPeopleManager.SetSingleValueProfileProperty($destSpProfile.AccountName, "AboutMe", $sourceSpProfile.UserProfileProperties["AboutMe"])}
@@ -135,6 +141,23 @@ function update-msolSharePointProfileFromAnotherProfile($sourceSpProfile,$destSp
     if($sourceSpProfile.UserProfileProperties["SPS-Interests"] -ne $null){$destPeopleManager.SetMultiValuedProfileProperty($destSpProfile.AccountName, "SPS-Interests", $sourceSpProfile.UserProfileProperties["SPS-Interests"].Split("|"))} 
     if($sourceSpProfile.UserProfileProperties["Qualifications"] -ne $null){$destPeopleManager.SetMultiValuedProfileProperty($destSpProfile.AccountName, "Qualifications", $sourceSpProfile.UserProfileProperties["Qualifications"].Split("|"))} 
     $destContext.ExecuteQuery()
+    }
+function update-SharePointInitialConfig([string]$userSAM, $anthesisAdminSite, $csomCreds, $timeZone, $countryLocale){
+    $adminContext = new-csomContext -fullSitePath $anthesisAdminSite -sharePointCredentials $csomCreds
+    $spoUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($adminContext)
+    $spoUsers.SetSingleValueProfileProperty("$userSAM@anthesisgroup.com", "SPS-RegionalSettings-Initialized", $true)
+    $spoUsers.SetSingleValueProfileProperty("$userSAM@anthesisgroup.com", "SPS-RegionalSettings-FollowWeb", $false)
+    #Getting the TimeZoneID is a massive PITA:
+    if($timeZones -eq $null){$timeZones = get-timeZones}
+    $tz = $timeZones | ?{$_.PSChildName -eq $timeZone} #Look that up in the registry list
+    if($spoTimeZones -eq $null){$spoTimeZones = get-spoTimeZoneHashTable}
+    $tzID = $spoTimeZones[$tz.Display.replace("+00:00","")] #Then match a different property of the registry object to the SPO object
+    if($tzID.Length -gt 0){$spoUsers.SetSingleValueProfileProperty("$userSAM@anthesisgroup.com", "SPS-TimeZone", $tzID)}
+    if($countryToLocaleHashTable[$antUser.Country].length -gt 0){$spoUsers.SetSingleValueProfileProperty("$userSAM@anthesisgroup.com", "SPS-Locale", $countryLocale)}
+    $spoUsers.SetSingleValueProfileProperty("$userSAM@anthesisgroup.com", "SPS-MUILanguages", "en-GB")
+    $spoUsers.SetSingleValueProfileProperty("$userSAM@anthesisgroup.com", "SPS-CalendarType", 1)
+    $spoUsers.SetSingleValueProfileProperty("$userSAM@anthesisgroup.com", "SPS-AltCalendarType", 1)
+    $adminContext.ExecuteQuery()
     }
 function create-personalFolder([string]$userSAM){
     $dirRoot = "X:\Personal"
@@ -234,7 +257,7 @@ function update-msolUserFromAd($userSAM){
     $userManagerSAM = (Get-ADUser $adu.Manager).SamAccountName
     try{
         log-Message "Updating MSOL account for $userSAM" -colour "Yellow"
-        update-MsolUser -userSAM $userSAM -userFirstName $adU.GivenName -userSurname $adU.Surname -userManagerSAM $userManagerSAM -userDepartment "SPARK(E)" -userJobTitle $adU.Title -userDisplayName $adU.DisplayName -userPhoneExtension $adU.ipPhone
+        update-MsolUser -userSAM $userSAM -userFirstName $adU.GivenName -userSurname $adU.Surname -userManagerSAM $userManagerSAM -userDepartment "SPARK" -userJobTitle $adU.Title -userDisplayName $adU.DisplayName -userPhoneExtension $adU.ipPhone
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{

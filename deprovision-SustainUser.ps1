@@ -140,7 +140,7 @@ $hrSite = "/teams/hr"
 $leavingUserListName = "Leaving User Requests"
 $oDataUnprocessedUsers = '$filter=Status ne ''Completed'''
 $oDataUnprocessedUsers = '$select=User_x0020_to_x0020_deprovision/Name,User_x0020_to_x0020_deprovision/Title,Last_x0020_day_x0020_of_x0020_em,Mailbox_x0020_action,E_x002d_mail_x0020_address_x0020,Reassign_x0020_e_x002d_mail_x002/Name,Reassign_x0020_e_x002d_mail_x002/Title,Additional_x0020_e_x002d_mail_x0,Title&$expand=User_x0020_to_x0020_deprovision/Id,Reassign_x0020_e_x002d_mail_x002/Id'
-$unprocessedLeavers = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $leavingUserListName -oDataQuery $oDataUnprocessedUsers -suppressProgress $false
+#$unprocessedLeavers = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $leavingUserListName -oDataQuery $oDataUnprocessedUsers -suppressProgress $false
 $unprocessedLeavers | %{
     $leavingUser = New-Object -TypeName PSObject
     $leavingUser | Add-Member -MemberType NoteProperty -Name "LeavingUserId" -Value $_.User_x0020_to_x0020_deprovision.Name.Replace("i:0#.f|membership|","")
