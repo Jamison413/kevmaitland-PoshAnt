@@ -21,7 +21,7 @@ param(
 }
 
 $dummy = "https://anthesisllc.sharepoint.com/sites/external/fishwick-ikea" 
-$allWebs = Get-SPOWebs -Url "https://anthesisllc.sharepoint.com/teams/communities" -Credential $csomCreds
+$allWebs = Get-SPOWebs -Url "https://anthesisllc.sharepoint.com/sites/external" -Credential $csomCreds
 $AllWebs | %{ Write-Host $_.Title }
 
 $AllWebs | %{ 
@@ -37,3 +37,34 @@ $AllWebs | %{
     $ctx.Dispose()
     }
 
+
+#Get all groups in SiteCollection
+$ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection) -sharePointCredentials $csomCreds
+$groups = $ctx.Web.SiteGroups
+$ctx.Load($groups)
+$ctx.ExecuteQuery()
+$groups.GetEnumerator() | % {
+    $group = $_
+    $ctx.Load($group)
+    $ctx.ExecuteQuery()
+    [array]$allGroups += $group
+    }
+
+$allGroups | %{$_.Title}
+$allGroups | %{
+    $_.Title
+    $owner = $ctx.web.SiteGroups.GetByName($($_.Title.Replace(" Members"," Owners").Replace(" Visitors"," Owners")))
+    $ctx.Load($owner)
+    $_.Owner = $owner
+    $_.Update()
+    $ctx.ExecuteQuery()
+    }
+
+
+$allWebs | %{
+    $ctx = new-csomContext -fullSitePath $_.url -sharePointCredentials $csomCreds
+    $_.Title
+    set-SPOGroupAsDefault -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $("/"+$_.Url.Split("/")[$_.Url.Split("/").Count-1]) -groupName "$($_.Title) Visitors" -defaultForWhat "Visitors"
+    set-SPOGroupAsDefault -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $("/"+$_.Url.Split("/")[$_.Url.Split("/").Count-1]) -groupName "$($_.Title) Members" -defaultForWhat "Members"
+    set-SPOGroupAsDefault -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $("/"+$_.Url.Split("/")[$_.Url.Split("/").Count-1]) -groupName "$($_.Title) Owners" -defaultForWhat "Owners"
+    }

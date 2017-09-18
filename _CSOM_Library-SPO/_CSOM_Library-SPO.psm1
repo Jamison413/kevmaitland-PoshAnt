@@ -3,11 +3,11 @@
 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client") | Out-Null
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing") | Out-Null
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") | Out-Null
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles") | Out-Null
 $webUrl = "https://anthesisllc.sharepoint.com" 
 
-$loadInfo1
 #region Functions
 function add-memberToGroup($credentials, $webUrl, $siteCollection, $sitePath, $groupName, $memberToAdd){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
@@ -23,6 +23,20 @@ function add-memberToGroup($credentials, $webUrl, $siteCollection, $sitePath, $g
 function add-site($credentials, $webUrl, $siteCollection, $sitePath, $siteName, $siteUrlEndStub, $siteTemplate, $inheritPermissions, $inheritTopNav, $owner){
     #{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site /sites/external
     #{7FD4CC3D-B615-4930-A041-3ADB8C6509EA}#Default Community Site /teams/communities
+    <#
+    #Get $newWeb again if we lose it
+    $z_webs = $ctx.Web.Webs
+    $ctx.Load($z_webs)
+    $ctx.ExecuteQuery()
+    $z_webs | %{
+        if($siteName -eq $_.Title){
+            $newWeb = $_
+            $ctx.Load($newWeb)
+            $ctx.ExecuteQuery()
+            }
+        }
+    #>
+
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
     $webCreationInformation = New-Object Microsoft.SharePoint.Client.WebCreationInformation
     $webCreationInformation.Url = $siteUrlEndStub
@@ -30,17 +44,38 @@ function add-site($credentials, $webUrl, $siteCollection, $sitePath, $siteName, 
     $webCreationInformation.WebTemplate = $siteTemplate
     $webCreationInformation.UseSamePermissionsAsParentSite = $inheritPermissions
     
+    #Create the Site
     $newWeb = $ctx.Web.Webs.Add($webCreationInformation)
     $ctx.Load($newWeb)
     $nNav = $newWeb.Navigation
     $ctx.Load($nNav)
     $nNav.UseShared = $inheritTopNav
     $ctx.ExecuteQuery()
-    #$newWeb.Navigation.UseShared = $inheritTopNav
-    
-    if($inheritPermissions -eq $false){
+
+    #Add link to Parent's QuickLaunch (if the Subsites Node exists)
+    $ql = $ctx.web.Navigation.QuickLaunch
+    $ctx.Load($ql)
+    $ctx.ExecuteQuery()
+    $ql.GetEnumerator() | % {
+        if("Subsites" -eq $_.Title){$subSitesId = $_.Id}
+        }
+    if($subSitesId){
+        $subSitesNode = $ctx.Web.Navigation.GetNodeById($subSitesId)
+        $ctx.Load($subSitesNode)
+        $newNode = New-Object Microsoft.SharePoint.Client.NavigationNodeCreationInformation
+        $newNode.Title = $siteName
+        $newNode.Url = $siteCollection+$sitePath+$siteUrlEndStub
+        $newNode.AsLastNode = $false
+        $newNode.IsExternal = $true
+        $ctx.Load($subSitesNode.Children.Add($newNode))
+        $ctx.ExecuteQuery()
+        }
+
+
+
+    if(!$inheritPermissions){
         #Create the standard groups
-        $ownersGroup  = new-SPOGroup -title "$siteName Owners"  -description "Managers and Admins of $siteName" -spoSite $newWeb -ctx $ctx
+        $ownersGroup  = new-SPOGroup -title "$siteName Owners"  -description "Managers and Admins of $siteName" -spoSite $newWeb -ctx $ctx 
         $membersGroup = new-SPOGroup -title "$siteName Members" -description "Contributors to $siteName" -spoSite $newWeb -ctx $ctx
         $visitorsGroup = new-SPOGroup -title "$siteName Visitors" -description "ReadOnly users of $siteName" -spoSite $newWeb -ctx $ctx
         
@@ -54,37 +89,38 @@ function add-site($credentials, $webUrl, $siteCollection, $sitePath, $siteName, 
         $roleDefBindRead = New-Object Microsoft.SharePoint.Client.RoleDefinitionBindingCollection($ctx)
         $roleDefBindRead.Add($newWeb.RoleDefinitions.GetByName("Read"))
 
-        #Assign the standard Roles to the standard Groups
+        #Assign the standard Roles to the standard Groups, set them as the Default Groups and 
         $ctx.Load($newWeb.RoleAssignments.Add($ownersGroup, $roleDefBindFullControl))
-        $ctx.Load($newWeb.RoleAssignments.Add($membersGroup, $roleDefBindContribute))
+        if($siteCollection -match "confidential"){$ctx.Load($newWeb.RoleAssignments.Add($membersGroup, $roleDefBindEdit))}
+            else{$ctx.Load($newWeb.RoleAssignments.Add($membersGroup, $roleDefBindContribute))}
         $ctx.Load($newWeb.RoleAssignments.Add($visitorsGroup, $roleDefBindRead))
+        $newWeb.AssociatedOwnerGroup = $ownersGroup
+        $newWeb.AssociatedMemberGroup = $membersGroup
+        $newWeb.AssociatedVisitorGroup = $visitorsGroup
+        $newWeb.Update()
         $ctx.ExecuteQuery()
 
         #Remove the current user from the Site
-        #Get the current User
         $currentUser = $newWeb.CurrentUser
         $ctx.Load($currentUser)
-        #Get the current RoleAssignments
-        $members= @()
-        $roleAssignments = $newWeb.RoleAssignments
-        $ctx.Load($roleAssignments)
         $ctx.ExecuteQuery()
-
-        #Look for the current user in the collection of RoleAssigments and delete it if we find it
-        $roleAssignments.GetEnumerator() | % {
-            $member = $newWeb.RoleAssignments.GetByPrincipalId($_.PrincipalId).Member
-            $ctx.Load($member)
-            $members += $member
-            if($member.Title -eq $currentUser.Title){$newWeb.RoleAssignments.GetByPrincipalId($member.Id).DeleteObject()}
-            }
-        $ctx.ExecuteQuery()
- 
+        remove-userFromSite -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath$siteUrlEndStub -memberToRemove $currentUser.Title
         }
 
-    #Set the RequestAccessEmail details
+    #Set the RequestAccessEmail details and disable Members' ability to Share
     if($owner -notmatch "@anthesisgroup.com"){$owner = $owner.Replace(" ",".") + "@anthesisgroup.com"}
     $newWeb.RequestAccessEmail = $owner
+    $newWeb.MembersCanShare = $false
+    $newweb.Update()
     $ctx.ExecuteQuery()
+
+    
+    #Unfuckulate an inheritance bug on the Access Requests list
+    if($siteCollection -match "external"){
+        new-sharingInvite -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath$siteUrlEndStub -userEmailAddressesArray "dummyexternaluser@spuriousdomain.com" -friendlyPermissionsLevel "Read" -sendEmail $false -customEmailMessageContent $null -additivePermission $true -allowExternalSharing $true
+        set-listInheritance -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath$siteUrlEndStub -listname "Access Requests" -enableInheritance $true
+        delete-allItemsInList -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath$siteUrlEndStub -listname "Access Requests" -areYouReallySure "YesIAmReallySure" # "Access Requests" 
+        }
 
     #Brand the bugger
     $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
@@ -160,6 +196,31 @@ function apply-theme($credentials, $webUrl, $siteCollection, $site, $colorPalett
     $web.Update()
     $ctx.ExecuteQuery()
     }
+function copy-file($credentials, $webUrl, $sourceCtx, $sourceSiteCollectionPath, $sourceSitePath, $sourceLibraryName, $sourceFolderPath, $sourceFileName, $destCtx, $destSiteCollectionPath, $destSitePath, $destLibraryName, $destFolderPath, $destFileName, [boolean]$overwrite){
+    if(!$sourceCtx){$sourceCtx = new-csomContext -fullSitePath $($webUrl+$sourceSiteCollectionPath+$sourceSitePath) -sharePointCredentials $credentials}
+    if(!$destCtx){$destCtx = new-csomContext -fullSitePath $($webUrl+$destSiteCollectionPath+$destSitePath) -sharePointCredentials $credentials}
+    if(!$destSiteCollectionPath){$destSiteCollectionPath = $sourceSiteCollectionPath}
+    if(!$destSitePath){$destSitePath = $sourceSitePath}
+    if(!$destLibraryName){$destLibraryName = $sourceLibraryName}
+    if(!$destFolderPath){$destFolderPath = $sourceFolderPath}
+    if(!$destFileName){$destFileName = $sourceFileName}
+
+    $sanitisedSourceLibraryName = sanitise-LibraryNameForUrl -dirtyString $sourceLibraryName
+    $sanitisedSourceFileName = sanitise-forSharePointFileName -dirtyString $sourceFileName
+    $sanitisedSourceFullRelativePath = [uri]::EscapeUriString($sourceSiteCollectionPath+"/"+$sourceSitePath+"/"+$sanitisedSourceLibraryName+"/"+$sourceFolderPath+"/"+$sanitisedSourceFileName).Replace("//","/").Replace("//","/").Replace("//","/")
+    $sanitisedSourceFullRelativePath = ($sourceSiteCollectionPath+"/"+$sourceSitePath+"/"+$sanitisedSourceLibraryName+"/"+$sourceFolderPath+"/"+$sanitisedSourceFileName).Replace("//","/").Replace("//","/").Replace("//","/")
+
+    $sanitisedDestLibraryName = sanitise-LibraryNameForUrl -dirtyString $destLibraryName
+    $sanitisedDestFileName = sanitise-forSharePointFileName -dirtyString $destFileName
+    $sanitisedDestFullRelativePath = [uri]::EscapeUriString($destSiteCollectionPath+"/"+$destSitePath+"/"+$sanitisedDestLibraryName+"/"+$destFolderPath+"/"+$sanitisedDestLibraryName).Replace("//","/").Replace("//","/").Replace("//","/")
+    $sanitisedDestFullRelativePath = ($destSiteCollectionPath+"/"+$destSitePath+"/"+$sanitisedDestLibraryName+"/"+$destFolderPath+"/"+$sanitisedDestFileName).Replace("//","/").Replace("//","/").Replace("//","/")
+
+    Write-Host $sanitisedSourceFullRelativePath
+    Write-Host $sanitisedDestFullRelativePath
+    $fileObj = [Microsoft.SharePoint.Client.File]::OpenBinaryDirect($sourceCtx,$sanitisedSourceFullRelativePath)
+    [Microsoft.SharePoint.Client.File]::SaveBinaryDirect($destCtx,$sanitisedDestFullRelativePath,$fileObj.Stream,$overwrite)
+    $fileObj.Dispose()
+    }
 function copy-ListItems($credentials, $webUrl, $srcSite, $srcListName, $destListName, $destSite){
     if(!$destSite){$destSite = $srcSite}
     $srcCtx = new-csomContext -fullSitePath ($webUrl+$srcSite) -sharePointCredentials $credentials
@@ -202,7 +263,7 @@ function copy-allLibraryItems($credentials, $webUrl, $srcSite, $srcLibraryName, 
     $srcCtx.Load($srcLibraryItems)  
     $srcCtx.Load($srcLibrary)  
     $srcCtx.ExecuteQuery()
-
+    
     $destLibrary = $destCtx.Web.Lists.GetByTitle($destLibraryName)  
     $destCtx.Load($destLibrary)  
     $destCtx.ExecuteQuery()
@@ -262,6 +323,21 @@ function copy-libraryItems($credentials, $webUrl, $srcSite, $srcLibraryName, $de
             }
         }
     }
+function delete-allItemsInList($credentials, $webUrl, $siteCollection, $sitePath, $listname, $areYouReallySure){
+    if("YesIAmReallySure" -eq $areYouReallySure){
+        $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
+        $list = $ctx.Web.Lists.GetByTitle($listname)
+        $ctx.Load($list)
+        $items = $list.GetItems([Microsoft.SharePoint.Client.CamlQuery]::CreateAllItemsQuery())
+        $ctx.Load($items)
+        $ctx.ExecuteQuery()
+        $items.GetEnumerator() | % {
+            $_.deleteObject()
+            }
+        $ctx.ExecuteQuery()
+        }
+        else{"Sorry - please supply `"YesIAmReallySure`" as the string value for `$areYouReallySure to really delete stuff"}
+    }
 function delete-termFromStore($credentials, $webUrl, $siteCollection, $pGroup,$pSet,$pTerm){
     #Sanitise the input:
     $pGroup = sanitise-forTermStore $pGroup
@@ -309,20 +385,129 @@ function get-webTempates($credentials, $webUrl, $siteCollection, $site){
         }
     $siteTemplates
     }
+function get-listID($credentials, $webUrl, $siteCollection, $sitePath, $listname){
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
+    $list = $ctx.Web.Lists.GetByTitle($listname)
+    $ctx.Load($list)
+    $ctx.ExecuteQuery()
+    $list.Id
+    }
+function get-list($credentials, $webUrl, $siteCollection, $sitePath, $listname){
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
+    $list = $ctx.Web.Lists.GetByTitle($listname)
+    $ctx.Load($list)
+    $ctx.ExecuteQuery()
+    $list
+    }
+function get-file($ctx, $credentials, $webUrl, $siteCollection, $sitePath, $listname, $folderPath, $fileName){
+    if (!$ctx){$ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials}
+    #$file = $ctx.Web.GetFileByServerRelativePath([Microsoft.SharePoint.Client.ResourcePath]::FromDecodedUrl('/teams/communities/heathandsafetyteam/Shared%20Documents/RAs/Projects/Anthesis%20UK%20Project%20Risk%20Assessment.xlsx'))
+    #$file = $ctx.Web.GetFileByServerRelativePath([Microsoft.SharePoint.Client.ResourcePath]::FromDecodedUrl('/teams/communities/heathandsafetyteam/Shared Documents/RAs/Projects/Anthesis UK Project Risk Assessment.xlsx'))
+    Write-Host $('$ctx.Web.GetFileByServerRelativePath([Microsoft.SharePoint.Client.ResourcePath]::FromDecodedUrl("'+"$siteCollection$sitePath/$listname$folderPath/$fileName"+'))')
+    $ctx.Load($file)
+    $ctx.ExecuteQuery()
+    $file
+    }
+function get-SPOGroup($ctx, $credentials, $webUrl, $siteCollection, $sitePath, $groupName){
+    if ($ctx -eq $null){$ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials}
+    $group = $ctx.Web.SiteGroups.GetByName($groupName)
+    $ctx.Load($group)
+    $ctx.ExecuteQuery()
+
+    #$groups = $ctx.Web.SiteGroups
+    #$ctx.Load($groups)
+    #$ctx.ExecuteQuery()
+    #$groups.GetEnumerator() | % {
+    #    if ($_.Title -eq $groupName){
+    #        $group = $_ 
+    #        $ctx.Load($group)
+    #        $ctx.ExecuteQuery()
+    #        }
+    #    }
+    $group
+    }
+function get-webTempates($credentials, $webUrl, $siteCollection, $site){
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$site) -sharePointCredentials $credentials
+    #New-Object Microsoft.SharePoint.Client.ClientContext($webUrl+$siteCollection+$site) 
+    #$ctx.Credentials = $credentials
+    $web = $ctx.Web
+    $ctx.Load($web)
+    $templateCollection = $web.GetAvailableWebTemplates("1033",$false)
+    $ctx.Load($templateCollection)
+    $siteTemplates = @()
+    $siteTemplatesEnum = $templateCollection.GetEnumerator()
+    $ctx.ExecuteQuery()
+    while ($siteTemplatesEnum.MoveNext()) {
+        $siteTemplates += $siteTemplatesEnum.Current.Name
+        }
+    $siteTemplates
+    }
 function new-csomContext ($fullSitePath, $sharePointCredentials){
     $ctx = New-Object Microsoft.SharePoint.Client.ClientContext($fullSitePath) 
     $ctx.Credentials = $sharePointCredentials
     $ctx
     }
-function new-SPOGroup($credentials, $title, $description, $spoSite, $ctx){
+function new-sharingInvite($credentials, $webUrl, $siteCollection, $sitePath, $userEmailAddressesArray, $friendlyPermissionsLevel, $sendEmail, $customEmailMessageContent, $additivePermission, $allowExternalSharing){
+    #Make a new context and load the Web
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
+    $web = $ctx.Web
+    $ctx.Load($web)
+    
+    #Get the Role Definition
+    switch ($friendlyPermissionsLevel){
+        "Full Control" {$sharingRole = [Microsoft.SharePoint.Client.Sharing.Role]::Owner}
+        "Edit" {$sharingRole = [Microsoft.SharePoint.Client.Sharing.Role]::Edit}
+        "Contribute" {$sharingRole = [Microsoft.SharePoint.Client.Sharing.Role]::Edit}
+        "Read" {$sharingRole = [Microsoft.SharePoint.Client.Sharing.Role]::View}
+        "None" {$sharingRole = [Microsoft.SharePoint.Client.Sharing.Role]::None}
+        default {"Uh-oh, someone left a sponge in the patient - `$friendlyPermissionsLevel value of $friendlyPermissionsLevel is invalid";break}
+        }
+
+    #Assign the Role Definition to each e-mail address in $userEmailAddressesArray
+    [System.Reflection.Assembly]::LoadWithPartialName("System.Collections") | Out-Null
+    $roleAssignments = New-Object "System.Collections.Generic.List[Microsoft.SharePoint.Client.Sharing.UserRoleAssignment]"
+    $userEmailAddressesArray | %{
+        #$ctx.Load($roleDef.Add($_, $roleDefBind))
+        $roleAssignment = New-Object Microsoft.SharePoint.Client.Sharing.UserRoleAssignment
+        $roleAssignment.UserId = $_
+        $roleAssignment.Role = $sharingRole
+        $roleAssignments.Add($roleAssignment)
+        }
+    
+    [Microsoft.SharePoint.Client.Sharing.WebSharingManager]::UpdateWebSharingInformation($ctx, $ctx.Web, $roleAssignments, $sendEmail, $customEmailMessageContent, $additivePermission, $allowExternalSharing)
+    $ctx.ExecuteQuery()
+    }
+function new-SPOGroup($ctx, $title, $description, $pGroupOwner, $spoSite){
     $spoGroupCreationInfo=New-Object Microsoft.SharePoint.Client.GroupCreationInformation
     $spoGroupCreationInfo.Title=$title
     $spoGroupCreationInfo.Description=$description
     $newGroup = $spoSite.SiteGroups.Add($spoGroupCreationInfo)
+    if ($pGroupOwner -ne $null){
+        if($pGroupOwner -eq $title){$newGroup.Owner = $newGroup} #If the new group is owned by itself, just do it now.
+        else{
+            try{
+                $groupOwner = $ctx.Web.SiteGroups.GetByName($pGroupOwner) #Otherwise see if $pGroupOwner is a group
+                $ctx.Load($groupOwner)
+                $ctx.ExecuteQuery()
+                }
+            catch{
+                try{
+                    $groupOwner = $ctx.Web.EnsureUser($pGroupOwner)#Otherwise, see if $pGroupOwner is a User
+                    $ctx.Load($groupOwner)
+                    $ctx.ExecuteQuery()
+                    }
+                catch{Write-Host "$pGroupOwner is not a valid SPOGroup or User :(";$groupOwner = $null}
+                }
+            }
+        }
+    if($groupOwner -ne $null){
+        $newGroup.Owner = $groupOwner
+        $newGroup.Update()
+        }
     $ctx.ExecuteQuery()
     $newGroup
     }
-function remove-memberFromGroup($credentials, $webUrl, $siteCollection, $sitePath, $groupName, $memberToRemove){
+function remove-userFromSite($credentials, $webUrl, $siteCollection, $sitePath, $memberToRemove){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
     #Get the current RoleAssignments
     $roleAssignments = $ctx.Web.RoleAssignments
@@ -335,10 +520,15 @@ function remove-memberFromGroup($credentials, $webUrl, $siteCollection, $sitePat
     $roleAssignments.GetEnumerator() | % {
         $member = $ctx.Web.RoleAssignments.GetByPrincipalId($_.PrincipalId).Member
         $ctx.Load($member)
-        if($member.Title -eq $userToRemove.Title){$newWeb.RoleAssignments.GetByPrincipalId($member.Id).DeleteObject()}
+        $ctx.ExecuteQuery()
+        #$member.Title
+        if($member.Title -eq $userToRemove.Title){$ctx.Web.RoleAssignments.GetByPrincipalId($member.Id).DeleteObject();$found = $true}
         }
-    $ctx.ExecuteQuery()
- 
+    if($found){
+        $ctx.ExecuteQuery()
+        "$memberToRemove removed"
+        }
+        else{"$memberToRemove not found"}
     }
 function rename-termInStore($credentials, $webUrl, $siteCollection, $pGroup,$pSet,$pOldTerm, $pNewTerm){
     #Sanitise the input:
@@ -367,16 +557,35 @@ function rename-termInStore($credentials, $webUrl, $siteCollection, $pGroup,$pSe
             $term = $termSet.Terms.GetByName($pOldTerm)
             $ctx.Load($pOldTerm)
             $term.Name = $pNewTerm
-            $term.Name = "BBC"
+            #$term.Name = "BBC"
             $ctx.ExecuteQuery()
            }
         }
+    }
+function sanitise-forSharePointFileName($dirtyString){ 
+    $dirtyString = $dirtyString.Trim()
+    $dirtyString.Replace("`"","").Replace("#","").Replace("%","").Replace("?","").Replace("<","").Replace(">","").Replace("\","").Replace("/","").Replace("...","").Replace("..","").Replace("'","`'")
+    if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
+    }
+function sanitise-LibraryNameForUrl($dirtyString){
+    $cleanerString = $dirtyString.Trim()
+    $cleanerString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
+    $cleanerString
     }
 function set-csomCredentials($username, $password){
     if ($username -eq $null -or $username -eq ""){$username = Read-Host -Prompt "Enter SharePoint Online username (blank for $($env:USERNAME)@anthesisgroup.com)"}
     if ($username -eq $null -or $username -eq ""){$username = "$($env:USERNAME)@anthesisgroup.com"}
     if ($password -eq $null -or $password -eq ""){$password = Read-Host -Prompt "Password for $username" -AsSecureString}
     New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($username, $password)
+    }
+function set-listInheritance($credentials, $webUrl, $siteCollection, $sitePath, $listname, $enableInheritance){
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
+    $list = $ctx.Web.Lists.GetByTitle($listname)
+    $ctx.Load($list)
+    if($enableInheritance){$list.ResetRoleInheritance()}
+        else{$list.BreakRoleInheritance($true, $true)} #1st Arg = Copy permissions from parent?; 2nd Arg = Remove any unquire permissions?
+    $list.Update()
+    $ctx.ExecuteQuery()
     }
 function set-navTopNodes($credentials, $webUrl, $siteCollection, $sitePath, $deleteAllBeforeAdding, $hashTableOfNodes){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
@@ -397,5 +606,21 @@ function set-navTopNodes($credentials, $webUrl, $siteCollection, $sitePath, $del
         $ctx.Load($NavBar.Add($NavigationNode)) 
         $ctx.ExecuteQuery()
         }    
+    }
+function set-SPOGroupAsDefault($credentials, $webUrl, $siteCollection, $sitePath, $groupName, $defaultForWhat){
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
+    $group = get-SPOGroup -ctx $ctx -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath -groupName $groupName
+    $web =$ctx.Web
+    $ctx.Load($web)
+    switch ($defaultForWhat){
+        "Owners" {$web.AssociatedOwnerGroup = $group}
+        "Editors" {$web.AssociatedMemberGroup = $group}
+        "Members" {$web.AssociatedMemberGroup = $group}
+        "Visitors" {$web.AssociatedVisitorGroup = $group}
+        default {"Uh-oh, `$defaultForWhat needs to be a string containing `"Owners`", `"Editors`", `"Members`", or `"Visitors`""}
+        }
+    $web.Update()
+    $ctx.ExecuteQuery()
+    $ctx.Dispose()
     }
 #endregion
