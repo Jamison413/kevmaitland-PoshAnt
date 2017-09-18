@@ -51,6 +51,7 @@ function connect-ToExo($credential){
     $ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://outlook.office365.com/powershell-liveid/" -Credential $credential -Authentication "Basic" -AllowRedirection
     Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global
     }
+
 function connect-ToSpo($credential){
     <#
     .Synopsis
