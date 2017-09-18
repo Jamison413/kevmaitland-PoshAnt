@@ -552,6 +552,11 @@ function sanitise-forSharePointFileName($dirtyString){
     $dirtyString.Replace("`"","").Replace("#","").Replace("%","").Replace("?","").Replace("<","").Replace(">","").Replace("\","").Replace("/","").Replace("...","").Replace("..","").Replace("'","`'")
     if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
     }
+function sanitise-LibraryNameForUrl($dirtyString){
+    $cleanerString = $dirtyString.Trim()
+    $cleanerString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
+    $cleanerString
+    }
 function sanitise-forSharePointUrl($dirtyString){ 
     $dirtyString = $dirtyString.Trim()
     $dirtyString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
