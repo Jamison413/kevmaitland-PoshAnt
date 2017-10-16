@@ -1,15 +1,17 @@
 ﻿Import-Module _PS_Library_MSOL.psm1
 connect-ToExo
 
-
-$members = @("Claudia Amos","Peter Scholes","Brad Blundell", "Thomas Milne", "Hannah Dick","Michael Kirk-Smith")
+$members = @("Polly Stebbings","Georgie Edwards","Graeme Hadley")
 $memberOf = @("")
-$name = "Helios Team"
+$name = "PULSE Team"
 $hideFromGal = $false
 $blockExternalMail = $true
-New-DistributionGroup -Name $name -Type Security -Members $members -PrimarySmtpAddress $($name.Replace(" ","")+"@anthesisgroup.com")
-Set-DistributionGroup $name -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail
 
+
+function new-mailEnabledDistributionGroup($displayName, $members, $memberOf, $hideFromGal, $blockExternalMail){
+    New-DistributionGroup -Name $name -Type Security -Members $members -PrimarySmtpAddress $($name.Replace(" ","")+"@anthesisgroup.com")
+    Set-DistributionGroup $name -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail
+    }
 
 Add-MailboxPermission -AccessRights fullaccess -Identity nigel.arnott -User mary.short -AutoMapping $true
 

@@ -195,7 +195,6 @@ function global:Invoke-SPORestMethod {
 } 
 #endregion
 #region Ant functions
-
 function check-digestExpiry($serverUrl, $sitePath){
     $sitePath = format-path $sitePath
     if(($digestExpiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){get-newDigest $serverUrl $sitePath}

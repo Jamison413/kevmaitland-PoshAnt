@@ -36,7 +36,15 @@ $password = "M0nkeyfucker"
 $securityToken = "Ou4G5iks8m5axtp6iDldxUZq"
 ########################################
 
-
+function convert-KimbleOne__BusinessUnitGroup__cToText($kimbleIdCode){
+    switch ($kimbleIdCode){
+        "a30240000000VW1AAM" {$result = "Anthesis UK"}
+        "a3024000000JmNZAA0" {$result = "Anthesis LLC"}
+        "a3024000000JmNeAAK" {$result = "Anthesis Dubai"}
+        default {$result = $kimbleIdCode}
+        }
+    $result
+    }
 
 ##################################
 #
@@ -58,7 +66,7 @@ $kp = get-list -serverUrl $serverUrl  -sitePath $sitePath -listName $listName
 #Get the Kimble Projects that have been modifed since the last update
 $cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
 #$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddYears(-1) -Format s) #Bodge this once for the initial Sync
-$soqlQuery = "SELECT Name,Id,KimbleOne__Account__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted,Community__c,Project_Type__c FROM KimbleOne__DeliveryGroup__c WHERE LastModifiedDate > $cutoffDate`Z"
+$soqlQuery = "SELECT Name,Id,KimbleOne__Account__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted,Community__c,Project_Type__c,KimbleOne__BusinessUnitGroup__c FROM KimbleOne__DeliveryGroup__c WHERE LastModifiedDate > $cutoffDate`Z"
 $kimbleModifiedProjects = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
 $kimbleChangedProjects = $kimbleModifiedProjects | ?{$_.LastModifiedDate -ge $cutoffDate}
 $kimbleNewProjects = $kimbleModifiedProjects | ?{$_.CreatedDate -ge $cutoffDate}
@@ -91,7 +99,8 @@ foreach($kimbleChangedProject in $kimbleChangedProjects){
             #Update the entry in [Kimble Projects]
             if(($kimbleChangedProject.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleChangedProject.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleChangedProject.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
                 else{$doNotProcess = $false} #Everyone else wants Project folders set up
-            $updateData = @{PreviousName=$kpListItem.ProjectName;PreviousKimbleClientId=$kpListItem.KimbleClientId;Title=$kimbleChangedProject.Name;KimbleClientId=$kimbleChangedProject.KimbleOne__Account__c;IsDeleted=$kimbleChangedProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
+            
+            $updateData = @{PreviousName=$kpListItem.ProjectName;PreviousKimbleClientId=$kpListItem.KimbleClientId;Title=$kimbleChangedProject.Name;KimbleClientId=$kimbleChangedProject.KimbleOne__Account__c;IsDeleted=$kimbleChangedProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess;BusinessUnit=$(convert-KimbleOne__BusinessUnitGroup__cToText -kimbleIdCode $kimbleChangedProject.KimbleOne__BusinessUnitGroup__c)}
             try{update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData}
             catch{$false;log-error -myError $Error[0] -myFriendlyMessage "Failed to update [Kimble Projects].$($kimbleChangedProject.Id) with $updateData"}
             }
@@ -105,7 +114,7 @@ foreach ($kimbleNewProject in $kimbleNewProjects){
 #foreach ($kimbleNewProject in $kimbleNewProjects){
     if(($kimbleNewProject.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleNewProject.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleNewProject.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
         else{$doNotProcess = $false} #Everyone else wants Project folders set up
-    $kimbleNewProjectData = @{KimbleId=$kimbleNewProject.Id;Title=$kimbleNewProject.Name;KimbleClientId=$kimbleNewProject.KimbleOne__Account__c;IsDeleted=$kimbleNewProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
+    $kimbleNewProjectData = @{KimbleId=$kimbleNewProject.Id;Title=$kimbleNewProject.Name;KimbleClientId=$kimbleNewProject.KimbleOne__Account__c;IsDeleted=$kimbleNewProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess;BusinessUnit=$(convert-KimbleOne__BusinessUnitGroup__cToText -kimbleIdCode $kimbleChangedProject.KimbleOne__BusinessUnitGroup__c)}
     try{new-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewProjectData}
     catch{$false;log-error -myError $Error[0] -myFriendlyMessage "Failed to create new [Kimble Projects].$($kimbleNewProject.Id) with $kimbleNewProjectData"}
     }
@@ -148,5 +157,23 @@ $kimbleModifiedProjects.Count
 $spProjects.Count
 $remainingKimbleProjects.Count
 
+
+
+foreach($kimbleChangedProject in $kimbleChangedProjects){
+    $kpListItem = get-itemsInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedProject.Id)`'"
+    if($kpListItem){
+        #Update the entry in [Kimble Projects]
+        $updateData = @{BusinessUnit=$(convert-KimbleOne__BusinessUnitGroup__cToText -kimbleIdCode $kimbleChangedProject.KimbleOne__BusinessUnitGroup__c)}
+        try{update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData}
+        catch{$false;log-error -myError $Error[0] -myFriendlyMessage "Failed to update [Kimble Projects].$($kimbleChangedProject.Id) with $updateData"}
+        }
+    else{$kimbleNewProjects += $kimbleChangedProject} #The Library doesn't exist, so add it to the "to-be-created" array, even though we were expecting it to exist
+    }
+
+
+
 #>
+
+
+
 Stop-Transcript
