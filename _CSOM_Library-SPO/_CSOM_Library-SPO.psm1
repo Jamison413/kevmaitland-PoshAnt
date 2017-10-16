@@ -196,6 +196,77 @@ function apply-theme($credentials, $webUrl, $siteCollection, $site, $colorPalett
     $web.Update()
     $ctx.ExecuteQuery()
     }
+function combine-url($arrayOfStrings){
+    $output = ""
+    $arrayOfStrings | % {
+        $output += $_.TrimStart("/").TrimEnd("/")+"/"
+        }
+    $output = $output.Substring(0,$output.Length-1)
+    $output = $output.Replace("//","/").Replace("//","/").Replace("//","/")
+    $output = $output.Replace("http:/","http://").Replace("https:/","https://")
+    $output
+    }
+function copy-allFilesAndFolders($credentials, $webUrl, $sourceCtx, $sourceSiteCollectionPath, $sourceSitePath, $sourceLibraryName, $sourceFolderPath, $destCtx, $destSiteCollectionPath, $destSitePath, $destLibraryName, $destFolderPath, [boolean]$overwrite){
+    if(!$sourceCtx){$sourceCtx = new-csomContext -fullSitePath $($webUrl+$sourceSiteCollectionPath+$sourceSitePath) -sharePointCredentials $credentials}
+    if(!$destCtx){$destCtx = new-csomContext -fullSitePath $($webUrl+$destSiteCollectionPath+$destSitePath) -sharePointCredentials $credentials}
+    if(!$destSiteCollectionPath){$destSiteCollectionPath = $sourceSiteCollectionPath}
+    if(!$destSitePath){$destSitePath = $sourceSitePath}
+    if(!$destLibraryName){$destLibraryName = $sourceLibraryName}
+    if(!$destFolderPath){$destFolderPath = $sourceFolderPath}
+
+    $srcLib = $sourceCtx.Web.Lists.GetByTitle($sourceLibraryName)
+    $srcQuery = [Microsoft.SharePoint.Client.CamlQuery]::CreateAllItemsQuery()
+    $srcQuery.FolderServerRelativeUrl = $(combine-url -arrayOfStrings @("/",$sourceSiteCollectionPath,$sourceSitePath,$sourceLibraryName,$sourceFolderPath))
+    $srcQuery.FolderServerRelativeUrl = $srcQuery.FolderServerRelativeUrl.Replace("/Documents/","/Shared Documents/")
+    Write-Host -ForegroundColor DarkYellow $srcQuery.FolderServerRelativeUrl
+    $srcItems = $srcLib.GetItems($srcQuery)
+    $sourceCtx.Load($srcItems)
+    $sourceCtx.ExecuteQuery()
+
+
+    #write-host -ForegroundColor DarkYellow $srcItems.Count " items found"
+    foreach($item in $srcItems){
+        switch ($item.FileSystemObjectType){
+            ([Microsoft.SharePoint.Client.FileSystemObjectType]::File){
+                $file = $item.File
+                $sourceCtx.Load($file)
+                $sourceCtx.ExecuteQuery() 
+                Write-Host -ForegroundColor Yellow "Copying:" $file.ServerRelativeUrl
+                #copy-file -credentials $credentials -webUrl $webUrl -sourceCtx $sourceCtx -sourceLibraryName $sourceLibraryName -sourceFolderPath $sourceFolderPath -sourceFileName $file.Name -destCtx $destCtx -destLibraryName $destLibraryName -destFolderPath $destFolderPath -destFileName $file.Name -overwrite $overwrite
+                }
+            ([Microsoft.SharePoint.Client.FileSystemObjectType]::Folder){
+                $folder= $item.Folder
+                $sourceCtx.Load($folder)
+                $sourceCtx.ExecuteQuery()
+
+                $destLib = $destCtx.Web.Lists.GetByTitle($destLibraryName)
+                $destCtx.Load($destLib)
+                $destCtx.ExecuteQuery()
+
+                #Enable folder creation if necessary
+                if([string]::IsNullOrEmpty($destFolderPath) -or "/" -eq $destFolderPath){
+                    if(!$destLib.EnableFolderCreation){$destLib.EnableFolderCreation = $true;$destLib.Update();$destCtx.ExecuteQuery()}
+                    }
+
+                #Create the folder
+                $creationinfo = [Microsoft.SharePoint.Client.ListItemCreationInformation]::new()
+                $creationinfo.UnderlyingObjectType = [Microsoft.SharePoint.Client.FileSystemObjectType]::Folder
+                $creationinfo.LeafName = $folder.Name
+                $creationinfo.FolderUrl = $(combine-url -arrayOfStrings @("/",$destSiteCollectionPath, $destSitePath, $destLibraryName, $destFolderPath))
+                $creationinfo.FolderUrl = $creationinfo.FolderUrl.Replace("/Documents/","/Shared Documents/")
+                Write-Host -ForegroundColor Yellow "Creating:" $(combine-url @("/",$creationinfo.FolderUrl, $creationinfo.LeafName))
+
+                $newFolder = $destLib.AddItem($creationinfo)
+                $newFolder["Title"] = $folder.Name
+                $newFolder.Update()
+                $destCtx.ExecuteQuery()                
+                #Recurse
+                #Write-Host -ForegroundColor DarkYellow "copy-allFilesAndFolders -credentials $credentials -webUrl $webUrl -sourceCtx $sourceCtx -sourceSiteCollectionPath $sourceSiteCollectionPath -sourceSitePath $sourceSitePath -sourceLibraryName $sourceLibraryName -sourceFolderPath $(combine-url -arrayOfStrings @($sourceFolderPath, $folder.Name)) -destCtx $destCtx -destSiteCollectionPath $destSiteCollectionPath -destSitePath $destSitePath -destLibraryName $destLibraryName -destFolderPath $(combine-url -arrayOfStrings @($destFolderPath,$folder.Name)) -overwrite $overwrite"
+                #copy-allFilesAndFolders -credentials $credentials -webUrl $webUrl -sourceCtx $sourceCtx -sourceSiteCollectionPath $sourceSiteCollectionPath -sourceSitePath $sourceSitePath -sourceLibraryName $sourceLibraryName -sourceFolderPath $(combine-url -arrayOfStrings @($sourceFolderPath, $folder.Name)) -destCtx $destCtx -destSiteCollectionPath $destSiteCollectionPath -destSitePath $destSitePath -destLibraryName $destLibraryName -destFolderPath $(combine-url -arrayOfStrings @($destFolderPath,$folder.Name)) -overwrite $overwrite
+                }
+            }
+        }
+    }
 function copy-file($credentials, $webUrl, $sourceCtx, $sourceSiteCollectionPath, $sourceSitePath, $sourceLibraryName, $sourceFolderPath, $sourceFileName, $destCtx, $destSiteCollectionPath, $destSitePath, $destLibraryName, $destFolderPath, $destFileName, [boolean]$overwrite){
     if(!$sourceCtx){$sourceCtx = new-csomContext -fullSitePath $($webUrl+$sourceSiteCollectionPath+$sourceSitePath) -sharePointCredentials $credentials}
     if(!$destCtx){$destCtx = new-csomContext -fullSitePath $($webUrl+$destSiteCollectionPath+$destSitePath) -sharePointCredentials $credentials}
