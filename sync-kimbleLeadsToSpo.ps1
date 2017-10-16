@@ -1,5 +1,9 @@
 ﻿Start-Transcript "$($MyInvocation.MyCommand.Definition)_$(Get-Date -Format "yyMMdd").log" -Append
 
+$pwd = pwd
+Write-Host $pwd
+Write-Host test
+
 Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-Kimble.psm1
 Import-Module _REST_Library-SPO.psm1
