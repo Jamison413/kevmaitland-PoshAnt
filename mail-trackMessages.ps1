@@ -23,6 +23,17 @@ function format-MailTracePrettily($traceBlob){
 
     
 $trace = get-allToAddressXHours -recipientAddress "mik@anthesisllc.onmicrosoft.com" -hoursAgo 720
-$trace = get-allFromAddressXHours -senderAddress "focalpoint@sustain.co.uk" -hoursAgo 1
+$trace = get-allFromAddressXHours -senderAddress "mary.short@anthesisgroup.com" -hoursAgo 2
 
 format-MailTracePrettily $trace
+
+
+
+Import-Module LyncOnlineConnector
+Get-OrganizationConfig | Format-Table -Auto Name,OAuth*
+Get-CsOAuthConfiguration
+
+Set-OrganizationConfig -OAuth2ClientProfileEnabled $true
+Set-CsOAuthConfiguration -ClientAdalAuthOverride Allowed
+connect-
+new-cs

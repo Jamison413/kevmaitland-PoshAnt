@@ -187,10 +187,12 @@ $siteTemplate = "{32C80FAC-E19D-495E-B923-6216EE14A571}#AnthesisTeamSite_v1.1"
 $siteCollection = "/teams/communities" 
 $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
 $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
-
-
-
-#$precreatedSecurityGroupForMembers = "uk software team"
+$sitePath = "/"
+$siteName = "TCS Team Site"
+$siteUrlEndStub = "tcs"
+$inheritTopNav = $true
+$inheritPermissions = $false
+#$precreatedSecurityGroupForMembers = "TCS Team"
 
 
 
@@ -202,6 +204,7 @@ add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection 
 #Rolled into add-site
 #remove-userFromSite -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -sitePath $sitePath$siteUrlEndStub -memberToRemove ("Kev Maitland")
 #apply-theme -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath$siteUrlEndStub -colorPaletteUrl $colorPaletteUrl -fontSchemeUrl $spFontUrl -backgroundImageUrl $null -shareGenerated $false
+#apply-theme -credentials $csomCredentials -webUrl $webUrl -siteCollection "/teams/IT" -site "" -colorPaletteUrl $colorPaletteUrl -fontSchemeUrl $spFontUrl -backgroundImageUrl $null -shareGenerated $false
 
 get-webTempates -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath
 
