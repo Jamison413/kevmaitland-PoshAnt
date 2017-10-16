@@ -54,7 +54,7 @@ function global:Clear-SPORestCredentials {
 .EXAMPLE
    Invoke-SPORestMethod -Url "https://contoso.sharepoint.com/_api/contextinfo" -Method "Post"
 #>
-function global:Invoke-SPORestMethod {
+function Invoke-SPORestMethod {
     [CmdletBinding()]
     [OutputType([int])]
     Param (
@@ -63,40 +63,45 @@ function global:Invoke-SPORestMethod {
         [ValidateNotNullOrEmpty()]
         [System.Uri]$Url,
 
+        # The credentials used to authenticate.
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        [Microsoft.SharePoint.Client.SharePointOnlineCredentials]$credentials,
+
         # Specifies the method used for the web request. The default value is "Get".
-        [Parameter(Mandatory = $false, Position = 1)]
+        [Parameter(Mandatory = $false, Position = 2)]
         [ValidateNotNullOrEmpty()]
         [ValidateSet("Get", "Head", "Post", "Put", "Delete", "Trace", "Options", "Merge", "Patch")]
         [string]$Method = "Get",
 
         # Additional metadata that should be provided as part of the Body of the request.
-        [Parameter(Mandatory = $false, Position = 2)]
+        [Parameter(Mandatory = $false, Position = 3)]
         [ValidateNotNullOrEmpty()]
         [object]$Metadata,
 
         # The "X-RequestDigest" header to set. This is most commonly used to provide the form digest variable. Use "(Invoke-SPORestMethod -Url "https://contoso.sharepoint.com/_api/contextinfo" -Method "Post").GetContextWebInformation.FormDigestValue" to get the Form Digest value.
-        [Parameter(Mandatory = $false, Position = 3)]
+        [Parameter(Mandatory = $false, Position = 4)]
         [ValidateNotNullOrEmpty()]
         [string]$RequestDigest,
         
         # The "If-Match" header to set. Provide this to make sure you are not overwritting an item that has changed since you retrieved it.
-        [Parameter(Mandatory = $false, Position = 4)]
+        [Parameter(Mandatory = $false, Position = 5)]
         [ValidateNotNullOrEmpty()]
         [string]$ETag, 
         
         # To work around the fact that many firewalls and other network intermediaries block HTTP verbs other than GET and POST, specify PUT, DELETE, or MERGE requests for -XHTTPMethod with a POST value for -Method.
-        [Parameter(Mandatory = $false, Position = 5)]
+        [Parameter(Mandatory = $false, Position = 6)]
         [ValidateNotNullOrEmpty()]
         [ValidateSet("Get", "Head", "Post", "Put", "Delete", "Trace", "Options", "Merge", "Patch")]
         [string]$XHTTPMethod,
 
-        [Parameter(Mandatory = $false, Position = 6)]
+        [Parameter(Mandatory = $false, Position = 7)]
         [ValidateNotNullOrEmpty()]
         [ValidateSet("Verbose", "MinimalMetadata", "NoMetadata")]
         [string]$JSONVerbosity = "Verbose",
 
         # If the returned data is a binary data object such as a file from a SharePoint site specify the output file name to save the data to.
-        [Parameter(Mandatory = $false, Position = 7)]
+        [Parameter(Mandatory = $false, Position = 8)]
         [ValidateNotNullOrEmpty()]
         [string]$OutFile
     )
@@ -105,7 +110,7 @@ function global:Invoke-SPORestMethod {
         if ((Get-Module Microsoft.Online.SharePoint.PowerShell -ListAvailable) -eq $null) {
             throw "The Microsoft SharePoint Online PowerShell cmdlets have not been installed."
         }
-        if ($global:spoCred -eq $null) {
+        if ($restCreds -eq $null) {
             [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
             $cred = Get-Credential -Message "Enter your credentials for SharePoint Online:"
         } 
@@ -113,7 +118,7 @@ function global:Invoke-SPORestMethod {
     }
     Process {
         $request = [System.Net.WebRequest]::Create($Url)
-        $request.Credentials = $global:spoCred
+        $request.Credentials = $restCreds
         $odata = ";odata=$($JSONVerbosity.ToLower())"
         $request.Accept = "application/json$odata"
         $request.ContentType = "application/json;charset=UTF-8$odata"   
@@ -195,12 +200,13 @@ function global:Invoke-SPORestMethod {
 } 
 #endregion
 #region Ant functions
-function check-digestExpiry($serverUrl, $sitePath){
+function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds){
     $sitePath = format-path $sitePath
-    if(($digestExpiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){get-newDigest $serverUrl $sitePath}
+    if(($digest.expiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
+    else{$digest}
     }
-function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite){
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
+function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite, $restCreds, $digest){
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #$sourceFile = get-fileInLibrary -sitePath $sourceSitePath -libraryAndFolderPath $sourceLibraryAndFolderPath -fileName $sourceFileName
     if(!$destinationSitePath -and !$destinationLibraryAndFolderPath -and !$destinationFileName){$destinationSitePath = $sourceSitePath;$destinationLibraryAndFolderPath = $sourceLibraryAndFolderPath;$destinationFileName = $sourceFileName+"_copy"}
     if(!$destinationSitePath){$destinationSitePath = $sourceSitePath}
@@ -218,7 +224,7 @@ function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceF
     $url
     try{
         if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-        Invoke-SPORestMethod -Url $url -Method "POST" -RequestDigest $digest.GetContextWebInformation.FormDigestValue
+        Invoke-SPORestMethod -Url $url -Method "POST" -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
         if($verboseLogging){log-result "FILE COPIED: $destinationFileName"}
         }
     catch{
@@ -226,16 +232,16 @@ function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceF
         $false
         }
     }
-function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAndNameToBeDeleted){
+function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAndNameToBeDeleted, $restCreds, $digest){
     #This needs tidying up
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $folderPathAndNameToBeDeleted = format-path $folderPathAndNameToBeDeleted
     $url = "$serverUrl$sitePath/_api/web/GetFolderByServerRelativeUrl('$sitePath$libraryName$folderPathAndNameToBeDeleted')"
     #$dummy = Invoke-SPORestMethod -Url $url 
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     try{
         if($verboseLogging){log-action "delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
-        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "DELETE" -RequestDigest $digest.GetContextWebInformation.FormDigestValue -ETag "*"
+        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "DELETE" -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -ETag "*" -credentials $restCreds
         if($verboseLogging){log-result "FOLDER DELETED: $sitePath$libraryName$folderPathAndNameToBeDeleted"}
         }
     catch{
@@ -249,7 +255,7 @@ function format-path($dirtyPath){
     if($dirtyPath.Substring(($dirtyPath.Length-1),1) -eq "/"){$dirtyPath = $dirtyPath.Substring(0,$dirtyPath.Length-1)}
     $dirtyPath
     }
-function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName){
+function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName, $restCreds){
     #Sanitise parameters
     $sitePath = format-path $sitePath
     $libraryAndFolderPath = format-path $libraryAndFolderPath
@@ -259,7 +265,7 @@ function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileNa
     $url = $serverUrl+$sitePath+"/_api/web/GetFileByServerRelativePath(decodedUrl='$sanitisedPath')"
     try{
         if($verboseLogging){log-action "get-fileInLibrary: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
+        Invoke-SPORestMethod -Url $url -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS: File found in Library"}
         }
     catch{
@@ -267,7 +273,7 @@ function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileNa
         $false
         }
     }
-function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName){
+function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName)
@@ -277,10 +283,10 @@ function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
     $sanitisedPath = "decodedurl='"+(sanitise-forResourcePath $sitePath$libraryName$folderPathAndOrName)+"'"
     #Build and execute REST statement
     #$url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativeUrl('$sitePath$libraryAndFolderPath/$folderName"+"')"
-    $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativePath($sanitisedPath)"
+    $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativePath($sanitisedPath)/ListItemAllFields"
     try{
         if($verboseLogging){log-action "get-folderInLibrary: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
+        Invoke-SPORestMethod -Url $url -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS:`tFolder in Library found"}
         }
     catch{
@@ -288,7 +294,7 @@ function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
         $false
         }
     }
-function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyName, $propertyValue){
+function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyName, $propertyValue, $restCreds){
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
     $query = "?filter=$propertyName eq $propertyValue"
@@ -296,7 +302,7 @@ function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyN
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items"
     try{
         if($verboseLogging){log-action "get-itemInListFromProperty: Invoke-SPORestMethod -Url ($url$query)"}
-        $item = Invoke-SPORestMethod -Url ($url+$query)
+        $item = Invoke-SPORestMethod -Url ($url+$query) -credentials $restCreds
         if($item){
             if($verboseLogging){log-result "FOUND ITEM IN LIST FROM PROPERTY"}
             $item.results
@@ -311,7 +317,7 @@ function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyN
         $false
         }
     }    
-function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppressProgress){
+function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppressProgress, $restCreds){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
@@ -321,7 +327,7 @@ function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppres
     #Run the query
     try{
         if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $url"}
-        $partialItems = Invoke-SPORestMethod -Url $url
+        $partialItems = Invoke-SPORestMethod -Url $url -credentials $restCreds
         if($partialItems){
             if($verboseLogging){log-result "SUCCESS: Initial $($partialItems.results.Count) items returned"}
             $queryResults = $partialItems.results
@@ -340,7 +346,7 @@ function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppres
     while($partialItems.__next){
         try{
             if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $($partialItems.__next)"}
-            $partialItems = Invoke-SPORestMethod -Url $partialItems.__next
+            $partialItems = Invoke-SPORestMethod -Url $partialItems.__next -credentials $restCreds
             if($partialItems){
                 if($verboseLogging){log-result "SUCCESS: Subsequent $($partialItems.results.Count) items returned"}
                 $queryResults += $partialItems.results
@@ -359,7 +365,7 @@ function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppres
         }
     $queryResults
     }
-function get-library($serverUrl, $sitePath, $libraryName){
+function get-library($serverUrl, $sitePath, $libraryName, $restCreds){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName) #The LibraryName cannot contain specific characters
@@ -367,7 +373,7 @@ function get-library($serverUrl, $sitePath, $libraryName){
     $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativePath(decodedurl='$sitePath$libraryName')"
     try{
         if($verboseLogging){log-action "get-library: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
+        Invoke-SPORestMethod -Url $url -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS: Library found"}
         }
     catch{
@@ -375,7 +381,7 @@ function get-library($serverUrl, $sitePath, $libraryName){
         $false
         }
     }
-function get-list($serverUrl, $sitePath, $listName){
+function get-list($serverUrl, $sitePath, $listName, $verboseLogging, $restCreds){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = (sanitise-forSharePointUrl $listName).Replace("Lists/","")
@@ -383,19 +389,23 @@ function get-list($serverUrl, $sitePath, $listName){
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')"
     try{
         if($verboseLogging){log-action "get-list: Invoke-SPORestMethod -Url $url"}
-        Invoke-SPORestMethod -Url $url
+        Invoke-SPORestMethod -Url $url -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS: List found"}
         }
     catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-list: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
+        if($verboseLogging){$_;$url;log-error -myError $_ -myFriendlyMessage "Failed to get-list: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
         $false
         }
     }
-function get-newDigest($serverUrl, $sitePath){
-    $global:digest = (Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -Method "POST")#.GetContextWebInformation.FormDigestValue
-    $global:digestExpiryTime = (Get-Date).AddSeconds($global:digest.GetContextWebInformation.FormDigestTimeoutSeconds)
+function new-spoDigest($serverUrl, $sitePath, $restCreds){
+    $digest = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")
+    $digest = New-Object psobject -Property @{"digest" = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")}
+    $digest | Add-Member -MemberType NoteProperty expiryTime -Value (Get-Date).AddSeconds($digest.digest.GetContextWebInformation.FormDigestTimeoutSeconds)
+    $digest
+    #$global:digest = (Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")#.GetContextWebInformation.FormDigestValue
+    #$global:digestExpiryTime = (Get-Date).AddSeconds($global:digest.GetContextWebInformation.FormDigestTimeoutSeconds)
     }
-function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName){
+function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds, $digest){
     #$libraryName = $kimbleClientHashTable[$dirtyProject.KimbleClientId]
     #$libraryName = "Shared Documents"
     #$folderPathAndOrName = $dirtyProject.Title
@@ -406,14 +416,14 @@ function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
     $folderPathAndOrName = format-path $folderPathAndOrName
     $sanitisedPath = "decodedurl='"+(sanitise-forResourcePath ($sitePath+$libraryName+$folderPathAndOrName))+"'"
     #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/folders/AddUsingPath($sanitisedPath)"
-    $folderExists = (get-folderInLibrary -sitePath $sitePath -libraryName $libraryName -folderPathAndOrName $folderPathAndOrName)
+    $folderExists = (get-folderInLibrary -serverUrl $serverUrl -sitePath $sitePath -libraryName $libraryName -folderPathAndOrName $folderPathAndOrName -restCreds $restCreds)
     if($folderExists -eq $false){
         try{
             if($verboseLogging){log-action -myMessage "new-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-            Invoke-SPORestMethod -Url $url -Method "POST" -RequestDigest $digest.GetContextWebInformation.FormDigestValue
+            Invoke-SPORestMethod -Url $url -Method "POST" -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
             if($verboseLogging){log-result "SUCCESS: Created folder $sitePath$libraryName$folderPathAndOrName"}
             }
         catch{
@@ -426,13 +436,13 @@ function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
         $folderExists
         }
     }
-function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$hashTableOfItemData){
+function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$hashTableOfItemData,$restCreds,$digest){
     #Error handling for no DataType?
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
     #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     log-action "new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})"
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items"
@@ -443,7 +453,7 @@ function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$
     $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
     try{
         if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-        Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue
+        Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS: New item created"}
         }
     catch{
@@ -451,12 +461,12 @@ function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$
         $false
         }
     }
-function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc){
+function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc, $digest, $restCreds){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = sanitise-forSharePointFileName $libraryName
     #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
     $metadata = "{'__metadata':{'type':'SP.List'},'Description':`"$libraryDesc`",'BaseTemplate':101,'ContentTypesEnabled':true,'Title':`"$libraryName`",'AllowContentTypes':true}"
     $url = $serverUrl+$sitePath+"/_api/web/lists"
@@ -464,7 +474,7 @@ function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc){
     if($libraryExists -eq $false){
         try{
             if($verboseLogging){log-action -myMessage "new-library: Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
-            Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue
+            Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
             if($verboseLogging){log-result "SUCCESS: Library created: $sitePath/$libraryName"}
             }
         catch{
@@ -477,12 +487,15 @@ function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc){
         $libraryExists
         }
     }
-function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData){
+function new-spoCred($username, $securePassword){
+    New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($userName, $securePassword)
+    }
+function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $restCreds, $digest){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
     #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath  #this needs to be checked for all POST queries
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')"
     foreach($key in $hashTableOfUpdateData.Keys){
@@ -493,7 +506,7 @@ function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData){
     $metadata = "{'__metadata':{'type':'SP.List'},$formattedItemData}"
     try{
         if($verboseLogging){log-action "update-list: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
-        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue -ETag "*"
+        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -ETag "*" -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS: List updated: $formattedItemData"}
         }
     catch{
@@ -501,12 +514,12 @@ function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData){
         $false
         }
     }
-function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData){
+function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData,$restCreds,$digest){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
     #Prepare security and log action
-    check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items($itemId)"
     foreach($key in $hashTableOfItemData.Keys){
@@ -516,71 +529,13 @@ function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType
     $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
     try{
         if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
-        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.GetContextWebInformation.FormDigestValue -ETag "*"
+        Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -ETag "*" -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS: Updated list item: $formattedItemData"}
         }
     catch{
         if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to update item in List: update-itemInList($sitePath,$listName,$predeterminedItemType,$itemId,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -doNotLogToEmail $true}
         $false
         }
-    }
-function log-action($myMessage, $doNotLogToFile, $doNotLogToScreen){
-    if($logActions){
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`t$myMessage") -Path $logfile}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Yellow $myMessage}
-        }
-    }
-function log-error($myError, $myFriendlyMessage, $doNotLogToFile, $doNotLogToScreen, $doNotLogToEmail, $overrideErrorLogFile){
-    if($logErrors){
-        if($overrideErrorLogFile){$myErrorLogFile = $overrideErrorLogFile} else{$myErrorLogFile = $logFile}
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value "`t`tERROR:`t$myFriendlyMessage" -Path $myErrorLogFile}
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value "`t`t$($myError.Exception.Message)" -Path $myErrorLogFile}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Red $myFriendlyMessage}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Red $myError}
-        if(!$doNotLogToEmail -or $logErrorsToEmail){Send-MailMessage -To $mailTo -From $mailFrom -Subject "Error in update-SpoClientsFolders - $myFriendlyMessage" -Body $myError -SmtpServer $smtpServer}
-        }
-    }
-function log-result($myMessage, $doNotLogToFile, $doNotLogToScreen){
-    if($logResults){
-        if(!$doNotLogToFile -or $logToFile){Add-Content -Value ("`t$myMessage") -Path $logfile}
-        if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor DarkYellow "`t$myMessage"}
-        }
-    }
-function sanitise-forSharePointFileName($dirtyString){ 
-    $dirtyString = $dirtyString.Trim()
-    $dirtyString.Replace("`"","").Replace("#","").Replace("%","").Replace("?","").Replace("<","").Replace(">","").Replace("\","").Replace("/","").Replace("...","").Replace("..","").Replace("'","`'")
-    if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
-    }
-function sanitise-LibraryNameForUrl($dirtyString){
-    $cleanerString = $dirtyString.Trim()
-    $cleanerString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
-    $cleanerString
-    }
-function sanitise-forSharePointUrl($dirtyString){ 
-    $dirtyString = $dirtyString.Trim()
-    $dirtyString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
-    #$dirtyString = $dirtyString.Replace("`"","").Replace("#","").Replace("%","").Replace("?","").Replace("<","").Replace(">","").Replace("\","/").Replace("//","/").Replace(":","")
-    #$dirtyString = $dirtyString.Replace("$","`$").Replace("``$","`$").Replace("(","").Replace(")","").Replace("-","").Replace(".","").Replace("&","").Replace(",","").Replace("'","").Replace("!","")
-    $cleanString =""
-    for($i= 0;$i -lt $dirtyString.Split("/").Count;$i++){ #Examine each virtual directory in the URL
-        if($i -gt 0){$cleanString += "/"}
-        if($dirtyString.Split("/")[$i].Length -gt 50){$tempString = $dirtyString.Split("/")[$i].SubString(0,50)} #Truncate long folder names to 50 characters
-            else{$tempString = $dirtyString.Split("/")[$i]}
-        if($tempString.Length -gt 0){
-            if(@(".", " ") -contains $tempString.Substring(($tempString.Length-1),1)){$tempString = $tempString.Substring(0,$tempString.Length-1)} #Trim trailing "." and " ", even if this results in a truncation <50 characters
-            }
-        $cleanString += $tempString
-        }
-    $cleanString = $cleanString.Replace("//","/").Replace("https/","https://") #"//" is duplicated to catch trailing "/" that might now be duplicated. https is an exception that needs specific handling
-    $cleanString
-    }
-function sanitise-forResourcePath($dirtyString){
-    if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
-    $dirtyString = $dirtyString.trim().replace("`'","`'`'")
-    $dirtyString = $dirtyString.replace("#","").replace("%","") #As of 2017-05-26, these characters are not supported by SharePoint (even though https://msdn.microsoft.com/en-us/library/office/dn450841.aspx suggests they should be)
-    #$dirtyString = $dirtyString -creplace "[^a-zA-Z0-9 _/()`'&-@!]+", '' #No need to strip non-standard characters
-    #[uri]::EscapeUriString($dirtyString) #No need to encode the URL
-    $dirtyString
     }
 #endregion
 
