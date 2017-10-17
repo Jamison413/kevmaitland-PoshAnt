@@ -19,17 +19,19 @@ function log-action($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     }
 function log-error($myError, $myFriendlyMessage, $fullLogFile, $errorLogFile, $doNotLogToFile, $doNotLogToScreen, $doNotLogToEmail, $smtpServer, $mailTo, $mailFrom){
     if(!$doNotLogToFile -or $logToFile){
-        Add-Content -Value "`t`tERROR:`t$myFriendlyMessage" -Path $errorLogFile
-        Add-Content -Value "`t`t$($myError.Exception.Message)" -Path $errorLogFile
-        Add-Content -Value "`t`tERROR:`t$myFriendlyMessage" -Path $fullLogFile
-        Add-Content -Value "`t`t$($myError.Exception.Message)" -Path $fullLogFile
+        Add-Content -Value "$(Get-Date -Format "yyyy-MM-dd HH:mm:ss")`t`tERROR:`t$myFriendlyMessage" -Path $errorLogFile
+        Add-Content -Value "$(Get-Date -Format "yyyy-MM-dd HH:mm:ss")`t$($myError.Exception.Message)" -Path $errorLogFile
+        if($fullLogFile){
+            Add-Content -Value "`t`tERROR:`t$myFriendlyMessage" -Path $fullLogFile
+            Add-Content -Value "`t`t$($myError.Exception.Message)" -Path $fullLogFile
+            }
         }
     if(!$doNotLogToScreen -or $logToScreen){
         Write-Host -ForegroundColor Red $myFriendlyMessage
         Write-Host -ForegroundColor Red $myError
         }
     if(!$doNotLogToEmail -or $logErrorsToEmail){
-        Send-MailMessage -To $mailTo -From $mailFrom -Subject "Error in automated script - $myFriendlyMessage" -Body $myError -SmtpServer $smtpServer
+        Send-MailMessage -To $mailTo -From $mailFrom -Subject "Error in automated script - $($myFriendlyMessage.SubString(0,20))" -Body ("$myError`r`n`r`n$myFriendlyMessage") -SmtpServer $smtpServer
         }
     }
 function log-result($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){

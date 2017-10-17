@@ -1,5 +1,5 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$($MyInvocation.PSCommandPath.Split("\")[$MyInvocation.PSCommandPath.Split("\").Count-1]))_Transcript_$(Get-Date -Format "yyMMdd").log"
+$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
     $fullLogPathAndName = $logFileLocation+"update-SpoClientsLeadsAndProjects_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = $logFileLocation+"update-SpoClientsLeadsAndProjects_ErrorLog_$(Get-Date -Format "yyMMdd").log"
@@ -24,8 +24,8 @@ $mailFrom = "scriptrobot@sustain.co.uk"
 $mailTo = "kevin.maitland@anthesisgroup.com"
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-#convertTo-localisedSecureString "kimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString "01000000d08c9ddf0115d1118c7a00c04fc297eb01000000392cb8f8735d884c82c0932b5782960b0000000002000000000003660000c00000001000000051a36130e00844adbf687f9c08d29daa0000000004800000a000000010000000a6f4e26c9c2f9a8dc2ac2999b693c7fa20000000766e5a175a1bea45be8872277613773bd0b1c71b45739cd3f47b7ca87e856cfc14000000c75545e28502de468e2169d27676b0dce044bba3" -AsPlainText -Force
+#convertTo-localisedSecureString "KimbleBotPasswordHere"
+$sharePointAdminPass = ConvertTo-SecureString "01000000d08c9ddf0115d1118c7a00c04fc297eb01000000392cb8f8735d884c82c0932b5782960b0000000002000000000003660000c0000000100000001106ea74b4a38baa299968a1a66276830000000004800000a0000000100000000e9cfebd739622b6a7a5ab5dc7ea090120000000aee0b1e143e4f5bd5b18e0e5a6aefe9114e83a20069acb2cba2342cce5cca27c14000000e3535184af5408c2425bbec440f59aff355f69e1"
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = set-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
@@ -37,7 +37,7 @@ $leadsCacheFile = "kimbleLeads.csv"
 
 #region functions
 function cache-kimbleClients(){
-    $kc = get-list -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -restCreds $restCreds
+    $kc = get-list -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -restCreds $restCreds 
     $kcCacheFile = Get-Item $cacheFilePath$clientsCacheFile
     if((get-date $kc.LastItemModifiedDate).AddMinutes(-5) -gt $kcCacheFile.LastWriteTimeUtc){#This is bodged so we don't miss any new clients added during the time it takes to actually download the full client list
         $spClients = get-itemsInList -sitePath $clientSite -listName "Kimble Clients" -serverUrl $webUrl -restCreds $restCreds
