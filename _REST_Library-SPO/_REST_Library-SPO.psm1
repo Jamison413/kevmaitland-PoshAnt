@@ -200,12 +200,12 @@ function Invoke-SPORestMethod {
 } 
 #endregion
 #region Ant functions
-function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds){
+function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds,$logFile,$verboseLogging){
     $sitePath = format-path $sitePath
     if(($digest.expiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
     else{$digest}
     }
-function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite, $restCreds, $digest){
+function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite, $restCreds, $digest,$logFile,$verboseLogging){
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #$sourceFile = get-fileInLibrary -sitePath $sourceSitePath -libraryAndFolderPath $sourceLibraryAndFolderPath -fileName $sourceFileName
     if(!$destinationSitePath -and !$destinationLibraryAndFolderPath -and !$destinationFileName){$destinationSitePath = $sourceSitePath;$destinationLibraryAndFolderPath = $sourceLibraryAndFolderPath;$destinationFileName = $sourceFileName+"_copy"}
@@ -232,7 +232,7 @@ function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceF
         $false
         }
     }
-function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAndNameToBeDeleted, $restCreds, $digest){
+function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAndNameToBeDeleted, $restCreds, $digest,$logFile,$verboseLogging){
     #This needs tidying up
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $folderPathAndNameToBeDeleted = format-path $folderPathAndNameToBeDeleted
@@ -255,7 +255,7 @@ function format-path($dirtyPath){
     if($dirtyPath.Substring(($dirtyPath.Length-1),1) -eq "/"){$dirtyPath = $dirtyPath.Substring(0,$dirtyPath.Length-1)}
     $dirtyPath
     }
-function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName, $restCreds){
+function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName, $restCreds,$logFile,$verboseLogging){
     #Sanitise parameters
     $sitePath = format-path $sitePath
     $libraryAndFolderPath = format-path $libraryAndFolderPath
@@ -273,7 +273,7 @@ function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileNa
         $false
         }
     }
-function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds){
+function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds,$logFile,$verboseLogging){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName)
@@ -294,7 +294,7 @@ function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
         $false
         }
     }
-function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyName, $propertyValue, $restCreds){
+function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyName, $propertyValue, $restCreds,$logFile,$verboseLogging){
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
     $query = "?filter=$propertyName eq $propertyValue"
@@ -317,7 +317,7 @@ function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyN
         $false
         }
     }    
-function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppressProgress, $restCreds){
+function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppressProgress, $restCreds,$logFile,$verboseLogging){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
@@ -365,7 +365,7 @@ function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppres
         }
     $queryResults
     }
-function get-library($serverUrl, $sitePath, $libraryName, $restCreds){
+function get-library($serverUrl, $sitePath, $libraryName, $restCreds,$logFile,$verboseLogging){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName) #The LibraryName cannot contain specific characters
@@ -381,7 +381,7 @@ function get-library($serverUrl, $sitePath, $libraryName, $restCreds){
         $false
         }
     }
-function get-list($serverUrl, $sitePath, $listName, $verboseLogging, $restCreds){
+function get-list($serverUrl, $sitePath, $listName, $restCreds,$logFile,$verboseLogging){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = (sanitise-forSharePointUrl $listName).Replace("Lists/","")
@@ -397,7 +397,7 @@ function get-list($serverUrl, $sitePath, $listName, $verboseLogging, $restCreds)
         $false
         }
     }
-function new-spoDigest($serverUrl, $sitePath, $restCreds){
+function new-spoDigest($serverUrl, $sitePath, $restCreds,$logFile,$verboseLogging){
     $digest = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")
     $digest = New-Object psobject -Property @{"digest" = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")}
     $digest | Add-Member -MemberType NoteProperty expiryTime -Value (Get-Date).AddSeconds($digest.digest.GetContextWebInformation.FormDigestTimeoutSeconds)
@@ -405,7 +405,7 @@ function new-spoDigest($serverUrl, $sitePath, $restCreds){
     #$global:digest = (Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")#.GetContextWebInformation.FormDigestValue
     #$global:digestExpiryTime = (Get-Date).AddSeconds($global:digest.GetContextWebInformation.FormDigestTimeoutSeconds)
     }
-function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds, $digest){
+function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds, $digest,$logFile,$verboseLogging){
     #$libraryName = $kimbleClientHashTable[$dirtyProject.KimbleClientId]
     #$libraryName = "Shared Documents"
     #$folderPathAndOrName = $dirtyProject.Title
@@ -436,14 +436,14 @@ function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
         $folderExists
         }
     }
-function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$hashTableOfItemData,$restCreds,$digest){
+function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$hashTableOfItemData,$restCreds,$digest,$logFile,$verboseLogging){
     #Error handling for no DataType?
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
     #Prepare security and log action
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
-    log-action "new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})"
+    if($verboseLogging){log-action "new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -logFile $logFile}
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items"
     foreach($key in $hashTableOfItemData.Keys){
@@ -452,13 +452,32 @@ function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$
     $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
     $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
     try{
-        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
+        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
-        if($verboseLogging){log-result "SUCCESS: New item created"}
+        if($verboseLogging){log-result "SUCCESS: New item created" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to create new list item: new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -doNotLogToEmail $true}
-        $false
+        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to create new list item: new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -doNotLogToEmail $true -errorLogFile $logFile}
+        #See if it already exists, and if so, return that instead
+        try{
+            #Extract the Title property from $hashTableOfItemData and use that to try and retrieve the item
+            if($verboseLogging){log-action -myMessage "Checking to see if the item has already been created" -logFile $logFile}
+            $item = get-itemsInList -serverUrl $serverUrl -sitePath $sitePath -listName $listName -oDataQuery "?`$filter=Title eq `'$($hashTableOfItemData["Title"])`'" -restCreds $restCreds -verboseLogging $verboseLogging -logFile $logFile
+            if($item){
+                if($verboseLogging){log-result -myMessage "SUCCESS: Item already existed and has been returned" -logFile $logFile}
+                return $item
+                }
+            else{
+                write-host "did not find item $($hashTableOfItemData["Title"])"
+                if($verboseLogging){log-result -myMessage "FAILURE: Item did not already exist either" -logFile $logFile}
+                $false
+                }
+            }
+        catch{
+            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Error when attempting to retrieve List Item [$($hashTableOfItemData["Title"])] that might have already been created" -errorLogFile $logFile -doNotLogToEmail $true}
+            $false
+            }
+        
         }
     }
 function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc, $digest, $restCreds){
@@ -490,7 +509,7 @@ function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc, $digest,
 function new-spoCred($username, $securePassword){
     New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($userName, $securePassword)
     }
-function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $restCreds, $digest){
+function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $restCreds, $digest,$logFile,$verboseLogging){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
@@ -514,7 +533,7 @@ function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $r
         $false
         }
     }
-function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData,$restCreds,$digest){
+function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData,$restCreds,$digest,$logFile,$verboseLogging){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
