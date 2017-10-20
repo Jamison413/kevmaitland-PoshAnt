@@ -200,12 +200,12 @@ function Invoke-SPORestMethod {
 } 
 #endregion
 #region Ant functions
-function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds,$logFile,$verboseLogging){
+function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds,$verboseLogging,$logFile){
     $sitePath = format-path $sitePath
     if(($digest.expiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
     else{$digest}
     }
-function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite, $restCreds, $digest,$logFile,$verboseLogging){
+function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite, $restCreds, $digest,$verboseLogging,$logFile){
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #$sourceFile = get-fileInLibrary -sitePath $sourceSitePath -libraryAndFolderPath $sourceLibraryAndFolderPath -fileName $sourceFileName
     if(!$destinationSitePath -and !$destinationLibraryAndFolderPath -and !$destinationFileName){$destinationSitePath = $sourceSitePath;$destinationLibraryAndFolderPath = $sourceLibraryAndFolderPath;$destinationFileName = $sourceFileName+"_copy"}
@@ -223,16 +223,16 @@ function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceF
     $url = $serverUrl+$sourceSitePath+"/_api/web/GetFileByServerRelativeUrl('$sourceSitePath$sourceLibraryAndFolderPath/$sourceFileName')/CopyTo('$destinationUrl')"
     $url
     try{
-        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
+        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -Method "POST" -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
-        if($verboseLogging){log-result "FILE COPIED: $destinationFileName"}
+        if($verboseLogging){log-result "FILE COPIED: $destinationFileName" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error -myError $Error -myFriendlyMessage "Failed to copy-FileInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -doNotLogToEmail $true}
+        if($verboseLogging){log-error -myError $Error -myFriendlyMessage "Failed to copy-FileInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
-function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAndNameToBeDeleted, $restCreds, $digest,$logFile,$verboseLogging){
+function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAndNameToBeDeleted, $restCreds, $digest,$verboseLogging,$logFile){
     #This needs tidying up
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $folderPathAndNameToBeDeleted = format-path $folderPathAndNameToBeDeleted
@@ -240,12 +240,12 @@ function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAn
     #$dummy = Invoke-SPORestMethod -Url $url 
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     try{
-        if($verboseLogging){log-action "delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
+        if($verboseLogging){log-action "delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "DELETE" -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -ETag "*" -credentials $restCreds
-        if($verboseLogging){log-result "FOLDER DELETED: $sitePath$libraryName$folderPathAndNameToBeDeleted"}
+        if($verboseLogging){log-result "FOLDER DELETED: $sitePath$libraryName$folderPathAndNameToBeDeleted" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -doNotLogToEmail $true}
+        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
@@ -255,7 +255,7 @@ function format-path($dirtyPath){
     if($dirtyPath.Substring(($dirtyPath.Length-1),1) -eq "/"){$dirtyPath = $dirtyPath.Substring(0,$dirtyPath.Length-1)}
     $dirtyPath
     }
-function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName, $restCreds,$logFile,$verboseLogging){
+function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName, $restCreds,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path $sitePath
     $libraryAndFolderPath = format-path $libraryAndFolderPath
@@ -264,16 +264,16 @@ function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileNa
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/GetFileByServerRelativePath(decodedUrl='$sanitisedPath')"
     try{
-        if($verboseLogging){log-action "get-fileInLibrary: Invoke-SPORestMethod -Url $url"}
+        if($verboseLogging){log-action "get-fileInLibrary: Invoke-SPORestMethod -Url $url" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -credentials $restCreds
-        if($verboseLogging){log-result "SUCCESS: File found in Library"}
+        if($verboseLogging){log-result "SUCCESS: File found in Library" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-fileInLibrary: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
+        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-fileInLibrary: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
-function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds,$logFile,$verboseLogging){
+function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName)
@@ -283,41 +283,41 @@ function get-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
     $sanitisedPath = "decodedurl='"+(sanitise-forResourcePath $sitePath$libraryName$folderPathAndOrName)+"'"
     #Build and execute REST statement
     #$url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativeUrl('$sitePath$libraryAndFolderPath/$folderName"+"')"
-    $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativePath($sanitisedPath)/ListItemAllFields"
+    $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativePath($sanitisedPath)"#/ListItemAllFields"
     try{
-        if($verboseLogging){log-action "get-folderInLibrary: Invoke-SPORestMethod -Url $url"}
+        if($verboseLogging){log-action "get-folderInLibrary: Invoke-SPORestMethod -Url $url" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -credentials $restCreds
-        if($verboseLogging){log-result "SUCCESS:`tFolder in Library found"}
+        if($verboseLogging){log-result "SUCCESS:`tFolder in Library found" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-folderInLibrary: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
+        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-folderInLibrary: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
-function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyName, $propertyValue, $restCreds,$logFile,$verboseLogging){
+function get-itemInListFromProperty($serverUrl, $sitePath, $listName, $propertyName, $propertyValue, $restCreds,$verboseLogging,$logFile){
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
     $query = "?filter=$propertyName eq $propertyValue"
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items"
     try{
-        if($verboseLogging){log-action "get-itemInListFromProperty: Invoke-SPORestMethod -Url ($url$query)"}
+        if($verboseLogging){log-action "get-itemInListFromProperty: Invoke-SPORestMethod -Url ($url$query)" -logFile $logFile}
         $item = Invoke-SPORestMethod -Url ($url+$query) -credentials $restCreds
         if($item){
-            if($verboseLogging){log-result "FOUND ITEM IN LIST FROM PROPERTY"}
+            if($verboseLogging){log-result "FOUND ITEM IN LIST FROM PROPERTY" -logFile $logFile}
             $item.results
             }
         else{
-            if($verboseLogging){log-result -myFriendlyMessage "WARNING: get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue) returned no items"}
+            if($verboseLogging){log-result -myFriendlyMessage "WARNING: get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue) returned no items" -logFile $logFile}
             $false
             }
         }
     catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue) failed to execute" -doNotLogToEmail $true}
+        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemInListFromProperty($sitePath, $listName, $propertyName, $propertyValue) failed to execute" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }    
-function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppressProgress, $restCreds,$logFile,$verboseLogging){
+function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppressProgress, $restCreds,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
@@ -326,38 +326,38 @@ function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppres
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items$oDataQuery"
     #Run the query
     try{
-        if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $url"}
+        if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $url" -logFile $logFile}
         $partialItems = Invoke-SPORestMethod -Url $url -credentials $restCreds
         if($partialItems){
-            if($verboseLogging){log-result "SUCCESS: Initial $($partialItems.results.Count) items returned"}
+            if($verboseLogging){log-result "SUCCESS: Initial $($partialItems.results.Count) items returned" -logFile $logFile}
             $queryResults = $partialItems.results
             }
         else{
-            if($verboseLogging){log-result -myFriendlyMessage "WARNING: get-itemsInList($sitePath, $listName) returned no items"}
+            if($verboseLogging){log-result -myFriendlyMessage "WARNING: get-itemsInList($sitePath, $listName) returned no items" -logFile $logFile}
             $false
             }
         }
     catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemsInList($sitePath, $listName) failed to execute" -doNotLogToEmail $true}
+        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemsInList($sitePath, $listName) failed to execute" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     $i=$partialItems.results.Count
     #Check for additional results
     while($partialItems.__next){
         try{
-            if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $($partialItems.__next)"}
+            if($verboseLogging){log-action "get-itemsInList: Invoke-SPORestMethod -Url $($partialItems.__next)" -logFile $logFile}
             $partialItems = Invoke-SPORestMethod -Url $partialItems.__next -credentials $restCreds
             if($partialItems){
-                if($verboseLogging){log-result "SUCCESS: Subsequent $($partialItems.results.Count) items returned"}
+                if($verboseLogging){log-result "SUCCESS: Subsequent $($partialItems.results.Count) items returned" -logFile $logFile}
                 $queryResults += $partialItems.results
                 }
             else{
-                if($verboseLogging){log-result "WARNING: get-itemsInList($sitePath, $listName) returned no items"}
+                if($verboseLogging){log-result "WARNING: get-itemsInList($sitePath, $listName) returned no items" -logFile $logFile}
                 $false
                 }
             }
         catch{
-            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemsInList($sitePath, $listName) failed to execute"}
+            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "get-itemsInList($sitePath, $listName) failed to execute" -errorLogFile $logFile}
             $false
             }
         $i+=$partialItems.results.Count
@@ -365,39 +365,39 @@ function get-itemsInList($serverUrl, $sitePath, $listName, $oDataQuery, $suppres
         }
     $queryResults
     }
-function get-library($serverUrl, $sitePath, $libraryName, $restCreds,$logFile,$verboseLogging){
+function get-library($serverUrl, $sitePath, $libraryName, $restCreds,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $libraryName = format-path (sanitise-forSharePointUrl $libraryName) #The LibraryName cannot contain specific characters
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/GetFolderByServerRelativePath(decodedurl='$sitePath$libraryName')"
     try{
-        if($verboseLogging){log-action "get-library: Invoke-SPORestMethod -Url $url"}
+        if($verboseLogging){log-action "get-library: Invoke-SPORestMethod -Url $url" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -credentials $restCreds
-        if($verboseLogging){log-result "SUCCESS: Library found"}
+        if($verboseLogging){log-result "SUCCESS: Library found" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-library($sitePath, $libraryName)" -doNotLogToEmail $true}
+        if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to get-library($sitePath, $libraryName)" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
-function get-list($serverUrl, $sitePath, $listName, $restCreds,$logFile,$verboseLogging){
+function get-list($serverUrl, $sitePath, $listName, $restCreds,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = (sanitise-forSharePointUrl $listName).Replace("Lists/","")
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')"
     try{
-        if($verboseLogging){log-action "get-list: Invoke-SPORestMethod -Url $url"}
+        if($verboseLogging){log-action "get-list: Invoke-SPORestMethod -Url $url" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -credentials $restCreds
-        if($verboseLogging){log-result "SUCCESS: List found"}
+        if($verboseLogging){log-result "SUCCESS: List found" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){$_;$url;log-error -myError $_ -myFriendlyMessage "Failed to get-list: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true}
+        if($verboseLogging){$_;$url;log-error -myError $_ -myFriendlyMessage "Failed to get-list: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
-function new-spoDigest($serverUrl, $sitePath, $restCreds,$logFile,$verboseLogging){
+function new-spoDigest($serverUrl, $sitePath, $restCreds,$verboseLogging,$logFile){
     $digest = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")
     $digest = New-Object psobject -Property @{"digest" = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")}
     $digest | Add-Member -MemberType NoteProperty expiryTime -Value (Get-Date).AddSeconds($digest.digest.GetContextWebInformation.FormDigestTimeoutSeconds)
@@ -405,7 +405,7 @@ function new-spoDigest($serverUrl, $sitePath, $restCreds,$logFile,$verboseLoggin
     #$global:digest = (Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")#.GetContextWebInformation.FormDigestValue
     #$global:digestExpiryTime = (Get-Date).AddSeconds($global:digest.GetContextWebInformation.FormDigestTimeoutSeconds)
     }
-function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds, $digest,$logFile,$verboseLogging){
+function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAndOrName, $restCreds, $digest,$verboseLogging,$logFile){
     #$libraryName = $kimbleClientHashTable[$dirtyProject.KimbleClientId]
     #$libraryName = "Shared Documents"
     #$folderPathAndOrName = $dirtyProject.Title
@@ -419,24 +419,24 @@ function new-folderInLibrary($serverUrl, $sitePath, $libraryName, $folderPathAnd
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/folders/AddUsingPath($sanitisedPath)"
-    $folderExists = (get-folderInLibrary -serverUrl $serverUrl -sitePath $sitePath -libraryName $libraryName -folderPathAndOrName $folderPathAndOrName -restCreds $restCreds)
+    $folderExists = (get-folderInLibrary -serverUrl $serverUrl -sitePath $sitePath -libraryName $libraryName -folderPathAndOrName $folderPathAndOrName -restCreds $restCreds -verboseLogging $verboseLogging -logFile $logFile)
     if($folderExists -eq $false){
         try{
-            if($verboseLogging){log-action -myMessage "new-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
+            if($verboseLogging){log-action -myMessage "new-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -logFile $logFile}
             Invoke-SPORestMethod -Url $url -Method "POST" -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
-            if($verboseLogging){log-result "SUCCESS: Created folder $sitePath$libraryName$folderPathAndOrName"}
+            if($verboseLogging){log-result "SUCCESS: Created folder $sitePath$libraryName$folderPathAndOrName" -logFile $logFile}
             }
         catch{
-            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to create new folder: new-folderInLibrary($sitePath, $libraryAndFolderPath, $folderName)" -doNotLogToEmail $true}
+            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to create new folder: new-folderInLibrary($sitePath, $libraryAndFolderPath, $folderName)" -doNotLogToEmail $true -errorLogFile $logFile}
             $false
             }
         }
     else{
-        if($verboseLogging){log-result "WARNING: Folder already exists: $sitePath$libraryName$folderPathAndOrName"}
+        if($verboseLogging){log-result "WARNING: Folder already exists: $sitePath$libraryName$folderPathAndOrName" -logFile $logFile}
         $folderExists
         }
     }
-function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$hashTableOfItemData,$restCreds,$digest,$logFile,$verboseLogging){
+function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$hashTableOfItemData,$restCreds,$digest,$verboseLogging,$logFile){
     #Error handling for no DataType?
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
@@ -492,24 +492,24 @@ function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc, $digest,
     $libraryExists = get-library -sitePath $sitePath -libraryName $libraryName
     if($libraryExists -eq $false){
         try{
-            if($verboseLogging){log-action -myMessage "new-library: Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)"}
+            if($verboseLogging){log-action -myMessage "new-library: Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -logFile $logFile}
             Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
-            if($verboseLogging){log-result "SUCCESS: Library created: $sitePath/$libraryName"}
+            if($verboseLogging){log-result "SUCCESS: Library created: $sitePath/$libraryName" -logFile $logFile}
             }
         catch{
-            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to create new Library: new-library($sitePath, $libraryName, $libraryDesc)" -doNotLogToEmail $true}
+            if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to create new Library: new-library($sitePath, $libraryName, $libraryDesc)" -doNotLogToEmail $true -errorLogFile $logFile}
             $false
             }
         }
     else{
-        if($verboseLogging){log-result "WARNING: Library already exists: $sitePath/$libraryName"}
+        if($verboseLogging){log-result "WARNING: Library already exists: $sitePath/$libraryName" -logFile $logFile}
         $libraryExists
         }
     }
 function new-spoCred($username, $securePassword){
     New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($userName, $securePassword)
     }
-function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $restCreds, $digest,$logFile,$verboseLogging){
+function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $restCreds, $digest,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl $listName
@@ -524,16 +524,16 @@ function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $r
     #$metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
     $metadata = "{'__metadata':{'type':'SP.List'},$formattedItemData}"
     try{
-        if($verboseLogging){log-action "update-list: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
+        if($verboseLogging){log-action "update-list: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -ETag "*" -credentials $restCreds
-        if($verboseLogging){log-result "SUCCESS: List updated: $formattedItemData"}
+        if($verboseLogging){log-result "SUCCESS: List updated: $formattedItemData" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to update-list($sitePath, $listName,$($hashTableOfUpdateData.Keys | %{"$_=$($hashTableOfUpdateData[$_]);"})" -doNotLogToEmail $true}
+        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to update-list($sitePath, $listName,$($hashTableOfUpdateData.Keys | %{"$_=$($hashTableOfUpdateData[$_]);"})" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
-function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData,$restCreds,$digest,$logFile,$verboseLogging){
+function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData,$restCreds,$digest,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
     $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
@@ -547,12 +547,12 @@ function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType
     $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
     $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
     try{
-        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`""}
+        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -Method "POST" -XHTTPMethod "MERGE" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -ETag "*" -credentials $restCreds
-        if($verboseLogging){log-result "SUCCESS: Updated list item: $formattedItemData"}
+        if($verboseLogging){log-result "SUCCESS: Updated list item: $formattedItemData" -logFile $logFile}
         }
     catch{
-        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to update item in List: update-itemInList($sitePath,$listName,$predeterminedItemType,$itemId,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -doNotLogToEmail $true}
+        if($verboseLogging){log-error $_ -myFriendlyMessage "Failed to update item in List: update-itemInList($sitePath,$listName,$predeterminedItemType,$itemId,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
     }
