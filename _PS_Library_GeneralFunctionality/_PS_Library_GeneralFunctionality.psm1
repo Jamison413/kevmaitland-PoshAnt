@@ -100,3 +100,10 @@ function sanitise-stripHtml($dirtyString){
     $cleanString = [System.Web.HttpUtility]::HtmlDecode($cleanString)# -replace '&amp;','&'
     $cleanString
     }
+function sanitise-forTermStore($dirtyString){
+    #$dirtyString.Replace("\t", " ").Replace(";", ",").Replace("\", "\uFF02").Replace("<", "\uFF1C").Replace(">", "\uFF1E").Replace("|", "\uFF5C")
+    $cleanerString = $dirtyString.Replace("`t", "").Replace(";", "").Replace("\", "").Replace("<", "").Replace(">", "").Replace("|", "")
+    if($cleanerString.Length -gt 255){$cleanerString.Substring(0,254)}
+    else{$cleanerString}
+    }
+#endregion
