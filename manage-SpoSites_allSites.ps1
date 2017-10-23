@@ -1,5 +1,5 @@
 ﻿Import-Module _CSOM_Library-SPO
-$csomCreds = set-csomCredentials
+$csomCreds = new-csomCredentials
 
 function Get-SPOWebs(){
 param(

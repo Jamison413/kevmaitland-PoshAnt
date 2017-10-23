@@ -31,7 +31,7 @@ $mailTo = "kevin.maitland@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
-$csomCreds = set-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
+$csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
 
 
 ########################################
@@ -81,7 +81,7 @@ catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listNam
 #Get the Kimble Clients that have been modifed since the last update
 $cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
 #$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddYears(-1) -Format s) #Bodge this once for the initial Sync
-$soqlQuery = "SELECT Name,Id,Description,Type,KimbleOne__IsCustomer__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted FROM account WHERE ((LastModifiedDate > $cutoffDate`Z) AND ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client')))"
+$soqlQuery = "SELECT Name,Id,Description,Type,KimbleOne__IsCustomer__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted FROM account WHERE ((LastModifiedDate > $cutoffDate`Z) AND ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client')))"
 try{
     log-action -myMessage "Getting Kimble Client data" -logFile $fullLogPathAndName
     $kimbleModifiedClients = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
