@@ -57,7 +57,7 @@ $usefulLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\logoutput3.csv -N
 
 
 
-$auditLog = "C:\Users\kevin.maitland\Downloads\AuditLog_2017-07-07_2017-10-06.csv"
+$auditLog = "C:\Users\kevin.maitland\Downloads\AuditLog_2017-09-26_2017-10-13.csv"
 $usefulLog = parse-unifiedAuditLogCsvToPsObjects -pathToAuditLogCsvFile $auditLog
 
 $usefulLog | %{$_.psobject.Properties.Name | %{if($headers -notcontains $($_+":Dummy")){[array]$headers += $($_+":Dummy")}}}
@@ -71,7 +71,7 @@ $headers | %{
 [array]$formattedLog += $headerObject
 $formattedLog += $usefulLog
 
-$formattedLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\UnifiedAuditLog_KayleeShalett_2017-07-07_2017-10-06.csv -NoClobber -NoTypeInformation
+$formattedLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\UnifiedAuditLog_MaryShort_2017-09-26_2017-10-13.csv -NoClobber -NoTypeInformation
 
 $formattedLog | Out-GridView
 [System.String]::Join(",",$headers)
