@@ -3,7 +3,7 @@ Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-SPO.psm1
 
 $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
-$csomCredentials = set-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
+$csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
 Set-SPORestCredentials -Credential $msolCredentials
 
 #region Get the Admin to pick the request/s to process

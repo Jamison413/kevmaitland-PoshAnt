@@ -1,11 +1,11 @@
 ﻿#Import-Module Microsoft.Online.Sharepoint.PowerShell
 #Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential
 
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client") | Out-Null
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing") | Out-Null
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") | Out-Null
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles") | Out-Null
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client") 
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime")
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing") 
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") 
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles")
 $webUrl = "https://anthesisllc.sharepoint.com" 
 
 #region Functions
@@ -643,7 +643,7 @@ function sanitise-LibraryNameForUrl($dirtyString){
     $cleanerString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
     $cleanerString
     }
-function set-csomCredentials($username, $password){
+function new-csomCredentials($username, $password){
     if ($username -eq $null -or $username -eq ""){$username = Read-Host -Prompt "Enter SharePoint Online username (blank for $($env:USERNAME)@anthesisgroup.com)"}
     if ($username -eq $null -or $username -eq ""){$username = "$($env:USERNAME)@anthesisgroup.com"}
     if ($password -eq $null -or $password -eq ""){$password = Read-Host -Prompt "Password for $username" -AsSecureString}

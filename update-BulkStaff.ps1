@@ -106,7 +106,7 @@ function sanitise-phoneNumber($dirtyString){
 $o365Creds = set-MsolCredentials
 connect-ToMsol -credential $o365Creds
 connect-ToExo -credential $o365Creds
-$csomCreds = set-csomCredentials -username $o365Creds.UserName -password $o365Creds.Password
+$csomCreds = new-csomCredentials -username $o365Creds.UserName -password $o365Creds.Password
 
 $userContext = new-csomContext -fullSitePath $anthesisMySite -sharePointCredentials $csomCreds
 $adminContext = new-csomContext -fullSitePath $anthesisAdminSite -sharePointCredentials $csomCreds
