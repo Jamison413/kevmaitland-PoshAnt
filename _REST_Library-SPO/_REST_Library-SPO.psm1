@@ -397,6 +397,11 @@ function get-list($serverUrl, $sitePath, $listName, $restCreds,$verboseLogging,$
         $false
         }
     }
+function get-propertyValueFromSpoMetadata([string]$__metadata, [string]$propertyName){
+    $propertyValue = ($__metadata.Replace("@{","").Replace("}","") -split "; " | ?{$_.Substring(0,$propertyName.length) -imatch "$propertyName"})
+    if(![string]::IsNullOrEmpty($propertyValue)){$propertyValue.Replace("$propertyName=","")}
+    else{$false}
+    }
 function new-spoDigest($serverUrl, $sitePath, $restCreds,$verboseLogging,$logFile){
     $digest = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")
     $digest = New-Object psobject -Property @{"digest" = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")}
@@ -489,7 +494,7 @@ function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc, $digest,
     #Build and execute REST statement
     $metadata = "{'__metadata':{'type':'SP.List'},'Description':`"$libraryDesc`",'BaseTemplate':101,'ContentTypesEnabled':true,'Title':`"$libraryName`",'AllowContentTypes':true}"
     $url = $serverUrl+$sitePath+"/_api/web/lists"
-    $libraryExists = get-library -sitePath $sitePath -libraryName $libraryName
+    $libraryExists = get-library -sitePath $sitePath -libraryName $libraryName -serverUrl $serverUrl -restCreds $restCreds
     if($libraryExists -eq $false){
         try{
             if($verboseLogging){log-action -myMessage "new-library: Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -logFile $logFile}
