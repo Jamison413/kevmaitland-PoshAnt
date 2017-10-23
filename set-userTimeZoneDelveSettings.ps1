@@ -3,7 +3,7 @@ Import-Module .\_PS_Library_MSOL.psm1
 
 $anthesisMySite = 'https://anthesisllc-my.sharepoint.com/' # This needs to be the mySite where the userdata lives.
 $anthesisAdminSite = 'https://anthesisllc-admin.sharepoint.com/' # This needs to be the "admin" site.
-$csomCreds = set-csomCredentials
+$csomCreds = new-csomCredentials
 $ctx = new-csomContext -fullSitePath $anthesisMySite -sharePointCredentials $csomCreds
 
 $anthesisUserProfileCollection = @()
