@@ -47,7 +47,7 @@ function format-emailAddress($dirtyString){
 #endregion
 
 $o365Creds = set-MsolCredentials
-$csomCreds = set-csomCredentials -username $o365Creds.UserName -password $o365Creds.Password
+$csomCreds = new-csomCredentials -username $o365Creds.UserName -password $o365Creds.Password
 connect-ToMsol -credential $o365Creds
 connect-ToExo -credential $o365Creds
 
