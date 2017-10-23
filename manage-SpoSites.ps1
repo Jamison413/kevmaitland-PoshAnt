@@ -4,7 +4,7 @@ Import-Module _REST_Library-SPO.psm1
 
 $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
 $csomCredentials = set-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
-Set-SPORestCredentials -Credential $msolCredentials
+#Set-SPORestCredentials -Credential $msolCredentials
 
 #region Get the Admin to pick the request/s to process
 #Get the Taxonomy Data for the Site Collection as there's Managed MetaData fields to retrieve 
@@ -188,12 +188,12 @@ $siteCollection = "/teams/communities"
 $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
 $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
 $sitePath = "/"
-$siteName = "TCS Team Site"
-$siteUrlEndStub = "tcs"
+$siteName = "Built Environment Team Site"
+$siteUrlEndStub = "builtenv"
 $inheritTopNav = $true
 $inheritPermissions = $false
-#$precreatedSecurityGroupForMembers = "TCS Team"
-
+#$precreatedSecurityGroupForMembers = "Built Environment Team"
+$owner = "susan.harris"
 
 
 #Build and customise a new Site
@@ -209,10 +209,10 @@ add-memberToGroup -credentials $csomCredentials -webUrl $webUrl -siteCollection 
 get-webTempates -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $sitePath
 
 #Brand multiple Sites:
-$siteCollection = "/sites/external" #Main Site Collections are "/", "/teams/communities", "/teams/sym" Full list available here: https://anthesisllc-admin.sharepoint.com/_layouts/15/online/SiteCollections.aspx
+$siteCollection = "/teams/IT" #Main Site Collections are "/", "/teams/communities", "/teams/sym" Full list available here: https://anthesisllc-admin.sharepoint.com/_layouts/15/online/SiteCollections.aspx
 $sites = @("/unite") #@("/intsus","/anyOtherSite", "/anyOtherSite/SubSite")
 foreach($site in $sites){
-    apply-theme -webUrl $webUrl -siteCollection $siteCollection -site $site -colorPaletteUrl $colorPaletteUrl -fontSchemeUrl $spFontUrl -backgroundImageUrl $null -shareGenerated $false
+    apply-theme -credentials $csomCredentials -webUrl $webUrl -siteCollection $siteCollection -site $site -colorPaletteUrl $colorPaletteUrl -fontSchemeUrl $spFontUrl -backgroundImageUrl $null -shareGenerated $false
     }
 
 #Update TopNav Bar:
@@ -238,3 +238,4 @@ $extGroups  = $groups | ? {$_.Users -match "ext"} | select Title
 $groups | ? {$_.users -eq "Admin Info"}
 
 #>
+
