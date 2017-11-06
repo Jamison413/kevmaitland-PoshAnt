@@ -3,14 +3,14 @@ Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-SPO.psm1
 
 $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
-$csomCredentials = set-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
-#Set-SPORestCredentials -Credential $msolCredentials
+$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
+$csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
 
 #region Get the Admin to pick the request/s to process
 #Get the Taxonomy Data for the Site Collection as there's Managed MetaData fields to retrieve 
 $webUrl = "https://anthesisllc.sharepoint.com"
 $taxonomyListName = "TaxonomyHiddenList"
-$taxononmyData = get-itemsInList -serverUrl $webUrl -sitePath "/" -listName $taxonomyListName -suppressProgress $true
+$taxononmyData = get-itemsInList -serverUrl $webUrl -sitePath "/" -listName $taxonomyListName -suppressProgress $true -restCreds $restCredentials
 
 #Get the Client Site requests that have a status of "Awaiting creation"
 $clientsSite = "/clients"
@@ -22,7 +22,7 @@ $oDataUnprocessedClientRequests += ',Site_x0020_MembersId,Site_x0020_Members/Id,
 $oDataUnprocessedClientRequests += ',Site_x0020_VisitorsId,Site_x0020_Visitors/Id,Site_x0020_Visitors/Title'
 $oDataUnprocessedClientRequests += '&$expand=Site_x0020_Admin/Id,Site_x0020_Owners/Id,Site_x0020_Members/Id,Site_x0020_Visitors/Id'    #,Site_x0020_Members,Site_x0020_Visitors
 $oDataUnprocessedClientRequests += '&$filter=Status eq ''Awaiting creation'''
-$unprocessedClientRequests = get-itemsInList -serverUrl $webUrl -sitePath $clientsSite -listName $clientSiteRequestListName -suppressProgress $false -oDataQuery $oDataUnprocessedClientRequests -debug $true
+$unprocessedClientRequests = get-itemsInList -serverUrl $webUrl -sitePath $clientsSite -listName $clientSiteRequestListName -suppressProgress $false -oDataQuery $oDataUnprocessedClientRequests -restCreds $restCredentials
 #Standardise the Requests:
 foreach($request in $unprocessedClientRequests){
     $req = New-Object -TypeName PSObject
@@ -68,7 +68,7 @@ $oDataUnprocessedSupplierRequests += ',Site_x0020_MembersId,Site_x0020_Members/I
 $oDataUnprocessedSupplierRequests += ',Site_x0020_VisitorsId,Site_x0020_Visitors/Id,Site_x0020_Visitors/Title'
 $oDataUnprocessedSupplierRequests += '&$expand=Site_x0020_Admin/Id,Site_x0020_Owners/Id,Site_x0020_Members/Id,Site_x0020_Visitors/Id'    #,Site_x0020_Members,Site_x0020_Visitors
 $oDataUnprocessedSupplierRequests += '&$filter=Status eq ''Awaiting creation'''
-$unprocessedSupplierRequests = get-itemsInList -serverUrl $webUrl -sitePath $suppliersSite -listName $supplierSiteRequestListName -suppressProgress $false -oDataQuery $oDataUnprocessedSupplierRequests -debug $true
+$unprocessedSupplierRequests = get-itemsInList -serverUrl $webUrl -sitePath $suppliersSite -listName $supplierSiteRequestListName -suppressProgress $false -oDataQuery $oDataUnprocessedSupplierRequests -restCreds $restCredentials
 #Standardise the Requests:
 foreach($request in $unprocessedSupplierRequests){
     $req = New-Object -TypeName PSObject
@@ -156,8 +156,9 @@ foreach ($currentRequest in $selectedRequests){
             $ctx.Load($admin)
             $ctx.ExecuteQuery()
             $ctx.Dispose()
-            get-newDigest -serverUrl $webUrl -sitePath $requestSite
-            update-itemInList -serverUrl $webUrl -sitePath $requestSite -listName $requestListName -predeterminedItemType $currentRequest.listContentType -itemId $currentRequest.Id -hashTableOfItemData @{Status="Created";Site_x0020_Created_x0020_ById=$admin.Id}
+            $digest = new-spoDigest -serverUrl $webUrl -sitePath $requestSite -restCreds $restCredentials 
+            check-digestExpiry -serverUrl $webUrl -sitePath $requestSite -digest $digest -restCreds $restCredentials
+            update-itemInList -serverUrl $webUrl -sitePath $requestSite -listName $requestListName -predeterminedItemType $currentRequest.listContentType -itemId $currentRequest.Id -hashTableOfItemData @{Status="Created";Site_x0020_Created_x0020_ById=$admin.Id} -restCreds $restCredentials -digest $digest
             }
         'Confidential' {}
         'Team' {}
@@ -188,12 +189,12 @@ $siteCollection = "/teams/communities"
 $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
 $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
 $sitePath = "/"
-$siteName = "Built Environment Team Site"
-$siteUrlEndStub = "builtenv"
+$siteName = "Kimble Working Group"
+$siteUrlEndStub = "kimblewg"
 $inheritTopNav = $true
 $inheritPermissions = $false
-#$precreatedSecurityGroupForMembers = "Built Environment Team"
-$owner = "susan.harris"
+$precreatedSecurityGroupForMembers = "Kimble Working Group"
+$owner = "Kimble Working Group"
 
 
 #Build and customise a new Site

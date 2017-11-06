@@ -52,6 +52,7 @@ function cache-kimbleClients(){
             $spClients = get-itemsInList -sitePath $clientSite -listName "Kimble Clients" -serverUrl $webUrl -restCreds $restCreds
             if($spClients){
                 log-result -myMessage "SUCCESS: $($spClients.Count) Kimble Client records retrieved!" -logFile $fullLogPathAndName
+                if(!(Test-Path -Path $cacheFilePath)){New-Item -Path $cacheFilePath -ItemType Directory}
                 $spClients | Export-Csv -Path $cacheFilePath$clientsCacheFile -Force -NoTypeInformation -Encoding UTF8
                 }
             else{log-result -myMessage "FAILURE: [Kimble Clients] items could not be retrieved" -logFile $fullLogPathAndName}
