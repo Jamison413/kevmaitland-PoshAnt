@@ -319,7 +319,18 @@ foreach($dirtyLead in $dirtyLeads){
         catch{log-error $_ -myFriendlyMessage "Failed to move Lead from Client X to Client Y" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
         }
     #Otherwise, the Lead is flagged IsDirty, but it's not going to get processed
-    else{log-action -myMessage "WARNING: LEAD [$($dirtyLead.Title)] for client [$($kimbleClientHashTable[$dirtyLead.KimbleClientId])] IsDirty, but I can't work out why :/" -logFile $fullLogPathAndName}
+    else{
+        log-action -myMessage "WARNING: LEAD [$($dirtyLead.Title)] for client [$($kimbleClientHashTable[$dirtyLead.KimbleClientId])] IsDirty, but I can't work out why :/ It might just be queued for re-processing, so I'll mark it as IsDirty = $false" -logFile $fullLogPathAndName
+        log-action "update-itemInList Kimble Leads | $($dirtyLead.Title) [$($dirtyLead.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
+        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
+        #Validate that the change was actually made
+        try{
+            $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -oDataQuery "?`$filter=Id eq $($dirtyLead.Id)" -restCreds $restCreds
+            if($updatedItem.IsDirty -eq $false){log-result "SUCCESS: $($dirtyLead.Title) updated!" -logFile $fullLogPathAndName}
+            else{log-result "FAILED: Could not set Lead [$($dirtyLead.Title)].IsDirty = `$true " -logFile $fullLogPathAndName}
+            }
+        catch{log-error -myError $_ -myFriendlyMessage "Failed to set IsDirty=`$true for Lead [$($dirtyLead.Title)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+        }
     }
 
 #endregion
