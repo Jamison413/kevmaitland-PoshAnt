@@ -8,6 +8,14 @@
     $output = $output.Replace("http:/","http://").Replace("https:/","https://")
     $output
     }
+function convertTo-arrayOfEmailAddresses($blockOfText){
+    $blockOfText | %{
+        foreach($blob in $_.Split(" ")){
+            if($blob -match "@" -and $blob -match "."){[array]$addresses += $blob}
+            }
+        }
+    $addresses
+    }
 function convertTo-localisedSecureString($plainText){
     if ($(Get-Module).Name -notcontains "_PS_Library_Forms"){Import-Module _PS_Library_Forms}
     if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
@@ -107,3 +115,13 @@ function sanitise-forTermStore($dirtyString){
     else{$cleanerString}
     }
 #endregion
+
+
+$blockOfText = "Chris Keller       Chris.Keller@anthesisgroup.com       Frankfurt, DEU Germany              03/08/2017 14:48:38        
+Michael Hoffmann   michael.hoffmann@anthesisgroup.com                  Germany              04/11/2014 17:27:34        
+Richard Wiles      Richard.Wiles@anthesisgroup.com      Dubai, ARE     United Arab Emirates 14/06/2015 11:22:48        
+endsight           endsight@anthesisgroup.com                          United States        20/08/2015 20:00:41        
+UK HR              UKHR@anthesisgroup.com                              United Kingdom       15/06/2017 14:39:23        
+Mahmoud Abourich   Mahmoud.Abourich@anthesisgroup.com   Dubai, ARE     United Arab Emirates 31/05/2015 08:40:16        
+Mikaela Stojanovic Mikaela.Stojanovic@anthesisgroup.com Stockholm, SWE Sweden               16/09/2016 11:05:33        
+"
