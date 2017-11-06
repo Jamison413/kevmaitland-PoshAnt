@@ -62,6 +62,33 @@ function cache-kimbleClients(){
     $clientCache = Import-Csv $cacheFilePath$clientsCacheFile
     $clientCache
     }
+function try-creatingALibrary(){}
+function try-creatingAFolder(){}
+function try-creatingASubFolder(){}
+function try-creatingATermStoreItem(){}
+function try-updatingAListItem($serverUrl, $siteCollectionAndPath, $listName, $listItem, $hashTableOfItemData, $restCreds, $digest){
+    log-action "try-updatingAListItem [$listName] | [$($listItem.Title)] [$($listItem.Id)] $stringifiedHashTable" -logFile $fullLogPathAndName
+    try{
+        [string]$stringifiedHashTable = "@{"+$($hashTableOfItemData.Keys | % {"`"$_`"=`"$($hashTableOfItemData[$_])`";"})+"}"
+        log-action "update-itemInList [$listName] | [$($listItem.Title)] [$($listItem.Id)] $stringifiedHashTable" -logFile $fullLogPathAndName
+        update-itemInList -serverUrl $serverUrl -sitePath $siteCollectionAndPath -listName $listName -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $listItem.__metadata -propertyName "type") -itemId $listItem.Id -hashTableOfItemData $hashTableOfItemData -restCreds $restCreds -digest $clientDigest #-verboseLogging $true -logFile $debugLog
+        try{
+            $updatedItem = get-itemsInList -serverUrl $serverUrl -sitePath $siteCollectionAndPath -listName $listName -oDataQuery "?`$filter=Id eq $($listItem.Id)" -restCreds $restCreds
+            #Now validate that the changes were made
+            $isValidated = $true #We'll assume it worked (or that $hash was empty) unless we can determine otherwise
+            $stringifiedResults = "@{"
+            $hashTableOfItemData.Keys | %{
+                $stringifiedResults += "`"$_`"=`"$($listItem."$_")`";"
+                if($updatedItem."$($hashTableOfItemData[$_])" -ne $hashTableOfItemData[$hashTableOfItemData[$_]]){$isValidated = $false}
+                }
+            if($isValidated){log-result "SUCCESS: [$listName] | [$($listItem.Title)] was successfully updated!" -logFile $fullLogPathAndName;$true}
+            else{log-result "FAILED: Could not set [$listName] | [$($listItem.Title)] $stringifiedHashTable > $stringifiedResults}" -logFile $fullLogPathAndName;$false}
+            }
+        catch{log-error -myError $_ -myFriendlyMessage "Error when trying to set $stringifiedHashTable for [$listName]|[$($listItem.Title)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true;$false}
+        }
+    catch{log-error $_ -myFriendlyMessage "Error when trying update-itemInList in try-updatingAListItem for [$listName]|[$($listItem.Title)] $stringifiedHashTable" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true;$false}
+    }
+
 #endregion
 
 #Retrieve (and update if necessary) the full Clients cache as we'll need it to set up any new Leads/Projects
@@ -74,6 +101,7 @@ foreach ($spClient in $clientCache){$kimbleClientHashTable.Add($spClient.KimbleI
 #region Create folders for any new Clients
 $dirtyClients = $clientCache | ?{$_.IsDirty -eq $true}
 $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $clientSite -restCreds $restCreds
+#$dirtyclient = $dirtyClients | ? {$_.Title -match "wilis"}
 
 foreach($dirtyClient in $dirtyClients){
     log-action -myMessage "************************************************************************" -logFile $fullLogPathAndName
