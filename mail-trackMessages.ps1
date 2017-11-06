@@ -18,11 +18,13 @@ function get-allToAddressXHours($recipientAddress,$hoursAgo){
     Get-MessageTrace -StartDate $dateStart -EndDate $dateEnd -RecipientAddress $recipientAddress
     }
 function format-MailTracePrettily($traceBlob){
-    $traceBlob | Select-Object Received, SenderAddress, RecipientAddress, Subject, Status, ToIP, FromIP, Size, MessageID, MessageTraceID | Out-GridView 
+    $trace | Select-Object Received, SenderAddress, RecipientAddress, Subject, Status, ToIP, FromIP, Size, MessageID, MessageTraceID | export-csv -NoTypeInformation -Path C:\Users\kevin.maitland\Desktop\mailTrace.log -Encoding UTF8
+     Out-GridView 
     }
 
     
-$trace = get-allToAddressXHours -recipientAddress "ecohomes@sustain.co.uk" -hoursAgo 720
+$trace = get-allToAddressXHours -recipientAddress "anthesisnorthamerica@anthesisgroup.com" -hoursAgo 150
+$trace = get-allToAddressXHours -recipientAddress "US-Anthesis@anthesisgroup.com" -hoursAgo 48
 $trace = get-allFromAddressXHours -senderAddress "mary.short@anthesisgroup.com" -hoursAgo 2
 
 format-MailTracePrettily $trace
