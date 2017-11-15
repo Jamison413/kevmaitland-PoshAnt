@@ -1,5 +1,4 @@
-﻿#Import-Module Microsoft.Online.Sharepoint.PowerShell
-#Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential
+﻿
 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime")
@@ -7,7 +6,6 @@
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles")
 $webUrl = "https://anthesisllc.sharepoint.com" 
-
 
 #region Functions
 function add-memberToGroup($credentials, $webUrl, $siteCollection, $sitePath, $groupName, $memberToAdd){
@@ -76,10 +74,9 @@ function add-site($credentials, $webUrl, $siteCollection, $sitePath, $siteName, 
 
     if(!$inheritPermissions){
         #Create the standard groups
-        Write-Host "About to create Owners Group"
-        $ownersGroup  = new-orExistingSPOGroup -title "$siteName Owners"  -description "Managers and Admins of $siteName" -spoSite $newWeb -ctx $ctx -pGroupOwner $owner
-        $membersGroup = new-orExistingSPOGroup -title "$siteName Members" -description "Contributors to $siteName" -spoSite $newWeb -ctx $ctx -pGroupOwner "$siteName Owners"
-        $visitorsGroup = new-orExistingSPOGroup -title "$siteName Visitors" -description "ReadOnly users of $siteName" -spoSite $newWeb -ctx $ctx -pGroupOwner "$siteName Owners"
+        $ownersGroup  = new-SPOGroup -title "$siteName Owners"  -description "Managers and Admins of $siteName" -spoSite $newWeb -ctx $ctx 
+        $membersGroup = new-SPOGroup -title "$siteName Members" -description "Contributors to $siteName" -spoSite $newWeb -ctx $ctx
+        $visitorsGroup = new-SPOGroup -title "$siteName Visitors" -description "ReadOnly users of $siteName" -spoSite $newWeb -ctx $ctx
         
         #Get the standard Roles
         $roleDefBindFullControl = New-Object Microsoft.SharePoint.Client.RoleDefinitionBindingCollection($ctx)
@@ -137,6 +134,8 @@ function add-termToStore($credentials, $webUrl, $siteCollection, $pGroup,$pSet,$
     $lcid = 1033 #Probably Language
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection) -sharePointCredentials $credentials
     Write-Host "Connected to DESTINATION SharePoint Online site: " $ctx.Url "" -ForegroundColor Green
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") 
+
     $taxonomySession = [Microsoft.SharePoint.Client.Taxonomy.TaxonomySession]::GetTaxonomySession($ctx)
     $taxonomySession.UpdateCache()
     $ctx.Load($taxonomySession)
@@ -482,14 +481,10 @@ function get-file($ctx, $credentials, $webUrl, $siteCollection, $sitePath, $list
     $file
     }
 function get-SPOGroup($ctx, $credentials, $webUrl, $siteCollection, $sitePath, $groupName){
-    try{
-        if ($ctx -eq $null){$ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials}
-        $group = $ctx.Web.SiteGroups.GetByName($groupName)
-        $ctx.Load($group)
-        $ctx.ExecuteQuery()
-        $group
-        }
-    catch{$false}
+    if ($ctx -eq $null){$ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials}
+    $group = $ctx.Web.SiteGroups.GetByName($groupName)
+    $ctx.Load($group)
+    $ctx.ExecuteQuery()
 
     #$groups = $ctx.Web.SiteGroups
     #$ctx.Load($groups)
@@ -501,6 +496,7 @@ function get-SPOGroup($ctx, $credentials, $webUrl, $siteCollection, $sitePath, $
     #        $ctx.ExecuteQuery()
     #        }
     #    }
+    $group
     }
 function get-webTempates($credentials, $webUrl, $siteCollection, $site){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$site) -sharePointCredentials $credentials
@@ -522,21 +518,6 @@ function new-csomContext ($fullSitePath, $sharePointCredentials){
     $ctx = New-Object Microsoft.SharePoint.Client.ClientContext($fullSitePath) 
     $ctx.Credentials = $sharePointCredentials
     $ctx
-    }
-function new-csomCredentials($username, $password){
-    if ($username -eq $null -or $username -eq ""){$username = Read-Host -Prompt "Enter SharePoint Online username (blank for $($env:USERNAME)@anthesisgroup.com)"}
-    if ($username -eq $null -or $username -eq ""){$username = "$($env:USERNAME)@anthesisgroup.com"}
-    if ($password -eq $null -or $password -eq ""){$password = Read-Host -Prompt "Password for $username" -AsSecureString}
-    New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($username, $password)
-    }
-function new-orExistingSPOGroup($ctx, $title, $description, $pGroupOwner, $spoSite){
-    Write-Host "new-orExistingSPOGroup"
-    $spoGroup = get-SPOGroup -ctx $ctx -groupName $title
-    if ($spoGroup -eq $null -or $spoGroup -eq $false){
-        Write-Host "calling new-SPOGroup -ctx $ctx -title $title -description $description -pGroupOwner $pGroupOwner -spoSite $spoSite"
-        $spoGroup = new-SPOGroup -ctx $ctx -title $title -description $description -pGroupOwner $pGroupOwner -spoSite $spoSite
-        }
-    $spoGroup
     }
 function new-sharingInvite($credentials, $webUrl, $siteCollection, $sitePath, $userEmailAddressesArray, $friendlyPermissionsLevel, $sendEmail, $customEmailMessageContent, $additivePermission, $allowExternalSharing){
     #Make a new context and load the Web
@@ -573,9 +554,6 @@ function new-SPOGroup($ctx, $title, $description, $pGroupOwner, $spoSite){
     $spoGroupCreationInfo.Title=$title
     $spoGroupCreationInfo.Description=$description
     $newGroup = $spoSite.SiteGroups.Add($spoGroupCreationInfo)
-    $ctx.Load($newGroup)
-    $ctx.ExecuteQuery()
-    Write-Host "Creating Group [$title]"
     if ($pGroupOwner -ne $null){
         if($pGroupOwner -eq $title){$newGroup.Owner = $newGroup} #If the new group is owned by itself, just do it now.
         else{
@@ -583,23 +561,18 @@ function new-SPOGroup($ctx, $title, $description, $pGroupOwner, $spoSite){
                 $groupOwner = $ctx.Web.SiteGroups.GetByName($pGroupOwner) #Otherwise see if $pGroupOwner is a group
                 $ctx.Load($groupOwner)
                 $ctx.ExecuteQuery()
-                Write-Host "Group [$title].Owner will be a Group [$($groupOwner.Title)]"
-
                 }
             catch{
-                Write-Host "Group [$title].Owner will not be a Group"
                 try{
                     $groupOwner = $ctx.Web.EnsureUser($pGroupOwner)#Otherwise, see if $pGroupOwner is a User
                     $ctx.Load($groupOwner)
                     $ctx.ExecuteQuery()
-                    Write-Host "Group [$title].Owner will be a Person [$($groupOwner.Title)]"
                     }
                 catch{Write-Host "$pGroupOwner is not a valid SPOGroup or User :(";$groupOwner = $null}
                 }
             }
         }
     if($groupOwner -ne $null){
-        Write-Host "Setting Group [$title].Owner to $($groupOwner.Title)"
         $newGroup.Owner = $groupOwner
         $newGroup.Update()
         }
@@ -670,6 +643,12 @@ function sanitise-LibraryNameForUrl($dirtyString){
     $cleanerString = $dirtyString.Trim()
     $cleanerString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
     $cleanerString
+    }
+function new-csomCredentials($username, $password){
+    if ($username -eq $null -or $username -eq ""){$username = Read-Host -Prompt "Enter SharePoint Online username (blank for $($env:USERNAME)@anthesisgroup.com)"}
+    if ($username -eq $null -or $username -eq ""){$username = "$($env:USERNAME)@anthesisgroup.com"}
+    if ($password -eq $null -or $password -eq ""){$password = Read-Host -Prompt "Password for $username" -AsSecureString}
+    New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($username, $password)
     }
 function set-listInheritance($credentials, $webUrl, $siteCollection, $sitePath, $listname, $enableInheritance){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
