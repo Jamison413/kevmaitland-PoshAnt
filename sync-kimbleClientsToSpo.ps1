@@ -42,11 +42,12 @@ $grantType = "password"
 $myInstance = "https://eu5.salesforce.com"
 $queryUri = "$myInstance/services/data/v39.0/query/?q="
 $querySuffixStub = " -H `"Authorization: Bearer "
-$clientId = "3MVG9Rd3qC6oMalWu.nvQtpSk61bDN.lZwfX8gpDqVnnIVt9zRnzJlDlG59lMF4QFnj.mmycmnid3o94k6Y9j"
-$clientSecret = "3010701969925148301"
-$username = "kevin.maitland@anthesisgroup.com"
-$password = "M0nkeyfucker"
-$securityToken = "Ou4G5iks8m5axtp6iDldxUZq"
+$kimbleLogin = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
+$clientId = $kimbleLogin.clientId
+$clientSecret = $kimbleLogin.clientSecret
+$username = $kimbleLogin.username
+$password = $kimbleLogin.password
+$securityToken = $kimbleLogin.securityToken
 ########################################
 
 
@@ -174,6 +175,36 @@ foreach ($kimbleNewClient in $kimbleNewClients){
 
 
 
+
+
+function reconcile-clients(){
+    #Get the full list of Kimble Clients 
+    $soqlQuery = "SELECT Name,Id,Description,Type,KimbleOne__IsCustomer__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted FROM account WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))"
+    try{
+        log-action -myMessage "Getting Kimble Client data" -logFile $fullLogPathAndName
+        $allKimbleClients = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
+        if($allKimbleClients){log-result -myMessage "SUCCESS: $($kimbleModifiedClients.Count) records retrieved!" -logFile $fullLogPathAndName}
+        else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Client data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+    #Get the full list of SPO Clients
+    try{
+        log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
+        $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds
+        if($clientDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientDigest.expiryTime)" -logFile $fullLogPathAndName}
+        else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for https://anthesisllc.sharepoint.com/clients" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+
+    try{
+        log-action -myMessage "Getting List: [$listName]" -logFile $fullLogPathAndName
+        $kp = get-itemsInList -serverUrl $webUrl  -sitePath $sitePath -listName $listName -restCreds $restCreds -logFile $logFileLocation 
+        if($kp){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
+        else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+
+    }
 
 
 

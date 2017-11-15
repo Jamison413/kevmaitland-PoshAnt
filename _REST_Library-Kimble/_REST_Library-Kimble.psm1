@@ -5,14 +5,12 @@ $grantType = "password"
 $myInstance = "https://eu5.salesforce.com"
 $queryUri = "$myInstance/services/data/v39.0/query/?q="
 $querySuffixStub = " -H `"Authorization: Bearer "
-$clientId = "3MVG9Rd3qC6oMalWu.nvQtpSk61bDN.lZwfX8gpDqVnnIVt9zRnzJlDlG59lMF4QFnj.mmycmnid3o94k6Y9j"
-$clientSecret = "3010701969925148301"
-$username = "kevin.maitland@anthesisgroup.com"
-$password = "M0nkeyfucker"
-$securityToken = "Ou4G5iks8m5axtp6iDldxUZq"
-#$username = "system.admin@anthesisgroup.com.sandbox"
-#$password = "SisethaN2017"
-#$securityToken = "eOURcVPchk8Xogv2hlbV3NSV1"
+$kimbleLogin = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
+$clientId = $kimbleLogin.clientId
+$clientSecret = $kimbleLogin.clientSecret
+$username = $kimbleLogin.username
+$password = $kimbleLogin.password
+$securityToken = $kimbleLogin.securityToken
 
 #region functions
 function Get-KimbleAuthorizationTokenWithUsernamePasswordFlowRequestBody($client_id, $client_secret, $user_name, $pass_word, $security_token){
