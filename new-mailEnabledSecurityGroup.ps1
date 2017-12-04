@@ -4,8 +4,8 @@ connect-ToExo
 
 $members = @()
 $memberOf = @()
-$name = "Guineapigs Spam Group 2"
-$hideFromGal = $true
+$name = "ECO2 Team"
+$hideFromGal = $false
 $blockExternalMail = $true
 
 

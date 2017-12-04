@@ -1,10 +1,10 @@
 ﻿Import-Module _PS_Library_MSOL
 connect-ToExo
 
-$daysToLookBack = 90
+$daysToLookBack = 7
 if(!$toDate){$toDate = Get-Date}
 if(!$fromDate){$fromDate = $toDate.AddDays(-$daysToLookBack)}
-[array]$arrayOfUsers = @("sinead.fenton@anthesisgroup.com")
+[array]$arrayOfUsers = @("richard.peagam@anthesisgroup.com")
 [array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
 $title = $arrayOfUsers[0]+" "+(get-date)
 
@@ -53,7 +53,7 @@ while($lastCount -ne $log.Count)
 
 $usefulLog =  parse-unifiedAuditLogToPsObjects -auditLogEntries $log
 $usefulLog | Out-GridView
-$usefulLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\logoutput3.csv -NoClobber -NoTypeInformation
+$usefulLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd).csv -NoClobber -NoTypeInformation
 
 
 
