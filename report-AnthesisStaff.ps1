@@ -71,7 +71,7 @@ $userContext.ExecuteQuery()
 #$people = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($context)
 
 Write-host -f Yellow "Getting MSOL Users"
-$msolUsers = Get-MsolUser | ?{$_.isLicensed -eq $true} | sort Country, City, DisplayName
+$msolUsers = Get-MsolUser -All | ?{$_.isLicensed -eq $true} | sort Country, City, DisplayName
 Write-host -f Yellow "Getting SPO Users"
 #ForEach($user in $sharepointUsers){
 ForEach($spoUser in ($spoUserList | ? {$msolUsers.UserPrincipalName -contains $_.LoginName.Replace("i:0#.f|membership|","")})){
@@ -79,7 +79,7 @@ ForEach($spoUser in ($spoUserList | ? {$msolUsers.UserPrincipalName -contains $_
     $userContext.Load($userprofile)
     $userContext.ExecuteQuery()
     #if($userprofile.AccountName -ne $null){
-        $spoUsers += $userprofile
+        [array]$spoUsers += $userprofile
     #    } #Enumerate each user account and save it to the userProfileCollection array
     }
 Write-host -f Yellow "Getting Mail Users"
@@ -170,20 +170,20 @@ foreach($ant in $userHash.Keys){# | ?{$_.Community -ne "Contractors"}){
         $sheet = $workbook.Sheets.Item('Anthesians')
         }
     Write-Host $userHash[$ant][0].DisplayName
-    #$sheet.Cells.Item($currentRow,1) = $userHash[$ant][0].DisplayName
-    #$sheet.Cells.Item($currentRow,2) = $userHash[$ant][0].Title
-    #$sheet.Cells.Item($currentRow,3) = $userHash[$ant][0].Country
-    #$sheet.Cells.Item($currentRow,4) = $userHash[$ant][0].City
-    #$sheet.Cells.Item($currentRow,5) = $userHash[$ant][0].Office
-    #$sheet.Cells.Item($currentRow,6) = $userHash[$ant][0].Department
-    #$sheet.Cells.Item($currentRow,7) = if($userHash[$ant][1] -ne $null){if($userHash[$ant][1].UserProfileProperties.Manager -ne ""){$userHash[(get-upnFromSpoUserId $userHash[$ant][1].UserProfileProperties.Manager)][0].DisplayName}}
-    #$sheet.Cells.Item($currentRow,8) = if($userHash[$ant][1] -ne $null){if($userHash[$ant][1].UserProfileProperties.'SPS-Dotted-line' -ne ""){$userHash[(get-upnFromSpoUserId $userHash[$ant][1].UserProfileProperties.'SPS-Dotted-line')][0].DisplayName}}
-    #$sheet.Cells.Item($currentRow,9) = $userHash[$ant][0].MobilePhone
-    #$sheet.Cells.Item($currentRow,10) = $userHash[$ant][0].PhoneNumber
-    #$sheet.Cells.Item($currentRow,11) = format-emailAddress ($userHash[$ant][0].ProxyAddresses | ?{$_ -cmatch "SMTP:"}).Replace("SMTP:","")
-    #if($userHash[$ant][2] -ne $null){$sheet.Cells.Item($currentRow,12) = get-formattedTimeZone (Get-MailboxRegionalConfiguration -Identity $userHash[$ant][0].UserPrincipalName).TimeZone}
-    #$sheet.Cells.Item($currentRow,13) = $userHash[$ant][2].CustomAttribute1
-    $sheet.Cells.Item($currentRow,14) = $(Get-MailboxStatistics -Identity $userHash[$ant][2].UserPrincipalName | select LastLogonTime).LastLogonTime
+    $sheet.Cells.Item($currentRow,1) = $userHash[$ant][0].DisplayName
+    $sheet.Cells.Item($currentRow,2) = $userHash[$ant][0].Title
+    $sheet.Cells.Item($currentRow,3) = $userHash[$ant][0].Country
+    $sheet.Cells.Item($currentRow,4) = $userHash[$ant][0].City
+    $sheet.Cells.Item($currentRow,5) = $userHash[$ant][0].Office
+    $sheet.Cells.Item($currentRow,6) = $userHash[$ant][0].Department
+    $sheet.Cells.Item($currentRow,7) = if($userHash[$ant][1] -ne $null){if($userHash[$ant][1].UserProfileProperties.Manager -ne ""){$userHash[(get-upnFromSpoUserId $userHash[$ant][1].UserProfileProperties.Manager)][0].DisplayName}}
+    $sheet.Cells.Item($currentRow,8) = if($userHash[$ant][1] -ne $null){if($userHash[$ant][1].UserProfileProperties.'SPS-Dotted-line' -ne ""){$userHash[(get-upnFromSpoUserId $userHash[$ant][1].UserProfileProperties.'SPS-Dotted-line')][0].DisplayName}}
+    $sheet.Cells.Item($currentRow,9) = $userHash[$ant][0].MobilePhone
+    $sheet.Cells.Item($currentRow,10) = $userHash[$ant][0].PhoneNumber
+    $sheet.Cells.Item($currentRow,11) = format-emailAddress ($userHash[$ant][0].ProxyAddresses | ?{$_ -cmatch "SMTP:"}).Replace("SMTP:","")
+    if($userHash[$ant][2] -ne $null){$sheet.Cells.Item($currentRow,12) = get-formattedTimeZone (Get-MailboxRegionalConfiguration -Identity $userHash[$ant][0].UserPrincipalName).TimeZone}
+    $sheet.Cells.Item($currentRow,13) = $userHash[$ant][2].CustomAttribute1
+    $sheet.Cells.Item($currentRow,14) = $(Get-MailboxStatistics -Identity $userHash[$ant][2].MicrosoftOnlineServicesID | select LastLogonTime).LastLogonTime
     }
 $workbook.SaveAs($outputPath+"Anthesis Staff List_$((Get-Date).ToString("yyyy-MM-dd")).xlsx")
 $workbook.Close($false)

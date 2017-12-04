@@ -25,10 +25,11 @@ function format-MailTracePrettily($traceBlob){
     
 $trace = get-allToAddressXHours -recipientAddress "anthesisnorthamerica@anthesisgroup.com" -hoursAgo 150
 $trace = get-allToAddressXHours -recipientAddress "US-Anthesis@anthesisgroup.com" -hoursAgo 48
-$trace = get-allFromAddressXHours -senderAddress "mary.short@anthesisgroup.com" -hoursAgo 2
+$trace = get-allFromAddressXHours -senderAddress "graeme.hadley@anthesisgroup.com" -hoursAgo 384
+
 
 format-MailTracePrettily $trace
-
+$trace | Export-Csv -Path "$env:USERPROFILE\Desktop\MailTrace_$(Get-Date -Format yyyy-MM-dd).csv" -NoTypeInformation
 
 
 Import-Module LyncOnlineConnector
@@ -37,5 +38,5 @@ Get-CsOAuthConfiguration
 
 Set-OrganizationConfig -OAuth2ClientProfileEnabled $true
 Set-CsOAuthConfiguration -ClientAdalAuthOverride Allowed
-connect-
-new-cs
+
+$users.windowsliveid
