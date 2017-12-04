@@ -5,6 +5,7 @@
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles")
+Import-Module _PS_Library_GeneralFunctionality
 $webUrl = "https://anthesisllc.sharepoint.com" 
 
 #region Functions
@@ -206,6 +207,67 @@ function combine-url($arrayOfStrings){
     $output = $output.Replace("//","/").Replace("//","/").Replace("//","/")
     $output = $output.Replace("http:/","http://").Replace("https:/","https://")
     $output
+    }
+function convert-listItemToCustomObject($spoListItem, $spoTaxonomyData){
+    $alwaysExclude = @("Activities","AttachmentFiles","Attachments","AuthorId","ComplianceAssetId","ContentType","ContentTypeId","EditorId","FieldValuesAsHtml","FieldValuesAsText","FieldValuesForEdit","File","FileSystemObjectType","FirstUniqueAncestorSecurableObject","Folder","GetDlpPolicyTip","GUID","Id","ID-dup","OData__UIVersionString","ParentList","Properties","RoleAssignments","ServerRedirectedEmbedUrl","ServerRedirectedEmbedUri","Versions","__metadata")
+    #$dummy2 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Line_x0020_Manager"}
+    #$dummy2 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Primary_x0020_Team"}
+    #$dummy3 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Additional_x0020_Teams"}
+    #$dummy4 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Finance_x0020_Cost_x0020_Attribu"}
+    #$dummy5 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Additional_x0020_software_x0020_"}
+    #$dummy6 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Mobile_x002f_Cell_x0020_phone_x0"}
+    #Ignoring the standard fields listed above, go through each remainig property and process it based on its Type
+    $customObj = [psobject]::new()
+    $spoListItem | Get-Member -MemberType NoteProperty | ?{$alwaysExclude -notcontains $_.Name} | % {
+        $ourMember = $_
+        #$($ourMember.Name)
+        #$spoListItem.$($ourMember.Name)
+        #$spoListItem.$($ourMember.Name).GetType().Name
+        try{
+            switch ($spoListItem.$($ourMember.Name).GetType().Name){
+                "String" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $(sanitise-stripHtml -dirtyString $($spoListItem.$($ourMember.Name)))}
+                "Int" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
+                "Bool" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
+                "PSCustomObject" {
+                    #Now for the complicated stuff
+                    #Check for duff data first:
+                    if($spoListItem.$($ourMember.Name).__deferred -ne $null){$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value "Value was deferred. Check you expanded it correctly in the spoQuery"}
+                    else{
+                        #Is it a single-value User/Group?
+                        if($spoListItem.$($ourMember.Name).Title -ne $null){
+                            #Process users and groups differently (get user UPN or group Title):
+                            if($spoListItem.$($dummy2.Name).Name -match 'i:0\#\.f\|membership\|'){$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name).Name.Replace("i:0#.f|membership|","")}
+                            else{$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name).Title -Force}
+                            }
+                        #Is it a multi-value User/Group?
+                        elseif($spoListItem.$($ourMember.Name).results[0].Title -ne $null){
+                            $userOrGroups = @()
+                            foreach($userOrGroup in $spoListItem.$($ourMember.Name).results){[array]$userOrGroups += $userOrGroup.Title}
+                            $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $userOrGroups -Force
+                            }
+                        #Is it a single-value metadata field?
+                        if($spoListItem.$($ourMember.Name).TermGuid -ne $null){
+                            $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $($taxononmyData | ?{$_.IdForTerm -eq $spoListItem.$($ourMember.Name).TermGuid} | %{$_.Term}) -Force
+                            }
+                        #Is it a multi-value metadata field?
+                        if($spoListItem.$($ourMember.Name).results[0].TermGuid -ne $null){
+                            $userOrGroups = @()
+                            foreach($userOrGroup in $spoListItem.$($ourMember.Name).results){[array]$userOrGroups += $userOrGroup.Label}
+                            $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $userOrGroups -Force
+                            }
+                        }
+                    }
+                default {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value "Uh-oh, someone left a sponge in the patient :(" -Force} 
+                }
+            }
+        #Not clever, but only $nulls should land here. Ha - "should".
+        catch{
+            if ($($customObj | Get-Member -Name $($ourMember.Name.Replace("_x0020_","_"))) -eq $null){
+                $customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $null
+                }
+            }
+        }
+    $customObj
     }
 function copy-allFilesAndFolders($credentials, $webUrl, $sourceCtx, $sourceSiteCollectionPath, $sourceSitePath, $sourceLibraryName, $sourceFolderPath, $destCtx, $destSiteCollectionPath, $destSitePath, $destLibraryName, $destFolderPath, [boolean]$overwrite){
     if(!$sourceCtx){$sourceCtx = new-csomContext -fullSitePath $($webUrl+$sourceSiteCollectionPath+$sourceSitePath) -sharePointCredentials $credentials}

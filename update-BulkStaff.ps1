@@ -1,7 +1,7 @@
 ﻿Import-Module _PS_Library_MSOL.psm1
 Import-Module _CSOM_Library-SPO.psm1
 
-$antUsersCsv = import-csv "C:\Users\Kevin.Maitland\Desktop\AntUserUpdate2.csv" -Delimiter "`t" #This should be a tab-delimited file (e.g. a cut-and-paste from Excel to notepad) with the following headings:
+$antUsersCsv = import-csv "C:\Users\Kevin.Maitland\Desktop\BulkUpload.csv" -Delimiter "`t" #This should be a tab-delimited file (e.g. a cut-and-paste from Excel to notepad) with the following headings:
 # Employee	
 # Role	
 # Country	
@@ -20,7 +20,7 @@ $antUsersCsv = import-csv "C:\Users\Kevin.Maitland\Desktop\AntUserUpdate2.csv" -
 $anthesisMySite = 'https://anthesisllc-my.sharepoint.com/' # This needs to be the mySite where the userdata lives.
 $anthesisAdminSite = 'https://anthesisllc-admin.sharepoint.com/' # This needs to be the "admin" site.
 $badUsers = @()
-$countryToLocaleHashTable = @{"Canada"="4105";"China"="2052";"Finland"="1035";"Germany"="1031";"Korea"="1042";"Spain"="1034";"Sri Lanka"="";"Philippines"="13321";"Sweden"="1053";"United Arab Emirates"="";"United Kingdom"="2057";"United States"="1033"}
+$countryToLocaleHashTable = @{"Canada"="4105";"China"="2052";"Finland"="1035";"Germany"="1031";"Korea"="1042";"Spain"="1034";"Sri Lanka"="1097";"Philippines"="13321";"Sweden"="1053";"United Arab Emirates"="";"United Kingdom"="2057";"United States"="1033"}
 
 #region functions
 function convert-UPNToSpoAccountName($upn){
@@ -112,7 +112,7 @@ $userContext = new-csomContext -fullSitePath $anthesisMySite -sharePointCredenti
 $adminContext = new-csomContext -fullSitePath $anthesisAdminSite -sharePointCredentials $csomCreds
 $spoUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($adminContext)
 
-$msolUsers = Get-MsolUser #We'll use this to validate users
+$msolUsers = Get-MsolUser -all #We'll use this to validate users
 $timeZones = get-timeZones #We need this to translate between the differente TimeZone formats
 $spoTimeZones = get-spoTimeZoneHashTable #We need this to translate between the differente TimeZone formats
 
