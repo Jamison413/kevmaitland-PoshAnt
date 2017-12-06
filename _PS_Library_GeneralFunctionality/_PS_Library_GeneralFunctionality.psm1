@@ -10,7 +10,7 @@
     }
 function convertTo-arrayOfEmailAddresses($blockOfText){
     $blockOfText | %{
-        foreach($blob in $_.Split(" ")){
+        foreach($blob in $_.Split(" ").Split("`r`n")){
             if($blob -match "@" -and $blob -match "."){[array]$addresses += $blob}
             }
         }
