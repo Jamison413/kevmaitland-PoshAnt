@@ -1,6 +1,6 @@
 ﻿Import-Module _PS_Library_MSOL.psm1
 connect-ToExo
-$outputFile = "$env:USERPROFILE\Desktop\DGs.csv"
+$outputFile = "$env:USERPROFILE\Desktop\DGs_after.csv"
 
 $groups = Get-DistributionGroup
 $groups | % {

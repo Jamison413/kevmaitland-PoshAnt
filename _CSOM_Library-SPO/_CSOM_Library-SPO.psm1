@@ -560,6 +560,23 @@ function get-SPOGroup($ctx, $credentials, $webUrl, $siteCollection, $sitePath, $
     #    }
     $group
     }
+function get-spoLocaleFromCountry($p3LetterCountryIsoCode){
+    #$countryToLocaleHashTable = @{"Canada"="4105";"China"="2052";"Finland"="1035";"Germany"="1031";"Korea"="1042";"Spain"="1034";"Sri Lanka"="1097";"Philippines"="13321";"Sweden"="1053";"United Arab Emirates"="";"United Kingdom"="2057";"United States"="1033"}
+    $countryToLocaleHashTable = @{"CAN"="4105";"CHN"="2052";"FIN"="1035";"DEU"="1031";"KOR"="1042";"ESP"="1034";"LKA"="1097";"PHL"="13321";"SWE"="1053";"ARE"="";"GBR"="2057";"USA"="1033"}
+    $countryToLocaleHashTable[$pCountry]
+    }
+function get-spoTimeZoneHashTable($credentials){
+    $ctx = new-csomContext -fullSitePath "https://anthesisllc.sharepoint.com" -sharePointCredentials $credentials
+    $tz = $ctx.Web.RegionalSettings.TimeZones
+    $ctx.Load($tz) | Out-Null
+    $tzEnum = $ctx.Web.RegionalSettings.TimeZones.GetEnumerator()
+    $ctx.ExecuteQuery() | Out-Null
+    $spoTimeZones = @{}
+    while($tzEnum.MoveNext()){
+        $spoTimeZones.Add($tzEnum.Current.Description, $tzEnum.Current.Id) | Out-Null
+        }
+    $spoTimeZones
+    }
 function get-webTempates($credentials, $webUrl, $siteCollection, $site){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$site) -sharePointCredentials $credentials
     #New-Object Microsoft.SharePoint.Client.ClientContext($webUrl+$siteCollection+$site) 

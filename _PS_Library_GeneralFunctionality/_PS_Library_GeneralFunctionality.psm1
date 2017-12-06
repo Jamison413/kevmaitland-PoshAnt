@@ -21,6 +21,168 @@ function convertTo-localisedSecureString($plainText){
     if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
     ConvertTo-SecureString $plainText -AsPlainText -Force | ConvertFrom-SecureString
     }
+function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[boolean]$localise){
+    if($pDirtyNumber.Length -gt 0){
+        $dirtynumber = $pDirtyNumber.Split("ext")[0]
+        $dirtynumber = $dirtyNumber.Trim() -replace '[^0-9]+',''
+        switch ($p3letterIsoCountryCode){
+            "ARE" {
+                if($dirtyNumber.Length -eq 10 -and $dirtyNumber.Substring(0,1) -eq "0"){$dirtyNumber = $dirtyNumber.Substring(1,9)}
+                if($dirtyNumber.Length -eq 12 -and $dirtyNumber.Substring(0,3) -eq "971"){$dirtyNumber = $dirtyNumber.Substring(3,9)}
+                if($dirtyNumber.Length -eq 9){
+                    if ($localise){}
+                    else{$cleanNumber = "+971 $dirtyNumber"}
+                    }
+                }
+            "CAN" {
+                if($dirtyNumber.Length -eq 11 -and $dirtyNumber.Substring(0,1) -eq "1"){$dirtyNumber = $dirtyNumber.Substring(1,10)}
+                if($dirtyNumber.Length -eq 10){
+                    if ($localise){$cleanNumber = "+1 " + $dirtyNumber.Substring(1,3) + "-"+$dirtyNumber.Substring(4,3)+"-"+$dirtyNumber.Substring(7,4)}
+                    else{$cleanNumber = "+1 $dirtyNumber"}
+                    }
+                }
+            "CHN" {
+                if($dirtyNumber.Length -eq 13 -and $dirtyNumber.Substring(0,2) -eq "86"){$dirtyNumber = $dirtyNumber.Substring(2,11)}
+                if($dirtyNumber.Length -eq 11){
+                    if ($localise){}
+                    else{$cleanNumber = "+86 $dirtyNumber"}
+                    }
+                }
+            "DEU" {
+                if($dirtyNumber.Length -eq 12 -and $dirtyNumber.Substring(0,2) -eq "49"){$dirtyNumber = $dirtyNumber.Substring(2,10)}
+                if($dirtyNumber.Length -eq 10){
+                    if ($localise){}
+                    else{$cleanNumber = "+49 $dirtyNumber"}
+                    }
+                }
+            "ESP" {"ES"}
+            "FIN" {
+                if($dirtyNumber.Length -eq 12 -and $dirtyNumber.Substring(0,3) -eq "358"){$dirtyNumber = $dirtyNumber.Substring(3,9)}
+                if($dirtyNumber.Length -eq 9){
+                    if ($localise){}
+                    else{$cleanNumber = "+358 $dirtyNumber"}
+                    }
+                }
+            "GBR" {
+                if($dirtyNumber.Length -eq 11 -and $dirtyNumber.Substring(0,1) -eq "0"){$dirtyNumber = $dirtyNumber.Substring(1,10)}
+                if($dirtyNumber.Length -eq 12 -and $dirtyNumber.Substring(0,2) -eq "44"){$dirtyNumber = $dirtyNumber.Substring(2,10)}
+                if($dirtyNumber.Length -eq 10){
+                    if ($localise){}
+                    else{$cleanNumber = "+44 $dirtyNumber"}
+                    }
+                }
+            "IRL" {
+                if($dirtyNumber.Substring(0,1) -eq "0"){$dirtyNumber = $dirtyNumber.Substring(1,$dirtyNumber.Length-1)}
+                if($dirtyNumber.Substring(0,3) -eq "353"){$dirtyNumber = $dirtyNumber.Substring(3,$dirtyNumber.Length-3)}
+                if ($localise){}
+                else{$cleanNumber = "+353 $dirtyNumber"}
+                }
+            "PHL" {
+                if($dirtyNumber.Length -eq 12 -and $dirtyNumber.Substring(0,2) -eq "63"){$dirtyNumber = $dirtyNumber.Substring(2,10)}
+                if($dirtyNumber.Length -eq 10){
+                    if ($localise){}
+                    else{$cleanNumber = "+63 $dirtyNumber"}
+                    }
+                }
+            "SWE" {
+                if($dirtyNumber.Length -eq 11 -and $dirtyNumber.Substring(0,2) -eq "46"){$dirtyNumber = $dirtyNumber.Substring(2,9)}
+                if($dirtyNumber.Length -eq 9){
+                    if ($localise){}
+                    else{$cleanNumber = "+46 $dirtyNumber"}
+                    }
+                }
+            "USA" {
+                if($dirtyNumber.Length -eq 11 -and $dirtyNumber.Substring(0,1) -eq 1){$dirtyNumber = $dirtyNumber.Substring(1,10)}
+                if($dirtyNumber.Length -eq 10){
+                    if ($localise){$cleanNumber = "+1 (" + $dirtyNumber.Substring(1,3) + ") "+$dirtyNumber.Substring(4,3)+"-"+$dirtyNumber.Substring(7,4)}
+                    else{$cleanNumber = "+1 $dirtyNumber"}
+                    }
+                }
+            }
+        }
+    if($cleanNumber -eq $null){$cleanNumber = $pDirtyNumber}
+    $cleanNumber
+    }
+function get-3letterIsoCodeFromCountryName($pCountryName){
+    switch ($pCountryName) {
+        {@("UAE","UE","AE","ARE","United Arab Emirates","Dubai") -contains $_} {"ARE"}
+        {@("CA","CAN","Canada","Canadia") -contains $_} {"CAN"}
+        {@("CN","CHN","China") -contains $_} {"CHN"}
+        {@("DE","DEU","GE","GER","Germany","Deutschland","Deutchland") -contains $_} {"DEU"}
+        {@("ES","ESP","SP","SPA","Spain","España","Espania") -contains $_} {"ESP"}
+        {@("FI","FIN","Finland","Suomen","Suomen tasavalta") -contains $_} {"FIN"}
+        {@("UK","GB","GBR","United Kingdom","Great Britain","Scotland","England","Wales","Northern Ireland") -contains $_} {"GBR"}
+        {@("IE","IRL","IR","IER","Ireland") -contains $_} {"IRL"}
+        {@("PH","PHL","PHI","FIL","Philippenes","Phillippenes","Philipenes","Phillipenes") -contains $_} {"IRL"}
+        {@("SE","SWE","SW","SWD","Sweden","Sweeden","Sverige") -contains $_} {"SWE"}
+        {@("US","USA","United States","United States of America") -contains $_} {"USA"}
+        #Add more countries
+        default {"US"}
+        }
+    }
+
+function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
+    switch ($p3letterIsoCode) {
+        "ARE" {"AE"}
+        "CAN" {"CA"}
+        "CHN" {"CN"}
+        "DEU" {"DE"}
+        "ESP" {"ES"}
+        "FIN" {"FI"}
+        "GBR" {"GB"}
+        "IRL" {"IE"}
+        "PHL" {"PH"}
+        "SWE" {"SE"}
+        "USA" {"US"}
+        #Add more countries
+        default {"Unknown"}
+        }
+    }
+function get-timeZones(){
+    $timeZones = Get-ChildItem "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Time zones" | foreach {Get-ItemProperty $_.PSPath}; $TimeZone | Out-Null
+    $timeZones
+    }
+function get-timeZoneHashTable($timeZoneArray){
+    if($timeZoneArray.Count -lt 1){$timeZones = get-timeZones}
+        else {$timeZones = $timeZoneArray}
+    $timeZoneHashTable = @{}
+    $timeZones | % {$timeZoneHashTable.Add($_.PSChildName, ($_.Display.Split(" ")[0].Replace("(","").Replace(")","")))} | Out-Null
+    $timeZoneHashTable.Add("","Unknown") | Out-Null
+    $timeZoneHashTable
+    }
+function get-timeZoneSpsIdFromUnformattedTimeZone($pUnformattedTimeZone, $pTimeZoneHashTable, $pSpoTimeZoneHashTable){
+    if ($pTimeZoneHashTable.Count -eq 0){$timeZoneHashTable = get-timeZoneHashTable}
+        else{$timeZoneHashTable = $pTimeZoneHashTable}
+    if ($pSpoTimeZoneHashTable.Count -eq 0){
+        
+
+        $spoTimeZoneHashTable = get-timeZoneHashTable
+        }
+        else{$spoTimeZoneHashTable = $pSpoTimeZoneHashTable}
+
+    }
+function get-unformattedTimeZone ($pFormattedTimeZone){
+    if ($pFormattedTimeZone -eq "" -or $pFormattedTimeZone -eq $null){"Unknown"}
+    else{
+        #$pFormattedTimeZone.Split("(")[1].Replace(")","").Trim()
+        [regex]::Match($pFormattedTimeZone,"\(([^)]+)\)").Groups[1].Value #Get everything between "(" and ")"
+        }
+    }
+function guess-languageCodeFromCountry($p3LetterCountryIsoCode){
+    switch ($p3LetterCountryIsoCode){
+        "ARE" {"en-GB"}
+        "CAN" {"en-CA"}
+        "CHN" {"en-US"}
+        "DEU" {"de"}
+        "ESP" {"es"}
+        "FIN" {"fi"}
+        "GBR" {"en-GB"}
+        "IRL" {"en-GB"}
+        "PHL" {"en-US"}
+        "SWE" {"sv"}
+        "USA" {"en-US"}
+        }
+    }
 function log-action($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`tACTION:`t$myMessage") -Path $logFile}
     if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Yellow $myMessage}
