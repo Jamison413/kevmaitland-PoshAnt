@@ -9,12 +9,32 @@
     $output
     }
 function convertTo-arrayOfEmailAddresses($blockOfText){
+    $addresses = @()
     $blockOfText | %{
         foreach($blob in $_.Split(" ").Split("`r`n")){
-            if($blob -match "@" -and $blob -match "."){[array]$addresses += $blob}
+            if($blob -match "@" -and $blob -match "."){$addresses += $blob}
             }
         }
     $addresses
+    }
+function convertTo-arrayOfStrings($blockOfText){
+    $strings = @()
+    $blockOfText | %{
+        foreach($blob in $_.Split(",").Split("`r`n")){
+            if(![string]::IsNullOrEmpty($blob)){$strings += $blob}
+            }
+        }
+    $strings
+    }
+function convertTo-exTimeZoneValue($pAmbiguousTimeZone){
+    $singleResult = @()
+    $tzs = get-timeZones
+    $tryThis = $pAmbiguousTimeZone.Replace([regex]::Match($pAmbiguousTimeZone,"\(([^)]+)\)").Groups[0].Value,"").Trim() #Get everything not between "(" and ")"
+    [array]$singleResult = $tzs | ? {$_.PSChildName -eq $tryThis} #Match it to the registry timezone names
+    if ($singleResult.Count -eq 1){$singleResult[0].PSChildName}
+    else{
+        #Try something else
+        }
     }
 function convertTo-localisedSecureString($plainText){
     if ($(Get-Module).Name -notcontains "_PS_Library_Forms"){Import-Module _PS_Library_Forms}
@@ -117,7 +137,7 @@ function get-3letterIsoCodeFromCountryName($pCountryName){
         {@("SE","SWE","SW","SWD","Sweden","Sweeden","Sverige") -contains $_} {"SWE"}
         {@("US","USA","United States","United States of America") -contains $_} {"USA"}
         #Add more countries
-        default {"US"}
+        default {"GBR"}
         }
     }
 

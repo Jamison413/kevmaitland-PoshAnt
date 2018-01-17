@@ -4,19 +4,15 @@ $msolCredentials = set-MsolCredentials
 connect-ToMsol -credential $msolCredentials
 
 $toDelete = convertTo-arrayOfEmailAddresses -blockOfText "Luis.Schaeffer@anthesisgroup.com
-Macclesfieldmeetingroom@anthesisgroup.com
-OxfordBoardRoom@anthesisgroup.com
-OxfordTrainingRoom@anthesisgroup.com
-UK.Info@anthesisgroup.com
-OxfordMeeting@anthesisgroup.com
-anna.rengstedt2@anthesisgroup.com
-tenders@anthesisgroup.com
-sustainability@anthesisgroup.com
 Matteo.Cossutta@anthesisgroup.com
 Elanor.Swan@anthesisgroup.com
+Tom.Drzewiecki@anthesisgroup.com
 Saro.Sivakumaran@anthesisgroup.com
 Bethany.Field@anthesisgroup.com
+CJ.Westrick@anthesisgroup.com
 Lucy.Richardson@anthesisgroup.com
+Michelle.Langefeld@anthesisgroup.com
+Dries.Dhooghe@anthesisgroup.com
 will.schreiber@anthesisgroup.com
 Paul.McNeillis@anthesisgroup.com
 cara.egbe@anthesisgroup.com
@@ -27,6 +23,7 @@ kathy.smith1@anthesisgroup.com
 Stefano.Andreola@anthesisgroup.com
 coramorena.fritz@anthesisgroup.com
 Dave.Cooke@anthesisgroup.com
+wdpec@anthesisgroup.com
 nicola.jenkin@anthesisgroup.com
 Fiona.Barker@anthesisgroup.com
 Esther.Areikin@anthesisgroup.com
@@ -39,27 +36,40 @@ Geoff.Green@anthesisgroup.com
 Alan.Ritchie@anthesisgroup.com
 Ruth.Norriss@anthesisgroup.com
 Ashley.Retallack@anthesisgroup.com
-FLEETSTMTGRMSNUG@anthesisgroup.com
 Tim.Duke@anthesisgroup.com
+WD@anthesisgroup.com
+renan.navarro@anthesisgroup.com
 Isabel.Terry@anthesisgroup.com
 alastair.pattrick@anthesisgroup.com
 Elise.Benjiman@anthesisgroup.com
 lucy.welch@anthesisgroup.com
 Cat.Hobbs@anthesisgroup.com
 Rosie.Sibley@anthesisgroup.com
-FLEETSTMTGRM1@anthesisgroup.com
 Pat.Glanville@anthesisgroup.com
 erika.bata@anthesisgroup.com
 Charles.Perry@anthesisgroup.com
-David.Fellows@anthesisgroup.com
-Tom.Drzewiecki@anthesisgroup.com
-CJ.Westrick@anthesisgroup.com
-Michelle.Langefeld@anthesisgroup.com
-Dries.Dhooghe@anthesisgroup.com
-wdpec@anthesisgroup.com
-WD@anthesisgroup.com
-renan.navarro@anthesisgroup.com"
-$toDisable = convertTo-arrayOfEmailAddresses -blockOfText "Ali.Mahdavi@anthesisgroup.com
+David.Fellows@anthesisgroup.com"
+$sustain = convertTo-arrayOfEmailAddresses -blockOfText "Kitbag-EEF1@anthesisgroup.com
+Kitbag-ESOS1@anthesisgroup.com
+Kitbag-ECOTechnicalMonitoring@anthesisgroup.com
+Kitbag-ESOS2@anthesisgroup.com
+Kitbag-EEF2@anthesisgroup.com
+MeetingRoom.Lovins@anthesisgroup.com
+MeetingRoom.Tesla@anthesisgroup.com
+MeetingRoomWatt@anthesisgroup.com
+BidsTenders@sustain.co.uk
+SatNav-Shephard@anthesisgroup.com
+SatNav-Hurley@anthesisgroup.com
+iPad02@anthesisgroup.com
+Camera-ThermalImaging2@anthesisgroup.com
+Sustain.Recruitment@anthesisgroup.com
+Kitbag-SmartHeat@anthesisgroup.com
+Camera-ThermalImaging1@anthesisgroup.com
+SatNav-Austen@anthesisgroup.com"
+
+$toDisable2 = convertTo-arrayOfEmailAddresses -blockOfText "Ali.Mahdavi@anthesisgroup.com
+OxfordBoardRoom@anthesisgroup.com
+Macclesfieldmeetingroom@anthesisgroup.com
 Ningwei.Dong@anthesisgroup.com
 content@anthesisgroup.com
 CDP-Support@anthesisgroup.com
@@ -69,6 +79,8 @@ Kitbag-EEF1@anthesisgroup.com
 Mats.Ivarsson@anthesisgroup.com
 nwsbq@anthesisgroup.com
 Kitbag-ESOS1@anthesisgroup.com
+OxfordTrainingRoom@anthesisgroup.com
+UK.Info@anthesisgroup.com
 Kitbag-ECOTechnicalMonitoring@anthesisgroup.com
 BWI@anthesisgroup.com
 wsfpbs@anthesisgroup.com
@@ -101,6 +113,7 @@ m.hidary@anthesisgroup.com
 ian@anthesisgroup.com
 londontcsroom@anthesisgroup.com
 Erik.Wallentin@anthesisgroup.com
+OxfordMeeting@anthesisgroup.com
 Emergen.Programme@anthesisgroup.com
 calebconatcts@anthesisgroup.com
 SatNav-Shephard@anthesisgroup.com
@@ -113,10 +126,13 @@ Matthew.Williams@anthesisgroup.com
 administrator@lrsconsultancy.com
 ukbidsandtenders@anthesisgroup.com
 Info123@anthesisgroup.com
+anna.rengstedt2@anthesisgroup.com
+tenders@anthesisgroup.com
 Gillian.Phillips@anthesisgroup.com
 jobs_de@anthesisgroup.com
 iPad01@anthesisgroup.com
 EORM@anthesisgroup.com
+sustainability@anthesisgroup.com
 MeetingRoom.Tesla@anthesisgroup.com
 Tom.McKellarSmythe@anthesisgroup.com
 SMO-AnthesisResources1@anthesisgroup.com
@@ -141,5 +157,23 @@ Camera-ThermalImaging1@anthesisgroup.com
 Collin.Marshall@anthesisgroup.com
 Sustain.Recruitment@anthesisgroup.com
 Copier@lrsconsultancy.com"
+    FLEETSTMTGRMSNUG@anthesisgroup.com
+    FLEETSTMTGRM1@anthesisgroup.com
 
-$dummy | %{Set-MsolUser -UserPrincipalName $_ -BlockCredential $true}
+$toDelete | %{Set-MsolUser -UserPrincipalName $_ -BlockCredential $true}
+$sustain | %{Set-MsolUser -UserPrincipalName $_ -BlockCredential $true}
+
+$sustain.count
+$toDisable.count
+
+$toDisable2 | %{
+    Write-Host -ForegroundColor Yellow $_
+    Set-MsolUser -UserPrincipalName $_ -BlockCredential $true
+    }
+
+$toDelete |%{Get-Mailbox -Identity $_ | %{Write-Host -ForegroundColor Yellow "$($_.DisplayName)`t$($_.RecipientTypeDetails)"}}
+$dummy = Get-Mailbox -Identity $toDelete[$toDelete.Count-1] 
+$dummy | fl
+
+Remove-MsolUser -UserPrincipalName Matteo.Cossutta@anthesisgroup.com
+$toDelete |%{Remove-MsolUser -UserPrincipalName $_ -Force}

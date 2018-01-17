@@ -129,7 +129,7 @@ foreach($dirtyClient in $dirtyClients){
                 #If we've got this far, try to update the IsDirty property on the Client in [Kimble Clients]
                 try{
                     log-action "update-itemInList Kimble Clients | $($dirtyClient.Title) [$($dirtyClient.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyClient.__metadata -propertyName "type") -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest -verboseLogging $true -logFile $debugLog
+                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Clients" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyClient.__metadata -propertyName "type") -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest -verboseLogging $true -logFile $debugLog
                     try{
                         $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -oDataQuery "?`$filter=Id eq $($dirtyClient.Id)" -restCreds $restCreds
                         if($updatedItem.IsDirty -eq $false){log-result "SUCCESS: $($dirtyClient.Title) updated!" -logFile $fullLogPathAndName}
@@ -162,7 +162,7 @@ foreach($dirtyClient in $dirtyClients){
                 if((get-list -sitePath $clientSite -listName $dirtyClient.Title -serverUrl $webUrl -restCreds $restCreds) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
                     log-result "SUCCESS: $($dirtyClient.PreviousName) updated to $($dirtyClient.Title)" -logFile $fullLogPathAndName
                     log-action "update-itemInList Kimble Clients | $($dirtyClient.Title) ($($dirtyClient.Id) @{IsDirty=$false})" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyClient.__metadata -propertyName "type") -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest
+                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Clients" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyClient.__metadata -propertyName "type") -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest
                     try{
                         $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -oDataQuery "?`$filter=Id eq $($dirtyClient.Id)" -restCreds $restCreds
                         if($updatedItem.IsDirty -eq $false){log-result "SUCCESS: $($dirtyClient.Title) updated!" -logFile $fullLogPathAndName}
@@ -265,7 +265,7 @@ foreach($dirtyLead in $dirtyLeads){
                     #If we've got this far, try to update the IsDirty property on the Lead
                     try{
                         log-action "update-itemInList Kimble Leads | $($dirtyLead.Title) [$($dirtyLead.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
-                        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
+                        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
                         #Validate that the change was actually made
                         try{
                             $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -oDataQuery "?`$filter=Id eq $($dirtyLead.Id)" -restCreds $restCreds
@@ -292,7 +292,7 @@ foreach($dirtyLead in $dirtyLeads){
             if($clientLibraryLeadFolder.__metadata){
                 try{
                     log-action -myMessage "update-itemInList [$($kimbleClientHashTable[$dirtyLead.KimbleClientId])] | $($dirtyLead.PreviousName) > @{Title=$leadFolderName;FileLeafRef=$leadFolderName}" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName $($kimbleClientHashTable[$dirtyLead.KimbleClientId]) -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $clientLibraryLeadFolder.__metadata -propertyName "type") -itemId $clientLibraryLeadFolder.Id -hashTableOfItemData @{Title=$leadFolderName;FileLeafRef=$leadFolderName} -restCreds $restCreds -digest $clientDigest #| Out-Null
+                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid $($kimbleClientHashTable[$dirtyLead.KimbleClientId]) -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $clientLibraryLeadFolder.__metadata -propertyName "type") -itemId $clientLibraryLeadFolder.Id -hashTableOfItemData @{Title=$leadFolderName;FileLeafRef=$leadFolderName} -restCreds $restCreds -digest $clientDigest #| Out-Null
                     try{
                         $updatedItem = get-folderInLibrary -serverUrl $webUrl -sitePath $clientSite -libraryName $($kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderPathAndOrName "/$leadFolderName" -restCreds $restCreds
                         if($updatedItem.__metadata){log-result "SUCCESS: $($dirtyLead.PreviousName) updated!" -logFile $fullLogPathAndName}
@@ -304,7 +304,7 @@ foreach($dirtyLead in $dirtyLeads){
             else{log-result -myMessage "FAILED: Could not retrieve folder: /$($kimbleClientHashTable[$dirtyLead.KimbleClientId])/BD_$($dirtyLead.PreviousName) (so cannot rname it)" -logFile $fullLogPathAndName}
             }
             if((get-folderInLibrary -sitePath $clientSite -libraryName $kimbleClientHashTable[$dirtyLead.KimbleClientId] -folderName $leadFolderName) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
-                update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false}
+                update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false}
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Folder I (allegedly) just updated: [$leadFolderName] this will stay as IsDirty=true forever :(" -logFile $fullLogPathAndName}
             }
@@ -323,7 +323,7 @@ foreach($dirtyLead in $dirtyLeads){
     else{
         log-action -myMessage "WARNING: LEAD [$($dirtyLead.Title)] for client [$($kimbleClientHashTable[$dirtyLead.KimbleClientId])] IsDirty, but I can't work out why :/ It might just be queued for re-processing, so I'll mark it as IsDirty = $false" -logFile $fullLogPathAndName
         log-action "update-itemInList Kimble Leads | $($dirtyLead.Title) [$($dirtyLead.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
-        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
+        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
         #Validate that the change was actually made
         try{
             $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -oDataQuery "?`$filter=Id eq $($dirtyLead.Id)" -restCreds $restCreds
@@ -387,7 +387,7 @@ foreach($dirtyProject in $dirtyProjects){
                     #If we've got this far, try to update the IsDirty property on the Project
                     try{
                         log-action "update-itemInList Kimble Projects | $($dirtyProject.Title) [$($dirtyProject.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
-                        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Projects" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyProject.__metadata -propertyName "type") -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
+                        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Projects" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyProject.__metadata -propertyName "type") -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
                         #Validate that the change was actually made
                         try{
                             $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Projects" -oDataQuery "?`$filter=Id eq $($dirtyProject.Id)" -restCreds $restCreds
@@ -415,7 +415,7 @@ foreach($dirtyProject in $dirtyProjects){
             if($clientLibraryProjectFolder.__metadata){
                 try{
                     log-action -myMessage "update-itemInList [$($kimbleClientHashTable[$dirtyProject.KimbleClientId])] | $($dirtyProject.PreviousName) > @{Title=$dirtyProject.Title;FileLeafRef=$dirtyProject.Title}" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName $($kimbleClientHashTable[$dirtyProject.KimbleClientId]) -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $clientLibraryProjectFolder.__metadata -propertyName "type") -itemId $clientLibraryProjectFolder.Id -hashTableOfItemData @{Title=$dirtyProject.Title;FileLeafRef=$dirtyProject.Title} -restCreds $restCreds -digest $clientDigest #| Out-Null
+                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid $($kimbleClientHashTable[$dirtyProject.KimbleClientId]) -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $clientLibraryProjectFolder.__metadata -propertyName "type") -itemId $clientLibraryProjectFolder.Id -hashTableOfItemData @{Title=$dirtyProject.Title;FileLeafRef=$dirtyProject.Title} -restCreds $restCreds -digest $clientDigest #| Out-Null
                     try{
                         $updatedItem = get-folderInLibrary -serverUrl $webUrl -sitePath $clientSite -libraryName $($kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderPathAndOrName "/$projectFolderName" -restCreds $restCreds
                         if($updatedItem.__metadata){log-result "SUCCESS: $($dirtyProject.PreviousName) updated!" -logFile $fullLogPathAndName}
@@ -427,7 +427,7 @@ foreach($dirtyProject in $dirtyProjects){
             else{log-result -myMessage "FAILED: Could not retrieve folder: /$($kimbleClientHashTable[$dirtyProject.KimbleClientId])/$($dirtyProject.PreviousName) (so cannot rename it)" -logFile $fullLogPathAndName}
             }
             if((get-folderInLibrary -sitePath $clientSite -libraryName $kimbleClientHashTable[$dirtyProject.KimbleClientId] -folderName $dirtyProject.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
-                update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Projects" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyProject.__metadata -propertyName "type") -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false}
+                update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Projects" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyProject.__metadata -propertyName "type") -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false}
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtyProject.Title)] this will stay as IsDirty=true forever :(" -logFile $fullLogPathAndName}
             }
@@ -465,7 +465,7 @@ foreach($dirtyProject in $dirtyProjects){
                 #If we've got this far, try to update the IsDirty property on the Project
                 try{
                     log-action "update-itemInList Kimble Projects | $($dirtyProject.Title) [$($dirtyProject.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Projects" -predeterminedItemType $dirtyProject.__metadata.type -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest | Out-Null
+                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Projects" -predeterminedItemType $dirtyProject.__metadata.type -itemId $dirtyProject.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest | Out-Null
                     try{
                         $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Projects" -oDataQuery "?`$filter=Id eq $($dirtyProject.Id)" -restCreds $restCreds
                         if($updatedItem.IsDirty -eq $false){log-result "SUCCESS: $($dirtyProject.Title) updated!" -logFile $fullLogPathAndName}

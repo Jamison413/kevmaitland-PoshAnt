@@ -1,10 +1,10 @@
 ﻿Import-Module _PS_Library_MSOL
 connect-ToExo
 
-$daysToLookBack = 7
-if(!$toDate){$toDate = Get-Date}
-if(!$fromDate){$fromDate = $toDate.AddDays(-$daysToLookBack)}
-[array]$arrayOfUsers = @("richard.peagam@anthesisgroup.com")
+$daysToLookBack = 90
+if(!$toDate){$toDate = $(Get-Date).AddDays(1)}
+if(!$fromDate){$fromDate = $toDate.AddDays(-($daysToLookBack+1))}
+[array]$arrayOfUsers = @("ian.forrester@anthesisgroup.com")
 [array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
 $title = $arrayOfUsers[0]+" "+(get-date)
 
@@ -43,7 +43,6 @@ function parse-unifiedAuditLogCsvToPsObjects($pathToAuditLogCsvFile){
 
 
 rv log
-rv events
 do{
     [int]$lastCount = $log.Count
     write-host $lastCount
@@ -53,7 +52,7 @@ while($lastCount -ne $log.Count)
 
 $usefulLog =  parse-unifiedAuditLogToPsObjects -auditLogEntries $log
 $usefulLog | Out-GridView
-$usefulLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd).csv -NoClobber -NoTypeInformation
+$usefulLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd)5.csv -NoClobber -NoTypeInformation
 
 
 
