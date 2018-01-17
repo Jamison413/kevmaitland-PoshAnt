@@ -103,7 +103,12 @@ function Invoke-SPORestMethod {
         # If the returned data is a binary data object such as a file from a SharePoint site specify the output file name to save the data to.
         [Parameter(Mandatory = $false, Position = 8)]
         [ValidateNotNullOrEmpty()]
-        [string]$OutFile
+        [string]$OutFile,
+
+        # Override the default timeout for long runnign queries
+        [Parameter(Mandatory = $false, Position = 9)]
+        [ValidateNotNullOrEmpty()]
+        [long]$manualTimeOut
     )
 
     Begin {
@@ -146,7 +151,8 @@ function Invoke-SPORestMethod {
         } else {
             $request.ContentLength = 0
         }
- 
+        if ($manualTimeOut -ne 0){$request.Timeout = $manualTimeOut}
+
         $response = $request.GetResponse()
         try {
             $streamReader = New-Object System.IO.StreamReader $response.GetResponseStream()
@@ -254,6 +260,22 @@ function format-path($dirtyPath){
     if($dirtyPath.Substring(0,1) -ne "/"){$dirtyPath = "/"+$dirtyPath}
     if($dirtyPath.Substring(($dirtyPath.Length-1),1) -eq "/"){$dirtyPath = $dirtyPath.Substring(0,$dirtyPath.Length-1)}
     $dirtyPath
+    }
+function get-allLists($serverUrl, $sitePath,$restCreds,$verboseLogging,$logFile){
+    #Sanitise parameters
+    $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
+    $listName = (sanitise-forSharePointUrl $listName).Replace("Lists/","")
+    #Build and execute REST statement
+    $url = $serverUrl+$sitePath+"/_api/web/Lists/"
+    try{
+        if($verboseLogging){log-action "get-allLists: Invoke-SPORestMethod -Url $url" -logFile $logFile}
+        Invoke-SPORestMethod -Url $url -credentials $restCreds -manualTimeOut 600000
+        if($verboseLogging){log-result "SUCCESS: List found" -logFile $logFile}
+        }
+    catch{
+        if($verboseLogging){$_;$url;log-error -myError $_ -myFriendlyMessage "Failed to get-allLists: Invoke-SPORestMethod -Url $url" -doNotLogToEmail $true -errorLogFile $logFile}
+        $false
+        }
     }
 function get-fileInLibrary($serverUrl, $sitePath, $libraryAndFolderPath, $fileName, $restCreds,$verboseLogging,$logFile){
     #Sanitise parameters
