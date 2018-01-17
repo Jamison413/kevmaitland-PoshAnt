@@ -2,9 +2,77 @@
 Import-Module _PS_Library_GeneralFunctionality
 connect-ToExo
 
-$members = @()
+$members = convertTo-arrayOfStrings -blockOfText "Stuart Mclachlan
+Ian Forrester
+Enda.Colfer@anthesisgroup.com
+Alan matthews
+Chris Keller
+Malcolm Paul
+Jason Urry
+Paul Crewe
+"
+
+$members = convertTo-arrayOfEmailAddresses -blockOfText "Kev Maitland
+ 
+kevin.maitland@anthesisgroup.com
+ 
+ 
+G
+ 
+Georgie Edwards
+ 
+Georgie.Edwards@anthesisgroup.com
+ 
+ 
+S
+ 
+Sion Fenwick
+ 
+Sion.Fenwick@anthesisgroup.com
+ 
+ 
+P
+ 
+Pete Best
+ 
+Pete.Best@anthesisgroup.com
+ 
+ 
+J
+ 
+James Walker
+ 
+james.walker@anthesisgroup.com
+ 
+ 
+M
+ 
+Margaret Davis
+ 
+Margaret.Davis@anthesisgroup.com
+ 
+ 
+L
+ 
+Louise Trimby
+ 
+Louise.Trimby@anthesisgroup.com
+ 
+ 
+M
+ 
+Mark Griffin
+ 
+Mark.Griffin@anthesisgroup.com
+ 
+ 
+S
+ 
+Stuart Gray"
+
+$members = @("Carl.van.Tonder","istvan.denes","Craig.Simmons","Ben.Diallo","Stephen.Ellis","Greg.Stencel")
 $memberOf = @()
-$name = "ECO2 Team"
+$name = "Products & Technology Team2"
 $hideFromGal = $false
 $blockExternalMail = $true
 
@@ -15,7 +83,7 @@ function new-mailEnabledDistributionGroup($displayName, $members, $memberOf, $hi
     }
 
 
-new-mailEnabledDistributionGroup -displayName $name -members $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail
+    new-mailEnabledDistributionGroup -displayName $name -members $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail
 
 #Add-MailboxPermission -AccessRights fullaccess -Identity nigel.arnott -User mary.short -AutoMapping $true
 #$members | %{Add-DistributionGroupMember -Identity "iONA Capital Team" -Member $_}

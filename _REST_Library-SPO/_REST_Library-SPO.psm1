@@ -202,7 +202,8 @@ function Invoke-SPORestMethod {
 #region Ant functions
 function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds,$verboseLogging,$logFile){
     $sitePath = format-path $sitePath
-    if(($digest.expiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
+    if($digest -eq $null){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
+    elseif(($digest.expiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
     else{$digest}
     }
 function copy-fileInLibrary($sourceSitePath,$sourceLibraryAndFolderPath,$sourceFileName,$destinationSitePath,$destinationLibraryAndFolderPath,$destinationFileName,[boolean]$overwrite, $restCreds, $digest,$verboseLogging,$logFile){
@@ -538,14 +539,18 @@ function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $r
         $false
         }
     }
-function update-itemInList($serverUrl,$sitePath,$listName,$predeterminedItemType,$itemId,$hashTableOfItemData,$restCreds,$digest,$verboseLogging,$logFile){
+function update-itemInList($serverUrl,$sitePath,$listNameOrGuid,$predeterminedItemType,$itemId,$hashTableOfItemData,$restCreds,$digest,$verboseLogging,$logFile){
     #Sanitise parameters
     $sitePath = format-path (sanitise-forSharePointUrl $sitePath)
-    $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listName.Replace("Lists/","")))
+    
     #Prepare security and log action
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
-    $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items($itemId)"
+    if ($listNameOrGuid.GetType().Name -eq  "Guid"){$url = $serverUrl+$sitePath+"/_api/web/Lists(guid'$listNameOrGuid')/items($itemId)"}
+    else{
+        $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listNameOrGuid.Replace("Lists/","")))
+        $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items($itemId)"
+        }
     foreach($key in $hashTableOfItemData.Keys){
         $formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "
         }
