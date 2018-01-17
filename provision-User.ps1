@@ -18,8 +18,8 @@ $timeZone = "GMT Standard Time"
 $countryLocale = "2057"
 #>
 
-$logFile = "C:\Scripts\Logs\provision-User.log"
-$errorLogFile = "C:\Scripts\Logs\provision-User_Errors.log"
+$logFile = "C:\ScriptLogs\provision-User.log"
+$errorLogFile = "C:\ScriptLogs\provision-User_Errors.log"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 
 $adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
@@ -32,7 +32,7 @@ connect-ToExo -credential $msolCredentials
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"
 $taxonomyListName = "TaxonomyHiddenList"
-$taxononmyData = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $taxonomyListName -suppressProgress $false -restCreds $restCredentials -logFile $logFile
+$taxonomyData = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $taxonomyListName -suppressProgress $false -restCreds $restCredentials -logFile $logFile
 
 $newUserListName = "New User Requests"
 #$oDataUnprocessedUsers = '$select=*,Line_x0020_Manager/Name,Line_x0020_Manager/Title,Prinicpal_x0020_Community_x0020_/Name,Prinicpal_x0020_Community_x0020_/Title,Primary_x0020_Team/Name,Primary_x0020_Team/Title,Additional_x0020_Teams/Id,Additional_x0020_Teams/Title&$filter=Current_x0020_Status eq ''1 - Waiting for IT Team to set up accounts''&$expand=Line_x0020_Manager/Id,Prinicpal_x0020_Community_x0020_/Id,Primary_x0020_Team/Id,Additional_x0020_Teams/Id'
@@ -46,22 +46,40 @@ $oDataUnprocessedUsers += "&`$expand=Line_x0020_Manager/Id,Prinicpal_x0020_Commu
 $unprocessedStarters = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $newUserListName -suppressProgress $false -oDataQuery $oDataUnprocessedUsers -restCreds $restCredentials -logFile $logFile
 #$unprocessedStarters | %{
 if($null -ne $unprocessedStartersFormatted){rv unprocessedStartersFormatted}
-$unprocessedStarters | %{[array]$unprocessedStartersFormatted += $(convert-listItemToCustomObject -spoListItem $_ -spoTaxonomyData $taxononmyData)}
-$selectedStartersrs = $unprocessedStartersFormatted | Out-GridView -PassThru
-
+$unprocessedStarters | %{[array]$unprocessedStartersFormatted += $(convert-listItemToCustomObject -spoListItem $_ -spoTaxonomyData $taxonomyData -debugMe $false)}
+#$selectedStarters = $unprocessedStartersFormatted | Out-GridView -PassThru
+$selectedStarters = $unprocessedStartersFormatted | select Title,JobTitle,Primary_Team,Line_Manager,Start_Date,Finance_Cost_Attribu,Guid | Out-GridView -PassThru
+[array]$selectedStarters = $unprocessedStartersFormatted | ?{$selectedStarters.GUID -contains $_.Guid}
 
 
 #region functions
-function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSAM, $pPrimaryTeam, $pSecondaryTeams, $pJobTitle, $plaintextPassword, $pBusinessUnit, $adCredentials){
+function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSAM, $pPrimaryTeam, $pSecondaryTeams, $pJobTitle, $plaintextPassword, $pBusinessUnit, $adCredentials, $pPrimaryOffice){
     #Set Domain-specific variables
     switch ($pBusinessUnit) {
-        "Sustain Limited" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "SustainLtd"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.sustain.co.uk"}
-        "Anthesis (UK) Limited" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
-        "Anthesis Consulting Group Ltd" {}
+        "Sustain Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "SustainLtd"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.sustain.co.uk"}
+        "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
+        "Anthesis Consulting Group Ltd (GBR)" {}
         "Anthesis LLC" {}
         default {}
         }
     #Create a new AD User account
+    write-host -ForegroundColor DarkYellow "UPN:`t$pUPN"
+    write-host -ForegroundColor DarkYellow "GivenName:`t$pFirstName"
+    write-host -ForegroundColor DarkYellow "Surname:`t$pSurname"
+    write-host -ForegroundColor DarkYellow "Company:`t$pBusinessUnit"
+    write-host -ForegroundColor DarkYellow "Department:`t$pPrimaryTeam"
+    write-host -ForegroundColor DarkYellow "DisplayName:`t$pDisplayName"
+    write-host -ForegroundColor DarkYellow "Fax:`t$twitterAccount"
+    write-host -ForegroundColor DarkYellow "HomePage:`t$website"
+    write-host -ForegroundColor DarkYellow "Manager:`t$(Get-ADUser -filter {SamAccountName -like $pManagerSAM})"
+    write-host -ForegroundColor DarkYellow "Name:`t$pFirstName $pSurname"
+    write-host -ForegroundColor DarkYellow "Office:`t$pPrimaryOffice"
+    write-host -ForegroundColor DarkYellow "OfficePhone:`t$DDI"
+    write-host -ForegroundColor DarkYellow "Title:`t$pJobTitle"
+    write-host -ForegroundColor DarkYellow "EmailAddress:`t$($pUPN.Split("@")[0])$upnSuffix"
+    write-host -ForegroundColor DarkYellow "pager:`t$receptionDDI"
+    write-host -ForegroundColor DarkYellow "Path:`t$ouDn"
+    write-host -ForegroundColor DarkYellow "SAMAccountName:`t$($pUPN.Split("@")[0])"
     New-ADUser `
         -AccountPassword (ConvertTo-SecureString $plaintextPassword -AsPlainText -force) `
         -CannotChangePassword $False `
@@ -69,31 +87,32 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
         -Company $pBusinessUnit `
         -Department $pPrimaryTeam `
         -DisplayName $pDisplayName `
-        -EmailAddress $pUPN `
         -Enabled $true `
         -Fax $twitterAccount `
         -GivenName $pFirstName `
         -HomePage $website `
-        -Manager $(Get-ADUser $pManagerSAM) `
+        -Manager $(Get-ADUser -filter {SamAccountName -like $pManagerSAM}) `
         -Name "$pFirstName $pSurname"`
+        -Office $pPrimaryOffice `
         -OfficePhone $DDI `
         -Path $ouDn `
-        -SAMAccountName $pUPN `
+        -SAMAccountName $($pUPN.Split("@")[0]) `
         -Surname $pSurname `
         -Title $pJobTitle `
-        -UserPrincipalName "$pUPN" `
-        -EmailAddress "$pUPN$upnSuffix" `
+        -UserPrincipalName "$($pUPN.Split("@")[0])$upnSuffix" `
+        -EmailAddress "$($pUPN.Split("@")[0])$upnSuffix" `
         -OtherAttributes @{'ipPhone'="XXX";'pager'=$receptionDDI} `
         -Credential $adCredentials
+    $upn = $pUPN+$upnSuffix
     $newAdUserAccount = Get-ADUser -filter {UserPrincipalName -like $pUPN} -Credential $adCredentials 
     Get-ADGroup -Filter {name -like $pPrimaryTeam} | %{Add-ADGroupMember -Identity $_ -Members $newAdUserAccount -Credential $adCredentials}
     $pSecondaryTeams | %{Get-ADGroup -Filter {name -like $_}} | %{Add-ADGroupMember -Identity $_ -Members $newAdUserAccount -Credential $adCredentials}
     }
-function create-msolUser($pUPN){
+function create-msolUser($pUPN,$pPlaintextPassword){
     #create the Mailbox rather than the MSOLUser, which will effectively create an unlicensed E1 user
-    New-Mailbox -Name $pUPN.Replace("."," ") -Password (ConvertTo-SecureString -AsPlainText $plaintextPassword -Force) -MicrosoftOnlineServicesID $pUPN@anthesisgroup.com
+    New-Mailbox -Name $pUPN.Replace("."," ").Split("@")[0] -Password (ConvertTo-SecureString -AsPlainText $pPlaintextPassword -Force) -MicrosoftOnlineServicesID $pUPN
     }
-function license-msolUser($pUPN, $licenseType){
+function license-msolUser($pUPN, $licenseType, $usageLocation){
     switch ($licenseType){
         "E1" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:STANDARDPACK"}}
         "E3" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:ENTERPRISEPACK"}}
@@ -101,10 +120,20 @@ function license-msolUser($pUPN, $licenseType){
         "PROJECT" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:PROJECTPROFESSIONAL"}}
         "EMS" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:EMS"}}
         }
-    Set-MsolUserLicense -UserPrincipalName $pUPN@anthesisgroup.com -AddLicenses $licenseToAssign.AccountSkuId
+    Set-MsolUserLicense -UserPrincipalName $pUPN -AddLicenses $licenseToAssign.AccountSkuId 
     }
-function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSAM, $pPrimaryTeam, $pSecondaryTeams, $pPrimaryOffice, $pSecondaryOffice, $pCountry, $pJobTitle, $pDDI, $pMobile){
-    switch($primaryOffice){
+function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimaryTeam, $pSecondaryTeams, $pPrimaryOffice, $pSecondaryOffice, $pCountry, $pJobTitle, $pDDI, $pMobile){
+    $currentUser = Get-MsolUser -UserPrincipalName $pUPN
+    if([string]::IsNullOrEmpty($pFirstName)){$firstName = $currentUser.FirstName}else{$firstname = $pFirstName}
+    if([string]::IsNullOrEmpty($pSurname)){$surName = $currentUser.LastName}else{$surName = $pSurname}
+    if([string]::IsNullOrEmpty($pDisplayName)){$displayName = $currentUser.DisplayName}else{$displayName = $pDisplayName}
+    if([string]::IsNullOrEmpty($pPrimaryOffice)){$primaryOffice = $currentUser.Office}else{$primaryOffice = $pPrimaryOffice}
+    if([string]::IsNullOrEmpty($pSecondaryOffice)){$secondaryOffice = $currentUser.City}else{$secondaryOffice = $pSecondaryOffice}
+    if([string]::IsNullOrEmpty($pJobTitle)){$jobTitle = $currentUser.Title}else{$jobTitle = $pJobTitle}
+    if([string]::IsNullOrEmpty($pDDI)){$ddi = $currentUser.PhoneNumber}else{$ddi = $pDDI}
+    if([string]::IsNullOrEmpty($pMobile)){$mobile = $currentUser.MobilePhone}else{$mobile = $pMobile}
+
+    switch($pPrimaryOffice){
         "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry)}
         "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB"}
         "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB"}
@@ -114,16 +143,17 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManager
         "Manila, PHI" {}
         "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US"}
         "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US"}
+        default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
         }
     #$msolUser = New-MsolUser `
-    Set-MsolUser -UserPrincipalName "$pUPN@anthesisgroup.com" `
-        -FirstName $pFirstName `
-        -LastName $pSurname `
-        -DisplayName $pDisplayName `
-        -Title $pJobTitle `
-        -Department $pPrimaryTeam `
+    Set-MsolUser -UserPrincipalName "$($pUPN.Split("@")[0])@anthesisgroup.com" `
+        -FirstName $firstName `
+        -LastName $surname `
+        -DisplayName $displayName `
+        -Title $jobTitle `
+        -Department $primaryTeam `
         -Office $primaryOffice `
-        -PhoneNumber $pDDI `
+        -PhoneNumber $ddi `
         -StreetAddress $streetAddress `
         -City $secondaryOffice `
         -PostalCode $postalCode `
@@ -132,15 +162,15 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManager
         -StrongPasswordRequired $true 
         #-Password "Welcome123" `
         #-ForceChangePassword $true
-    Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN
-    $pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN}
+    if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN}
+    if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN}}
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
-    Get-Mailbox $pUPN@anthesisgroup.com | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $pUPN -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true
-    if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN@anthesisgroup.com | Set-Mailbox -EmailAddresses @{add="$pUPN@sustain.co.uk"}}
-    Get-Mailbox $pUPN@anthesisgroup.com | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
-    Set-User -Identity $pUPN@anthesisgroup.com -Company $pBusinessUnit
-    Set-MailboxRegionalConfiguration -Identity $pUPN@anthesisgroup.com -TimeZone $pTimeZone
+    Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true
+    if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN | Set-Mailbox -EmailAddresses @{add="$($pUPN.Split("@")[0])@sustain.co.uk"}}
+    Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
+    Set-User -Identity $pUPN -Company $pBusinessUnit
+    Set-MailboxRegionalConfiguration -Identity $pUPN -TimeZone $(convertTo-exTimeZoneValue $pTimeZone)
     }
 function update-msolSharePointProfileFromAnotherProfile($sourceSpProfile,$destSpProfile,$destContext,$destPeopleManager){
     if($sourceSpProfile.UserProfileProperties["AboutMe"] -ne $null){$destPeopleManager.SetSingleValueProfileProperty($destSpProfile.AccountName, "AboutMe", $sourceSpProfile.UserProfileProperties["AboutMe"])}
@@ -175,9 +205,9 @@ function update-sharePointInitialConfig($pUPN, $anthesisAdminSite, $csomCreds, $
     }
 function create-personalFolder($pUPN){
     $dirRoot = "X:\Personal"
-    
+    $username = $pUPN.split("@")[0]
     #Create the user's Personal Folder and give them Modify rights
-    $personalFolder = New-Item -Path "$dirRoot\$pUPN" -ItemType Directory
+    $personalFolder = New-Item -Path "$dirRoot\$username" -ItemType Directory
     $acl = Get-Acl $personalFolder
     $perm = "Modify"
     $permInherit = "ContainerInherit, ObjectInherit" #This folder, files & subfolders - see http://powershell.nicoh.me/powershell-1/files-and-folders/set-folders-acl-owner-and-ntfs-rights 
@@ -208,6 +238,13 @@ function set-mailboxPermissions($pUPN,$pManagerSAM,$pBusinessUnit){
         Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "Edit all Sustain calendars" -AccessRights "PublishingEditor"
         }
     }
+function update-newUserRequest($listItem, $digest, $restCredentials, $logFile){
+    $digest = check-digestExpiry -serverUrl $sharePointServerUrl -sitePath $hrSite -digest $digest -restCreds $restCredentials -logFile $logFile
+    [guid]$listGuid = [regex]::Match($listItem.__metadata.uri,"\'([^)]+)\'").Groups[1].Value
+    update-itemInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listNameOrGuid $listGuid -predeterminedItemType $listItem.__metadata.type -itemId $listItem.Id -hashTableOfItemData @{"Current_x0020_Status"="2 - Waiting for HR to populate user data";"Previous_x0020_Status"=$listItem.Current_Status} -restCreds $restCredentials -digest $digest -logFile $logFile
+}
+
+
 function log-Message([string]$logMessage, $colour){
     Write-Host -Object $logMessage -ForegroundColor $colour 
     Add-Content -Value "$(Get-Date -Format G): $logMessage" -Path $logFile
@@ -221,26 +258,28 @@ function log-Error([string]$errorMessage){
 #endregion
 
 #region meta-functions
-function provision-user($userUPN, $userFirstName, $userSurname, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $plaintextPassword, $adCredentials){
-    try{
-        log-Message "Creating AD account for $userUPN" -colour "Yellow"
-        create-ADUser -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pManagerSAM $userManagerSAM -pDepartment $userDepartment -pJobTitle $userJobTitle -plaintextPassword $plaintextPassword -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pBusinessUnit $userBusinessUnit -adCredentials $adCredentials
-        log-Message "Account created" -colour "DarkYellow"
-        }
-    catch{
-        log-Error "Failed to create AD account"
-        log-Error $Error
-        }
+function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userPrimaryOffice, $userSecondaryOffice, $userBusinessUnit, $userJobTitle, $plaintextPassword, $restCredentials, $newUserListItem, $userTimeZone, $user365License){
+    $lastError = $Error[0]
+    if ([string]::IsNullOrEmpty($userDisplayName)){$userDisplayName = "$userFirstName $userSurname"}
     try{
         log-Message "Creating MSOL account for $userUPN" -colour "Yellow"
-        create-msolUser -userUPN $userUPN
+        create-MsolUser -pUPN $userUPN -pPlaintextPassword $plaintextPassword
         log-Message "Account created" -colour "DarkYellow"
         }
     catch{
         log-Error "Failed to create MSOL account"
         log-Error $Error
         }
-    Start-Sleep -Seconds 5 #Give EXO a chance to catch up
+    Start-Sleep -Seconds 5 #Let MSOL & EXO Syncronise
+    try{
+        log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
+        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice 
+        log-Message "Account updated" -colour "DarkYellow"
+        }
+    catch{
+        log-Error "Failed to update MSOL account"
+        log-Error $Error
+        }
     try{
         log-Message "Setting mailbox permissions for $userUPN" -colour "Yellow"
         set-mailboxPermissions -pUPN $userUPN -pManagerSAM $userManagerSAM -pBusinessUnit $userBusinessUnit
@@ -257,6 +296,30 @@ function provision-user($userUPN, $userFirstName, $userSurname, $userManagerSAM,
         }
     catch{
         log-Error "Failed to update mailbox"
+        log-Error $Error
+        }
+    try{
+        log-Message "Licensing $userUPN with $user365License" -colour "Yellow"
+        license-msolUser -pUPN $userUPN -licenseType $user365License
+        log-Message "Mailbox updated" -colour "DarkYellow"
+        }
+    catch{
+        log-Error "Failed to update mailbox"
+        log-Error $Error
+        }
+
+    if ($lastError -eq $Error[0]){
+        update-newUserRequest -listItem $newUserListItem -digest $digest -restCredentials $restCredentials -logFile $logFile
+        }
+    }
+function provision-SustainADUser($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $plaintextPassword, $adCredentials){
+    try{
+        log-Message "Creating AD account for $userUPN" -colour "Yellow"
+        create-ADUser -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pManagerSAM $($userManagerSAM.Split("@")[0]) -pDepartment $userPrimaryTeam -pJobTitle $userJobTitle -plaintextPassword $plaintextPassword -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pBusinessUnit $userBusinessUnit -adCredentials $adCredentials -pPrimaryOffice $userPrimaryOffice
+        log-Message "Account created" -colour "DarkYellow"
+        }
+    catch{
+        log-Error "Failed to create AD account"
         log-Error $Error
         }
     if($userBusinessUnit -match "Sustain"){
@@ -289,8 +352,7 @@ function update-msolUserFromAd($userUPN){
         }
     try{
         log-Message "Updating MSOL mailbox for $userUPN" -colour "Yellow"
-        ######This is as far as you got!!
-        update-msolMailbox -userUPN $userUPN -userFirstName $adU.GivenName -userSurname $adU.Surname -userDisplayName $adU.DisplayName
+        update-msolMailbox -pUPN $userUPN -pFirstName $adU.GivenName -pSurname $adU.Surname -pDisplayName $adU.DisplayName -pBusinessUnit $adU.Company -pTimeZone "GMT Standard Time"
         log-Message "Mailbox updated" -colour "DarkYellow"
         }
     catch{
@@ -303,10 +365,61 @@ function update-msolUserFromAd($userUPN){
 
 
 
+$selectedStarters | % {
+    provision-365user -userUPN $($selectedStarters.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
+        -userFirstName $selectedStarters.Title.Split(" ")[0] `
+        -userSurname $($selectedStarters.Title.Split(" ")[$selectedStarters.Title.Split(" ").Count-1]) `
+        -userDisplayName $($selectedStarters.Title) `
+        -userManagerSAM $selectedStarters.Line_Manager `
+        -userCommunity $null `
+        -userPrimaryTeam $selectedStarters.Primary_Team `
+        -userSecondaryTeams $selectedStarters.Additional_Teams `
+        -userBusinessUnit $selectedStarters.Finance_Cost_Attribu `
+        -userJobTitle $selectedStarters.Job_title `
+        -plaintextPassword "Welcome123" `
+        -adCredentials $adCredentials `
+        -restCredentials $restCredentials `
+        -newUserListItem $selectedStarters `
+        -userTimeZone $selectedStarters.TimeZone `
+        -user365License $selectedStarters.Office_365_license 
+    }
+$selectedStarters | ?{$_.Finance_Cost_Attribu -eq "Sustain Ltd (GBR)"} | % {
+    provision-SustainADUser -userUPN $($selectedStarters.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
+        -userFirstName $selectedStarters.Title.Split(" ")[0] `
+        -userSurname $($selectedStarters.Title.Split(" ")[$selectedStarters.Title.Split(" ").Count-1]) `
+        -userDisplayName $($selectedStarters.Title) `
+        -userManagerSAM $selectedStarters.Line_Manager `
+        -userCommunity $null `
+        -userPrimaryTeam $selectedStarters.Primary_Team `
+        -userSecondaryTeams $selectedStarters.Additional_Teams `
+        -userBusinessUnit $selectedStarters.Finance_Cost_Attribu `
+        -userJobTitle $selectedStarters.Job_title `
+        -plaintextPassword "Welcome123" `
+        -adCredentials $adCredentials `
+        -restCredentials $restCredentials `
+        -newUserListItem $selectedStarters `
+        -userTimeZone $selectedStarters.TimeZone `
+        -user365License $selectedStarters.Office_365_license 
+    }
 
-provision-user -userUPN $userUPN -userFirstName $userFirstName -userSurname $userSurname -userManagerSAM $userManagerSAM -userDepartment $userDepartment -userJobTitle $userJobTitle -plaintextPassword $plaintextPassword
-#Now assign the user a phone number via http://shoretel/shorewaredirector and set their ipPhone and telephoneNumber AD attributes
-start-sleep -Seconds 10
-update-msolUserFromAd -userUPN $userUPN
-#foreach($license in $licenses){license-msolUser -userUPN $userUPN -licenseType $license}
+$selectedStarters | % {
+    $userUPN = $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
+    $userFirstName = $_.Title.Split(" ")[0] 
+    $userSurname = $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) 
+    $userDisplayName = $($_.Title)
+    $userManagerSAM = $_.Line_Manager 
+    $userCommunity = $null 
+    $userPrimaryTeam = $_.Primary_Team 
+    $userSecondaryTeams = $_.Additional_Teams 
+    $userPrimaryOffice = $_.Primary_Workplace
+    $userSecondaryOffice = $_.Nearest_Office
+    $userBusinessUnit = $_.Finance_Cost_Attribu 
+    $userJobTitle = $_.Job_title 
+    $plaintextPassword = "Welcome123" 
+    $adCredentials = $adCredentials 
+    $restCredentials = $restCredentials 
+    $newUserListItem = $_ 
+    $userTimeZone = $_.TimeZone 
+    $user365License = $_.Office_365_license 
+    }
 

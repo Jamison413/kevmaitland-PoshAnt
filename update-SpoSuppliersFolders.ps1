@@ -73,8 +73,8 @@ foreach($dirtySupplier in $dirtySpSuppliers){
         try{
             if((get-library -sitePath $sitePath -libraryName $dirtySupplier.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
                 log-result "Successfully validated!"
-                log-action "update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName `"Kimble Suppliers`" -predeterminedItemType $($dirtySupplier.__metadata.type) -itemId $($dirtySupplier.Id) -hashTableOfItemData @{IsDirty=$false}"
-                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Suppliers" -predeterminedItemType $dirtySupplier.__metadata.type -itemId $dirtySupplier.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                log-action "update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listNameOrGuid `"Kimble Suppliers`" -predeterminedItemType $($dirtySupplier.__metadata.type) -itemId $($dirtySupplier.Id) -hashTableOfItemData @{IsDirty=$false}"
+                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listNameOrGuid "Kimble Suppliers" -predeterminedItemType $dirtySupplier.__metadata.type -itemId $dirtySupplier.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
                 log-result "Successfully updated!"
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just created: [$($dirtySupplier.Title)] this will stay as IsDirty=true forever :("}
@@ -99,7 +99,7 @@ foreach($dirtySupplier in $dirtySpSuppliers){
         #Update the Supplier in [Kimble Suppliers]
         try{
             if((get-list -sitePath $sitePath -listName $dirtySupplier.Title) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
-                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Suppliers" -predeterminedItemType $dirtySupplier.__metadata.type -itemId $dirtySupplier.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listNameOrGuid "Kimble Suppliers" -predeterminedItemType $dirtySupplier.__metadata.type -itemId $dirtySupplier.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtySupplier.Title)] this will stay as IsDirty=true forever :("}
             }
@@ -110,7 +110,7 @@ foreach($dirtySupplier in $dirtySpSuppliers){
         try{
             update-list -sitePath $sitePath -listName $dirtySupplier.Title -hashTableOfUpdateData @{Description=$(sanitise-stripHtml $dirtySupplier.SupplierDescription)} | Out-Null
             if(sanitise-stripHtml $((get-list -sitePath $sitePath -listName $dirtySupplier.Title).SupplierDescription) -eq $(sanitise-stripHtml $dirtySupplier.SupplierDescription)){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
-                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Suppliers" -predeterminedItemType $dirtySupplier.__metadata.type -itemId $dirtySupplier.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
+                update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listNameOrGuid "Kimble Suppliers" -predeterminedItemType $dirtySupplier.__metadata.type -itemId $dirtySupplier.Id -hashTableOfItemData @{IsDirty=$false} | Out-Null
                 }
             else{log-result -myMessage "Uh-oh, I couldn't find the Library I (allegedly) just updated: [$($dirtySupplier.Title)] this will stay as IsDirty=true forever :("}
             }
