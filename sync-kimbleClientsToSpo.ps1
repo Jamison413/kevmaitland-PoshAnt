@@ -63,7 +63,7 @@ $kimbleRestHeaders = @{Authorization = "Bearer " + $kimbleAccessToken.access_tok
 
 
 #region Kimble Sync
-#Get the last Project modified in /Projects/lists/Kimble Projects to minimise the number of records to process
+#Get the last Client modified in [/lists/Kimble Clients] to minimise the number of records to process
 try{
     log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
     $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds
@@ -116,7 +116,7 @@ foreach($kimbleChangedClient in $kimbleChangedClients){
     log-action -myMessage "CHANGED CLIENT:`t[$($kimbleChangedClient.Name)] needs updating!" -logFile $fullLogPathAndName
     try{
         log-action -myMessage "Retrieving existing Client from SPO" -logFile $fullLogPathAndName
-        $kpListItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedClient.Id)`'" -restCreds $restCreds
+        $kpListItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedClient.Id)`'" -restCreds $restCreds -logFile $fullLogPathAndName
         if($kpListItem){
             log-result -myMessage "SUCCESS: list item [$($kpListItem.Title)] retrieved!" -logFile $fullLogPathAndName
             #Check whether the data has changed
@@ -128,7 +128,7 @@ foreach($kimbleChangedClient in $kimbleChangedClients){
                     update-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData -restCreds $restCreds -digest $clientDigest
                     #Check it's worked
                     try{
-                        $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?`$filter=Id eq $($kpListItem.Id)" -restCreds $restCreds
+                        $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?`$filter=Id eq $($kpListItem.Id)" -restCreds $restCreds -logFile $fullLogPathAndName
                         if($updateData.IsDirty -eq $true -and $updateData.Title -eq $kimbleChangedClient.Name){log-result -myMessage "SUCCESS: SPO [Kimble Client] item $($kpListItem.Title) updated!" -logFile $fullLogPathAndName}
                         else{log-result -myMessage "FAILED: SPO [Kimble Client] item $($kpListItem.Title) did not update correctly!" -logFile $fullLogPathAndName}
                         }
@@ -153,26 +153,30 @@ foreach($kimbleChangedClient in $kimbleChangedClients){
 
 #Add the new Clients
 foreach ($kimbleNewClient in $kimbleNewClients){
-    log-action -myMessage "NEW CLIENT:`t[$($kimbleNewClient.Name)] needs creating!" -logFile $fullLogPathAndName
-    $kimbleNewClientData = @{KimbleId=$kimbleNewClient.Id;Title=$kimbleNewClient.Name;IsDeleted=$kimbleNewClient.IsDeleted;IsDirty=$true}
-    #Create the new List item
-    try{
-        log-action -myMessage "Creating new SPO List item [$($kimbleNewClient.Name)]" -logFile $fullLogPathAndName
-        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewClientData -restCreds $restCreds -digest $clientDigest -verboseLogging $true -logFile "$env:USERPROFILE\Desktop\Log.txt"
-        #Check it's worked
-        if($newItem){log-result -myMessage "SUCCESS: SPO [Kimble Client] item $($newItem.Title) created!" -logFile $fullLogPathAndName}
-        else{
-            log-result -myMessage "FAILED: SPO [Kimble Client] item $($kimbleNewClient.Name) did not create!" -logFile $fullLogPathAndName
-            #Bodge this with an e-mail alert as we don't want Projects going missing
-            Send-MailMessage -SmtpServer $smtpServer -To $mailTo -From $mailFrom -Subject "Kimble Client [$($kimbleNewClient.Name)] could not be created in SPO" -Body "Project: $($kimbleNewClient.Id)"
-            }
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Failed to create new [Kimble Clients].$($kimbleNewClient.Name) with @{$($($kimbleNewClientData.Keys | % {$_+":"+$kimbleNewClientData[$_]+","}) -join "`r")}" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailTo $mailTo -mailFrom $mailFrom}
+    new-spoClient -kimbleClientObject $kimbleNewClient -webUrl $webUrl -sitePath $sitePath -spoClientList $kp -restCreds $restCreds -clientDigest $clientDigest -fullLogPathAndName $fullLogPathAndName
     }
 
 #endregion
 
 
+function new-spoClient($kimbleClientObject, $webUrl, $sitePath, $spoClientList, $restCreds, $clientDigest, $fullLogPathAndName){
+    log-action -myMessage "NEW CLIENT:`t[$($kimbleClientObject.Name)] needs creating!" -logFile $fullLogPathAndName
+    $newSpoClientData = @{KimbleId=$kimbleClientObject.Id;Title=$kimbleClientObject.Name;IsDeleted=$kimbleClientObject.IsDeleted;IsDirty=$true}
+    #Create the new List item
+    try{
+        log-action -myMessage "Creating new SPO List item [$($kimbleClientObject.Name)]" -logFile $fullLogPathAndName
+        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -predeterminedItemType $spoClientList.ListItemEntityTypeFullName -hashTableOfItemData $newSpoClientData -restCreds $restCreds -digest $clientDigest -verboseLogging $true -logFile $fullLogPathAndName
+        #Check it's worked
+        if($newItem){log-result -myMessage "SUCCESS: SPO [Kimble Client] item $($newItem.Title) created!" -logFile $fullLogPathAndName}
+        else{
+            log-result -myMessage "FAILED: SPO [Kimble Client] item $($kimbleClientObject.Name) did not create!" -logFile $fullLogPathAndName
+            #Bodge this with an e-mail alert as we don't want Projects going missing
+            Send-MailMessage -SmtpServer $smtpServer -To $mailTo -From $mailFrom -Subject "Kimble Client [$($kimbleClientObject.Name)] could not be created in SPO" -Body "Project: $($kimbleClientObject.Id)"
+            }
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Failed to create new [Kimble Clients].$($kimbleClientObject.Name) with @{$($($newSpoClientData.Keys | % {$_+":"+$newSpoClientData[$_]+","}) -join "`r")}" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailTo $mailTo -mailFrom $mailFrom}
+    
+    }
 
 
 
@@ -198,16 +202,18 @@ function reconcile-clients(){
 
     try{
         log-action -myMessage "Getting List: [$listName]" -logFile $fullLogPathAndName
-        $kp = get-itemsInList -serverUrl $webUrl  -sitePath $sitePath -listName $listName -restCreds $restCreds -logFile $logFileLocation 
-        if($kp){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
+        $spoClients = get-itemsInList -serverUrl $webUrl  -sitePath $sitePath -listName "Kimble Clients" -restCreds $restCreds -logFile $logFileLocation 
+        if($spoClients){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
         else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
         }
     catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
 
+    $allKimbleClients | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name KimbleId -Value $_.Id}
+    $missingClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $spoClients -Property "KimbleId" -PassThru -CaseSensitive:$false
+    $missingClients | % {
+        if ($_.SideIndicator -eq "<="){new-spoClient -kimbleClientObject $_ -webUrl $webUrl -sitePath $sitePath -spoClientList $kp -restCreds $restCreds -clientDigest $clientDigest -fullLogPathAndName $fullLogPathAndName}
+        }
     }
-
-
-
 
 
 <#
