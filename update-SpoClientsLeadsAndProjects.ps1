@@ -111,8 +111,8 @@ foreach($dirtyClient in $dirtyClients){
     if((!$dirtyClient.PreviousName -and !$dirtyClient.PreviousDescription) -OR $recreateAllFolders -eq $true){
         #Create a new Library and subfolders
         try{
-            log-action "new-library /$($dirtyClient.Title) Description: $((sanitise-stripHtml $dirtyClient.ClientDescription))" -logFile $fullLogPathAndName
-            $newLibrary = new-library -serverUrl $webUrl -sitePath $clientSite -libraryName $dirtyClient.Title -libraryDesc $dirtyClient.ClientDescription -restCreds $restCreds -digest $clientDigest
+            log-action "new-library /$($dirtyClient.Title) Description: $(sanitise-stripHtml $dirtyClient.ClientDescription)" -logFile $fullLogPathAndName
+            $newLibrary = new-library -serverUrl $webUrl -sitePath $clientSite -libraryName $dirtyClient.Title -libraryDesc $(sanitise-stripHtml $dirtyClient.ClientDescription) -restCreds $restCreds -digest $clientDigest
             if($newLibrary){#If the new Library has been created, make the subfolders and update the List Item
                 log-result "SUCCESS: $($dirtyClient.Title) is there!" -logFile $fullLogPathAndName
                 #Try to create the subfolders
@@ -188,7 +188,7 @@ foreach($dirtyClient in $dirtyClients){
         #Update the Library's Description
         try{
             log-action -myMessage "update-list [$($dirtyClient.Title)].Description `"$($dirtyClient.PreviousDescription.Substring(0,20))...`" > `"$((sanitise-stripHtml $dirtyClient.ClientDescription).Substring(0,20))...`"" -logFile $fullLogPathAndName
-            update-list -serverUrl $webUrl -sitePath $clientSite -restCreds $restCreds -digest $clientDigest -listName $dirtyClient.Title -hashTableOfUpdateData @{Description=$(sanitise-stripHtml $dirtyClient.ClientDescription)} 
+            update-list -serverUrl $webUrl -sitePath $clientSite -restCreds $restCreds -digest $clientDigest -listName $dirtyClient.Title -hashTableOfUpdateData @{Description=$(sanitise-stripHtml $dirtyClient.ClientDescription)} -logFile $logFileLocation
             #If it's worked, update the IsDirty property on the Client
             if($(get-list -serverUrl $webUrl -sitePath $clientSite -listName $dirtyClient.Title -restCreds $restCreds).Description -eq $(sanitise-stripHtml $dirtyClient.ClientDescription)){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
                 log-result -myMessage "SUCCESS: [$($dirtyClient.Title)].Description updated to `"$((sanitise-stripHtml $dirtyClient.ClientDescription).Substring(0,20))...`"" -logFile $fullLogPathAndName
@@ -255,7 +255,8 @@ foreach($dirtyLead in $dirtyLeads){
                     foreach($sub in $listOfLeadProjSubFolders){
                         try{
                             log-action "new-folderInLibrary $("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId])/$leadFolderName/$sub" -logFile $fullLogPathAndName
-                            $newLeadLibrarySubfolder = new-FolderInLibrary -serverUrl $webUrl -site $clientSite -libraryName ("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderPathAndOrName ("/"+$leadFolderName.Replace("/","")+"/"+$sub) -restCreds $restCreds -digest $clientDigest
+                            $newLeadLibrarySubfolder = new-FolderInLibrary -serverUrl $webUrl -site $clientSite -libraryName ("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -folderPathAndOrName ("/"+$leadFolderName.Replace("/","")+"/"+$sub) -restCreds $restCreds -digest $clientDigest -logFile $fullLogPathAndName
+                             if($sub -eq "Admin & contracts"){copy-file -credentials $csomCreds -webUrl $webUrl -sourceSiteCollectionPath "/teams/communities" -sourceSitePath "/heathandsafetyteam" -sourceLibraryName "Shared Documents" -sourceFolderPath "/RAs/Projects" -sourceFileName "Anthesis UK Project Risk Assessment.xlsx" -destSiteCollectionPath "/" -destSitePath "/clients" -destLibraryName $("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId]) -destFolderPath $("/"+$leadFolderName.Replace("/",'')+"/$sub") -destFileName "Anthesis UK Project Risk Assessment.xlsx" -overwrite $false}
                             }
                         catch{log-error -myError $_ -myFriendlyMessage "Failed to create the subfolder $("/"+$kimbleClientHashTable[$dirtyLead.KimbleClientId])/$leadFolderName/$sub"}
                         #Validate that new-FolderInLibrary returned *something* (we're not validating that each subfolder gets created - if the main Lead folder created correctly, we'll just assume that they all will)
@@ -265,10 +266,14 @@ foreach($dirtyLead in $dirtyLeads){
                     #If we've got this far, try to update the IsDirty property on the Lead
                     try{
                         log-action "update-itemInList Kimble Leads | $($dirtyLead.Title) [$($dirtyLead.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
+<<<<<<< HEAD
                         update-itemInList -serverUrl $webUrl -sitePath $clientSite -listNameOrGuid "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest 
+=======
+                        update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyLead.__metadata -propertyName "type") -itemId $dirtyLead.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest -logFile $fullLogPathAndName
+>>>>>>> 1b324ba6b344d702cb4e722ea69905820346859f
                         #Validate that the change was actually made
                         try{
-                            $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -oDataQuery "?`$filter=Id eq $($dirtyLead.Id)" -restCreds $restCreds
+                            $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Leads" -oDataQuery "?`$filter=Id eq $($dirtyLead.Id)" -restCreds $restCreds -logFile $logFileLocation
                             if($updatedItem.IsDirty -eq $false){log-result "SUCCESS: $($dirtyLead.Title) updated!" -logFile $fullLogPathAndName}
                             else{log-result "FAILED: Could not set Lead [$($dirtyLead.Title)].IsDirty = `$true " -logFile $fullLogPathAndName}
                             }
@@ -378,6 +383,7 @@ foreach($dirtyProject in $dirtyProjects){
                         try{
                             log-action "new-folderInLibrary $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId])/$projectFolderName/$sub" -logFile $fullLogPathAndName
                             $newProjectLibrarySubfolder = new-FolderInLibrary -serverUrl $webUrl -site $clientSite -libraryName ("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderPathAndOrName ("/"+$projectFolderName.Replace("/","")+"/"+$sub) -restCreds $restCreds -digest $clientDigest
+                            if($sub -eq "Admin & contracts"){copy-file -credentials $csomCreds -webUrl $webUrl -sourceSiteCollectionPath "/teams/communities" -sourceSitePath "/heathandsafetyteam" -sourceLibraryName "Shared Documents" -sourceFolderPath "/RAs/Projects" -sourceFileName "Anthesis UK Project Risk Assessment.xlsx" -destSiteCollectionPath "/" -destSitePath "/clients" -destLibraryName $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -destFolderPath $("/"+$dirtyProject.Title.Replace("/",'')+"/$sub") -destFileName "Anthesis UK Project Risk Assessment.xlsx" -overwrite $false}
                             }
                         catch{log-error -myError $_ -myFriendlyMessage "Failed to create the subfolder $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId])/$projectFolderName/$sub"}
                         #Validate that new-FolderInLibrary returned *something* (we're not validating that each subfolder gets created - if the main Project folder created correctly, we'll just assume that they all will)
