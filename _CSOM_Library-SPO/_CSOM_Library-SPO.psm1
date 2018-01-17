@@ -29,9 +29,14 @@ function add-site($credentials, $webUrl, $siteCollection, $sitePath, $siteName, 
     $ctx.Load($z_webs)
     $ctx.ExecuteQuery()
     $z_webs | %{
+        $_.Title
         if($siteName -eq $_.Title){
             $newWeb = $_
             $ctx.Load($newWeb)
+            $ctx.Load($newWeb.AllProperties)
+            $ctx.Load($newWeb.AssociatedOwnerGroup)
+            $ctx.Load($newWeb.AssociatedMemberGroup)
+            $ctx.Load($newWeb.AssociatedVisitorGroup)
             $ctx.ExecuteQuery()
             }
         }
@@ -208,25 +213,20 @@ function combine-url($arrayOfStrings){
     $output = $output.Replace("http:/","http://").Replace("https:/","https://")
     $output
     }
-function convert-listItemToCustomObject($spoListItem, $spoTaxonomyData){
-    $alwaysExclude = @("Activities","AttachmentFiles","Attachments","AuthorId","ComplianceAssetId","ContentType","ContentTypeId","EditorId","FieldValuesAsHtml","FieldValuesAsText","FieldValuesForEdit","File","FileSystemObjectType","FirstUniqueAncestorSecurableObject","Folder","GetDlpPolicyTip","GUID","Id","ID-dup","OData__UIVersionString","ParentList","Properties","RoleAssignments","ServerRedirectedEmbedUrl","ServerRedirectedEmbedUri","Versions","__metadata")
-    #$dummy2 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Line_x0020_Manager"}
-    #$dummy2 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Primary_x0020_Team"}
-    #$dummy3 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Additional_x0020_Teams"}
-    #$dummy4 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Finance_x0020_Cost_x0020_Attribu"}
-    #$dummy5 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Additional_x0020_software_x0020_"}
-    #$dummy6 = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Mobile_x002f_Cell_x0020_phone_x0"}
+function convert-listItemToCustomObject($spoListItem, $spoTaxonomyData, $debugMe){
+    $alwaysExclude = @("Activities","AttachmentFiles","Attachments","AuthorId","ComplianceAssetId","ContentType","ContentTypeId","EditorId","FieldValuesAsHtml","FieldValuesAsText","FieldValuesForEdit","File","FileSystemObjectType","FirstUniqueAncestorSecurableObject","Folder","GetDlpPolicyTip","ID-dup","OData__UIVersionString","ParentList","Properties","RoleAssignments","ServerRedirectedEmbedUrl","ServerRedirectedEmbedUri","Versions")
     #Ignoring the standard fields listed above, go through each remainig property and process it based on its Type
     $customObj = [psobject]::new()
     $spoListItem | Get-Member -MemberType NoteProperty | ?{$alwaysExclude -notcontains $_.Name} | % {
         $ourMember = $_
+        #$ourMember = $spoListItem | Get-Member -MemberType NoteProperty | ?{$_.Name -eq "Id"}
         #$($ourMember.Name)
         #$spoListItem.$($ourMember.Name)
         #$spoListItem.$($ourMember.Name).GetType().Name
         try{
             switch ($spoListItem.$($ourMember.Name).GetType().Name){
                 "String" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $(sanitise-stripHtml -dirtyString $($spoListItem.$($ourMember.Name)))}
-                "Int" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
+                "Int32" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
                 "Bool" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
                 "PSCustomObject" {
                     #Now for the complicated stuff
@@ -234,27 +234,32 @@ function convert-listItemToCustomObject($spoListItem, $spoTaxonomyData){
                     if($spoListItem.$($ourMember.Name).__deferred -ne $null){$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value "Value was deferred. Check you expanded it correctly in the spoQuery"}
                     else{
                         #Is it a single-value User/Group?
-                        if($spoListItem.$($ourMember.Name).Title -ne $null){
+                        if($spoListItem.$($ourMember.Name).Title -ne $null){if($debugMe){Write-Host -ForegroundColor DarkCyan "$($spoListItem.Title).$($ourMember.Name) is a single-value user/group field"}
                             #Process users and groups differently (get user UPN or group Title):
-                            if($spoListItem.$($dummy2.Name).Name -match 'i:0\#\.f\|membership\|'){$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name).Name.Replace("i:0#.f|membership|","")}
+                            if($spoListItem.$($ourMember.Name).Name -match 'i:0\#\.f\|membership\|'){$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name).Name.Replace("i:0#.f|membership|","")}
                             else{$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name).Title -Force}
                             }
-                        #Is it a multi-value User/Group?
-                        elseif($spoListItem.$($ourMember.Name).results[0].Title -ne $null){
-                            $userOrGroups = @()
-                            foreach($userOrGroup in $spoListItem.$($ourMember.Name).results){[array]$userOrGroups += $userOrGroup.Title}
-                            $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $userOrGroups -Force
-                            }
                         #Is it a single-value metadata field?
-                        if($spoListItem.$($ourMember.Name).TermGuid -ne $null){
-                            $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $($taxononmyData | ?{$_.IdForTerm -eq $spoListItem.$($ourMember.Name).TermGuid} | %{$_.Term}) -Force
+                        elseif($spoListItem.$($ourMember.Name).TermGuid -ne $null){if($debugMe){Write-Host -ForegroundColor DarkCyan "$($spoListItem.Title).$($ourMember.Name) is a single-value metadata field"}
+                            $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $(($spoTaxonomyData | ?{$_.IdForTerm -eq $spoListItem.$($ourMember.Name).TermGuid})[0] | %{$_.Title}) #-Force
                             }
-                        #Is it a multi-value metadata field?
-                        if($spoListItem.$($ourMember.Name).results[0].TermGuid -ne $null){
-                            $userOrGroups = @()
-                            foreach($userOrGroup in $spoListItem.$($ourMember.Name).results){[array]$userOrGroups += $userOrGroup.Label}
-                            $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $userOrGroups -Force
+                        #Is it a multi-value field?
+                        elseif($spoListItem.$($ourMember.Name).results.Count -gt 0){if($debugMe){Write-Host -ForegroundColor DarkCyan "$($spoListItem.Title).$($ourMember.Name) is a multi-value field"}
+                            #Is it a multi-value User/Group?
+                            if($spoListItem.$($ourMember.Name).results[0].Title -ne $null){if($debugMe){Write-Host -ForegroundColor DarkCyan "$($spoListItem.Title).$($ourMember.Name) is a multi-value user/group field"}
+                                $userOrGroups = @()
+                                foreach($userOrGroup in $spoListItem.$($ourMember.Name).results){$userOrGroups += $userOrGroup.Title}
+                                $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $userOrGroups -Force
+                                }
+                            #Is it a multi-value metadata field?
+                            if($spoListItem.$($ourMember.Name).results[0].TermGuid -ne $null){if($debugMe){Write-Host -ForegroundColor DarkCyan "$($spoListItem.Title).$($ourMember.Name) is a multi-value metadata field"}
+                                $userOrGroups = @()
+                                foreach($userOrGroup in $spoListItem.$($ourMember.Name).results){$userOrGroups += $userOrGroup.Label}
+                                $customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $userOrGroups -Force
+                                }
                             }
+                        #Otherwise, just add it
+                        else{$customObj | Add-Member -MemberType NoteProperty -Name $($ourMember.Name.Replace("_x0020_","_")) -Value $spoListItem.$($ourMember.Name)}
                         }
                     }
                 default {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value "Uh-oh, someone left a sponge in the patient :(" -Force} 
@@ -262,6 +267,7 @@ function convert-listItemToCustomObject($spoListItem, $spoTaxonomyData){
             }
         #Not clever, but only $nulls should land here. Ha - "should".
         catch{
+            write-host $_
             if ($($customObj | Get-Member -Name $($ourMember.Name.Replace("_x0020_","_"))) -eq $null){
                 $customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $null
                 }
@@ -577,6 +583,34 @@ function get-spoTimeZoneHashTable($credentials){
         }
     $spoTimeZones
     }
+function get-termsInSet($credentials, $webUrl, $siteCollection, $pGroup,$pSet){
+    #Sanitise the input:
+    $group = sanitise-forTermStore $pGroup
+    $set = sanitise-forTermStore $pSet
+    $lcid = 1033 #Probably Language
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection) -sharePointCredentials $credentials
+    $taxonomySession = [Microsoft.SharePoint.Client.Taxonomy.TaxonomySession]::GetTaxonomySession($ctx)
+    $taxonomySession.UpdateCache()
+    $ctx.Load($taxonomySession)
+    $ctx.ExecuteQuery()
+    if (!$taxonomySession.ServerObjectIsNull){
+        Write-Host "Destination Taxonomy session initiated: " $taxonomySession.Path.Identity "" -ForegroundColor Green
+        $termStore = $taxonomySession.GetDefaultSiteCollectionTermStore()
+        $ctx.Load($termStore)
+        $termGroup = $termStore.Groups.GetByName($group)
+        $ctx.Load($termGroup)
+        $termSet = $termGroup.TermSets.GetByName($set)
+        $ctx.Load($termSet)
+        $ctx.ExecuteQuery()        #Delete the Term if necessary
+        $ctx.Load($termSet.Terms)
+        $termsEnum = $termSet.Terms.GetEnumerator()
+        $ctx.ExecuteQuery()
+        while ($termsEnum.MoveNext()) {
+            [array]$arrayOfTerms += $termsEnum.Current.Name
+            }
+        $arrayOfTerms
+        }
+    }
 function get-webTempates($credentials, $webUrl, $siteCollection, $site){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$site) -sharePointCredentials $credentials
     #New-Object Microsoft.SharePoint.Client.ClientContext($webUrl+$siteCollection+$site) 
@@ -709,6 +743,48 @@ function rename-termInStore($credentials, $webUrl, $siteCollection, $pGroup,$pSe
             $ctx.Load($pOldTerm)
             $term.Name = $pNewTerm
             #$term.Name = "BBC"
+            $ctx.ExecuteQuery()
+           }
+        }
+    }
+function reuse-allTermsInTermStore($credentials,$webUrl,$siteCollection,$sourceTermGroup,$sourceTermSet,$destTermGroup,$destTermSet){
+    $termsToReUse = get-termsInSet -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -pGroup $sourceTermGroup -pSet $sourceTermSet
+    $termsToReUse | % {reuse-termInStore -credentials $credentials -webUrl $webUrl -siteCollection $siteCollection -pCurrentGroup $sourceTermGroup -pCurrentSet $sourceTermSet -pTerm $_ -pAdditionalGroup $destTermGroup -pAdditionalSet $destTermSet}
+    }
+function reuse-termInStore($credentials, $webUrl, $siteCollection, $pCurrentGroup,$pCurrentSet,$pTerm,$pAdditionalGroup,$pAdditionalSet){
+    #Sanitise the input:
+    $currentGroup = sanitise-forTermStore $pCurrentGroup
+    $currentSet = sanitise-forTermStore $pCurrentSet
+    $additionalGroup = sanitise-forTermStore $pAdditionalGroup
+    $additionalSet = sanitise-forTermStore $pAdditionalSet
+    $term = sanitise-forTermStore $pTerm
+    $lcid = 1033 #Probably Language
+    $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection) -sharePointCredentials $credentials
+    Write-Host "Connected to DESTINATION SharePoint Online site: " $ctx.Url "" -ForegroundColor Green
+    $taxonomySession = [Microsoft.SharePoint.Client.Taxonomy.TaxonomySession]::GetTaxonomySession($ctx)
+    $taxonomySession.UpdateCache()
+    $ctx.Load($taxonomySession)
+    $ctx.ExecuteQuery()
+    if (!$taxonomySession.ServerObjectIsNull){
+        Write-Host "Destination Taxonomy session initiated: " $taxonomySession.Path.Identity "" -ForegroundColor Green
+        $termStore = $taxonomySession.GetDefaultSiteCollectionTermStore()
+        $ctx.Load($termStore)
+        $currentTermGroup = $termStore.Groups.GetByName($currentGroup)
+        $ctx.Load($currentTermGroup)
+        $currentTermSet = $currentTermGroup.TermSets.GetByName($currentSet)
+        $ctx.Load($currentTermSet)
+        $ctx.Load($currentTermSet.Terms)
+        $targetTermGroup = $termStore.Groups.GetByName($additionalGroup)
+        $ctx.Load($targetTermGroup)
+        $targetTermSet = $targetTermGroup.TermSets.GetByName($additionalSet)
+        $ctx.Load($targetTermSet)
+        $ctx.ExecuteQuery()
+        if(($currentTermSet.Terms.Name) -contains $term){
+            $termToReuse = $currentTermSet.Terms.GetByName($term)
+            $ctx.Load($termToReuse)
+            $ctx.ExecuteQuery()
+            Write-Host "Reusing term: [$($termToReuse.Name)] from [$($currentTermSet.Name)] in [$($targetTermSet.Name)]" -ForegroundColor Green
+            $targetTermSet.ReuseTerm($termToReuse,$false) | Out-Null #This weirdly throws a "collection has not been initialized" error, but works fine if you ignore it
             $ctx.ExecuteQuery()
            }
         }
