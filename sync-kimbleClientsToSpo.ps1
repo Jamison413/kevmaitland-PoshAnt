@@ -309,7 +309,7 @@ foreach($kimbleChangedClient in $kimbleChangedClients){
             -or $kCListItem.IsDeleted -ne $kimbleChangedClient.IsDeleted){
             #Update the entry in [Kimble Clients]
             $updateData = @{PreviousName=$kCListItem.ClientName;PreviousDescription=$kCListItem.ClientDescription;Title=$kimbleChangedClient.Name;ClientDescription=$kimbleChangedClient.Description;IsDeleted=$kimbleChangedClient.IsDeleted;IsDirty=$true}
-            try{update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Clients" -predeterminedItemType $kc.ListItemEntityTypeFullName -itemId $kCListItem.Id -hashTableOfItemData $updateData}
+            try{update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listNameOrGuid "Kimble Clients" -predeterminedItemType $kc.ListItemEntityTypeFullName -itemId $kCListItem.Id -hashTableOfItemData $updateData}
             catch{$false;log-error -myError $Error[0] -myFriendlyMessage "Failed to update [Kimble Clients].$($kimbleChangedClient.Id) with $updateData"}
             }
         }

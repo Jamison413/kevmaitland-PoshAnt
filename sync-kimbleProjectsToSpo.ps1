@@ -345,7 +345,7 @@ foreach($kimbleChangedProject in $kimbleChangedProjects){
             if(($kimbleChangedProject.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleChangedProject.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleChangedProject.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
                 else{$doNotProcess = $false} #Everyone else wants Project folders set up
             $updateData = @{PreviousName=$kpListItem.ProjectName;PreviousKimbleClientId=$kpListItem.KimbleClientId;Title=$kimbleChangedProject.Name;KimbleClientId=$kimbleChangedProject.KimbleOne__Account__c;IsDeleted=$kimbleChangedProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
-            try{update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData}
+            try{update-itemInList -serverUrl $serverUrl -sitePath $sitePath -listNameOrGuid "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData}
             catch{$false;log-error -myError $Error[0] -myFriendlyMessage "Failed to update [Kimble Projects].$($kimbleChangedProject.Id) with $updateData"}
             }
         }
