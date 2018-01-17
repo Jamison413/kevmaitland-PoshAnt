@@ -40,7 +40,7 @@ $leadsCacheFile = "kimbleLeads.csv"
 function cache-kimbleClients(){
     try{
         log-action -myMessage "Getting [Kimble Clients] to check whether it needs recaching" -logFile $fullLogPathAndName 
-        $kc = get-list -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -restCreds $restCreds 
+        $kc = get-list -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -restCreds $restCreds -logFile $fullLogPathAndName
         if($kc){log-result -myMessage "SUCCESS: List retrieved" -logFile $fullLogPathAndName}
         else{log-result -myMessage "FAILURE: List could not be retrieved" -logFile $fullLogPathAndName}
         }
@@ -49,7 +49,7 @@ function cache-kimbleClients(){
     if((get-date $kc.LastItemModifiedDate).AddMinutes(-5) -gt $kcCacheFile.LastWriteTimeUtc){#This is bodged so we don't miss any new clients added during the time it takes to actually download the full client list
         try{
             log-action -myMessage "[Kimble Clients] needs recaching - downloading full list" -logFile $fullLogPathAndName 
-            $spClients = get-itemsInList -sitePath $clientSite -listName "Kimble Clients" -serverUrl $webUrl -restCreds $restCreds
+            $spClients = get-itemsInList -sitePath $clientSite -listName "Kimble Clients" -serverUrl $webUrl -restCreds $restCreds -logFile $fullLogPathAndName
             if($spClients){
                 log-result -myMessage "SUCCESS: $($spClients.Count) Kimble Client records retrieved!" -logFile $fullLogPathAndName
                 if(!(Test-Path -Path $cacheFilePath)){New-Item -Path $cacheFilePath -ItemType Directory}
@@ -67,7 +67,7 @@ function try-creatingALibrary(){}
 function try-creatingAFolder(){}
 function try-creatingASubFolder(){}
 function try-creatingATermStoreItem(){}
-function try-updatingAListItem($serverUrl, $siteCollectionAndPath, $listName, $listItem, $hashTableOfItemData, $restCreds, $digest){
+function try-updatingAListItem($serverUrl, $siteCollectionAndPath, $listName, $listItem, $hashTableOfItemData, $restCreds, $clientDigest){
     log-action "try-updatingAListItem [$listName] | [$($listItem.Title)] [$($listItem.Id)] $stringifiedHashTable" -logFile $fullLogPathAndName
     try{
         [string]$stringifiedHashTable = "@{"+$($hashTableOfItemData.Keys | % {"`"$_`"=`"$($hashTableOfItemData[$_])`";"})+"}"
@@ -88,6 +88,37 @@ function try-updatingAListItem($serverUrl, $siteCollectionAndPath, $listName, $l
         catch{log-error -myError $_ -myFriendlyMessage "Error when trying to set $stringifiedHashTable for [$listName]|[$($listItem.Title)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true;$false}
         }
     catch{log-error $_ -myFriendlyMessage "Error when trying update-itemInList in try-updatingAListItem for [$listName]|[$($listItem.Title)] $stringifiedHashTable" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true;$false}
+    }
+function new-clientFolder($clientName, $clientDescription, $listofClientSubfolders, $webUrl, $restCreds, $fullLogPathAndName, $errorLogPathAndName, $digest){
+    log-action "new-library /$clientName Description: $(sanitise-stripHtml $clientDescription)" -logFile $fullLogPathAndName
+    $newLibrary = new-library -serverUrl $webUrl -sitePath "/clients" -libraryName $clientName -libraryDesc $(sanitise-stripHtml $clientDescription) -restCreds $restCreds -digest $clientDigest
+    if($newLibrary){#If the new Library has been created, make the subfolders and update the List Item
+        log-result "SUCCESS: $($clientName) is there!" -logFile $fullLogPathAndName
+        #Try to create the subfolders
+        foreach($sub in $listOfClientFolders){ 
+            try{
+                log-action "new-FolderInLibrary /$($clientName)/$sub" -logFile $fullLogPathAndName
+                $newFolder = new-FolderInLibrary -serverUrl $webUrl -site "/clients" -libraryName ("/"+$clientName) -folderPathAndOrName $sub -restCreds $restCreds -digest $clientDigest -logFile $fullLogPathAndName
+                #Bug awareness note #1
+                }
+            catch{log-error $_ -myFriendlyMessage "Failed to create new subfolder $($clientName)/$sub" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+            if ($newFolder){log-result "SUCCESS: $($clientName)\$sub created!" -logFile $fullLogPathAndName}
+            else{log-result "FAILURE: $($clientName)\$sub was not created/retrievable!" -logFile $fullLogPathAndName}
+            }
+        #If we've got this far, try to update the IsDirty property on the Client in [Kimble Clients]
+        try{
+            log-action "update-itemInList Kimble Clients | $($clientName) [$($dirtyClient.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
+            update-itemInList -serverUrl $webUrl -sitePath "/clients" -listName "Kimble Clients" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyClient.__metadata -propertyName "type") -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest -verboseLogging $true -logFile $debugLog
+            try{
+                $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath "/clients" -listName "Kimble Clients" -oDataQuery "?`$filter=Id eq $($dirtyClient.Id)" -restCreds $restCreds -logFile $fullLogPathAndName
+                if($updatedItem.IsDirty -eq $false){log-result "SUCCESS: $($clientName) updated!" -logFile $fullLogPathAndName}
+                else{log-result "FAILED: Could not set Client [$($clientName)].IsDirty = `$true " -logFile $fullLogPathAndName}
+                }
+            catch{log-error -myError $_ -myFriendlyMessage "Failed to set IsDirty=`$true for Client [$($clientName)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+            }
+        catch{log-error $_ -myFriendlyMessage "Failed to update $($clientName) in [Kimble Clients] List - this will stay as IsDirty=true forever :(" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+        }
+    else{log-result "FAILURE: $($clientName) was not created/retrievable!" -logFile $fullLogPathAndName}    
     }
 
 #endregion
@@ -111,35 +142,7 @@ foreach($dirtyClient in $dirtyClients){
     if((!$dirtyClient.PreviousName -and !$dirtyClient.PreviousDescription) -OR $recreateAllFolders -eq $true){
         #Create a new Library and subfolders
         try{
-            log-action "new-library /$($dirtyClient.Title) Description: $(sanitise-stripHtml $dirtyClient.ClientDescription)" -logFile $fullLogPathAndName
-            $newLibrary = new-library -serverUrl $webUrl -sitePath $clientSite -libraryName $dirtyClient.Title -libraryDesc $(sanitise-stripHtml $dirtyClient.ClientDescription) -restCreds $restCreds -digest $clientDigest
-            if($newLibrary){#If the new Library has been created, make the subfolders and update the List Item
-                log-result "SUCCESS: $($dirtyClient.Title) is there!" -logFile $fullLogPathAndName
-                #Try to create the subfolders
-                foreach($sub in $listOfClientFolders){ 
-                    try{
-                        log-action "new-FolderInLibrary /$($dirtyClient.Title)/$sub" -logFile $fullLogPathAndName
-                        $newFolder = new-FolderInLibrary -serverUrl $webUrl -site $clientSite -libraryName ("/"+$dirtyClient.Title) -folderPathAndOrName $sub -restCreds $restCreds -digest $clientDigest
-                        #Bug awareness note #1
-                        }
-                    catch{log-error $_ -myFriendlyMessage "Failed to create new subfolder $($dirtyClient.Title)/$sub" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-                    if ($newFolder){log-result "SUCCESS: $($dirtyClient.Title)\$sub created!" -logFile $fullLogPathAndName}
-                    else{log-result "FAILURE: $($dirtyClient.Title)\$sub was not created/retrievable!" -logFile $fullLogPathAndName}
-                    }
-                #If we've got this far, try to update the IsDirty property on the Client in [Kimble Clients]
-                try{
-                    log-action "update-itemInList Kimble Clients | $($dirtyClient.Title) [$($dirtyClient.Id) @{IsDirty=$false}]" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -predeterminedItemType $(get-propertyValueFromSpoMetadata -__metadata $dirtyClient.__metadata -propertyName "type") -itemId $dirtyClient.Id -hashTableOfItemData @{IsDirty=$false} -restCreds $restCreds -digest $clientDigest -verboseLogging $true -logFile $debugLog
-                    try{
-                        $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $clientSite -listName "Kimble Clients" -oDataQuery "?`$filter=Id eq $($dirtyClient.Id)" -restCreds $restCreds
-                        if($updatedItem.IsDirty -eq $false){log-result "SUCCESS: $($dirtyClient.Title) updated!" -logFile $fullLogPathAndName}
-                        else{log-result "FAILED: Could not set Client [$($dirtyClient.Title)].IsDirty = `$true " -logFile $fullLogPathAndName}
-                        }
-                    catch{log-error -myError $_ -myFriendlyMessage "Failed to set IsDirty=`$true for Client [$($dirtyClient.Title)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-                    }
-                catch{log-error $_ -myFriendlyMessage "Failed to update $($dirtyClient.Title) in [Kimble Clients] List - this will stay as IsDirty=true forever :(" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-                }
-            else{log-result "FAILURE: $($dirtyClient.Title) was not created/retrievable!" -logFile $fullLogPathAndName}
+            new-clientFolder -clientName $($dirtyClient.Title) -clientDescription $($dirtyClient.ClientDescription) -listofClientSubfolders $listOfClientFolders -webUrl $webUrl -restCreds $restCreds -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName -digest $clientDigest
             }
         catch{log-error $_ -myFriendlyMessage "Failed to create new Library for $($dirtyClient.Title)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailTo $mailTo -mailFrom $mailFrom}
         #Now try to add the new ClientName to the TermStore
@@ -379,7 +382,7 @@ foreach($dirtyProject in $dirtyProjects){
                         try{
                             log-action "new-folderInLibrary $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId])/$projectFolderName/$sub" -logFile $fullLogPathAndName
                             $newProjectLibrarySubfolder = new-FolderInLibrary -serverUrl $webUrl -site $clientSite -libraryName ("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -folderPathAndOrName ("/"+$projectFolderName.Replace("/","")+"/"+$sub) -restCreds $restCreds -digest $clientDigest
-                            if($sub -eq "Admin & contracts"){copy-file -credentials $csomCreds -webUrl $webUrl -sourceSiteCollectionPath "/teams/communities" -sourceSitePath "/heathandsafetyteam" -sourceLibraryName "Shared Documents" -sourceFolderPath "/RAs/Projects" -sourceFileName "Anthesis UK Project Risk Assessment.xlsx" -destSiteCollectionPath "/" -destSitePath "/clients" -destLibraryName $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -destFolderPath $("/"+$dirtyProject.Title.Replace("/",'')+"/$sub") -destFileName "Anthesis UK Project Risk Assessment.xlsx" -overwrite $false}
+                            if($sub -eq "Admin & contracts"){copy-file -credentials $csomCreds -webUrl $webUrl -sourceSiteCollectionPath "/teams/communities" -sourceSitePath "/heathandsafetyteam" -sourceLibraryName "Shared Documents" -sourceFolderPath "/RAs/Projects" -sourceFileName "Anthesis UK Project Risk Assessment.xlsx" -destSiteCollectionPath "/" -destSitePath "/clients" -destLibraryName $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId]) -destFolderPath $("/"+$projectFolderName.Replace("/",'')+"/$sub") -destFileName "Anthesis UK Project Risk Assessment.xlsx" -overwrite $false}
                             }
                         catch{log-error -myError $_ -myFriendlyMessage "Failed to create the subfolder $("/"+$kimbleClientHashTable[$dirtyProject.KimbleClientId])/$projectFolderName/$sub"}
                         #Validate that new-FolderInLibrary returned *something* (we're not validating that each subfolder gets created - if the main Project folder created correctly, we'll just assume that they all will)
@@ -481,3 +484,26 @@ foreach($dirtyProject in $dirtyProjects){
             }
 
 #>
+
+function reconcile-spoClients(){
+    try{
+        log-action -myMessage "Getting all Client Libraries:" -logFile $fullLogPathAndName
+        $spoClientLibraries = get-allLists -serverUrl $webUrl -sitePath "/clients" -restCreds $restCreds -logFile $fullLogPathAndName -verboseLogging $true
+        if($spoClients){log-result -myMessage "SUCCESS: Libraries retrieved!" -logFile $fullLogPathAndName}
+        else{log-result -myMessage "FAILED: Unable to retrieve list of Libraries" -logFile $fullLogPathAndName}
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+
+    try{
+        log-action -myMessage "Getting List: [Kimble Clients]" -logFile $fullLogPathAndName
+        $spoClients = get-itemsInList -serverUrl $webUrl  -sitePath $sitePath -listName "Kimble Clients" -restCreds $restCreds -logFile $logFileLocation 
+        if($spoClients){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
+        else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [Kimble Clients]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+
+    $missingClientLibraries = Compare-Object -ReferenceObject $spoClients -DifferenceObject $spoClientLibraries.results -Property "Title" -PassThru
+    $missingClientLibraries | %{
+        if($_.SideIndicator -eq "<="){new-clientFolder -clientName $($_.Title) -clientDescription $($_.ClientDescription) -listofClientSubfolders $listOfClientFolders -webUrl $webUrl -restCreds $restCreds -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName -digest $clientDigest}
+        }
+    }
