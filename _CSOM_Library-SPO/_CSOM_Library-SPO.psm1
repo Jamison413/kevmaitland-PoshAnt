@@ -228,6 +228,7 @@ function convert-listItemToCustomObject($spoListItem, $spoTaxonomyData, $debugMe
                 "String" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $(sanitise-stripHtml -dirtyString $($spoListItem.$($ourMember.Name)))}
                 "Int32" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
                 "Bool" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
+                "Boolean" {$customObj | Add-Member -Name $($ourMember.Name.Replace("_x0020_","_")) -MemberType NoteProperty -Value $spoListItem.$($ourMember.Name)}
                 "PSCustomObject" {
                     #Now for the complicated stuff
                     #Check for duff data first:
