@@ -205,10 +205,36 @@ function Invoke-SPORestMethod {
     }
 } 
 #endregion
-#region Ant functions
+function add-attachmentToListItem($serverUrl,$sitePath,$listItem,$filePathAndName,$restCreds,$digest,$verboseLogging,$logFile){
+    if($verboseLogging){Write-Host -ForegroundColor Yellow "add-attachmentToListItem -serverUrl $serverUrl -sitePath $sitePath -listItem $($listItem.__metadata.uri) -filePathAndName $filePathAndName -restCreds $restCreds"}
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$digest = $($digest.digest.GetContextWebInformation.FormDigestValue))"}
+    $digest = check-digestExpiry -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -digest $digest -restCreds $restCreds -logFile $logFile -verboseLogging $verboseLogging
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$digest = $($digest.digest.GetContextWebInformation.FormDigestValue))"}
+    $sanitisedFileName = [uri]::EscapeUriString($(Split-Path $filePathAndName -Leaf)) 
+    $url = $listItem.__metadata.uri+"/AttachmentFiles/add(Filename=`'$sanitisedFileName`')"
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$url = $url"}
+    [System.Net.WebRequest]$request = [System.Net.WebRequest]::CreateHttp($url)
+    $request.Credentials = $restCreds
+    $request.Headers.Add("X-FORMS_BASED_AUTH_ACCEPTED", "f")
+    $request.Headers.Add("X-RequestDigest", $($digest.digest.GetContextWebInformation.FormDigestValue))
+    $request.Method = "POST"
+
+    $fileContent = [System.IO.File]::ReadAllBytes($filePathAndName)
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$fileContent.Length = $($fileContent.Length)"}
+    $request.ContentLength = $fileContent.Length
+
+    $requestStream = $request.GetRequestStream()
+    $requestStream.Write($fileContent,0,$fileContent.Length)
+    
+    $response = $request.GetResponse()
+    $response
+    }
 function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds,$verboseLogging,$logFile){
     $sitePath = format-path $sitePath
-    if($digest -eq $null){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
+    if($digest -eq $null){
+        if($verboseLogging){write-host -ForegroundColor DarkYellow "Digest was `$null"} 
+        new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds
+        }
     elseif(($digest.expiryTime.AddSeconds(-30) -lt (Get-Date)) -or ($digest.digest.GetContextWebInformation.WebFullUrl -ne $serverUrl+$sitePath)){new-spoDigest -serverUrl $serverUrl -sitePath $sitePath -restCreds $restCreds}
     else{$digest}
     }
@@ -255,6 +281,17 @@ function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAn
         if($verboseLogging){log-error -myError $_ -myFriendlyMessage "Failed to delete-folderInLibrary: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"DELETE`" -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -doNotLogToEmail $true -errorLogFile $logFile}
         $false
         }
+    }
+function format-itemData($hashTableOfItemData){
+    foreach($key in $hashTableOfItemData.Keys){
+        if($hashTableOfItemData[$key].GetType().Name -eq "DateTime"){$formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "} #If it's a DateTime, mark it up like a string
+        elseif($hashTableOfItemData[$key].GetType().Name -eq "Boolean"){$formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "} #If it's a Boolean, mark it up like a string
+        elseif([regex]::Match($hashTableOfItemData[$key],"^[0-9\-\.]+$").Success){$formattedItemData += "`'$key`':$($hashTableOfItemData[$key]), "} #If it's a numeric value
+        elseif($hashTableOfItemData[$key].Trim()[0] -eq "{"){[string]$formattedItemData += "`'$key`':$($hashTableOfItemData[$key]), "}#If it's a compound value
+        else{$formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key].Replace('"','\"'))`", "} #If it's anything else, treat it as a string
+        }
+    $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
+    $formattedItemData
     }
 function format-path($dirtyPath){
     #All "path" variables should be prefixed with a "/", but not suffixed
@@ -426,8 +463,8 @@ function get-propertyValueFromSpoMetadata([string]$__metadata, [string]$property
     else{$false}
     }
 function new-spoDigest($serverUrl, $sitePath, $restCreds,$verboseLogging,$logFile){
-    $digest = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")
-    $digest = New-Object psobject -Property @{"digest" = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")}
+    #$digest = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")
+    $digest = New-Object psobject -Property @{"digest" = $(Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST" -manualTimeOut 10000)}
     $digest | Add-Member -MemberType NoteProperty expiryTime -Value (Get-Date).AddSeconds($digest.digest.GetContextWebInformation.FormDigestTimeoutSeconds)
     $digest
     #$global:digest = (Invoke-SPORestMethod -Url "$serverUrl$sitePath/_api/contextinfo" -credentials $restCreds -Method "POST")#.GetContextWebInformation.FormDigestValue
@@ -474,13 +511,10 @@ function new-itemInList($serverUrl, $sitePath,$listName,$predeterminedItemType,$
     if($verboseLogging){log-action "new-itemInList($sitePath,$listName,$predeterminedItemType,$($hashTableOfItemData.Keys | %{"$_=$($hashTableOfItemData[$_]);"})" -logFile $logFile}
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items"
-    foreach($key in $hashTableOfItemData.Keys){
-        $formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "
-        }
-    $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
+    $formattedItemData = format-itemData -hashTableOfItemData $hashTableOfItemData
     $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
     try{
-        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue)" -logFile $logFile}
+        if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -Metadata $metadata -RequestDigest $($digest.digest.GetContextWebInformation.FormDigestValue)" -logFile $logFile}
         Invoke-SPORestMethod -Url $url -Method "POST" -Metadata $metadata -RequestDigest $digest.digest.GetContextWebInformation.FormDigestValue -credentials $restCreds
         if($verboseLogging){log-result "SUCCESS: New item created" -logFile $logFile}
         }
@@ -545,11 +579,7 @@ function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $r
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')"
-    foreach($key in $hashTableOfUpdateData.Keys){
-        $formattedItemData += "`'$key`':`'$($hashTableOfUpdateData[$key])`', "
-        }
-    $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
-    #$metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
+    $formattedItemData = format-itemData -hashTableOfItemData $hashTableOfItemData
     $metadata = "{'__metadata':{'type':'SP.List'},$formattedItemData}"
     try{
         if($verboseLogging){log-action "update-list: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -logFile $logFile}
@@ -573,10 +603,7 @@ function update-itemInList($serverUrl,$sitePath,$listNameOrGuid,$predeterminedIt
         $listName = sanitise-forSharePointUrl(sanitise-forSharePointFileName ($listNameOrGuid.Replace("Lists/","")))
         $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')/items($itemId)"
         }
-    foreach($key in $hashTableOfItemData.Keys){
-        $formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "
-        }
-    $formattedItemData = $formattedItemData.Substring(0,$formattedItemData.Length-2) #Trim off the final ","
+    $formattedItemData = format-itemData -hashTableOfItemData $hashTableOfItemData
     $metadata = "{ '__metadata': { 'type': '$predeterminedItemType' }, $formattedItemData}"
     try{
         if($verboseLogging){log-action "Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -logFile $logFile}
@@ -588,5 +615,4 @@ function update-itemInList($serverUrl,$sitePath,$listNameOrGuid,$predeterminedIt
         $false
         }
     }
-#endregion
 

@@ -164,7 +164,7 @@ foreach ($kimbleNewProject in $kimbleNewProjects){
     #Create the new List item
     try{
         log-action -myMessage "Creating new SPO List item [$($kimbleNewProject.Name)]" -logFile $fullLogPathAndName
-        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewProjectData -restCreds $restCreds -digest $clientDigest
+        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewProjectData -restCreds $restCreds -digest $clientDigest -logFile $logFileLocation
         #Check it's worked
         if($newItem){log-result -myMessage "SUCCESS: SPO [Kimble Project] item $($newItem.Title) created/retrieved!" -logFile $fullLogPathAndName}
         else{
