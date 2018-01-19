@@ -15,40 +15,45 @@ $EWSServicePath = 'C:\Program Files\Microsoft\Exchange\Web Services\2.2\Microsof
 Import-Module $EWSServicePath
 Import-Module _REST_Library-SPO
 Import-Module _CSOM_Library-SPO
-
-
-#Set some variables
-$ExchVer = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
-$ewsUrl = "https://outlook.office365.com/EWS/Exchange.asmx"
-$upnExtension = "anthesisgroup.com"
-$smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
-$checkInPFPath   = "\1.Public Folders\1.Admin\IT\Check-In"
-$failedPFPath    = "\1.Public Folders\1.Admin\IT\Check-In\Failed"
-$logFile = "C:\Scripts\Logs\checkInTool.log"
-$errorLogFile = "C:\Scripts\Logs\checkInTool_error.log"
-$upnSMA = "kimblebot@anthesisgroup.com"
-#$passSMA = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
-$passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
-
-#Connect to Exchange using EWS
-$service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($exchver)
-$service.Credentials = New-Object System.Net.NetworkCredential($upnSMA,$passSMA)
-$service.Url = $ewsUrl
-
-$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $upnSMA, $passSMA
-$restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
-$csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
-
+Import-Module _PS_Library_GeneralFunctionality
 
 #region functions
+function get-allEwsItems($exchangeService, $folderId, $searchFilter){
+    #Example $FolderId = [Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $ukCareersEmailAddress)
+    $bind = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($exchangeService, $folderId)
+    #$ukCareersItems = $service.FindItems($bind.Id,$searchFilter,[Microsoft.Exchange.WebServices.Data.ItemView]::new(100))
+
+    $itemsOffset = [Microsoft.Exchange.WebServices.Data.ItemView]::new(100)
+    do {
+        $foundItems = $exchangeService.FindItems($bind.Id,$null,$itemsOffset)
+        $itemsOffset.Offset = $foundFolders.NextPageOffset
+        $allItems += $foundItems.Items
+        }
+    while ($foundItems.MoreAvailable -eq $true) 
+    $allItems
+    }
+function get-allEwsFolders($exchangeService, $folderId){
+    #Example FolderId = [Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox
+    $folderOffset = [Microsoft.Exchange.WebServices.Data.FolderView]::new(100)
+    do {
+        $foundFolders = $exchangeService.FindFolders($folderId, $folderOffset)
+        $folderOffset.Offset = $foundFolders.NextPageOffset
+        $allFolders += $foundFolders.Folders
+        }
+    while ($foundFolders.MoreAvailable -eq $true) 
+    $allFolders
+    }
+
 function FolderIdFromPath{  
-    param ($FolderPath = "$( throw 'Folder Path is a mandatory Parameter' )")  
+    param ($FolderPath = "$( throw 'Folder Path is a mandatory Parameter' )"
+        , $exchangeService = "$( throw 'exchangeService is a mandatory Parameter' )"
+        , $smtpAddress)  
     process{  
         ## Find and Bind to Folder based on Path    
         #Define the path to search should be seperated with \    
         #Bind to the MSGFolder Root    
         $folderId = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox)     
-        $tfTargetFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderId)    
+        $tfTargetFolder = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($exchangeService,$folderId,$smtpAddress)    
         #Split the Search path into an array    
         $fldArray = $FolderPath.Split("\")  
          #Loop through the Split Array and do a Search for each level of folder  
@@ -84,108 +89,275 @@ function LogError([string]$errorMessage){
     }        
 #endregion
 
-$folderId = new-object Microsoft.Exchange.WebServices.Data.FolderId(FolderIdFromPath -FolderPath $checkInPFPath)
-$checkInPF = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderId)    
-$folderId = new-object Microsoft.Exchange.WebServices.Data.FolderId(FolderIdFromPath -FolderPath $processedPFPath)
-$processedPF = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderId)    
-$folderId = new-object Microsoft.Exchange.WebServices.Data.FolderId(FolderIdFromPath -FolderPath $failedPFPath)
-$failedPF = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service,$folderId)    
-$itemView =  New-Object Microsoft.Exchange.WebServices.Data.ItemView(10)  
-$propertySet = new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)  
+#Set some variables
+$ExchVer = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
+$ewsUrl = "https://outlook.office365.com/EWS/Exchange.asmx"
+$upnExtension = "anthesisgroup.com"
+$ukCareersEmailAddress = "ukcareers@$upnExtension"
+$sendReportToAddress = "kevin.maitland@anthesisgroup.com"
+$smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
+$closedJobMailFolderName = "z_closed"
+$onHoldJobMailFolderName = "z_on-hold"
+$duffMailFolderName = "_UnableToAutomate"
+$logFile = "C:\ScriptLogs\process-ukCareersEmail.log"
+$errorLogFile = "C:\ScriptLogs\process-ukCareersEmail_error.log"
+$verboseLogging = $true
+$upnSMA = "kimblebot@anthesisgroup.com"
+#$passSMA = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
+$passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 
-#Get an array of objects from SharePoint with the users' mobile phone numbers:
-try {$userData = Invoke-Command -ComputerName $sharePointServer -ConfigurationName $sharePointPSSesssionConfigName -ScriptBlock {param($actionToPerform, $findProperty, $findPropertyCurrentValue) \\SP01\Scripts\MySites_Maintenance_UserProfileData.ps1 @PSBoundParameters} -ArgumentList "GetAll", "CellPhone", "dummyValue" -ErrorAction Stop}
-catch {
-    $ErrorMessage = $_.Exception.Message
-    $FailedItem = $_.Exception.ItemName
-    LogError -errorMessage "ERROR: Failed to read MobilePhone info from MySites `n Item: $FailedItem`n Message: $ErrorMessage"
+#Connect to Exchange using EWS
+$service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($exchver)
+$service.Credentials = New-Object System.Net.NetworkCredential($upnSMA,$passSMA)
+$service.Url = $ewsUrl
+#$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $ukCareersEmailAddress) -ErrorAction Stop
+
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $upnSMA, $passSMA
+$restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
+$csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
+
+$webUrl = "https://anthesisllc.sharepoint.com"
+$recruitmentSiteCollection = "/teams/communities"
+$recruitmentSite = "/Recruitment"
+$ukJobsListName = "UK Roles"
+$ukCandidatsListName = "UK Role Candidates"
+$taxonomyListName = "TaxonomyHiddenList"
+$taxonomyData = get-itemsInList -serverUrl $webUrl -sitePath $recruitmentSiteCollection -listName $taxonomyListName -suppressProgress $false -restCreds $restCreds -logFile $logFile -verboseLogging $true
+
+$ukJobs = get-itemsInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName $ukJobsListName -restCreds $restCreds -logFile $logFile -verboseLogging $true -oDataQuery "?`$filter=MailFolderArchived eq 0" #Get all Jobs where we haven't archived the Mail Folder (as they're done and dusted)
+$ukJobsObjects =@()
+$ukJobs | % {[array]$ukJobsObjects += convert-listItemToCustomObject -spoListItem $_ -spoTaxonomyData $taxonomyData} #Convert the List Items to PS Objects as some of the attributes are difficult to work with (e.g. MetaData or People/Group)
+$ukJobsObjects | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name DisplayName -Value $_.UniqueJobID} #Add the UniqueJobId property again as DisplayName so we can use compare-object efficiently later
+$ukCandidateList = get-list -webUrl $webUrl -siteCollection $recruitmentSiteCollection -credentials $restCreds -sitePath $recruitmentSite -listname $ukCandidatsListName
+
+
+#Reconcile the current Job Roles with the E-mail folders
+$inboxFolders = get-allEwsFolders -exchangeService $service -folderId $([Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $ukCareersEmailAddress)) 
+if($verboseLogging){Write-Host -ForegroundColor Yellow "Reconciling e-mail folders: $($inboxFolders.Count) Inbox folders and $($ukJobsObjects.Count) Job Roles found"}
+$onHoldFolderId = $inboxFolders | ? {$_.DisplayName -eq $onHoldJobMailFolderName} | % {$_.Id}
+$closedFolderId = $inboxFolders | ? {$_.DisplayName -eq $closedJobMailFolderName} | % {$_.Id}
+$dufferFolderId = $inboxFolders | ? {$_.DisplayName -eq $duffMailFolderName} | % {$_.Id}
+$newFoldersToReconcile = Compare-Object $inboxFolders -DifferenceObject $ukJobsObjects -Property "DisplayName" -PassThru -ErrorAction Continue
+#If the Role is open, but there's no folder...
+if($verboseLogging){if(($newFoldersToReconcile | ?{$_.SideIndicator -eq "=>" -and $_.Recruitment_Status -match "Open"} | % {})-eq $null){Write-Host -ForegroundColor DarkYellow "No new e-mail folders need creating in Inbox"}}
+$newFoldersToReconcile | ?{$_.SideIndicator -eq "=>" -and $_.Recruitment_Status -match "Open"} | % { 
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Creating e-mail folder $($_.UniqueJobId) in Inbox"}
+    $newJobMailFolder = [Microsoft.Exchange.WebServices.Data.Folder]::new($service)
+    $newJobMailFolder.DisplayName = $_.UniqueJobID
+    $newJobMailFolder.Save([Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $ukCareersEmailAddress))
     }
-
-#Build an up-to-date contacts list from AD to get Company mobile phone numbers too
-$usersList = Get-ADUser -Filter * -SearchBase "OU=Users,OU=Sustain,DC=Sustainltd,DC=local" -Properties @("SAMAccountName","DisplayName","GivenName","SurName","Title","Company","Department","mail","OfficePhone","MobilePhone","Manager")
-#Generalise the data from AD so that we can use it with the data from SharePoint
-foreach ($user in $usersList){
-    $generalisedUser = New-Object Object
-    if($user.MobilePhone){$generalisedUser | Add-Member NoteProperty CellPhone ($user.MobilePhone).Replace(" ","")}
-        else{$generalisedUser | Add-Member NoteProperty CellPhone ""}
-    $generalisedUser | Add-Member NoteProperty AccountName "SUSTAINLTD\$($user.SAMAccountName)"
-    $generalisedUser | Add-Member NoteProperty WhatIsMyName $user.GivenName
-    $generalisedUser | Add-Member NoteProperty Manager "SUSTAINLTD\$(get-managerSamAccountNameFromCn -cNString $user.Manager)"
-    $userData += $generalisedUser
-    }
-
-
-$foundItems = $null  
-do{  
-    $foundItems = $service.FindItems($checkInPF.Id,$itemView)  
-    [Void]$service.LoadPropertiesForItems($foundItems,$propertySet)
-    foreach($email in $foundItems.Items){
-        LogMessage -logMessage "INFO: E-mail received from $($email.Sender)"
-        $texterNumber = GetStandardisedUKMobileNumber $(($email.Subject -split " ")[($email.Subject -split " ").Count -1]).Replace("(", "").Replace(")", "")
-
-        $texterName = $null
-        foreach ($user in $userData){
-            if ($(GetStandardisedUKMobileNumber $user.CellPhone) -eq $texterNumber){
-                LogMessage -logMessage "INFO: SMS identified as being from $(($user.AccountName -split "\\")[1])"
-                #CreateAppointment -service $service -user $user.AccountName -email $email
-                try {$service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $("$(($user.AccountName -split "\\")[1])@$upnExtension")) -ErrorAction Stop}
-                catch {
-                    $ErrorMessage = $_.Exception.Message
-                    $FailedItem = $_.Exception.ItemName
-                    LogError -errorMessage "ERROR: Failed to impersonate $($user.AccountName) in EWS to create appointment`n Item: $FailedItem`n Message: $ErrorMessage"
-                    }
-                $texterName = $user.WhatIsMyName
-                $appointment = New-Object Microsoft.Exchange.WebServices.Data.Appointment -ArgumentList $service
-                $appointment.Start = $email.DateTimeReceived
-                $appointment.End = $email.DateTimeReceived.AddMinutes(15)
-                $appointment.Subject = "Check-in via SMS"
-                $appointment.Body = FindSmsInEmail -emailBody $email.Body.ToString()
-                $appointment.IsAllDayEvent = $false
-                $appointment.ReminderDueBy = $email.DateTimeReceived
-                $appointment.IsReminderSet = $true
-                $appointment.Categories.Add("Check-In")
-                $appointment.Categories.Add("Important")
-                try {$appointment.Save([Microsoft.Exchange.WebServices.Data.SendInvitationsMode]::SendToAllAndSaveCopy)
-                } 
-                catch {
-                    $ErrorMessage = $_.Exception.Message
-                    $FailedItem = $_.Exception.ItemName
-                    LogError -errorMessage "ERROR: Failed to save newly created appointment for $($user.AccountName) in EWS `nItem: $FailedItem`n Message: $ErrorMessage"
-                    break
-                    }
-                try {
-                    $email.Move($processedPF.Id)
-                    #Confirm receipt and update via email-to-SMS service at TextMarketer if the message is moved (to prevent responding to the same message repeatedly)
-                    $mycreds = New-Object System.Management.Automation.PSCredential ($upnSMA, $passSMA)
-                    Send-MailMessage -To "$($texterNumber.Substring(2))$smsServiceDomain" -From "checkinrobot@sustain.co.uk" -SmtpServer $smtpServer -Subject "Thanks $texterName - I've updated your Outlook calendar with the contents of your text message. Love, The Sustain Check-In Robot" -Body " " -Credential $mycreds
-                    Send-MailMessage -To ($user.Manager.Replace("SUSTAINLTD\","").Replace("sustainltd\","")+"@$upnExtension") -From "checkinrobot@anthesisgroup.com" -SmtpServer $smtpServer -Subject "$texterName has checked in via the Lone Worker Check-In tool." -Body "$(FindSmsInEmail -emailBody $email.Body.ToString()) `r`n$(get-date $email.DateTimeReceived -Format "dd/MM/yyyy HH:mm:ss")`r`n`r`nLove, `r`n`r`nThe Sustain Check-In Robot (on behalf of $texterName)" -Credential $mycreds
-                    Send-MailMessage -To ("wai.cheung@$upnExtension") -From "checkinrobot@anthesisgroup.com" -SmtpServer $smtpServer -Subject "$texterName has checked in via the Lone Worker Check-In tool." -Body "$(FindSmsInEmail -emailBody $email.Body.ToString()) `r`n$(get-date $email.DateTimeReceived -Format "dd/MM/yyyy HH:mm:ss")`r`n`r`nLove, `r`n`r`nThe Sustain Check-In Robot (on behalf of $texterName)" -Credential $mycreds
-                    }
-                catch {
-                    $ErrorMessage = $_.Exception.Message
-                    $FailedItem = $_.Exception.ItemName
-                    LogError -errorMessage "ERROR: Failed to move processed Check-In for $($user.AccountName) via EWS `n Item: $FailedItem`n Message: $ErrorMessage"
-                    break
-                    }
-                break #break here to avoid multiple matches where the user has listed their company phone in SharePoint
-                }
-            }
-    if ($texterName -eq $null) {
-        LogError -errorMessage "WARNING: SMS received from an unknown phone number: $texterNumber"
-        Send-MailMessage -To "officemanagementteam@sustain.co.uk" -From checkinrobot@sustain.co.uk -SmtpServer $smtpServer -Subject "Check-in text received from unknown number: $texterNumber" -Body "Hello Office Management Team,`n`nI've received a Check-In text, but I don't know who it's from (so I can't update their calendar) :(`n`nIt's from: $texterNumber`nAnd it reads: $((($email.Body.ToString() -split "`n")[28] -split "<")[0])`n`nLove,`n`nThe Lone Worker Check-In Tool Robot" -Credential $mycreds
-        Send-MailMessage -To "$($texterNumber.Substring(2))$smsServiceDomain" -From "checkinrobot@sustain.co.uk" -SmtpServer $smtpServer -Subject "I'm sorry, but I couldn't find your mobile number in any MySustain profile. Please call 0117 4032 700 and check in verbally. Love, The Sustain Check-In Robot" -Body " " -Credential $mycreds
-        try {$email.Move($failedPF.Id)}
-        catch {
-            $ErrorMessage = $_.Exception.Message
-            $FailedItem = $_.Exception.ItemName
-            LogError -errorMessage "ERROR: Failed to move failed Check-In for $($user.AccountName) via EWS `n Item: $FailedItem`n Message: $ErrorMessage"
+#If the Role is On-hold, but there is a folder...
+$ukJobsObjectsOnHold = $ukJobsObjects | ?{$_.Recruitment_Status -match "hold"}
+if($ukJobsObjectsOnHold){ #Compare-Object will throw a wobbly if we send a $null -DifferenceObject
+    $onHoldFoldersToReconcile = Compare-Object $inboxFolders -DifferenceObject $ukJobsObjectsOnHold -Property "DisplayName" -PassThru -ExcludeDifferent -IncludeEqual -ErrorAction Continue
+    if($onHoldFoldersToReconcile){#Process any folders
+        $onHoldFoldersToReconcile | %{
+            if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Moving folder $($_.DisplayName) to $onHoldJobMailFolderName"}
+            $folderToMoveBind = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $_.Id)
+            #$folderToMoveBind.Move($onHoldFolderId)
             }
         }
-    }  
-    $itemView.Offset += $foundItems.Items.Count  
-}while($foundItems.MoreAvailable -eq $true) 
+    else{if($verboseLogging){Write-Host -ForegroundColor DarkYellow "No e-mail folders need moving to $onHoldJobMailFolderName"}}
+    }
+else{if($verboseLogging){Write-Host -ForegroundColor DarkYellow "No Job Roles are On-Hold"}}
+#If the Role is Closed, but there is a folder...
+$ukJobsObjectsClosed = $ukJobsObjects | ?{$_.Recruitment_Status -match "Closed"}
+if($ukJobsObjectsClosed){ #Compare-Object will throw a wobbly if we send a $null -DifferenceObject
+    $closedFoldersToReconcile = Compare-Object $inboxFolders -DifferenceObject $ukJobsObjectsClosed -Property "DisplayName" -PassThru -ExcludeDifferent -IncludeEqual -ErrorAction Continue
+    if($closedFoldersToReconcile){#Process any folders
+        $closedFoldersToReconcile | %{
+            #Move the folder and mark the JobRole ListItem as MailFolderArchived
+            try{
+                #First move the folder
+                if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Moving folder $($_.DisplayName) to $closedJobMailFolderName"}
+                $folderToMoveBind = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $_.Id)
+                #$folderToMoveBind.Move($closedFolderId)
+                #Second, update the ListItem
+                $folderToMoveObject = $_
+                try{
+                    $jobRecordToUpdate = $ukJobsObjectsClosed | ?{$_.UniqueJobID -eq $folderToMoveObject.DisplayName}
+                    $recruitmentDigest = check-digestExpiry -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -restCreds $restCreds -logFile $logFile -digest $recruitmentDigest
+                    update-itemInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listNameOrGuid $ukJobsListName -predeterminedItemType $jobRecordToUpdate.__metadata.type -itemId $jobRecordToUpdate.Id -hashTableOfItemData @{"MailFolderArchived"=$true} -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
+                    }
+                catch{[array]$spongeInThePatient += "Could not update JobRole $($jobRecordToUpdate.DisplayName) to set MailFolderArchived = `$true"}
+                }
+            catch{[array]$spongeInThePatient += "Could not Move mail folder $($_.DisplayName) to $closedJobMailFolderName"}
+            }
+        }
+    else{if($verboseLogging){Write-Host -ForegroundColor DarkYellow "No e-mail folders need moving to $closedJobMailFolderName"}}
+    }
+else{if($verboseLogging){Write-Host -ForegroundColor DarkYellow "No Job Roles are Closed (that we haven't already archived)"}}
 
+#Get any e-mails that haven't been processed (i.e. are still in the root Inbox)
+$ukCareersItems = get-allEwsItems -exchangeService $service -folderId $([Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $ukCareersEmailAddress)) -searchFilter $null
+if($verboseLogging){Write-Host -ForegroundColor Yellow "Found $($ukCareersItems.Count) e-mails that need processing"}
+$ukCareersItems | %{
+    #Read the Subject to see if it contains a jobID
+    $email = $_
+    if($verboseLogging){Write-Host -ForegroundColor Yellow "Found e-mail from $($email.Sender.Address) with Subject $($email.Subject)"}
+    $jobCodes = @()
+    $email.Subject.Split(" ") | % {
+        if($ukJobsObjects.UniqueJobID -icontains $_){[array]$jobCodes += $_} #We need -icontains, not -imatch to avoid matching WS1 to WS12
+        }
+    if($jobCodes.Count -eq 1){#If it contains exactly 1 job code, create a List Item
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Exactly 1 JobCode found [$($jobCodes[0])]"}
+        #$dummyCandidate = get-itemsInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName "UK Role Candidates" -restCreds $restCreds -logFile $logFile -oDataQuery "&`$filter=Id eq 1" #Quickly find the field names in SPO
+        $recruitmentDigest = check-digestExpiry -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -restCreds $restCreds -logFile $logFile -digest $recruitmentDigest
+        $candidateHash=@{}
+        $candidateHash.Add("Application_x0020_received",$email.DateTimeReceived)
+        $candidateHash.Add("E_x002d_mail_x0020_address",$email.Sender.Address)
+        $candidateHash.Add("Title", $email.Sender.Name)
+        #Try to work out the first/last name
+        if($email.Sender.Name.Split(" ").Count -eq 2){ #Check that there are exactly two words separated by a space
+            if($email.Sender.Name.Split(" ")[0] -notmatch ","){ #If the first word doesn't contain a comma, assume the format "FirstName LastName"
+                $candidateHash.Add("First_x0020_Name", $email.Sender.Name.Split(" ")[0])
+                $candidateHash.Add("Last_x0020_Name", $email.Sender.Name.Split(" ")[1])
+                }
+            else{# If the first word /does/ contain a comma, assume the format "LastName, FirstName"
+                $candidateHash.Add("First_x0020_Name", $email.Sender.Name.Split(" ")[1])
+                $candidateHash.Add("Last_x0020_Name", $email.Sender.Name.Split(" ")[0])
+                }
+            }
+        #Get the required information to build a metadata value for the JobID
+        $jobTerm = $taxonomyData | ?{$_.Term -contains $jobCodes[0]}
+        <#This is what the real object looks like, but we only need the string values to build the JSON REST command
+        $jobIDMetaDataValue = [Microsoft.SharePoint.Client.Taxonomy.TaxonomyFieldValue]::new() 
+        $jobIDMetaDataValue.Label = $jobTerm.Term
+        $jobIDMetaDataValue.TermGuid = $jobTerm.IdForTerm
+        $jobIDMetaDataValue.WssId = -1#>
+        $jobIDMetaDataHash = @{"Label"=$jobTerm.Term;"TermGuid"=$jobTerm.IdForTerm;"WssId"=-1} #No idea what WssId refers to, but -1 works fine.
+        $formattedJobIdData = format-itemData $jobIDMetaDataHash
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$formattedJobIdData = $formattedJobIdData"}
+        $candidateHash.Add("RoleID","{'__metadata':{'type':'SP.Taxonomy.TaxonomyFieldValue'},$formattedJobIdData}")
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Trying to create Candidate List Item"}
+        $newCandidateRecord = new-itemInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName $ukCandidatsListName -predeterminedItemType $ukCandidateList.ListItemEntityTypeFullName -hashTableOfItemData $candidateHash -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $verboseLogging
+        if(!$newCandidateRecord){
+            if($verboseLogging){Write-Host -ForegroundColor DarkYellow "New Candidate ListItem did not create for $($email.Sender.Address) :("}
+            [array]$spongeInThePatient += "Something went wrong when creating the Candidate Record for $($email.Sender.Address) in SharePoint"
+            }
+        else{[array]$allNewCandidateRecords += $newCandidateRecord}
 
+        #If the e-mail has attachments, add them to the newly-created List Item
+        if($email.HasAttachments){
+            if($verboseLogging){Write-Host -ForegroundColor DarkYellow "E-mail has attachments"}
+            $emailWithAttachments = [Microsoft.Exchange.WebServices.Data.EmailMessage]::Bind($service, $email.Id, [Microsoft.Exchange.WebServices.Data.PropertySet]::new([Microsoft.Exchange.WebServices.Data.BasePropertySet]::IdOnly, [Microsoft.Exchange.WebServices.Data.ItemSchema]::Attachments))
+            $emailWithAttachments.Attachments | % {
+                $attachment = $_
+                if($attachment.GetType().Name -eq "FileAttachment" -and ($attachment.Name -match ".doc" -or $attachment.Name -match ".pdf")){
+                    $tempFilePathAndName = $env:TEMP+"\"+$attachment.Name
+                    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Attempting to save attachment as $tempFilePathAndName"}
+                    $attachment.Load($tempFilePathAndName)
+                    $response = add-attachmentToListItem -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listItem $newCandidateRecord -filePathAndName $tempFilePathAndName -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
+                    if ($response.StatusCode -eq "OK"){Write-Host "High-five!"}
+                    else{
+                        #Try again as it seems unreliable...
+                        $response = add-attachmentToListItem -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listItem $newCandidateRecord -filePathAndName $tempFilePathAndName -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
+                        if ($response.StatusCode -eq "OK"){Write-Host "High-five! (second attempt)"}
+                        else{
+                            #Try a third time as it seems unreliable...
+                            $response = add-attachmentToListItem -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listItem $newCandidateRecord -filePathAndName $tempFilePathAndName -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
+                            if ($response.StatusCode -eq "OK"){Write-Host "High-five! (third attempt)"}
+                            else{[array]$spongeInThePatient += "There were valid attachments from $($email.Sender.Address), but something went wrong and I couldn't attach them $($attachment.Name) in SharePoint :("}
+                            }
+                        }
+                    Remove-Item -Path $tempFilePathAndName -Force #Delete the local copy
+                    }
+                else{[array]$spongeInThePatient += "There were attachments that weren't Word or PDF files ($($attachment.Name)) from $($email.Sender.Address)"}
+                }
+            }
 
-
+        #If it's worked, move the e-mail to the appropriate subfolder
+        if($newCandidateRecord){
+            $jobFolder = $null
+            $jobFolder = $inboxFolders | ?{$_.DisplayName -eq $jobCodes[0]}
+            if($jobFolder){
+                #$email.Move($jobFolder.Id)
+                }
+            }
+        }
+    #If it doesn't have exactly one Job Code, move it to the "_UnableToAutomate" subfolder & leave it for a human to process
+    else{
+        #$email.Move($dufferFolderId)
+        $duffCount++
+        }
+    }
+        
+#Write a nice report if we've done anything
+if($ukCareersItems){
+    $reportBody = "<HTML><BODY><P>Hello,</P>
+    <P>I've been working away on your behalf and I've:</P><UL>"
+    $reportBody += "<LI>Looked at $($ukCareersItems.Count) e-mails</LI>"
+    if($duffCount){$reportBody += "<LI>But I couldn't process $duffCount automatically, so you'll need to take a look at them (in the $duffMailFolderName folder)</LI>"}
+    if($allNewCandidateRecords){
+        $reportBody += "<LI>And I've created new <A HREF=`"$webUrl$recruitmentSiteCollection$recruitmentSite/Lists/Role%20Candidates/`">Candidate records</A> for:<UL>"
+        $allNewCandidateRecords | %{
+            $newRecordObject = convert-listItemToCustomObject -spoListItem $_ -spoTaxonomyData $taxonomyData
+            $reportBody += "<LI>$($newRecordObject.RoleID)`t$($newRecordObject.First_Name) $($newRecordObject.Last_Name)`t$($newRecordObject.E_x002d_mail_address)</LI>"
+            }
+        $reportBody += "</UL>"
+        }
+    if($newFoldersToReconcile | ?{$_.SideIndicator -eq "=>" -and $_.Recruitment_Status -match "Open"}){
+        $reportBody += "<LI>And I've created new E-mail folders these new Job Roles:<UL>"
+        $newFoldersToReconcile | ?{$_.SideIndicator -eq "=>" -and $_.Recruitment_Status -match "Open"} | %{
+            $newRecordObject = convert-listItemToCustomObject -spoListItem $_ -spoTaxonomyData $taxonomyData
+            $reportBody += "<LI>$($newRecordObject.UniqueJobID) - $($newRecordObject.Title)</LI>"
+            }
+        $reportBody += "</UL>"
+        }
+    if($onHoldFoldersToReconcile){
+        $reportBody += "<LI>And I've moved these E-mail folders to the $onHoldJobMailFolderName folder:<UL>"
+        $onHoldFoldersToReconcile | % {
+            $reportBody += "<LI>$($_.DisplayName)</LI>"
+            }
+        $reportBody += "</UL>"
+        }
+    if($closedFoldersToReconcile){
+        $reportBody += "<LI>And I've moved these E-mail folders to the $closedJobMailFolderName folder:<UL>"
+        $closedFoldersToReconcile | % {
+            $reportBody += "<LI>$($_.DisplayName)</LI>"
+            }
+        $reportBody += "</UL>"
+        }
+    if($spongeInThePatient){
+        $reportBody += "I also encountered these problems:<UL>"
+        $spongeInThePatient | %{
+            $reportBody += "<LI>$($_)</LI>"
+            }
+        $reportBody += "</UL>"
+        }
+    $reportBody += "</UL>"
+    $reportBody += "<P></P><P>Love,</P><P>The Recruitment Robot</P></BODY></HTML>"
+    Send-MailMessage -To $sendReportToAddress -Subject "Recruitment automation update" -BodyAsHtml $reportBody -From "therecruitmentrobot@anthesisgroup.com" -SmtpServer $smtpServer
+    }
 Stop-Transcript
+
+
+<#
+$toRestore = @("AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAKm3/ZkAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAL/KEcuAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAI8jQi3AAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAMWM5tYAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAMVyrQ7AAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AALIrgRBAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAKu4J6QAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAKra0PeAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAKra0PfAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAI8jQiSAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AALeeEBeAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAMTucacAAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAMVyrQ8AAA=",
+"AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AALaVOQLAAA=")
+
+$allClosedFolders = get-allEwsFolders -exchangeService $service -folderId $onHoldFolderId
+foreach ($folder in $toRestore){
+    $restoreId = $null
+    $restoreId = $allClosedFolders | ?{$_.Id.UniqueId -contains $folder} | % {$_.Id}
+    if($restoreId){
+        $folderToMoveBind = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $restoreId)
+        $folderToMoveBind.Move($inboxFolderId)    
+        }
+    else {write-host -ForegroundColor DarkBlue "$folder failed"}
+    }
+
+$toRestore = @("AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AALaVOQMAAA=", "AAMkAGU3MzI0NjllLTQxMzAtNGJlMy1iYmFkLWI2NDliNTQ2M2UwYQAuAAAAAADlFHvuHN6MTIgoCwE/HEs2AQBBwLL8RoSKQpoh0zPoc4a5AAMWM5tZAAA=")
+#>
