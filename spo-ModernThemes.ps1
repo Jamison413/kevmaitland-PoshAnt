@@ -1,0 +1,164 @@
+﻿$allOrange = @{
+"themePrimary" = "#f7901e";
+"themeLighterAlt" = "#fffaf4";
+"themeLighter" = "#fef4e8";
+"themeLight" = "#fde9d2";
+"themeTertiary" = "#fcd1a0";
+"themeSecondary" = "#f89d34";
+"themeDarkAlt" = "#f18408";
+"themeDark" = "#bc6706";
+"themeDarker" = "#935105";
+"neutralLighterAlt" = "#f8f8f8";
+"neutralLighter" = "#f4f4f4";
+"neutralLight" = "#eaeaea";
+"neutralQuaternaryAlt" = "#dadada";
+"neutralQuaternary" = "#d0d0d0";
+"neutralTertiaryAlt" = "#c8c8c8";
+"neutralTertiary" = "#e2e2e3";
+"neutralSecondary" = "#7f7d81";
+"neutralPrimaryAlt" = "#656467";
+"neutralPrimary" = "#717073";
+"neutralDark" = "#4f4e50";
+"black" = "#3e3d3f";
+"white" = "#ffffff";
+"primaryBackground" = "#ffffff";
+"primaryText" = "#717073";
+"bodyBackground" = "#ffffff";
+"bodyText" = "#717073";
+"disabledBackground" = "#f4f4f4";
+"disabledText" = "#c8c8c8";
+}
+
+$allRed = @{
+"themePrimary" = "#c24527";
+"themeLighterAlt" = "#fdf5f3";
+"themeLighter" = "#faece8";
+"themeLight" = "#f6d8d1";
+"themeTertiary" = "#ecad9e";
+"themeSecondary" = "#d5502f";
+"themeDarkAlt" = "#ae3f23";
+"themeDark" = "#88311b";
+"themeDarker" = "#6b2615";
+"neutralLighterAlt" = "#f8f8f8";
+"neutralLighter" = "#f4f4f4";
+"neutralLight" = "#eaeaea";
+"neutralQuaternaryAlt" = "#dadada";
+"neutralQuaternary" = "#d0d0d0";
+"neutralTertiaryAlt" = "#c8c8c8";
+"neutralTertiary" = "#e2e2e3";
+"neutralSecondary" = "#7f7d81";
+"neutralPrimaryAlt" = "#656467";
+"neutralPrimary" = "#717073";
+"neutralDark" = "#4f4e50";
+"black" = "#3e3d3f";
+"white" = "#ffffff";
+"primaryBackground" = "#ffffff";
+"primaryText" = "#717073";
+"bodyBackground" = "#ffffff";
+"bodyText" = "#717073";
+"disabledBackground" = "#f4f4f4";
+"disabledText" = "#c8c8c8";
+}
+
+$allDarkBlue = @{
+"themePrimary" = "#266776";
+"themeLighterAlt" = "#f2f9fb";
+"themeLighter" = "#e4f3f6";
+"themeLight" = "#c9e7ee";
+"themeTertiary" = "#8ecddb";
+"themeSecondary" = "#2e7e90";
+"themeDarkAlt" = "#225c6a";
+"themeDark" = "#1a4852";
+"themeDarker" = "#153841";
+"neutralLighterAlt" = "#f8f8f8";
+"neutralLighter" = "#f4f4f4";
+"neutralLight" = "#eaeaea";
+"neutralQuaternaryAlt" = "#dadada";
+"neutralQuaternary" = "#d0d0d0";
+"neutralTertiaryAlt" = "#c8c8c8";
+"neutralTertiary" = "#e2e2e3";
+"neutralSecondary" = "#7f7d81";
+"neutralPrimaryAlt" = "#656467";
+"neutralPrimary" = "#717073";
+"neutralDark" = "#4f4e50";
+"black" = "#3e3d3f";
+"white" = "#ffffff";
+"primaryBackground" = "#ffffff";
+"primaryText" = "#717073";
+"bodyBackground" = "#ffffff";
+"bodyText" = "#717073";
+"disabledBackground" = "#f4f4f4";
+"disabledText" = "#c8c8c8";
+}
+
+$allLightBlue = @{
+"themePrimary" = "#add2e0";
+"themeLighterAlt" = "#fbfdfd";
+"themeLighter" = "#f7fbfc";
+"themeLight" = "#eff6f9";
+"themeTertiary" = "#dcecf2";
+"themeSecondary" = "#b5d7e3";
+"themeDarkAlt" = "#90c3d6";
+"themeDark" = "#56a4c0";
+"themeDarker" = "#3b859f";
+"neutralLighterAlt" = "#f8f8f8";
+"neutralLighter" = "#f4f4f4";
+"neutralLight" = "#eaeaea";
+"neutralQuaternaryAlt" = "#dadada";
+"neutralQuaternary" = "#d0d0d0";
+"neutralTertiaryAlt" = "#c8c8c8";
+"neutralTertiary" = "#e2e2e3";
+"neutralSecondary" = "#7f7d81";
+"neutralPrimaryAlt" = "#656467";
+"neutralPrimary" = "#717073";
+"neutralDark" = "#4f4e50";
+"black" = "#3e3d3f";
+"white" = "#ffffff";
+"primaryBackground" = "#ffffff";
+"primaryText" = "#717073";
+"bodyBackground" = "#ffffff";
+"bodyText" = "#717073";
+"disabledBackground" = "#f4f4f4";
+"disabledText" = "#c8c8c8";
+}
+
+Add-SPOTheme -Identity "AllOrange" -Palette $allOrange -IsInverted $false
+Add-SPOTheme -Identity "AllRed" -Palette $allRed -IsInverted $false
+Add-SPOTheme -Identity "AllDarkBlue" -Palette $allDarkBlue -IsInverted $false
+Add-SPOTheme -Identity "AllLightBlue" -Palette $allLightBlue -IsInverted $false
+
+$orange = "#f7901e"
+$red = "#C24527"
+$lBlue = "#add2e0"
+$dBlue = "#266776"
+$AntOrangeRedDarkBlue = @{
+"themePrimary" = $orange;
+"themeLighterAlt" = "#fffaf4";
+"themeLighter" = "#fef4e8";
+"themeLight" = "#fde9d2";
+"themeTertiary" = "$dBlue";
+"themeSecondary" = $red;
+"themeDarkAlt" = "#f18408";
+"themeDark" = "#bc6706";
+"themeDarker" = "#935105";
+"neutralLighterAlt" = "#f8f8f8";
+"neutralLighter" = "#f4f4f4";
+"neutralLight" = "#eaeaea";
+"neutralQuaternaryAlt" = "#dadada";
+"neutralQuaternary" = "#d0d0d0";
+"neutralTertiaryAlt" = "#c8c8c8";
+"neutralTertiary" = "#e2e2e3";
+"neutralSecondary" = "#7f7d81";
+"neutralPrimaryAlt" = "#656467";
+"neutralPrimary" = "#717073";
+"neutralDark" = "#4f4e50";
+"black" = "#3e3d3f";
+"white" = "#ffffff";
+"primaryBackground" = "#ffffff";
+"primaryText" = "#717073";
+"bodyBackground" = "#ffffff";
+"bodyText" = "#717073";
+"disabledBackground" = "#f4f4f4";
+"disabledText" = "#c8c8c8";
+}
+Add-SPOTheme -Identity "Orange-Red-DarkBlue" -Palette $AntOrangeRedDarkBlue -IsInverted $false
