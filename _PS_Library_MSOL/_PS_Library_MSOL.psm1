@@ -35,6 +35,16 @@ function connect-ToMsol($credential){
     Import-Module MSOnline
     Connect-MsolService -Credential $credential
     }
+function connect-toAAD($credential){
+    if ($(Get-Module AzureAD) -ne $null){
+        Import-Module AzureAD
+        Connect-AzureAD -Credential $credential
+        }
+    if ($(Get-Module AzureADPreview) -ne $null){
+        Import-Module AzureADPreview
+        Connect-AzureAD -Credential $credential
+        }
+    }
 function connect-ToExo($credential){
     <#
     .Synopsis

@@ -28,6 +28,7 @@ $restCredentials = new-spoCred -username $msolCredentials.UserName -securePasswo
 $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
 connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
+connect-ToSpo -credential $msolCredentials
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"

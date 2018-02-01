@@ -189,12 +189,12 @@ $siteCollection = "/teams/communities"
 $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
 $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
 $sitePath = "/"
-$siteName = "Kimble Working Group"
-$siteUrlEndStub = "kimblewg"
+$siteName = "NA Growth Team"
+$siteUrlEndStub = "nagrowthteam"
 $inheritTopNav = $true
 $inheritPermissions = $false
-$precreatedSecurityGroupForMembers = "Kimble Working Group"
-$owner = "Kimble Working Group"
+$precreatedSecurityGroupForMembers = "NAGrowthTeam"
+$owner = "Rosanna.Collorafi"
 
 
 #Build and customise a new Site
