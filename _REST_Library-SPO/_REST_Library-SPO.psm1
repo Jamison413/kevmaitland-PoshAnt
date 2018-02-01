@@ -208,7 +208,7 @@ function Invoke-SPORestMethod {
 function add-attachmentToListItem($serverUrl,$sitePath,$listItem,$filePathAndName,$restCreds,$digest,$verboseLogging,$logFile){
     if($verboseLogging){Write-Host -ForegroundColor Yellow "add-attachmentToListItem -serverUrl $serverUrl -sitePath $sitePath -listItem $($listItem.__metadata.uri) -filePathAndName $filePathAndName -restCreds $restCreds"}
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$digest = $($digest.digest.GetContextWebInformation.FormDigestValue))"}
-    $digest = check-digestExpiry -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -digest $digest -restCreds $restCreds -logFile $logFile -verboseLogging $verboseLogging
+    $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds -logFile $logFile -verboseLogging $verboseLogging
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$digest = $($digest.digest.GetContextWebInformation.FormDigestValue))"}
     $sanitisedFileName = [uri]::EscapeUriString($(Split-Path $filePathAndName -Leaf)) 
     $url = $listItem.__metadata.uri+"/AttachmentFiles/add(Filename=`'$sanitisedFileName`')"
@@ -227,7 +227,9 @@ function add-attachmentToListItem($serverUrl,$sitePath,$listItem,$filePathAndNam
     $requestStream.Write($fileContent,0,$fileContent.Length)
     
     $response = $request.GetResponse()
-    $response
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`$response.StatusCode: $($response.StatusCode)"}
+    $response.StatusCode
+    $response.Dispose()
     }
 function check-digestExpiry($serverUrl, $sitePath, $digest, $restCreds,$verboseLogging,$logFile){
     $sitePath = format-path $sitePath

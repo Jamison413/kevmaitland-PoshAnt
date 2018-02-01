@@ -1,21 +1,28 @@
-﻿#Script to check the \ICT\CheckIn Public Folder for e-mails (from TextMarketer), then
-#match the phone number to an employee, create an appointment in their Outlook calendar
-#using the message body and timestamp, then e-mail TextMarketer back (who will SMS the 
-#original sender)
+﻿# Script to check the UKCareers Mailbox and create SharePoint list items for pre-configured Job Roles
 #
-# Needs to authenticate with o365 as SustainMailboxAccess to enable impersonation via EWS
 #
-# Kev Maitland 15/1/15
+# Needs to authenticate with o365 as KimbleBot to enable delegate access via EWS (not impersonation)
 #
-# Edited Kev Maitland 30/04/15 - added function FindSmsInEmail to handle a change in formatting from TextMagic
-# Edited Kev Maitland 01/02/17 - revised for Office 365 and changed Get-User to Get-ADUser to avoid hitting o365 Exchange
-Start-Transcript "$($MyInvocation.MyCommand.Definition).log" #-Append
+# Kev Maitland 17/1/18
+#
+$logFileLocation = "C:\ScriptLogs\"
+$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    $fullLogPathAndName = $logFileLocation+"sync-kimbleProjectsToSpo_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"sync-kimbleProjectsToSpo_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+else{
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+Start-Transcript $transcriptLogName
 
 $EWSServicePath = 'C:\Program Files\Microsoft\Exchange\Web Services\2.2\Microsoft.Exchange.WebServices.dll'
 Import-Module $EWSServicePath
-Import-Module _REST_Library-SPO
-Import-Module _CSOM_Library-SPO
 Import-Module _PS_Library_GeneralFunctionality
+Import-Module _CSOM_Library-SPO.psm1
+Import-Module _REST_Library-SPO.psm1
+
 
 #region functions
 function get-allEwsItems($exchangeService, $folderId, $searchFilter){
@@ -94,7 +101,9 @@ $ExchVer = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
 $ewsUrl = "https://outlook.office365.com/EWS/Exchange.asmx"
 $upnExtension = "anthesisgroup.com"
 $ukCareersEmailAddress = "ukcareers@$upnExtension"
-$sendReportToAddress = "kevin.maitland@anthesisgroup.com"
+$sendReportToAddress = @("amanda.cox@anthesisgroup.com","helen.tyrrell@anthesisgroup.com","wai.cheung@anthesisgroup.com","lorna.kelly@anthesisgroup.com")
+#$sendReportToAddress = "kevin.maitland@anthesisgroup.com"
+
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $closedJobMailFolderName = "z_closed"
 $onHoldJobMailFolderName = "z_on-hold"
@@ -105,6 +114,7 @@ $verboseLogging = $true
 $upnSMA = "kimblebot@anthesisgroup.com"
 #$passSMA = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
 $passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+log-action -myMessage "Transcript saved to $($MyInvocation.MyCommand.Definition).log" -logFile $logFile
 
 #Connect to Exchange using EWS
 $service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($exchver)
@@ -122,14 +132,13 @@ $recruitmentSite = "/Recruitment"
 $ukJobsListName = "UK Roles"
 $ukCandidatsListName = "UK Role Candidates"
 $taxonomyListName = "TaxonomyHiddenList"
-$taxonomyData = get-itemsInList -serverUrl $webUrl -sitePath $recruitmentSiteCollection -listName $taxonomyListName -suppressProgress $false -restCreds $restCreds -logFile $logFile -verboseLogging $true
+$taxonomyData = get-itemsInList -serverUrl $webUrl -sitePath $recruitmentSiteCollection -listName $taxonomyListName -suppressProgress $false -restCreds $restCreds -logFile $logFile -verboseLogging $verboseLogging
 
-$ukJobs = get-itemsInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName $ukJobsListName -restCreds $restCreds -logFile $logFile -verboseLogging $true -oDataQuery "?`$filter=MailFolderArchived eq 0" #Get all Jobs where we haven't archived the Mail Folder (as they're done and dusted)
+$ukJobs = get-itemsInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName $ukJobsListName -restCreds $restCreds -logFile $logFile -verboseLogging $verboseLogging -oDataQuery "?`$filter=MailFolderArchived eq 0" #Get all Jobs where we haven't archived the Mail Folder (as they're done and dusted)
 $ukJobsObjects =@()
 $ukJobs | % {[array]$ukJobsObjects += convert-listItemToCustomObject -spoListItem $_ -spoTaxonomyData $taxonomyData} #Convert the List Items to PS Objects as some of the attributes are difficult to work with (e.g. MetaData or People/Group)
 $ukJobsObjects | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name DisplayName -Value $_.UniqueJobID} #Add the UniqueJobId property again as DisplayName so we can use compare-object efficiently later
-$ukCandidateList = get-list -webUrl $webUrl -siteCollection $recruitmentSiteCollection -credentials $restCreds -sitePath $recruitmentSite -listname $ukCandidatsListName
-
+$ukCandidateList = get-list -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName $ukCandidatsListName -restCreds $restCreds -verboseLogging $verboseLogging -logFile $logFile
 
 #Reconcile the current Job Roles with the E-mail folders
 $inboxFolders = get-allEwsFolders -exchangeService $service -folderId $([Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $ukCareersEmailAddress)) 
@@ -154,7 +163,7 @@ if($ukJobsObjectsOnHold){ #Compare-Object will throw a wobbly if we send a $null
         $onHoldFoldersToReconcile | %{
             if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Moving folder $($_.DisplayName) to $onHoldJobMailFolderName"}
             $folderToMoveBind = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $_.Id)
-            #$folderToMoveBind.Move($onHoldFolderId)
+            $folderToMoveBind.Move($onHoldFolderId)
             }
         }
     else{if($verboseLogging){Write-Host -ForegroundColor DarkYellow "No e-mail folders need moving to $onHoldJobMailFolderName"}}
@@ -171,7 +180,7 @@ if($ukJobsObjectsClosed){ #Compare-Object will throw a wobbly if we send a $null
                 #First move the folder
                 if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Moving folder $($_.DisplayName) to $closedJobMailFolderName"}
                 $folderToMoveBind = [Microsoft.Exchange.WebServices.Data.Folder]::Bind($service, $_.Id)
-                #$folderToMoveBind.Move($closedFolderId)
+                $folderToMoveBind.Move($closedFolderId)
                 #Second, update the ListItem
                 $folderToMoveObject = $_
                 try{
@@ -188,6 +197,11 @@ if($ukJobsObjectsClosed){ #Compare-Object will throw a wobbly if we send a $null
     }
 else{if($verboseLogging){Write-Host -ForegroundColor DarkYellow "No Job Roles are Closed (that we haven't already archived)"}}
 
+#Get this again now that we might have created some new folders
+if($newFoldersToReconcile | ?{$_.SideIndicator -eq "=>" -and $_.Recruitment_Status -match "Open"}){
+    $inboxFolders = get-allEwsFolders -exchangeService $service -folderId $([Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $ukCareersEmailAddress)) 
+    }
+
 #Get any e-mails that haven't been processed (i.e. are still in the root Inbox)
 $ukCareersItems = get-allEwsItems -exchangeService $service -folderId $([Microsoft.Exchange.WebServices.Data.FolderId]::new([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Inbox, $ukCareersEmailAddress)) -searchFilter $null
 if($verboseLogging){Write-Host -ForegroundColor Yellow "Found $($ukCareersItems.Count) e-mails that need processing"}
@@ -201,7 +215,7 @@ $ukCareersItems | %{
         }
     if($jobCodes.Count -eq 1){#If it contains exactly 1 job code, create a List Item
         if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Exactly 1 JobCode found [$($jobCodes[0])]"}
-        #$dummyCandidate = get-itemsInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName "UK Role Candidates" -restCreds $restCreds -logFile $logFile -oDataQuery "&`$filter=Id eq 1" #Quickly find the field names in SPO
+        #$dummyCandidate = get-itemsInList -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listName "UK Role Candidates" -restCreds $restCreds -logFile $logFile -oDataQuery "&`$filter=Id eq 18" -verboseLogging $true #Quickly find the field names in SPO
         $recruitmentDigest = check-digestExpiry -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -restCreds $restCreds -logFile $logFile -digest $recruitmentDigest
         $candidateHash=@{}
         $candidateHash.Add("Application_x0020_received",$email.DateTimeReceived)
@@ -244,22 +258,13 @@ $ukCareersItems | %{
             $emailWithAttachments.Attachments | % {
                 $attachment = $_
                 if($attachment.GetType().Name -eq "FileAttachment" -and ($attachment.Name -match ".doc" -or $attachment.Name -match ".pdf")){
-                    $tempFilePathAndName = $env:TEMP+"\"+$attachment.Name
+                    $tempFilePathAndName = $env:TEMP+"\"+$attachment.Name.Replace("'","''")
                     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Attempting to save attachment as $tempFilePathAndName"}
                     $attachment.Load($tempFilePathAndName)
-                    $response = add-attachmentToListItem -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listItem $newCandidateRecord -filePathAndName $tempFilePathAndName -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
-                    if ($response.StatusCode -eq "OK"){Write-Host "High-five!"}
-                    else{
-                        #Try again as it seems unreliable...
-                        $response = add-attachmentToListItem -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listItem $newCandidateRecord -filePathAndName $tempFilePathAndName -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
-                        if ($response.StatusCode -eq "OK"){Write-Host "High-five! (second attempt)"}
-                        else{
-                            #Try a third time as it seems unreliable...
-                            $response = add-attachmentToListItem -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listItem $newCandidateRecord -filePathAndName $tempFilePathAndName -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
-                            if ($response.StatusCode -eq "OK"){Write-Host "High-five! (third attempt)"}
-                            else{[array]$spongeInThePatient += "There were valid attachments from $($email.Sender.Address), but something went wrong and I couldn't attach them $($attachment.Name) in SharePoint :("}
-                            }
-                        }
+                    $webResponseCode = add-attachmentToListItem -serverUrl $webUrl -sitePath $($recruitmentSiteCollection+$recruitmentSite) -listItem $newCandidateRecord -filePathAndName $tempFilePathAndName -restCreds $restCreds -digest $recruitmentDigest -logFile $logFile -verboseLogging $true
+                    if ($webResponseCode -eq "OK"){Write-Host "High-five!"}
+                    else{[array]$spongeInThePatient += "There were valid attachments from $($email.Sender.Address), but something went wrong and I couldn't attach them $($attachment.Name) in SharePoint :("}
+                    #$webResponseCode.Dispose()
                     Remove-Item -Path $tempFilePathAndName -Force #Delete the local copy
                     }
                 else{[array]$spongeInThePatient += "There were attachments that weren't Word or PDF files ($($attachment.Name)) from $($email.Sender.Address)"}
@@ -271,20 +276,25 @@ $ukCareersItems | %{
             $jobFolder = $null
             $jobFolder = $inboxFolders | ?{$_.DisplayName -eq $jobCodes[0]}
             if($jobFolder){
-                #$email.Move($jobFolder.Id)
+                $email.Move($jobFolder.Id)
+                }
+            else{
+                [array]$spongeInThePatient += "Job $($jobCodes[0]) is not Open! I've created the Candidate record anyway, but I'm moving the e-mail from $($email.Sender.Address) to $duffMailFolderName"
+                $email.Move($dufferFolderId)
                 }
             }
         }
     #If it doesn't have exactly one Job Code, move it to the "_UnableToAutomate" subfolder & leave it for a human to process
     else{
-        #$email.Move($dufferFolderId)
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Could not work out the JobCode for e-mail from $($email.Sender.Address)"}
+        $email.Move($dufferFolderId)
         $duffCount++
         }
     }
         
 #Write a nice report if we've done anything
 if($ukCareersItems){
-    $reportBody = "<HTML><BODY><P>Hello,</P>
+    $reportBody = "<HTML><BODY><P>Hello Recruitment Human,</P>
     <P>I've been working away on your behalf and I've:</P><UL>"
     $reportBody += "<LI>Looked at $($ukCareersItems.Count) e-mails</LI>"
     if($duffCount){$reportBody += "<LI>But I couldn't process $duffCount automatically, so you'll need to take a look at them (in the $duffMailFolderName folder)</LI>"}
