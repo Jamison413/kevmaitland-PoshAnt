@@ -23,6 +23,6 @@ foreach ($role in $roles){
 $roleDataHash.Keys | %{$_+","+$roleDataHash[$_] | Add-Content -Path $outputFile}
 
 $roleUsers = $roleUsers | select -Unique | sort DisplayName
-$msolUsers = Get-MsolUser | ?{$roleUsers -contains $_.UserPrincipalName}
+$msolUsers = Get-MsolUser -All | ?{$roleUsers -contains $_.UserPrincipalName}
 "" | Add-Content -Path $outputFile
 $msolUsers | %{$_.DisplayName+","+$_.UserPrincipalName+","+$_.IsLicensed+","+$_.LastPasswordChangeTimestamp | Add-Content -Path $outputFile} 

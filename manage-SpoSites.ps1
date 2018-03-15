@@ -126,7 +126,8 @@ foreach ($currentRequest in $selectedRequests){
             $siteUrlEndStub = $currentRequest.SiteName -replace $alphaNumericRegexPattern, ""
             $inheritPermissions = $false 
             $inheritTopNav = $false
-            $siteTemplate = "{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site"
+            $siteTemplate = "{5C86D4B3-3D30-4C36-BDE1-6A1779799A45}#ExternalSiteTemplate"
+            #$siteTemplate = "{8C3E419E-EADC-4032-A7CD-BC5778A30F9C}#Default External Sharing Site"
             $siteCollection = "/sites/external" 
             $colorPaletteUrl = "/_catalogs/theme/15/AnthesisPalette_Orange.spcolor"
             $spFontUrl = "/_catalogs/theme/15/Anthesis_fontScheme_Montserrat_uploaded.spfont"
