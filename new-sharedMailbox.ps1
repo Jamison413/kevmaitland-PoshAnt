@@ -2,9 +2,9 @@
 Import-Module _PS_Library_GeneralFunctionality
 connect-ToExo
 
-$displayName = "Sustain Recruitment"
-$owner = "lorna.kelly@anthesisgroup.com"
-$arrayOfFullAccessMembers = @("lorna.kelly@anthesisgroup.com","wai.cheung@anthesisgroup.com")
+$displayName = "Micron"
+$owner = "michael.malate@anthesisgroup.com"
+$arrayOfFullAccessMembers = @("michael.malate@anthesisgroup.com","Sharleen.rivera@anthesisgroup.com","Gerber.Manalo@anthesisgroup.com","acsmailboxaccess@anthesisgroup.com")
 $hideFromGal = $true
 
 

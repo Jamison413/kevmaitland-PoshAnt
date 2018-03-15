@@ -32,7 +32,7 @@ $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desk
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
-
+$verboseLogging = $false
 
 ########################################
 #Don't change these unless the Kimble account or App changes
@@ -66,14 +66,14 @@ $kimbleRestHeaders = @{Authorization = "Bearer " + $kimbleAccessToken.access_tok
 #Get the last Project modified in /Projects/lists/Kimble Projects to minimise the number of records to process
 try{
     log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-    $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds
+    $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -verboseLogging $verboseLogging -logFile $fullLogPathAndName
     if($clientDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientDigest.expiryTime)" -logFile $fullLogPathAndName}
     else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
     }
 catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for https://anthesisllc.sharepoint.com/clients" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
 try{
     log-action -myMessage "Getting List: [$listName]" -logFile $fullLogPathAndName
-    $kp = get-list -serverUrl $webUrl  -sitePath $sitePath -listName $listName -restCreds $restCreds
+    $kp = get-list -serverUrl $webUrl  -sitePath $sitePath -listName $listName -restCreds $restCreds -verboseLogging $verboseLogging -logFile $fullLogPathAndName
     if($kp){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
     else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
     }
@@ -91,7 +91,7 @@ try{
     else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
     }
 catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Lead data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-$kimbleChangedLeads = $kimbleModifiedLeads | ?{$_.LastModifiedDate -ge $cutoffDate -and $_.CreatedDate -lt $cutoffDate}
+$kimbleChangedLeads = $kimbleModifiedLeads | ?{$_.LastModifiedDate -ge $cutoffDate} # -and $_.CreatedDate -lt $cutoffDate} #These can be both Created AND Modified if the user creates, then immediately updates the record
 $kimbleNewLeads = $kimbleModifiedLeads | ?{$_.CreatedDate -ge $cutoffDate}
 #Check any other Leads for changes
 #At what point does it become more efficent to dump the whole [Kimble Leads] List from SP, rather than query individual items?
@@ -116,7 +116,7 @@ foreach($kimbleChangedLead in $kimbleChangedLeads){
     log-action -myMessage "CHANGED LEAD:`t[$($kimbleChangedLead.Name)] needs updating!" -logFile $fullLogPathAndName
     try{
         log-action -myMessage "Retrieving existing Lead from SPO" -logFile $fullLogPathAndName
-        $kpListItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedLead.Id)`'" -restCreds $restCreds
+        $kpListItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedLead.Id)`'" -restCreds $restCreds -verboseLogging $verboseLogging -logFile $fullLogPathAndName
         if($kpListItem){
             log-result -myMessage "SUCCESS: list item [$($kpListItem.Title)] retrieved!" -logFile $fullLogPathAndName
             #Check whether the data has changed
@@ -128,10 +128,10 @@ foreach($kimbleChangedLead in $kimbleChangedLeads){
                 $updateData = @{PreviousName=$kpListItem.LeadName;PreviousKimbleClientId=$kpListItem.KimbleClientId;Title=$kimbleChangedLead.Name;KimbleClientId=$kimbleChangedLead.KimbleOne__Account__c;IsDeleted=$kimbleChangedLead.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
                 try{
                     log-action -myMessage "Updating SPO [Kimble Lead] item $($kpListItem.Title)" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData -restCreds $restCreds -digest $clientDigest
+                    update-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData -restCreds $restCreds -digest $clientDigest -verboseLogging $verboseLogging -logFile $fullLogPathAndName
                     #Check it's worked
                     try{
-                        $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -oDataQuery "?`$filter=Id eq $($kpListItem.Id)" -restCreds $restCreds
+                        $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -oDataQuery "?`$filter=Id eq $($kpListItem.Id)" -restCreds $restCreds -verboseLogging $verboseLogging -logFile $fullLogPathAndName
                         if($updateData.IsDirty -eq $true -and $updateData.Title -eq $kimbleChangedLead.Name){log-result -myMessage "SUCCESS: SPO [Kimble Lead] item $($kpListItem.Title) updated!" -logFile $fullLogPathAndName}
                         else{log-result -myMessage "FAILED: SPO [Kimble Lead] item $($kpListItem.Title) did not update correctly!" -logFile $fullLogPathAndName}
                         }
@@ -164,7 +164,7 @@ foreach ($kimbleNewLead in $kimbleNewLeads){
     #Create the new List item
     try{
         log-action -myMessage "Creating new SPO List item [$($kimbleNewLead.Name)]" -logFile $fullLogPathAndName
-        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewLeadData -restCreds $restCreds -digest $clientDigest
+        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewLeadData -restCreds $restCreds -digest $clientDigest -verboseLogging $verboseLogging -logFile $fullLogPathAndName
         #Check it's worked
         if($newItem){log-result -myMessage "SUCCESS: SPO [Kimble Lead] item $($newItem.Title) created!" -logFile $fullLogPathAndName}
         else{
