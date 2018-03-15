@@ -32,7 +32,7 @@ $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desk
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
-
+$verboseLogging = $false
 
 ########################################
 #Don't change these unless the Kimble account or App changes
@@ -91,7 +91,7 @@ try{
     else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
     }
 catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Project data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-$kimbleChangedProjects = $kimbleModifiedProjects | ?{$_.LastModifiedDate -ge $cutoffDate -and $_.CreatedDate -lt $cutoffDate}
+$kimbleChangedProjects = $kimbleModifiedProjects | ?{$_.LastModifiedDate -ge $cutoffDate} #-and $_.CreatedDate -lt $cutoffDate} These can be both Created and Modified
 $kimbleNewProjects = $kimbleModifiedProjects | ?{$_.CreatedDate -ge $cutoffDate}
 #Check any other Projects for changes
 #At what point does it become more efficent to dump the whole [Kimble Projects] List from SP, rather than query individual items?
@@ -116,22 +116,22 @@ foreach($kimbleChangedProject in $kimbleChangedProjects){
     log-action -myMessage "CHANGED PROJECT:`t[$($kimbleChangedProject.Name)] needs updating!" -logFile $fullLogPathAndName
     try{
         log-action -myMessage "Retrieving existing Project from SPO" -logFile $fullLogPathAndName
-        $kpListItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedProject.Id)`'" -restCreds $restCreds
+        $kpListItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedProject.Id)`'" -restCreds $restCreds -verboseLogging $verboseLogging -logFile $fullLogPathAndName
         if($kpListItem){
-            log-result -myMessage "SUCCESS: list item [$($kpListItem.Title)] retrieved!" -logFile $fullLogPathAndName
+            log-result -myMessage "SUCCESS: list item [$($kpListItem.Title)] retrieved!" -logFile $fullLogPathAndName 
             #Check whether the data has changed
             if($kpListItem.Title -ne $kimbleChangedProject.Name -or $kpListItem.KimbleClientId -ne $kimbleChangedProject.KimbleOne__Account__c -or $kpListItem.IsDeleted -ne $kimbleChangedProject.IsDeleted){
                 #If it has, update the entry in [Kimble Projects]
                 #SusChem don't want folders set up for specific sorts of Projects
                 if(($kimbleChangedProject.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleChangedProject.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleChangedProject.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
                     else{$doNotProcess = $false} #Everyone else wants Project folders set up
-                $updateData = @{PreviousName=$kpListItem.ProjectName;PreviousKimbleClientId=$kpListItem.KimbleClientId;Title=$kimbleChangedProject.Name;KimbleClientId=$kimbleChangedProject.KimbleOne__Account__c;IsDeleted=$kimbleChangedProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
+                $updateData = @{PreviousName=$kpListItem.Title;PreviousKimbleClientId=$kpListItem.KimbleClientId;Title=$kimbleChangedProject.Name;KimbleClientId=$kimbleChangedProject.KimbleOne__Account__c;IsDeleted=$kimbleChangedProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
                 try{
                     log-action -myMessage "Updating SPO [Kimble Project] item $($kpListItem.Title)" -logFile $fullLogPathAndName
-                    update-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData -restCreds $restCreds -digest $clientDigest
+                    update-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -itemId $kpListItem.Id -hashTableOfItemData $updateData -restCreds $restCreds -digest $clientDigest -verboseLogging $verboseLogging -logFile $fullLogPathAndName
                     #Check it's worked
                     try{
-                        $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -oDataQuery "?`$filter=Id eq $($kpListItem.Id)" -restCreds $restCreds
+                        $updatedItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -oDataQuery "?`$filter=Id eq $($kpListItem.Id)" -restCreds $restCreds -verboseLogging $verboseLogging -logFile $fullLogPathAndName
                         if($updateData.IsDirty -eq $true -and $updateData.Title -eq $kimbleChangedProject.Name){log-result -myMessage "SUCCESS: SPO [Kimble Project] item $($kpListItem.Title) updated!" -logFile $fullLogPathAndName}
                         else{log-result -myMessage "FAILED: SPO [Kimble Project] item $($kpListItem.Title) did not update correctly!" -logFile $fullLogPathAndName}
                         }
@@ -164,7 +164,7 @@ foreach ($kimbleNewProject in $kimbleNewProjects){
     #Create the new List item
     try{
         log-action -myMessage "Creating new SPO List item [$($kimbleNewProject.Name)]" -logFile $fullLogPathAndName
-        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewProjectData -restCreds $restCreds -digest $clientDigest -logFile $logFileLocation
+        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Projects" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewProjectData -restCreds $restCreds -digest $clientDigest -logFile $fullLogPathAndName -verboseLogging $verboseLogging
         #Check it's worked
         if($newItem){log-result -myMessage "SUCCESS: SPO [Kimble Project] item $($newItem.Title) created/retrieved!" -logFile $fullLogPathAndName}
         else{
