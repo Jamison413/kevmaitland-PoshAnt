@@ -140,7 +140,6 @@ function get-3letterIsoCodeFromCountryName($pCountryName){
         default {"GBR"}
         }
     }
-
 function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
     switch ($p3letterIsoCode) {
         "ARE" {"AE"}
@@ -228,6 +227,18 @@ function log-result($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     if(!$doNotLogToFile -or $logToFile){Add-Content -Value ("`tRESULT:`t$myMessage") -Path $logfile}
     if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor DarkYellow "`t$myMessage"}
     }
+function matchContains($term, $arrayOfStrings){
+    # Turn wildcards into regexes
+    # First escape all characters that might cause trouble in regexes (leaving out those we care about)
+    $escaped = $arrayOfStrings -replace '[ #$()+.[\\^{]','\$&' # list taken from Regex.Escape
+    # replace wildcards with their regex equivalents
+    $regexes = $escaped -replace '\*','.*' -replace '\?','.'
+    # combine them into one regex
+    $singleRegex = ($regexes | %{ '^' + $_ + '$' }) -join '|'
+
+    # match against that regex
+    $term -match $singleRegex
+    }
 function sanitise-forSharePointStandard($dirtyString){
     $dirtyString = $dirtyString.Trim()
     $dirtyString = $dirtyString.Replace(" "," ") #Weird instance where a space character is not a space character...
@@ -296,8 +307,12 @@ function sanitise-forTermStore($dirtyString){
     if($cleanerString.Length -gt 255){$cleanerString.Substring(0,254)}
     else{$cleanerString}
     }
+function smartReplace($mysteryString,$findThis,$replaceWithThis){
+    if([string]::IsNullOrEmpty($mysteryString)){$result = $mysteryString}
+    else{$result = $mysteryString.ToString().Replace($findThis,$replaceWithThis)}
+    $result
+    }
 #endregion
-
 
 $blockOfText = "Chris Keller       Chris.Keller@anthesisgroup.com       Frankfurt, DEU Germany              03/08/2017 14:48:38        
 Michael Hoffmann   michael.hoffmann@anthesisgroup.com                  Germany              04/11/2014 17:27:34        
