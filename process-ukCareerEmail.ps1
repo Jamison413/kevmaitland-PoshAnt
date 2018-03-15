@@ -33,8 +33,9 @@ function get-allEwsItems($exchangeService, $folderId, $searchFilter){
     $itemsOffset = [Microsoft.Exchange.WebServices.Data.ItemView]::new(100)
     do {
         $foundItems = $exchangeService.FindItems($bind.Id,$null,$itemsOffset)
-        $itemsOffset.Offset = $foundFolders.NextPageOffset
+        $itemsOffset.Offset = $foundItems.NextPageOffset
         $allItems += $foundItems.Items
+        Write-Host -ForegroundColor DarkYellow "`t`t$($allItems.count)/$($foundItems.TotalCount) retrieved"
         }
     while ($foundItems.MoreAvailable -eq $true) 
     $allItems
