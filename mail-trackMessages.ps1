@@ -22,16 +22,18 @@ function format-MailTracePrettily($traceBlob){
     $trace | Out-GridView 
     }
 
+$emailAddressForTrace = "rosanna.collorafi@anthesisgroup.com"
     
-$trace = get-allToAddressXHours -recipientAddress "john.yates@anthesisgroup.com" -hoursAgo 150
-$trace = get-allToAddressXHours -recipientAddress "US-Anthesis@anthesisgroup.com" -hoursAgo 48
-$trace = get-allFromAddressXHours -senderAddress "ian.forrester@anthesisgroup.com" -hoursAgo 720
+$trace = get-allToAddressXHours -recipientAddress $emailAddressForTrace -hoursAgo 150
+$trace = get-allToAddressXHours -recipientAddress $emailAddressForTrace -hoursAgo 48
+$trace = get-allFromAddressXHours -senderAddress $emailAddressForTrace -hoursAgo 720
 
 
 format-MailTracePrettily $trace
-$trace | Export-Csv -Path "$env:USERPROFILE\Desktop\MailTrace_$(Get-Date -Format yyyy-MM-dd).csv" -NoTypeInformation
+$trace | Export-Csv -Path "$env:USERPROFILE\Desktop\AuditLogs\MailTrace_$(Get-Date -Format yyyy-MM-dd).csv" -NoTypeInformation
 
 
+<#
 Import-Module LyncOnlineConnector
 Get-OrganizationConfig | Format-Table -Auto Name,OAuth*
 Get-CsOAuthConfiguration
@@ -42,3 +44,4 @@ Set-CsOAuthConfiguration -ClientAdalAuthOverride Allowed
 $users.windowsliveid
 
 $OoO = "Thanks for your email. I am currently out of office on paternity leave until the 2 January 2018, and will be in touch shortly upon return. For project related matters, please contact Margaret Davis on 0117 403 2663."
+#>
