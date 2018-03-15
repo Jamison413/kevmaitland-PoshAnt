@@ -15,43 +15,29 @@ Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-Kimble.psm1
 Import-Module _REST_Library-SPO.psm1
 
+
 #region Variables
 ##################################
 #
 #Get ready
 #
-##################################
-#Don't change these unless the Kimble account or App changes
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$callbackUri = "https://login.salesforce.com/services/oauth2/token" #"https://test.salesforce.com/services/oauth2/token"
-$grantType = "password"
-$myInstance = "https://eu5.salesforce.com"
-$queryUri = "$myInstance/services/data/v39.0/query/?q="
-$querySuffixStub = " -H `"Authorization: Bearer "
-$kimbleLogin = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
-$clientId = $kimbleLogin.clientId
-$clientSecret = $kimbleLogin.clientSecret
-$username = $kimbleLogin.username
-$password = $kimbleLogin.password
-$securityToken = $kimbleLogin.securityToken
 ########################################
-#Change these as required
 $webUrl = "https://anthesisllc.sharepoint.com" 
 $sitePath = "/clients"
 $listName = "Kimble Clients"
-$sharePointAdmin = "kimblebot@anthesisgroup.com"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $mailFrom = "scriptrobot@sustain.co.uk"
 $mailTo = "kevin.maitland@anthesisgroup.com"
 #convertTo-localisedSecureString ""
+$sharePointAdmin = "kimblebot@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
 ########################################
-$oAuthReqBody = Get-KimbleAuthorizationTokenWithUsernamePasswordFlowRequestBody -client_id $clientId -client_secret $clientSecret -user_name $username -pass_word $password -security_token $securityToken
-try{$kimbleAccessToken=Invoke-RestMethod -Method Post -Uri $callbackUri -Body $oAuthReqBody} catch {Failure}
-$kimbleRestHeaders = @{Authorization = "Bearer " + $kimbleAccessToken.access_token}
+$kimbleCreds = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
+$standardKimbleHeaders = get-kimbleHeaders -clientId $kimbleCreds.clientId -clientSecret $kimbleCreds.clientSecret -username $kimbleCreds.username -password $kimbleCreds.password -securityToken $kimbleCreds.securityToken -connectToLiveContext $true -verboseLogging $true
+$standardKimbleQueryUri = get-kimbleQueryUri
 #endregion
 
 #region Functions
@@ -90,14 +76,7 @@ function new-spoProject($kimbleProjectObject, $webUrl, $sitePath, $spoProjectLis
     }
 function reconcile-leads(){
     #Get the full list of Kimble Leads
-    $soqlQuery = "SELECT Name,Id,KimbleOne__Account__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted,Community__c,Project_Type__c FROM KimbleOne__SalesOpportunity__c"
-    try{
-        log-action -myMessage "Getting Kimble Lead data from SalesForce" -logFile $fullLogPathAndName
-        $allKimbleLeads = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
-        if($allKimbleLeads){log-result -myMessage "SUCCESS: $($kimbleModifiedLeads.Count) records retrieved!" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Lead data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+    $allKimbleLeads = get-allKimbleLeads -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
     
     #Get the full list of SPO Leads
     try{
@@ -136,15 +115,7 @@ function reconcile-leads(){
     }
 function reconcile-projects(){
     #Get the full list of Kimble Projects
-    $soqlQuery = "SELECT Name,Id,KimbleOne__Account__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted,Community__c,Project_Type__c FROM KimbleOne__DeliveryGroup__c"
-    try{
-        log-action -myMessage "Getting Kimble Project data from SalesForce" -logFile $fullLogPathAndName
-        $allKimbleProjects = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
-        if($allKimbleProjects){log-result -myMessage "SUCCESS: $($kimbleModifiedProjects.Count) records retrieved!" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Project data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-    
+    $allKimbleProjects = get-allKimbleProjects -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
     #Get the full list of SPO Projects
     try{
         log-action -myMessage "Getting List Items: [Kimble Projects]" -logFile $fullLogPathAndName
@@ -180,25 +151,17 @@ function reconcile-projects(){
         }
 
     }
-
 function reconcile-clients(){
-    #Get the full list of Kimble Clients 
-    $soqlQuery = "SELECT Name,Id,Description,Type,KimbleOne__IsCustomer__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted FROM account WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))"
-    try{
-        log-action -myMessage "Getting Kimble Client data" -logFile $fullLogPathAndName
-        $allKimbleClients = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
-        if($allKimbleClients){log-result -myMessage "SUCCESS: $($kimbleModifiedClients.Count) records retrieved!" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Client data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+    #Get the full list of Kimble Clients
+    $allKimbleClients = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))" 
     #Get the full list of SPO Clients
     try{
         log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-        $clientsDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds
+        $clientsDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -logFile $fullLogPathAndName -verboseLogging $true
         if($clientsDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientsDigest.expiryTime)" -logFile $fullLogPathAndName}
         else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
         }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for https://anthesisllc.sharepoint.com/clients" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for $webUrl$sitePath" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
 
     try{
         log-action -myMessage "Getting List: [Kimble Clients]" -logFile $fullLogPathAndName
@@ -210,8 +173,8 @@ function reconcile-clients(){
     
     try{
         log-action -myMessage "Getting List: [$listName]" -logFile $fullLogPathAndName
-        $kp = get-list -serverUrl $webUrl  -sitePath $sitePath -listName $listName -restCreds $restCreds
-        if($kp){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
+        $spoClientsList = get-list -serverUrl $webUrl  -sitePath $sitePath -listName $listName -restCreds $restCreds
+        if($spoClientsList){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
         else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
         }
     catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
@@ -219,7 +182,7 @@ function reconcile-clients(){
     $allKimbleClients | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name KimbleId -Value $_.Id}
     $missingClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $spoClients -Property "KimbleId" -PassThru -CaseSensitive:$false
     $missingClients | % {
-        if ($_.SideIndicator -eq "<="){new-spoClient -kimbleClientObject $_ -webUrl $webUrl -sitePath $sitePath -spoClientList $kp -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName}
+        if ($_.SideIndicator -eq "<="){new-spoClient -kimbleClientObject $_ -webUrl $webUrl -sitePath $sitePath -spoClientList $spoClientsList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName}
         }
     }
 #endregion
@@ -230,3 +193,7 @@ function reconcile-clients(){
 #Do Stuff
 #
 ##################################
+
+reconcile-clients
+reconcile-leads
+reconcile-projects
