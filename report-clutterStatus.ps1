@@ -10,9 +10,17 @@ $mbs | %{
     [array]$mbInfo += $mbInfoObj
     }
 
-$mbInfo = $sminfo
+
 for ($i=0;$i -lt $mbInfo.Count; $i++){
-    if($mbInfo[$i].Clutter -eq $true){[array]$clutterOn += $mbIfo[$i]}
-        else{[array]$cluetteroff += $mbIfo[$i]}
+    if($mbInfo[$i].Clutter.IsEnabled -eq $true){[array]$clutterOn += $mbInfo[$i]}
+        else{[array]$clutterOff += $mbInfo[$i]}
     }
 
+$mbInfo.Count
+$mbs.Count
+$mbInfo | ?{$_.Clutter -eq $null} | % {$_.Clutter = $(Get-Clutter -Identity $_.Mailbox.Id)}
+
+$mbInfo.Mailbox -eq "Kevin.Maitland"
+
+Export-Csv -InputObject $clutterOff -Path $env:USERPROFILE\desktop\ClutterOff.csv
+Export-Csv -InputObject $clutterOn -Path $env:USERPROFILE\desktop\ClutterOn.csv
