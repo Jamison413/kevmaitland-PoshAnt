@@ -29,7 +29,10 @@ function convertTo-arrayOfStrings($blockOfText){
 function convertTo-exTimeZoneValue($pAmbiguousTimeZone){
     $singleResult = @()
     $tzs = get-timeZones
-    $tryThis = $pAmbiguousTimeZone.Replace([regex]::Match($pAmbiguousTimeZone,"\(([^)]+)\)").Groups[0].Value,"").Trim() #Get everything not between "(" and ")"
+    if($pAmbiguousTimeZone -match '\('){
+        $tryThis = $pAmbiguousTimeZone.Replace([regex]::Match($pAmbiguousTimeZone,"\(([^)]+)\)").Groups[0].Value,"").Trim() #Get everything not between "(" and ")"
+        }
+    else{$tryThis = $pAmbiguousTimeZone}
     [array]$singleResult = $tzs | ? {$_.PSChildName -eq $tryThis} #Match it to the registry timezone names
     if ($singleResult.Count -eq 1){$singleResult[0].PSChildName}
     else{
