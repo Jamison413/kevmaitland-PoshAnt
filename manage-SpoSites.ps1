@@ -121,7 +121,7 @@ foreach ($currentRequest in $selectedRequests){
         {$_ -in 'Client',"Supplier"} {
             #These define the specifics for External Client/Supplier Sites
             $sitePath = "/" 
-            $siteName = $currentRequest.SiteName 
+            $siteName = sanitise-forSharePointFolderPath $currentRequest.SiteName 
             $alphaNumericRegexPattern = '[^a-zA-Z0-9]'
             $siteUrlEndStub = $currentRequest.SiteName -replace $alphaNumericRegexPattern, ""
             $inheritPermissions = $false 
@@ -165,6 +165,7 @@ foreach ($currentRequest in $selectedRequests){
         'Team' {}
         default {}
         }
+    Write-host "$weburl/sites/external/$siteName".Replace(" ","")
     }
 #endregion
 
