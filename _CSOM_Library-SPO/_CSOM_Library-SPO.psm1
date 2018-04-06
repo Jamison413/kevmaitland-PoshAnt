@@ -80,9 +80,10 @@ function add-site($credentials, $webUrl, $siteCollection, $sitePath, $siteName, 
 
     if(!$inheritPermissions){
         #Create the standard groups
-        $ownersGroup  = new-SPOGroup -title "$siteName Owners"  -description "Managers and Admins of $siteName" -spoSite $newWeb -ctx $ctx 
-        $membersGroup = new-SPOGroup -title "$siteName Members" -description "Contributors to $siteName" -spoSite $newWeb -ctx $ctx
-        $visitorsGroup = new-SPOGroup -title "$siteName Visitors" -description "ReadOnly users of $siteName" -spoSite $newWeb -ctx $ctx
+        $siteNameForGroups = sanitise-forSharePointGroupName $siteName
+        $ownersGroup  = new-SPOGroup -title "$siteNameForGroups Owners"  -description "Managers and Admins of $siteName" -spoSite $newWeb -ctx $ctx 
+        $membersGroup = new-SPOGroup -title "$siteNameForGroups Members" -description "Contributors to $siteName" -spoSite $newWeb -ctx $ctx
+        $visitorsGroup = new-SPOGroup -title "$siteNameForGroups Visitors" -description "ReadOnly users of $siteName" -spoSite $newWeb -ctx $ctx
         
         #Get the standard Roles
         $roleDefBindFullControl = New-Object Microsoft.SharePoint.Client.RoleDefinitionBindingCollection($ctx)

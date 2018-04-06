@@ -56,6 +56,9 @@ $selectedStarters = $unprocessedStartersFormatted | select Title,JobTitle,Primar
 #region functions
 function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSAM, $pPrimaryTeam, $pSecondaryTeams, $pJobTitle, $plaintextPassword, $pBusinessUnit, $adCredentials, $pPrimaryOffice){
     #Set Domain-specific variables
+    <#
+    $pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pManagerSAM=$userManagerSAM;$pPrimaryTeam=$userPrimaryTeam;$pSecondaryTeams=$userSecondaryTeams;$pJobTitle=$userJobTitle;$pBusinessUnit=$userBusinessUnit;$pPrimaryOffice=$userPrimaryOffice
+    #> 
     switch ($pBusinessUnit) {
         "Sustain Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "SustainLtd"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.sustain.co.uk"}
         "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
@@ -104,7 +107,6 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
         -EmailAddress "$($pUPN.Split("@")[0])$upnSuffix" `
         -OtherAttributes @{'ipPhone'="XXX";'pager'=$receptionDDI} `
         -Credential $adCredentials
-    $upn = $pUPN+$upnSuffix
     $newAdUserAccount = Get-ADUser -filter {UserPrincipalName -like $pUPN} -Credential $adCredentials 
     Get-ADGroup -Filter {name -like $pPrimaryTeam} | %{Add-ADGroupMember -Identity $_ -Members $newAdUserAccount -Credential $adCredentials}
     $pSecondaryTeams | %{Get-ADGroup -Filter {name -like $_}} | %{Add-ADGroupMember -Identity $_ -Members $newAdUserAccount -Credential $adCredentials}
@@ -124,6 +126,7 @@ function license-msolUser($pUPN, $licenseType, $usageLocation){
     Set-MsolUserLicense -UserPrincipalName $pUPN -AddLicenses $licenseToAssign.AccountSkuId 
     }
 function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimaryTeam, $pSecondaryTeams, $pPrimaryOffice, $pSecondaryOffice, $pCountry, $pJobTitle, $pDDI, $pMobile){
+    #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pPrimaryTeam=$userPrimaryTeam;$pSecondaryTeams=$userSecondaryTeams;$pPrimaryOffice=$userPrimaryOffice;$pSecondaryOffice=$userSecondaryOffice;$pJobTitle=$userJobTitle;$pDDI=$userDDI;$pMobile=$userMobile
     $currentUser = Get-MsolUser -UserPrincipalName $pUPN
     if([string]::IsNullOrEmpty($pFirstName)){$firstName = $currentUser.FirstName}else{$firstname = $pFirstName}
     if([string]::IsNullOrEmpty($pSurname)){$surName = $currentUser.LastName}else{$surName = $pSurname}
@@ -135,15 +138,15 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if([string]::IsNullOrEmpty($pMobile)){$mobile = $currentUser.MobilePhone}else{$mobile = $pMobile}
 
     switch($pPrimaryOffice){
-        "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry)}
-        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB"}
-        "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB"}
-        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB"}
-        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB"}
-        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB"}
+        "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers")}
+        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "AllBristol"}
+        "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)"}
+        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
+        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
+        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
         "Manila, PHI" {}
-        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US"}
-        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US"}
+        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All North America"}
+        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All North America"}
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
         }
     #$msolUser = New-MsolUser `
@@ -165,8 +168,10 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         #-ForceChangePassword $true
     if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN}
     if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN}}
+    if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN}
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
+    #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
     Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true
     if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN | Set-Mailbox -EmailAddresses @{add="$($pUPN.Split("@")[0])@sustain.co.uk"}}
     Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
@@ -190,25 +195,25 @@ function update-sharePointInitialConfig($pUPN, $anthesisAdminSite, $csomCreds, $
     $languageCode = guess-languageCodeFromCountry -p3LetterCountryIsoCode $p3LetterCountryIsoCode
     $adminContext = new-csomContext -fullSitePath $anthesisAdminSite -sharePointCredentials $csomCreds
     $spoUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($adminContext)
-    $spoUsers.SetSingleValueProfileProperty("$pUPN@anthesisgroup.com", "SPS-RegionalSettings-Initialized", $true)
-    $spoUsers.SetSingleValueProfileProperty("$pUPN@anthesisgroup.com", "SPS-RegionalSettings-FollowWeb", $false)
+    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-RegionalSettings-Initialized", $true)
+    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-RegionalSettings-FollowWeb", $false)
     #Getting the TimeZoneID is a massive PITA:
     if($timeZones -eq $null){$timeZones = get-timeZones}
     $tz = $timeZones | ?{$_.PSChildName -eq $timeZone} #Look that up in the registry list
     if($spoTimeZones -eq $null){$spoTimeZones = get-spoTimeZoneHashTable -credentials $csomCredentials}
     $tzID = $spoTimeZones[$tz.Display.replace("+00:00","")] #Then match a different property of the registry object to the SPO object
-    if($tzID.Length -gt 0){$spoUsers.SetSingleValueProfileProperty("$pUPN@anthesisgroup.com", "SPS-TimeZone", $tzID)}
-    if($countryLocale.length -gt 0){$spoUsers.SetSingleValueProfileProperty("$pUPN@anthesisgroup.com", "SPS-Locale", $countryLocale)}
-    if($languageCode.length -gt 0){$spoUsers.SetSingleValueProfileProperty("$pUPN@anthesisgroup.com", "SPS-MUILanguages", $languageCode)}
-    $spoUsers.SetSingleValueProfileProperty("$pUPN@anthesisgroup.com", "SPS-CalendarType", 1)
-    $spoUsers.SetSingleValueProfileProperty("$pUPN@anthesisgroup.com", "SPS-AltCalendarType", 1)
+    if($tzID.Length -gt 0){$spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-TimeZone", $tzID)}
+    if($countryLocale.length -gt 0){$spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-Locale", $countryLocale)}
+    if($languageCode.length -gt 0){$spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-MUILanguages", $languageCode)}
+    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-CalendarType", 1)
+    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-AltCalendarType", 1)
     $adminContext.ExecuteQuery()
     }
 function create-personalFolder($pUPN){
     $dirRoot = "X:\Personal"
     $username = $pUPN.split("@")[0]
     #Create the user's Personal Folder and give them Modify rights
-    $personalFolder = New-Item -Path "$dirRoot\$username" -ItemType Directory
+    $personalFolder = New-Item -Path "$dirRoot\$username" -ItemType Directory -Credential $adCredentials
     $acl = Get-Acl $personalFolder
     $perm = "Modify"
     $permInherit = "ContainerInherit, ObjectInherit" #This folder, files & subfolders - see http://powershell.nicoh.me/powershell-1/files-and-folders/set-folders-acl-owner-and-ntfs-rights 
@@ -274,7 +279,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
     Start-Sleep -Seconds 5 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
-        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice 
+        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{
@@ -412,7 +417,7 @@ $selectedStarters | % {
     $userFirstName = $_.Title.Split(" ")[0] 
     $userSurname = $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) 
     $userDisplayName = $($_.Title)
-    $userManagerSAM = $_.Line_Manager 
+    $userManagerSAM = $($_.Line_Manager).Replace("@anthesisgroup.com","")
     $userCommunity = $null 
     $userPrimaryTeam = $_.Primary_Team 
     $userSecondaryTeams = $_.Additional_Teams 
@@ -425,6 +430,7 @@ $selectedStarters | % {
     $restCredentials = $restCredentials 
     $newUserListItem = $_ 
     $userTimeZone = $_.TimeZone 
-    $user365License = $_.Office_365_license 
+    $user365License = $_.Office_365_license
+    $userDDI="0117 403 2XXX"
     }
 
