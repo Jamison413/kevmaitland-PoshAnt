@@ -36,11 +36,11 @@ function connect-ToMsol($credential){
     Connect-MsolService -Credential $credential
     }
 function connect-toAAD($credential){
-    if ($(Get-Module AzureAD) -ne $null){
+    if ($(Get-Module -ListAvailable AzureAD) -ne $null){
         Import-Module AzureAD
         Connect-AzureAD -Credential $credential
         }
-    if ($(Get-Module AzureADPreview) -ne $null){
+    if ($(Get-Module -ListAvailable AzureADPreview) -ne $null){
         Import-Module AzureADPreview
         Connect-AzureAD -Credential $credential
         }
@@ -78,4 +78,12 @@ function connect-ToSpo($credential){
     Import-Module Microsoft.Online.Sharepoint.PowerShell
     Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential
     }
-
+function connect-to365(){
+    $msolCredentials = set-MsolCredentials 
+    connect-ToMsol $msolCredentials
+    connect-toAAD $msolCredentials
+    connect-ToExo $msolCredentials
+    connect-ToSpo $msolCredentials
+    $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
+    $restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
+    }
