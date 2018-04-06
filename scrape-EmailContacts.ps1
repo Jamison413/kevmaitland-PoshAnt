@@ -223,3 +223,70 @@ foreach($user in $listOfFolders){
     else{[array]$missing += $user}
     }
 
+
+
+
+
+foreach($user in $listOfFolders){
+    $mailboxEmailAddress = $user+"@"+$upnExtension
+    $outputfile = "\\sustainltd.local\data\Personal\$user\Contacts.csv"
+    $testMe = Get-Item $outputfile
+    if($testMe){
+        $contacts = Import-Csv $outputfile
+        if($contacts.Count -gt 0){
+            if($contacts[0].Birthday -ne $null){
+                $contacts | % {
+                    if(!(matchContains -term $_.Company -arrayOfStrings $excludedCompanies)){
+                        $newContact = New-Object psobject -Property $([ordered]@{"displayName"=$null;"firstName" = $null;"lastName"=$null;"email1"=$null;"email2"=$null;"email3"=$null;"businessPhone"=$null;"mobile"=$null;"company"=$null;"jobTitle"=$null;"scrapedFrom"=$user+"@"+$upnExtension})
+                        #displayName
+                        $newContact.displayName = $($_.'First Name' + " " + $_.'Last Name').Trim()
+                        #firstName
+                        if([string]::IsNullOrWhiteSpace($_.'First Name')){}
+                        else{$newContact.firstName = $_.'First Name'.Trim()}
+                        #lastName
+                        if([string]::IsNullOrWhiteSpace($_.'Last Name')){}
+                        $newContact.lastName = $_.'Last Name'.Trim()
+                        #companyName
+                        if([string]::IsNullOrWhiteSpace($_.Company)){}
+                        else{$newContact.company = $_.Company.Trim()}
+                        #jobTitle
+                        if([string]::IsNullOrWhiteSpace($_.'Job Title')){}
+                        else{$newContact.jobTitle = $_.'Job Title'.Trim()}
+                        #emails
+                        if(!(matchContains $_.'E-mail Address' -arrayOfStrings $excludedDomains) -and $_.'E-mail Address' -match "@"){
+                            $newContact.email1 = $_.'E-mail Address'
+                            }
+                        if(!(matchContains $_.'E-mail 2 Address' -arrayOfStrings $excludedDomains) -and $_.'E-mail 2 Address' -match "@"){
+                            if([string]::IsNullOrWhiteSpace($newContact.email1)){$newContact.email1 = $_.'E-mail 2 Address'}
+                            else{$newContact.email2 = $_.'E-mail 2 Address'}
+                            }
+                        if(!(matchContains $_.'E-mail 3 Address' -arrayOfStrings $excludedDomains) -and $_.'E-mail 3 Address' -match "@"){
+                            if([string]::IsNullOrWhiteSpace($newContact.email1)){$newContact.email1 = $_.'E-mail 3 Address'}
+                            elseif([string]::IsNullOrWhiteSpace($newContact.email2)){$newContact.email2 = $_.'E-mail 3 Address'}
+                            else{$newContact.email3 = $_.'E-mail 3 Address'}
+                            }
+                        #phones
+                        if(!([string]::IsNullOrWhiteSpace($_.'Business Phone'))){
+                            if(!(matchContains -term $($_.'Business Phone'.Replace(" ","")) -arrayOfStrings $excludedPhoneNumbers)){
+                                if(@("0","+") -notcontains $_.'Business Phone'.Replace(" ","")[0]){$newContact.businessPhone = "0"+$_.'Business Phone'.Replace(" ","")}
+                                else{$newContact.businessPhone = $_.'Business Phone'.Replace(" ","")}
+                                }
+                            }
+                        if(!([string]::IsNullOrWhiteSpace($_.'Mobile Phone'))){
+                            if(!(matchContains -term $($_.'Mobile Phone'.Replace(" ","")) -arrayOfStrings $excludedPhoneNumbers)){
+                                if(@("0","+") -notcontains $_.'Mobile Phone'.Replace(" ","")[0]){$newContact.businessPhone = "0"+$_.'Mobile Phone'.Replace(" ","")}
+                                else{$newContact.businessPhone = $_.'Mobile Phone'.Replace(" ","")}
+                                }
+                            }
+                        $newContact.scrapedFrom = $mailboxEmailAddress
+                        [array]$massContactScrape += $newContact
+                        }
+                    }
+                }
+            else{[array]$massContactScrape += $contacts}
+            }
+        }
+    else{[array]$missing += $user}
+    }
+
+
