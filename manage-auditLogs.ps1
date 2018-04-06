@@ -1,10 +1,10 @@
 ﻿Import-Module _PS_Library_MSOL
 connect-ToExo
 
-$daysToLookBack = 30
+$daysToLookBack = 5
 if(!$toDate){$toDate = $(Get-Date).AddDays(1)}
 $fromDate = $toDate.AddDays(-($daysToLookBack+1))
-[array]$arrayOfUsers = @("ian.bailey@anthesisgroup.com")
+[array]$arrayOfUsers = @("acsmailboxaccess@anthesisgroup.com ")
 #[array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
 $title = $arrayOfUsers[0]+" "+(get-date)
 
@@ -25,7 +25,7 @@ function export-psobjectsToCSV($arrayOfPsobjectAuditEntries){
     $nicelyFormattedArray =@()
     $nicelyFormattedArray += $fullyMemberedObject
     $arrayOfPsobjectAuditEntries | % {$nicelyFormattedArray += $_}
-    $nicelyFormattedArray | Export-Csv -Path $env:USERPROFILE\Desktop\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd).csv -NoClobber -NoTypeInformation
+    $nicelyFormattedArray | Export-Csv -Path $env:USERPROFILE\Desktop\AuditLogs\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd).csv -NoClobber -NoTypeInformation
     }
 function parse-unifiedAuditLogToPsObjects($auditLogEntries){
     $auditLogEntries | %{

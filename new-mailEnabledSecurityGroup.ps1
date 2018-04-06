@@ -2,89 +2,36 @@
 Import-Module _PS_Library_GeneralFunctionality
 connect-ToExo
 
-$members = convertTo-arrayOfStrings -blockOfText "Stuart Mclachlan
-Ian Forrester
-Enda.Colfer@anthesisgroup.com
-Alan matthews
-Chris Keller
-Malcolm Paul
-Jason Urry
-Paul Crewe
-"
+$members = convertTo-arrayOfStrings -blockOfText ""
+$members = convertTo-arrayOfEmailAddresses -blockOfText ""
+$members = @("Jessica.onyshko@anthesisgroup.com","Paul.Ashford@anthesisgroup.com","Drew.ONeil@Target.com","Don.Asleson@Target.com")
+$members = @("kevin.maitland")
 
-$members = convertTo-arrayOfEmailAddresses -blockOfText "Kev Maitland
- 
-kevin.maitland@anthesisgroup.com
- 
- 
-G
- 
-Georgie Edwards
- 
-Georgie.Edwards@anthesisgroup.com
- 
- 
-S
- 
-Sion Fenwick
- 
-Sion.Fenwick@anthesisgroup.com
- 
- 
-P
- 
-Pete Best
- 
-Pete.Best@anthesisgroup.com
- 
- 
-J
- 
-James Walker
- 
-james.walker@anthesisgroup.com
- 
- 
-M
- 
-Margaret Davis
- 
-Margaret.Davis@anthesisgroup.com
- 
- 
-L
- 
-Louise Trimby
- 
-Louise.Trimby@anthesisgroup.com
- 
- 
-M
- 
-Mark Griffin
- 
-Mark.Griffin@anthesisgroup.com
- 
- 
-S
- 
-Stuart Gray"
-
-$members = @("Jason.Urry","Pravin.Selvarajah","Alan.Dow")
-$members = "kevin.maitland"
 $memberOf = @()
-$owners = @("Jason.Urry")
-$name = "Finance Team (Group)"
-$hideFromGal = $true
+$owners = @("kevin.maitland")
+$name = "IT Team (All)"
+$hideFromGal = $false
 $blockExternalMail = $true
+$public365Site = $true
+$autoSubscribe = $true
 
 function new-mailEnabledDistributionGroup($displayName, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners){
     New-DistributionGroup -Name $displayName -Type Security -Members $members -PrimarySmtpAddress $($name.Replace(" ","").Replace("(","").Replace(")","")+"@anthesisgroup.com")
     Set-DistributionGroup $displayName -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy $owners
     }
+function new-365Group($displayName, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, $isPublic, $autoSubscribe){
+    $shortName = $Name.Replace(" (All)","")
+    new-mailEnabledDistributionGroup -displayName $("Managers - $shortName") -members $owners -memberOf "Managers - All" -hideFromGal $true -blockExternalMail $true -owners "IT Team"
+    $newManagerGroup = Get-DistributionGroup -Identity $("Managers - $shortName")
+    if($isPublic){$accessType = "Public"}else{$accessType = "Private"}
+    $alias = $name.replace(" ","").Replace("(","_").Replace(")","")
+    New-UnifiedGroup -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -DisplayName $Name -Members $members -AccessType $accessType -Name $alias -Alias $alias -Owner $($owners -join ",")
+    }
 
 
-    new-mailEnabledDistributionGroup -displayName $name -members $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -owners $owners
+
+new-mailEnabledDistributionGroup -displayName $name -members $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -owners $owners
+new-365Group -displayName $name -members $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -owners $owners -isPublic $public365Site -autoSubscribe $autoSubscribe
 
 #Add-MailboxPermission -AccessRights fullaccess -Identity nigel.arnott -User mary.short -AutoMapping $true
 #$members | %{Add-DistributionGroupMember -Identity "iONA Capital Team" -Member $_}
@@ -108,10 +55,16 @@ $guinepigs | % {
     Add-DistributionGroupMember "Guineapigs Spam Experimental Group" -Member $($_.Replace(" ",".")+"@anthesisgroup.com")
     }
 
-function new-365Group($displayName, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, $isPublic){
-    new-mailEnabledDistributionGroup -displayName $("Managers - $displayName") -members $owners -memberOf "Managers - All" -hideFromGal $true -blockExternalMail $true -owners "IT Team"
-    if($isPublic){$accessType = "Public"}else{$accessType = "Private"}
-    New-UnifiedGroup -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$true -AlwaysSubscribeMembersToCalendarEvents:$true -DisplayName $displayName -ManagedBy $owners -Members $members -AccessType $accessType 
-    }
 
     $dummy = Get-DistributionGroup -Identity "Managers - All"
+
+
+@("ali.mahdavi","katie.swain","simon.white","laura.sponti","sion.fenwick","ben.buffery","laura.pugh","tilly.shaw","catherine.green") | % {
+    $user = $_
+    $u = Get-User -Identity $user@anthesisgroup.com
+    Get-DistributionGroup -Filter "Members -eq '$($u.DistinguishedName)'" | % {
+        Remove-DistributionGroupMember -Identity $_.Id -Member $user@anthesisgroup.com -Confirm:$false
+        }
+    Set-Mailbox $user -HiddenFromAddressListsEnabled $true -InactiveMailbox
+    }
+
