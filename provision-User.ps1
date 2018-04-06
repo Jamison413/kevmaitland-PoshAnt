@@ -367,40 +367,44 @@ function update-msolUserFromAd($userUPN){
 
 
 $selectedStarters | % {
-    provision-365user -userUPN $($selectedStarters.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
-        -userFirstName $selectedStarters.Title.Split(" ")[0] `
-        -userSurname $($selectedStarters.Title.Split(" ")[$selectedStarters.Title.Split(" ").Count-1]) `
-        -userDisplayName $($selectedStarters.Title) `
-        -userManagerSAM $selectedStarters.Line_Manager `
+    provision-365user -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
+        -userFirstName $_.Title.Split(" ")[0] `
+        -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
+        -userDisplayName $($_.Title) `
+        -userManagerSAM $_.Line_Manager `
         -userCommunity $null `
-        -userPrimaryTeam $selectedStarters.Primary_Team `
-        -userSecondaryTeams $selectedStarters.Additional_Teams `
-        -userBusinessUnit $selectedStarters.Finance_Cost_Attribu `
-        -userJobTitle $selectedStarters.Job_title `
+        -userPrimaryTeam $_.Primary_Team `
+        -userSecondaryTeams $_.Additional_Teams `
+        -userBusinessUnit $_.Finance_Cost_Attribu `
+        -userJobTitle $_.Job_title `
         -plaintextPassword "Welcome123" `
         -adCredentials $adCredentials `
         -restCredentials $restCredentials `
-        -newUserListItem $selectedStarters `
-        -userTimeZone $selectedStarters.TimeZone `
-        -user365License $selectedStarters.Office_365_license 
+        -newUserListItem $_ `
+        -userTimeZone $_.TimeZone `
+        -user365License $_.Office_365_license 
     }
-$selectedStarters | ?{$_.Finance_Cost_Attribu -eq "Sustain Ltd (GBR)"} | % {
-    provision-SustainADUser -userUPN $($selectedStarters.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
-        -userFirstName $selectedStarters.Title.Split(" ")[0] `
-        -userSurname $($selectedStarters.Title.Split(" ")[$selectedStarters.Title.Split(" ").Count-1]) `
-        -userDisplayName $($selectedStarters.Title) `
-        -userManagerSAM $selectedStarters.Line_Manager `
+$selectedStarters | % {$_.Finance_Cost_Attribu -eq "Sustain Ltd (GBR)"} | % {
+    provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
+        -userFirstName $_.Title.Split(" ")[0] `
+        -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
+        -userDisplayName $($_.Title) `
+        -userManagerSAM $_.Line_Manager `
         -userCommunity $null `
-        -userPrimaryTeam $selectedStarters.Primary_Team `
-        -userSecondaryTeams $selectedStarters.Additional_Teams `
-        -userBusinessUnit $selectedStarters.Finance_Cost_Attribu `
-        -userJobTitle $selectedStarters.Job_title `
+        -userPrimaryTeam $_.Primary_Team `
+        -userSecondaryTeams $_.Additional_Teams `
+        -userBusinessUnit $_.Finance_Cost_Attribu `
+        -userJobTitle $_.Job_title `
         -plaintextPassword "Welcome123" `
         -adCredentials $adCredentials `
         -restCredentials $restCredentials `
-        -newUserListItem $selectedStarters `
-        -userTimeZone $selectedStarters.TimeZone `
-        -user365License $selectedStarters.Office_365_license 
+        -newUserListItem $_ `
+        -userTimeZone $_.TimeZone `
+        -user365License $_.Office_365_license 
+    }
+
+$selectedStarters | % {
+    update-msolUserFromAd -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")
     }
 
 $selectedStarters | % {

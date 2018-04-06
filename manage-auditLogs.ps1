@@ -1,21 +1,40 @@
 ﻿Import-Module _PS_Library_MSOL
 connect-ToExo
 
-$daysToLookBack = 90
+$daysToLookBack = 30
 if(!$toDate){$toDate = $(Get-Date).AddDays(1)}
-if(!$fromDate){$fromDate = $toDate.AddDays(-($daysToLookBack+1))}
-[array]$arrayOfUsers = @("ian.forrester@anthesisgroup.com")
-[array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
+$fromDate = $toDate.AddDays(-($daysToLookBack+1))
+[array]$arrayOfUsers = @("ian.bailey@anthesisgroup.com")
+#[array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
 $title = $arrayOfUsers[0]+" "+(get-date)
 
+
+
+function export-psobjectsToCSV($arrayOfPsobjectAuditEntries){
+    $arrayOfAllProperties = @(
+        $(New-Object psobject -Property @{"Name"="TimeStamp"}),
+        $(New-Object psobject -Property @{"Name"="User"}),
+        $(New-Object psobject -Property @{"Name"="Event"})
+        )
+    $arrayOfPsobjectAuditEntries | %{
+        Compare-Object -ReferenceObject $arrayOfAllProperties -DifferenceObject $(Get-Member -InputObject $_ -MemberType NoteProperty) -Property Name -PassThru | ?{$_.SideIndicator -eq "=>"} | % {$arrayOfAllProperties += New-Object psobject -Property @{"Name"=$_.Name}}
+        }
+    $hashOfAllProperties = [ordered]@{} 
+    $arrayOfAllProperties | % {$hashOfAllProperties.Add($_.Name,$null)}
+    $fullyMemberedObject = New-Object psobject -Property $hashOfAllProperties
+    $nicelyFormattedArray =@()
+    $nicelyFormattedArray += $fullyMemberedObject
+    $arrayOfPsobjectAuditEntries | % {$nicelyFormattedArray += $_}
+    $nicelyFormattedArray | Export-Csv -Path $env:USERPROFILE\Desktop\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd).csv -NoClobber -NoTypeInformation
+    }
 function parse-unifiedAuditLogToPsObjects($auditLogEntries){
     $auditLogEntries | %{
         [psobject]$event = [psobject]::new()
         $event | Add-Member -MemberType NoteProperty -Name TimeStamp -Value $_.CreationDate -Force
         $event | Add-Member -MemberType NoteProperty -Name User -Value $_.UserIds -Force
         $event | Add-Member -MemberType NoteProperty -Name Event -Value $_.Operations -Force
-        foreach($prop in $_.AuditData.Replace("{","").Replace("}","").Replace("`"","").Split(",")){
-            $event | Add-Member -MemberType NoteProperty -Name $($prop.Split(":")[0]) -Value $($prop.Replace($prop.Split(":")[0]+":","")) -Force
+        foreach($prop in $_.AuditData.Replace('"ExtendedProperties":',"").Replace('"Name":',"").Replace(',"Value":',":").Replace("{","").Replace("[","").Replace("}","").Replace("]","").Replace("\/","/") -split ',(?=(?:[^"]|"[^"]*")*$)'){
+            $event | Add-Member -MemberType NoteProperty -Name $($prop.Split(":")[0].Replace('"','')) -Value $($prop.Replace($prop.Split(":")[0]+":","").Replace('"','')) -Force
             }
         [array]$events += $event
         }
@@ -42,7 +61,7 @@ function parse-unifiedAuditLogCsvToPsObjects($pathToAuditLogCsvFile){
     }
 
 
-rv log
+if ($log){rv log}
 do{
     [int]$lastCount = $log.Count
     write-host $lastCount
@@ -51,11 +70,11 @@ do{
 while($lastCount -ne $log.Count)
 
 $usefulLog =  parse-unifiedAuditLogToPsObjects -auditLogEntries $log
-$usefulLog | Out-GridView
-$usefulLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd)5.csv -NoClobber -NoTypeInformation
+#$usefulLog | Out-GridView
+#$usefulLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\AuditLog_$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd).csv -NoClobber -NoTypeInformation
+export-psobjectsToCSV -arrayOfPsobjectAuditEntries $usefulLog
 
-
-
+<#
 $auditLog = "C:\Users\kevin.maitland\Downloads\AuditLog_2017-09-26_2017-10-13.csv"
 $usefulLog = parse-unifiedAuditLogCsvToPsObjects -pathToAuditLogCsvFile $auditLog
 
@@ -75,3 +94,21 @@ $formattedLog  | Export-Csv -Path C:\Users\kevin.maitland\Desktop\UnifiedAuditLo
 $formattedLog | Out-GridView
 [System.String]::Join(",",$headers)
 $usefulLog.Count
+
+
+
+
+
+        foreach($prop in $log[0].AuditData.Replace('"ExtendedProperties":',"").Replace('"Name":',"").Replace(',"Value":',":").Replace("{","").Replace("[","").Replace("}","").Replace("]","").Replace("\/","/") -split ',(?=(?:[^"]|"[^"]*")*$)')
+            {
+            Write-Host -ForegroundColor Yellow $($prop.Split(":")[0]) 
+            Write-Host -ForegroundColor DarkYellow "`t"$($prop.Replace($prop.Split(":")[0]+":","").Replace("\/","/"))
+            }
+
+
+$RegexOptions = [System.Text.RegularExpressions.RegexOptions]
+$csvSplit = '(,)(?=(?:[^"]|"[^"]*")*$)'
+$splitColumns = [regex]::Split($log[12].AuditData.Replace("{","").Replace("[","").Replace("}","").Replace("]","").Replace("\/","/"), $csvSplit, $RegexOptions::ExplicitCapture)
+
+$log[12].AuditData.Replace("{","").Replace("[","").Replace("}","").Replace("]","").Replace("\/","/") -split ',(?=(?:[^"]|"[^"]*")*$)'
+ #>
