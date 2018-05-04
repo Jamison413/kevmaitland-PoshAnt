@@ -28,6 +28,7 @@ $restCredentials = new-spoCred -username $msolCredentials.UserName -securePasswo
 $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
 connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
+connect-toAAD -credential $msolCredentials
 connect-ToSpo -credential $msolCredentials
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
@@ -139,14 +140,14 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
 
     switch($pPrimaryOffice){
         "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers")}
-        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "AllBristol"}
+        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)"}
         "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)"}
         "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
         "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
         "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
         "Manila, PHI" {}
-        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All North America"}
-        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All North America"}
+        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)"}
+        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)"}
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
         }
     #$msolUser = New-MsolUser `
@@ -175,6 +176,7 @@ function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusiness
     Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true
     if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN | Set-Mailbox -EmailAddresses @{add="$($pUPN.Split("@")[0])@sustain.co.uk"}}
     Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
+    Get-Mailbox $pUPN | Set-Clutter -Enable $true
     Set-User -Identity $pUPN -Company $pBusinessUnit
     Set-MailboxRegionalConfiguration -Identity $pUPN -TimeZone $(convertTo-exTimeZoneValue $pTimeZone)
     }
@@ -389,7 +391,7 @@ $selectedStarters | % {
         -userTimeZone $_.TimeZone `
         -user365License $_.Office_365_license 
     }
-$selectedStarters | % {$_.Finance_Cost_Attribu -eq "Sustain Ltd (GBR)"} | % {
+$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Sustain Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
