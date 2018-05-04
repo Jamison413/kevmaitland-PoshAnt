@@ -5,11 +5,11 @@ Import-Module _REST_Library-SPO.psm1
 Import-Module _CSOM_Library-SPO
 
 <#
-$userSAM = "Ali.Midhani"
-$userFirstName = "Ali"
-$userSurname = "Midhani"
-$userManagerSAM = "Duncan.Faulkes"
-$userCommunity = "SPARK"
+$userSAM = "Dummy.User"
+$userFirstName = "Dummy"
+$userSurname = "User"
+$userManagerSAM = "Kevin.Maitland"
+$userCommunity = "Roots"
 $userDepartment = "Sustain"
 $userJobTitle = "Associate"
 $plaintextPassword = ""
@@ -28,12 +28,13 @@ $restCredentials = new-spoCred -username $msolCredentials.UserName -securePasswo
 $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
 connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
+connect-toAAD -credential $msolCredentials
 connect-ToSpo -credential $msolCredentials
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"
 $taxonomyListName = "TaxonomyHiddenList"
-$taxonomyData = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $taxonomyListName -suppressProgress $false -restCreds $restCredentials -logFile $logFile
+$taxonomyData = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $taxonomyListName -suppressProgress $false -restCreds $restCredentials -logFile $logFile -verboseLogging $true
 
 $newUserListName = "New User Requests"
 #$oDataUnprocessedUsers = '$select=*,Line_x0020_Manager/Name,Line_x0020_Manager/Title,Prinicpal_x0020_Community_x0020_/Name,Prinicpal_x0020_Community_x0020_/Title,Primary_x0020_Team/Name,Primary_x0020_Team/Title,Additional_x0020_Teams/Id,Additional_x0020_Teams/Title&$filter=Current_x0020_Status eq ''1 - Waiting for IT Team to set up accounts''&$expand=Line_x0020_Manager/Id,Prinicpal_x0020_Community_x0020_/Id,Primary_x0020_Team/Id,Additional_x0020_Teams/Id'

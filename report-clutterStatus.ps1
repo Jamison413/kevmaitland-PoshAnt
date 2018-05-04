@@ -22,5 +22,16 @@ $mbInfo | ?{$_.Clutter -eq $null} | % {$_.Clutter = $(Get-Clutter -Identity $_.M
 
 $mbInfo.Mailbox -eq "Kevin.Maitland"
 
-Export-Csv -InputObject $clutterOff -Path $env:USERPROFILE\desktop\ClutterOff.csv
+Export-Csv -Path $env:USERPROFILE\desktop\ClutterOff.csv
 Export-Csv -InputObject $clutterOn -Path $env:USERPROFILE\desktop\ClutterOn.csv
+
+$clutterOff | % {
+    $dummy = $_
+    Select $dummy.Mailbox, $dummy.Clutter
+    }
+
+$mbInfo | % {
+    [array]$allTheThings += New-Object psobject -Property $([ordered]@{"MailBox"=$_.Mailbox;"Clutter"=$_.Clutter.IsEnabled})
+    }
+
+$allTheThings | Export-Csv -Path $env:USERPROFILE\desktop\Clutter\ClutterStatus_$((get-date -Format "yyyy_MM_dd")).csv -NoTypeInformation -Encoding UTF8
