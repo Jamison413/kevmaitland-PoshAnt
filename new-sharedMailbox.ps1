@@ -1,19 +1,21 @@
 ﻿Import-Module _PS_Library_MSOL.psm1
 Import-Module _PS_Library_GeneralFunctionality
+Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "ProductCompliance"
-$owner = "michael.malate@anthesisgroup.com"
-$arrayOfFullAccessMembers = @("michael.malate@anthesisgroup.com","Sharleen.rivera@anthesisgroup.com","acsmailbox@anthesisgroup.com","Gerber.Manalo@anthesisgroup.com")
+$displayName = "Shared Mailbox - Finance Team (Anthesis Consulting Group)"
+$owner = "jason.urry@anthesisgroup.com"
+$arrayOfFullAccessMembers = @("jason.urry@anthesisgroup.com","alan.matthews@anthesisgroup.com","pravin.Selvarajah@anthesisgroup.com")
 $grantSendAsToo = $true
 $hideFromGal = $false
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){
-    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $displayName.Replace(" ",".") | Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false
+    $exchangeAlias = $(guess-aliasFromDisplayName -displayName $displayName)
+    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias | Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false
     $arrayOfFullAccessMembers  | %{
-        Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $displayName.Replace(" ",".")
-        if ($grantSendAsToo){Add-RecipientPermission -Identity $displayName.Replace(" ",".") -Trustee $_ -AccessRights SendAs}
+        Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
+        if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs}
         }
     }
 
