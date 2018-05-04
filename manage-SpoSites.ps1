@@ -121,7 +121,7 @@ foreach ($currentRequest in $selectedRequests){
         {$_ -in 'Client',"Supplier"} {
             #These define the specifics for External Client/Supplier Sites
             $sitePath = "/" 
-            $siteName = sanitise-forSharePointFolderPath $currentRequest.SiteName 
+            $siteName = $currentRequest.SiteName 
             $alphaNumericRegexPattern = '[^a-zA-Z0-9]'
             $siteUrlEndStub = $currentRequest.SiteName -replace $alphaNumericRegexPattern, ""
             $inheritPermissions = $false 
