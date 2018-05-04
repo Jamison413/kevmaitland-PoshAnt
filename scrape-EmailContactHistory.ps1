@@ -64,53 +64,67 @@ function get-mostRecentMailFromEachContact($exchangeService,$mailboxEmailAddress
         if($mailIsOutbound){
             $boundEmail = [Microsoft.Exchange.WebServices.Data.EmailMessage]::Bind($exchangeService, $unboundEmail.Id, [Microsoft.Exchange.WebServices.Data.PropertySet]::new([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties))
             $boundEmail.ToRecipients | %{
-                if(!(matchContains -term $_.Address -arrayOfStrings $excludedDomains)){do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $_.Address -mailIsOutbound $true -dateStamp $boundEmail.DateTimeSent -subject $boundEmail.Subject -contactHistoryHash $contactHistoryHash}
+                if(!(matchContains -term $_.Address -arrayOfStrings $excludedDomains)){do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $_.Address -mailIsOutbound $true -dateStamp $boundEmail.DateTimeSent -subject $boundEmail.Subject.Replace(",","") -contactHistoryHash $contactHistoryHash -theirName $((guess-nameFromString $_.Name).Replace(",",""))}
                 }
             $boundEmail.CcRecipients | %{
-                if(!(matchContains -term $_.Address -arrayOfStrings $excludedDomains)){do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $_.Address -mailIsOutbound $true -dateStamp $boundEmail.DateTimeSent -subject $boundEmail.Subject -contactHistoryHash $contactHistoryHash}
+                if(!(matchContains -term $_.Address -arrayOfStrings $excludedDomains)){do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $_.Address -mailIsOutbound $true -dateStamp $boundEmail.DateTimeSent -subject $boundEmail.Subject.Replace(",","") -contactHistoryHash $contactHistoryHash -theirName $((guess-nameFromString $_.Name).Replace(",",""))}
                 }
             $boundEmail.BccRecipients | %{
-                if(!(matchContains -term $_.Address -arrayOfStrings $excludedDomains)){do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $_.Address -mailIsOutbound $true -dateStamp $boundEmail.DateTimeSent -subject $boundEmail.Subject -contactHistoryHash $contactHistoryHash}
+                if(!(matchContains -term $_.Address -arrayOfStrings $excludedDomains)){do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $_.Address -mailIsOutbound $true -dateStamp $boundEmail.DateTimeSent -subject $boundEmail.Subject.Replace(",","") -contactHistoryHash $contactHistoryHash -theirName $((guess-nameFromString $_.Name).Replace(",",""))}
                 }
             }
         else{
             if(!([string]::IsNullOrEmpty($unboundEmail.From.Address))){
                 if(!(matchContains -term $unboundEmail.From.Address -arrayOfStrings $excludedDomains) -and $unboundEmail.From.Address -match "@"){
-                    do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $unboundEmail.From.Address -mailIsOutbound $false -dateStamp $unboundEmail.DateTimeReceived -subject $unboundEmail.Subject -contactHistoryHash $contactHistoryHash
+                    do-contactHistoryStuff -myAddress $mailboxEmailAddress -theirAddress $unboundEmail.From.Address -mailIsOutbound $false -dateStamp $unboundEmail.DateTimeReceived -subject $unboundEmail.Subject.Replace(",","") -contactHistoryHash $contactHistoryHash -theirName $((guess-nameFromString $unboundEmail.From.Name).Replace(",",""))
                     }
                 }
             }
         }
     }
-function do-contactHistoryStuff($myAddress,$theirAddress,$mailIsOutbound,$dateStamp,$subject,$contactHistoryHash){
-        if($contactHistoryHash.Keys -notcontains $theirAddress){
-            #add it
-            $detailsHash = @{"mailbox"=$myAddress;"from"=$theirAddress;"to"=$myAddress;"directionOutbound"=$mailIsOutbound;"date"=$dateStamp;"subject"=$subject}
-            if($mailIsOutbound){ #reverse the to/from
-                $detailsHash["to"] = $theirAddress
-                $detailsHash["from"] = $myAddress
-                }
-            $details = New-Object psobject -Property $detailsHash
-            $contactHistoryHash.Add($theirAddress,$details)
+function do-contactHistoryStuff($myAddress,$theirAddress,$theirName,$mailIsOutbound,$dateStamp,$subject,$contactHistoryHash){
+    if($contactHistoryHash.Keys -notcontains $theirAddress){
+        #add it
+        $detailsHash = [ordered]@{"mailbox"=$myAddress;"from"=$theirAddress;"to"=$myAddress;"directionOutbound"=$mailIsOutbound;"inboundDate"=$null;"outboundDate"=$null;"theirDomain"=$($theirAddress.Split("@")[1]);"inboundMessageCount"=0;"outboundMessageCount"=0;"guessedName"=$theirName;"lastSubject"=$subject}
+        if($mailIsOutbound){ #reverse the to/from
+            $detailsHash["to"] = $theirAddress
+            $detailsHash["from"] = $myAddress
+            $detailsHash["outboundDate"] = $dateStamp
+            $detailsHash["outboundMessageCount"] = 1
             }
-        elseif($contactHistoryHash[$theirAddress].date -lt $dateStamp){
-            #overwrite it
-            $contactHistoryHash[$theirAddress].date = $dateStamp
-            $contactHistoryHash[$theirAddress].directionOutbound = $mailIsOutbound
-            $contactHistoryHash[$theirAddress].subject = $subject
-            #$contactHistoryHash[$theirAddress].to = $myAddress
-            #$contactHistoryHash[$theirAddress].from = $theirAddress
-            #$contactHistoryHash[$theirAddress].mailbox = $myAddress
-            if($directionOutbound){
-                $contactHistoryHash[$theirAddress].from = $myAddress
-                $contactHistoryHash[$theirAddress].to = $theirAddress
-                }
         else{
-            #do nothing
+            $detailsHash["inboundDate"] = $dateStamp
+            $detailsHash["inboundMessageCount"] = 1
+            }
+        $details = New-Object psobject -Property $detailsHash
+        $contactHistoryHash.Add($theirAddress,$details)
+        }
+    elseif($mailIsOutbound){
+        if($contactHistoryHash[$theirAddress].inboundDate -lt $dateStamp){
+            #overwrite it
+            $contactHistoryHash[$theirAddress].inboundDate = $dateStamp
+            $contactHistoryHash[$theirAddress].directionOutbound = $mailIsOutbound
+            $contactHistoryHash[$theirAddress].lastSubject = $subject
+            $contactHistoryHash[$theirAddress].inboundMessageCount = $contactHistoryHash[$theirAddress].inboundMessageCount + 1
+            }
+        else{
+            #Just increment inboundMessageCount
+            $contactHistoryHash[$theirAddress].inboundMessageCount = $contactHistoryHash[$theirAddress].inboundMessageCount + 1
             }
         }
-        
-    
+    else{
+        if($contactHistoryHash[$theirAddress].outboundDate -lt $dateStamp){
+            #overwrite it
+            $contactHistoryHash[$theirAddress].outboundDate = $dateStamp
+            $contactHistoryHash[$theirAddress].directionOutbound = $mailIsOutbound
+            $contactHistoryHash[$theirAddress].lastSubject = $subject
+            $contactHistoryHash[$theirAddress].outboundMessageCount = $contactHistoryHash[$theirAddress].outboundMessageCount + 1
+            }
+        else{
+            #Just increment outboundMessageCount
+            $contactHistoryHash[$theirAddress].outboundMessageCount = $contactHistoryHash[$theirAddress].outboundMessageCount + 1
+            }
+        }
     }
 #endregion
 
@@ -119,7 +133,7 @@ $ExchVer = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
 $ewsUrl = "https://outlook.office365.com/EWS/Exchange.asmx"
 $upnExtension = "anthesisgroup.com"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
-$excludedDomains = @("*sustain.co.uk","*anthesisgroup.com","*AnthesisLLC.onmicrosoft.com")
+$excludedDomains = @("*sustain.co.uk","*anthesisgroup.com","*AnthesisLLC.onmicrosoft.com","*gmail.com","*hotmail.com","*hotmail.co.uk","*yahoo.com","*yahoo.co.uk","*twitter.com","*twitter.co.uk","*linkedin.com","*outlook.com","*bestfootforward.com","*bestfootforward.co.ukget-m","*calebgroup.net")
 $logFile = "C:\ScriptLogs\scrape-EmailContactHistory.log"
 $errorLogFile = "C:\ScriptLogs\scrape-EmailContactHistory_error.log"
 #$verboseLogging = $true
@@ -133,7 +147,7 @@ $service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($exchv
 $service.Credentials = New-Object System.Net.NetworkCredential($upnSMA,$passSMA)
 $service.Url = $ewsUrl
 
-$listOfMailboxesToScrape = @("ian.forrester","Craig.Simmons")
+$listOfMailboxesToScrape = @("tim.clare","jono.adams","brad.blundell","ian.forrester","craig.simmons")
 foreach($user in $listOfMailboxesToScrape){
     $mailboxEmailAddress = "$user@$upnExtension"
     $service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $mailboxEmailAddress) -ErrorAction Stop
@@ -146,7 +160,7 @@ foreach($user in $listOfMailboxesToScrape){
     scrape-recursively -exchangeService $service -mailboxEmailAddress $mailboxEmailAddress -ewsFolder $sentItems -mailIsOutbound $true -contactHistoryHash $contactHistoryHash
 
     $contactHistoryHash.Keys | %{
-        $contactHistoryHash[$_] |  Export-Csv -Path $env:USERPROFILE\Desktop\$mailboxEmailAddress.csv -NoTypeInformation -Append
+        $contactHistoryHash[$_] |  Export-Csv -Path "$env:USERPROFILE\Desktop\Scrape_$($mailboxEmailAddress)_Initial.csv" -NoTypeInformation -Append
         }
     }
 Stop-Transcript

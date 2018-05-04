@@ -205,6 +205,35 @@ function guess-languageCodeFromCountry($p3LetterCountryIsoCode){
         "USA" {"en-US"}
         }
     }
+function guess-nameFromString([string]$ambiguousString){
+    $lessAmbiguousString = $ambiguousString.Trim().Replace('"','')
+    $leastAmbiguousString = $null
+    #If it doesn't contain a space, see if it's an e-mail address
+    if($lessAmbiguousString.Split(" ").Count -lt 2){
+        if($lessAmbiguousString -match "@"){
+            $lessAmbiguousString.Split("@")[0] | % {$_.Split(".")} | %{
+                $blob = $_.Trim()
+                $leastAmbiguousString += $($blob.SubString(0,1).ToUpper() + $blob.SubString(1,$blob.Length-1).ToLower()) + " " #Title Case
+                }
+            }
+        else{$leastAmbiguousString = $lessAmbiguousString}#Do nothing - it's too weird.
+        }
+    else{
+        if($lessAmbiguousString -match ","){#If Lastname, Firstname
+            $lessAmbiguousString.Split(",") | %{
+                $blob = $_.Trim()
+                $leastAmbiguousString = $($blob.SubString(0,1).ToUpper() + $blob.SubString(1,$blob.Length-1).ToLower()) + " $leastAmbiguousString" #Prepend each blob as they're in reverse order
+                }
+            }
+        else{
+            $lessAmbiguousString.Split(" ") | %{ #If firstname lastname
+                $blob = $_.Trim()
+                $leastAmbiguousString += $($blob.SubString(0,1).ToUpper() + $blob.SubString(1,$blob.Length-1).ToLower()) + " "#Just Title Case it
+                }
+            }
+        }
+    $leastAmbiguousString.Trim()
+    }
 function log-action($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`tACTION:`t$myMessage") -Path $logFile}
     if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Yellow $myMessage}
@@ -305,16 +334,20 @@ function sanitise-forResourcePath($dirtyString){
         $dirtyString
         }
     }
-function sanitise-stripHtml($dirtyString){
-    $cleanString = $dirtyString -replace '<[^>]+>',''
-    $cleanString = [System.Web.HttpUtility]::HtmlDecode($cleanString)# -replace '&amp;','&'
-    $cleanString
+function sanitise-forSql([string]$dirtyString){
+    if([string]::IsNullOrWhiteSpace($dirtyString)){}
+    else{$dirtyString.Replace("'","`'`'")}
     }
 function sanitise-forTermStore($dirtyString){
     #$dirtyString.Replace("\t", " ").Replace(";", ",").Replace("\", "\uFF02").Replace("<", "\uFF1C").Replace(">", "\uFF1E").Replace("|", "\uFF5C")
     $cleanerString = $dirtyString.Replace("`t", "").Replace(";", "").Replace("\", "").Replace("<", "").Replace(">", "").Replace("|", "")
     if($cleanerString.Length -gt 255){$cleanerString.Substring(0,254)}
     else{$cleanerString}
+    }
+function sanitise-stripHtml($dirtyString){
+    $cleanString = $dirtyString -replace '<[^>]+>',''
+    $cleanString = [System.Web.HttpUtility]::HtmlDecode($cleanString)# -replace '&amp;','&'
+    $cleanString
     }
 function smartReplace($mysteryString,$findThis,$replaceWithThis){
     if([string]::IsNullOrEmpty($mysteryString)){$result = $mysteryString}
