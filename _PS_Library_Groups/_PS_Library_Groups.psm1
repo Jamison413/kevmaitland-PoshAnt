@@ -2,12 +2,11 @@
 
 Import-Module _PS_Library_MSOL.psm1
 Import-Module _PS_Library_GeneralFunctionality
-Import-Module *pnp*
+#Import-Module *pnp*
 
 function guess-aliasFromDisplayName($displayName){
     if(![string]::IsNullOrWhiteSpace($displayName)){$displayName.replace(" ","_").Replace("(","").Replace(")","")}
     }
-
 function enumerate-groupMemberships(){
     Get-AzureADMSGroup -All:$true | % {
         $thisGroup = $_
@@ -31,9 +30,9 @@ function enumerate-groupMemberships(){
 
         [array]$allGroupStubs += $groupStub
         }   
-    $allGroupStub
+    $allGroupStubs
     }
-function new-365Group($displayName, $description, $managers, $teamMembers, $memberOf, $hideFromGal, $blockExternalMail, $isPublic, $autoSubscribe, $additionalEmailAddress, $groupClassification){
+function new-365Group($displayName, $description, $managers, $teamMembers, $memberOf, $hideFromGal, $blockExternalMail, $isPublic, $autoSubscribe, $additionalEmailAddress, $groupClassification, $ownersAreRealManagers){
     #Groups created look like this:
     # [Dummy Team (All)] - Mail-enabled Security Group (DisplayName)
     # [Dummy Team (All)] - Unified Group (DisplayName)
@@ -48,13 +47,16 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
         #First, create a corresponding mail-enabled Security group
         if(Get-DistributionGroup -Identity $(guess-aliasFromDisplayName $displayName) -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "Corresponding Security Group already exists";$onlyUpdate = $true}
         else{$onlyUpdate = $false}
-        $sg = new-mailEnabledDistributionGroup -dgDisplayName $displayName -members $teamMembers -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners "IT Team" -description "Mail-enabled Security Group for $shortName" -onlyUpdate $onlyUpdate
+        $sg = new-mailEnabledDistributionGroup -dgDisplayName $displayName -members $teamMembers -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners "IT Team" -description "Mail-enabled Security Group for $displayName" -onlyUpdate $onlyUpdate
         
         try{
             #Then create a Managers mail-enabled Security group
             if(Get-DistributionGroup -Identity $("$displayName - Managers") -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "Managers Security Group already exists";$onlyUpdate = $true}
             else{$onlyUpdate = $false}
-            $managerSG = new-mailEnabledDistributionGroup -dgDisplayName $("$displayName - Managers") -members $managers -memberOf @("Managers (All)",$sg.ExternalDirectoryObjectId) -hideFromGal $true -blockExternalMail $true -owners "IT Team" -description "Mail-enabled Security Group for $shortName Managers" -onlyUpdate $onlyUpdate
+            
+            $managersMemberOf =@($sg.ExternalDirectoryObjectId)
+            if($ownersAreRealManagers){$managersMemberOf += "Managers (All)"}
+            $managerSG = new-mailEnabledDistributionGroup -dgDisplayName $("$displayName - Managers") -members $managers -memberOf $managersMemberOf -hideFromGal $true -blockExternalMail $true -owners "IT Team" -description "Mail-enabled Security Group for $shortName Managers" -onlyUpdate $onlyUpdate
             if(Get-DistributionGroup -Identity $("$displayName - 365 Mirror") -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "365 Mirror Security Group already exists";$onlyUpdate = $true}
             else{$onlyUpdate = $false}
             $mirrorSG = new-mailEnabledDistributionGroup -dgDisplayName $("$displayName - 365 Mirror") -members $teamMembers -memberOf $sg.ExternalDirectoryObjectId -hideFromGal $true -blockExternalMail $true -owners "IT Team" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -onlyUpdate $onlyUpdate
@@ -63,9 +65,9 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
                 #Then, if that's worked, create the 365 Group
                 if($isPublic){$accessType = "Public"}else{$accessType = "Private"}
                 $mailAlias = $(guess-aliasFromDisplayName "$displayName 365")
-                if([string]::IsNullOrWhiteSpace($description)){$description = "Unified 365 Group for $shortName"}
+                if([string]::IsNullOrWhiteSpace($description)){$description = "Unified 365 Group for $displayName"}
                 if(Get-UnifiedGroup -Identity $mailAlias  -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "Unified Group already exists - not recreating!"}
-                else{New-UnifiedGroup -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -DisplayName $displayName -Members $teamMembers -AccessType $accessType -Name $mailAlias -Alias $mailAlias -Owner $($managers -join ",") -Notes $description | Set-UnifiedGroup -HiddenFromAddressListsEnabled $true -Classification $groupClassification}
+                else{New-UnifiedGroup -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -DisplayName $displayName -Members $teamMembers -AccessType $accessType -Name $mailAlias -Alias $mailAlias -Owner "Ben.Lynch" -Notes $description | Set-UnifiedGroup -HiddenFromAddressListsEnabled $true -Classification $groupClassification}
                 $ug = Get-UnifiedGroup -Identity $mailAlias
 
                 #Create a Shared Mailbox and autoforward mail to the Unified Group
@@ -98,11 +100,14 @@ function new-mailEnabledDistributionGroup($dgDisplayName, $description, $members
     $mailAlias = guess-aliasFromDisplayName $dgDisplayName
     if($onlyUpdate){
         $members  | % {
-            Write-Host -ForegroundColor DarkYellow Adding TeamMembers Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck
+            Write-Host -ForegroundColor DarkYellow "Adding TeamMembers Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
             Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck
             }
         }
-    else{New-DistributionGroup -Name $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($dgDisplayName.Replace(" ","").Replace("(","").Replace(")","")+"@anthesisgroup.com") -Notes $description -Alias $mailAlias | Out-Null}
+    else{
+        try{New-DistributionGroup -Name $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($dgDisplayName.Replace(" ","").Replace("(","").Replace(")","")+"@anthesisgroup.com") -Notes $description -Alias $mailAlias | Out-Null}
+        catch{$Error}
+        }
     Set-DistributionGroup -Identity $mailAlias -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy $owners
     $memberOf | % {
         Write-Host -ForegroundColor DarkYellow Adding As MemberOf Add-DistributionGroupMember $_ -Member $mailAlias -Confirm:$false -BypassSecurityGroupManagerCheck
@@ -117,7 +122,7 @@ function new-symGroup($displayName, $description, $managers, $teamMembers, $memb
     $isPublic = $true 
     $autoSubscribe = $true
     $groupClassification = "Internal"
-    new-365Group -displayName $displayName -description $description -managers $managers -teamMembers $teamMembers -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -isPublic $isPublic -autoSubscribe $autoSubscribe -additionalEmailAddress $additionalEmailAddress -groupCategory $groupClassification
+    new-365Group -displayName $displayName -description $description -managers $managers -teamMembers $teamMembers -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -isPublic $isPublic -autoSubscribe $autoSubscribe -additionalEmailAddress $additionalEmailAddress -groupClassification $groupClassification -ownersAreRealManagers $false
     }
 function new-teamGroup($displayName, $description, $managers, $teamMembers, $memberOf, $additionalEmailAddress){
     $hideFromGal = $false
@@ -125,46 +130,47 @@ function new-teamGroup($displayName, $description, $managers, $teamMembers, $mem
     $isPublic = $false 
     $autoSubscribe = $true
     $groupClassification = "Internal"
-    new-365Group -displayName $displayName -description $description -managers $managers -teamMembers $teamMembers -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -isPublic $isPublic -autoSubscribe $autoSubscribe -additionalEmailAddress $additionalEmailAddress -groupCategory $groupClassification}
+    new-365Group -displayName $displayName -description $description -managers $managers -teamMembers $teamMembers -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -isPublic $isPublic -autoSubscribe $autoSubscribe -additionalEmailAddress $additionalEmailAddress -groupClassification $groupClassification -ownersAreRealManagers $true} 
 function report-groupMembershipEnumeration($allGroupStubs,$filePathAndName){
     $allGroupStubs | % {
         [array]$formattedGroupStubs += New-Object psobject -Property $([ordered]@{"GroupName"=$_.Name;"GroupType"=$_.Type;"Owners"=$($_.Owners -join "`r`n");"Members"=$($_.Members -join "`r`n");"Id"=$_.ObjectId})
         }
     $formattedGroupStubs | Sort-Object GroupName | Export-Csv -Path $filePathAndName -Encoding UTF8 -NoTypeInformation -Append
     }
-function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGroupOwners,[boolean]$groupIsUnified,$emailAddressForOverviewReport){
-    #$groupChangesArray = $membersChanged
-    if($groupIsUnified){
-        $groupChangesArray | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "GenericGroupName" -Value $_.'365GroupName' -Force}
-        }
-    else{
-        $groupChangesArray | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "GenericGroupName" -Value $_.SecGroupName -Force}
-        }
-    $groupChangesArray | Sort-Object GenericGroupName,Result,Change,DisplayName | %{
-        if($currentGroupName -ne $_.GenericGroupName){
+function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGroupOwners,[boolean]$actionedGroupIs365 = $true,$emailAddressForOverviewReport){
+    #$groupChangesArray = $ownersChanged
+    if($actionedGroupIs365){$groupChangesArray = $groupChangesArray | Sort-Object ActionedGroupName,Result,Change,DisplayName}
+    else{$groupChangesArray = $groupChangesArray | Sort-Object SourceGroupName,Result,Change,DisplayName}
+    $groupChangesArray | %{
+        if($current365GroupName -ne $_.SourceGroupName -and $current365GroupName -ne $_.ActionedGroupName){
             #We need to start another report, so send the current one before we start again
             if($ownerReport){
+                Write-Host $ownerReport
                 send-membershipEmailReport -ownerReport $ownerReport -changesAreToGroupOwners $changesAreToGroupOwners -emailAddressForOverviewReport $emailAddressForOverviewReport
                 }
             #Start new ownerReport
             $ownerReport = New-Object psobject -Property $([ordered]@{"To"=@();"groupName"=$null;"added"=@();"removed"=@();"problems"=@();"fullMemberList"=@()})
-            $currentGroupName = $_.GenericGroupName
-            $ownerReport.groupName = $currentGroupName
+            if($actionedGroupIs365){$current365GroupName = $_.ActionedGroupName}
+            else{$current365GroupName = $_.SourceGroupName}
+            $ownerReport.groupName = $current365GroupName
             #Get the owners' e-mail addresses
-            [array]$owners = Get-AzureADMSGroup -SearchString $currentGroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName}
+            #[array]$owners = Get-AzureADMSGroup -SearchString $current365GroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName}
+            [array]$owners = Get-AzureADMSGroup -Filter "MailNickname eq '$(guess-aliasFromDisplayName $current365GroupName)_365'" | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName}
+            
             if($owners){$ownerReport.To = $owners}
             else{
                 $ownerReport.To = $emailAddressForOverviewReport
-                $ownerReport.groupName = "***Unowned Group*** $currentGroupName"
+                $ownerReport.groupName = "***Unowned Group*** $current365GroupName"
                 }
             #Get the members' (or owners' if we're reporting on group Ownership) DisplayNames
             if($changesAreToGroupOwners){
-                [array]$members = Get-AzureADMSGroup -SearchString $currentGroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).DisplayName}
+                #[array]$members = Get-AzureADMSGroup -SearchString $current365GroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).DisplayName}
+                [array]$members = Get-AzureADMSGroup -Filter "MailNickname eq '$(guess-aliasFromDisplayName $current365GroupName)_365'" | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).DisplayName}
                 $members = $($members | Sort-Object)
                 if($members){$ownerReport.fullMemberList = $members}
                 }
             else{
-                [array]$members = Get-AzureADMSGroup -SearchString $currentGroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupMember -All:$true -ObjectId $_.Id).DisplayName}
+                [array]$members = Get-AzureADMSGroup -Filter "MailNickname eq '$(guess-aliasFromDisplayName $current365GroupName)_365'" | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupMember -All:$true -ObjectId $_.Id).DisplayName}
                 $members = $($members | Sort-Object)
                 if($members){$ownerReport.fullMemberList = $members}
                 }
@@ -178,7 +184,9 @@ function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGro
         else{$ownerReport.problems += $_.DisplayName}
         }
     #Finally, send the last reports too
-    send-membershipEmailReport -ownerReport $ownerReport -changesAreToGroupOwners $changesAreToGroupOwners -emailAddressForOverviewReport $emailAddressForOverviewReport
+    Write-Host $ownerReport
+    Write-Host "To: " + $ownerReport.To
+    send-membershipEmailReport -ownerReport $ownerReport -changesAreToGroupOwners $changesAreToGroupOwners  -emailAddressForOverviewReport $emailAddressForOverviewReport
     }
 function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwners,$emailAddressForOverviewReport){
     #Write and send e-mail
@@ -186,19 +194,20 @@ function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwne
     else{$type = "member"}
     $subject = "$($ownerReport.groupName) $($type)ship updated"
     $body = "<HTML><FONT FACE=`"Calibri`">Hello owners of <B>$($ownerReport.groupName)</B>,`r`n`r`n<BR><BR>"
-    if($ownerReport.added)  {$body += "The following users have been <B>added</B> to the Group:      `r`n`t<BR><PRE>&#9;$($ownerReport.added -join     "`r`n`t")</PRE>`r`n`r`n<BR>"}
-    if($ownerReport.removed){$body += "The following users have been <B>removed</B> from the Group:  `r`n`t<BR><PRE>&#9;$($ownerReport.removed -join   "`r`n`t")</PRE>`r`n`r`n<BR>"}
+    $body += "Changes have been made to the <B><U>$($type)</U>ship</B> of $($ownerReport.groupName)`r`n`r`n<BR><BR>"
+    if($ownerReport.added)  {$body += "The following users have been <B>added</B> as Group <B>$($type)s</B>:      `r`n`t<BR><PRE>&#9;$($ownerReport.added -join     "`r`n`t")</PRE>`r`n`r`n<BR>"}
+    if($ownerReport.removed){$body += "The following users have been <B>removed</B> from the Group <B>$($type)s</B>:  `r`n`t<BR><PRE>&#9;$($ownerReport.removed -join   "`r`n`t")</PRE>`r`n`r`n<BR>"}
     if($ownerReport.problems){
         $body += "The were some problems processing changes to these users (but IT have been notified):`r`n`t<BR><PRE>&#9;$($ownerReport.problems -join "`r`n`t")</PRE>`r`n`r`n<BR>"
         $ownerReport.To += $emailAddressForOverviewReport
         }
     if($ownerReport.fullMemberList){$body += "The full list of group $($type)s looks like this:`r`n`t<BR><PRE>&#9;$($ownerReport.fullMemberList -join "`r`n`t")</PRE>`r`n`r`n<BR>"}
     else{$body += "It looks like the group is now empty...`r`n`r`n<BR><BR>"}
-    if($type -eq "owner"){$body += "To help us all remain compliant and secure, group <I>ownership</I> is still managed centrally by your IT Team.`r`n`r`n<BR><BR>"}
-    $body += "As an owner, you can manage the membership of this group (and there is a <A HREF=`"https://anthesisllc.sharepoint.com/help/`">guide available to help you</A>), or you can contact the IT team for your region,`r`n`r`n<BR><BR>"
+    if($type -eq "owner"){$body += "To help us all remain compliant and secure, group <I>ownership</I> is still managed centrally by your IT Team, and you will need to liaise with them tomake changes to group ownership.`r`n`r`n<BR><BR>"}
+    $body += "As an owner, you can manage the membership of this group (and there is a <A HREF=`"https://anthesisllc.sharepoint.com/teams/ITTeam_All/SitePages/Group-membership-management-(for-Team-Managers).aspx`">guide available to help you</A>), or you can contact the IT team for your region,`r`n`r`n<BR><BR>"
     $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
-    #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body
-    Send-MailMessage -To $ownerReport.To -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+    #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+    Send-MailMessage -To $ownerReport.To -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
     #$body
     }
 function sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport){
@@ -206,7 +215,7 @@ function sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[b
     Get-AzureADMSGroup -All:$true | ?{$_.GroupTypes -contains "Unified"} | %{
         $365Group = $_
         #Look for the corresponding Security Group (search by alias by swapping the "_365" suffix of the 365 group for the "-365Mirror" suffix of the Mirror Groups as Owners can alter DisplayName)
-        $securityGroup = Get-AzureADMSGroup -SearchString $365Group.MailNickname.Replace("_365","-365Mirror") | ?{$_.MailEnabled -eq $true -and $_.SecurityEnabled -eq $true -and $_.GroupTypes -notcontains "Unified"}
+        $securityGroup = Get-AzureADMSGroup -Filter "MailNickname eq '$($365Group.MailNickname.Replace("_365","_-_365") + "_Mirror")'" | ?{$_.MailEnabled -eq $true -and $_.SecurityEnabled -eq $true -and $_.GroupTypes -notcontains "Unified"}
         if($securityGroup.Count -eq 1){
             #Get the members for the 365 Group from AAD
             $365GroupMembers = @() #Not only do we /never/ want to add users to the wrong group, having an intantiated empty array helps with compare-object later
@@ -221,22 +230,22 @@ function sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[b
             $membersDelta | ?{$_.SideIndicator -eq "<="} | %{ 
                 $userStub = $_
                 try {
-                    if($reallyDoIt){Add-DistributionGroupMember -Identity $securityGroup.Id -Member $userStub.objectId}
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"SecGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+                    if($reallyDoIt){Add-DistributionGroupMember -Identity $securityGroup.Id -Member $userStub.objectId -BypassSecurityGroupManagerCheck:$true}
+                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$securityGroup.DisplayName;"SourceGroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
                     }
                 catch {
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"SecGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$securityGroup.DisplayName;"SourceGroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
                     }
                 }
             #Remove "removed" members in the 365 Group
             $membersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
                 $userStub = $_
                  try {
-                    if($reallyDoIt){Remove-DistributionGroupMember -Identity $securityGroup.Id -Member $_.userPrincipalName -Confirm:$false}
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"SecGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+                    if($reallyDoIt){Remove-DistributionGroupMember -Identity $securityGroup.Id -Member $_.userPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true}
+                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$securityGroup.DisplayName;"SourceGroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
                     }
                 catch {
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"SecGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$securityGroup.DisplayName;"SourceGroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
                     }
                 }
             }  
@@ -247,7 +256,7 @@ function sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[b
             #Nah - let's just alert for now.
             }
         }
-    if(!$dontSendEmailReport){report-groupMembershipSync -groupChangesArray $membersChanged -changesAreToGroupOwners $false -groupIsUnified $false -emailAddressForOverviewReport $itAdminEmailAddress}
+    if(!$dontSendEmailReport){report-groupMembershipSync -groupChangesArray $membersChanged -changesAreToGroupOwners $false -actionedGroupIs365 $false -emailAddressForOverviewReport $itAdminEmailAddress}
     }
 function sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport){
     #This should be less important now as Owners cannot add Owners, it should just synchronise IT-led changes to the [Dummy Team (All) - Managers] group
@@ -255,13 +264,14 @@ function sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$d
     Get-AzureADMSGroup -All:$true | ?{$_.GroupTypes -contains "Unified"} | %{
         $365Group = $_
         #Look for the corresponding Security Group
-        $securityGroup = Get-AzureADMSGroup -SearchString $365Group.DisplayName | ?{$_.MailEnabled -eq $true -and $_.SecurityEnabled -eq $true -and $_.GroupTypes -notcontains "Unified"}
+        $securityGroup = Get-AzureADMSGroup -Filter "MailNickname eq '$($365Group.MailNickname.Replace("_365",'') + "_-_Managers")'" | ?{$_.MailEnabled -eq $true -and $_.SecurityEnabled -eq $true -and $_.GroupTypes -notcontains "Unified"}
         if($securityGroup.Count -eq 1){
             #Get the owners for the 365 Group from AAD
             $365GroupOwners = @()
             $secGroupOwners = @()
-            Get-AzureADGroupOwner -All:$true -ObjectId $365Group.Id | %{[array]$365GroupOwners += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
+            Get-AzureADGroupOwner -All:$true -ObjectId $365Group.Id | %{[array]$365GroupOwners += New-Object psobject -Property $([ordered]@{"windowsLiveID"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
             #region Getting the "owners" of a mail-enabled distribution group is more complicated
+            <#What are you blithering about you dopey bastard? We're never letting users manage the Managers groups - we want the /Members/ of the Managers Group
             $managedBy = $(Get-DistributionGroup -Identity $securityGroup.Id).ManagedBy 
             $managedBy | % {
                 $hopefullyASingleUserMailbox = @()
@@ -277,28 +287,31 @@ function sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$d
                         }
                     }
                 }
+            #>
+            $membersOfManagersGroup = Get-DistributionGroupMember -Identity $securityGroup.Id
             #endregion
             #Update the 365 Group ownership based on the Security Group ownership (the opposite direction to Members)
-            $ownersDelta = Compare-Object -ReferenceObject $secGroupOwners -DifferenceObject $365GroupOwners -Property userPrincipalName -PassThru 
+            $ownersDelta = Compare-Object -ReferenceObject $membersOfManagersGroup -DifferenceObject $365GroupOwners -Property windowsLiveID -PassThru 
             #Add extra members in the 365 Group
             $ownersDelta | ?{$_.SideIndicator -eq "<="} | %{
                 $userStub = $_
                 try {
-                    if($reallyDoIt){Add-AzureADGroupOwner -ObjectId $365Group.Id -RefObjectId $userStub.objectId}
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"365GroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+                    if($reallyDoIt){Add-AzureADGroupOwner -ObjectId $365Group.Id -RefObjectId $userStub.objectId -BypassSecurityGroupManagerCheck:$true}
+                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$365Group.DisplayName;"SourceGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
                     }
                 catch {
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"365GroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$365Group.DisplayName;"SourceGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
                     }
                 }
             #Remove "removed" members in the 365 Group
             $ownersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
+                $userStub = $_
                  try {
-                    if($reallyDoIt){Remove-AzureADGroupOwner -ObjectId $365Group.Id -OwnerId $_.objectId}
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"365GroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+                    if($reallyDoIt){Remove-AzureADGroupOwner -ObjectId $365Group.Id -OwnerId $_.objectId -BypassSecurityGroupManagerCheck:$true}
+                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$365Group.DisplayName;"SourceGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
                     }
                 catch {
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"365GroupName"=$365Group.DisplayName;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$365Group.DisplayName;"SourceGroupName"=$securityGroup.DisplayName;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
                     }
                 }
             }
@@ -309,7 +322,7 @@ function sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$d
             #Nah - let's just alert for now.
             }
         }   
-    if(!$dontSendEmailReport){report-groupMembershipSync -groupChangesArray $ownersChanged -changesAreToGroupOwners $true -groupIsUnified $true -emailAddressForOverviewReport "kevin.maitland@anthesisgroup.com"}
+    if(!$dontSendEmailReport){report-groupMembershipSync -groupChangesArray $ownersChanged -changesAreToGroupOwners $true -actionedGroupIs365 $true -emailAddressForOverviewReport $itAdminEmailAddress}
     }
 
 <#
@@ -334,37 +347,7 @@ $autoSubscribe = $true
 $displayName = "Energy Management Team (All)"
 $description = $null
 $managers = @("Matt.Whitehead")
-$teamMembers = convertTo-arrayOfStrings "Amy Dartington 
-Ben Lynch 
-Duncan Faulkes 
-Georgie Edwards 
-James Carberry 
-Josep Porta 
-Matt Landick 
-Matt Whitehead 
-Matthew Gitsham 
-Stuart Gray 
-Tom Willis"
-#$memberOf = @("ITTeam")
-$hideFromGal = $false
-$blockExternalMail = $true
-$isPublic = $false
-$autoSubscribe = $true
-
-
-$displayName = "Working Group - Collaboration Improvement"
-$description = ""
-$managers = @("Dee.Moloney")
-
-$displayName = "Working Group - Plastics"
-$description = ""
-$managers = @("Pearl.Nemeth")
-$teamMembers = @("Pearl.Nemeth","Beth.Simpson")
-$memberOf =$null
-
-new-365Group -displayName $displayName -description $null -managers $managers -teamMembers $teamMembers -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -isPublic $false -autoSubscribe $autoSubscribe
-#>
-$teamMembers = convertTo-arrayOfStrings "Amy.Dartington@anthesisgroup.com
+$teamMembers = convertTo-arrayOfEmailAddresses "Amy.Dartington@anthesisgroup.com
 Ben.Lynch@anthesisgroup.com
 Duncan.Faulkes@anthesisgroup.com
 Georgie.Edwards@anthesisgroup.com
@@ -375,3 +358,57 @@ Matt.Whitehead@anthesisgroup.com
 Matthew.Gitsham@anthesisgroup.com
 Stuart.Gray@anthesisgroup.com
 Tom.Willis@anthesisgroup.com"
+#$memberOf = @("ITTeam")
+$hideFromGal = $false
+$blockExternalMail = $true
+$isPublic = $false
+$autoSubscribe = $true
+
+
+$displayName = "Working Group - Collaboration Improvement"
+$description = ""
+$managers = @("Dee.Moloney")
+$teamMembers = @("Dee.Moloney","kevin.maitland","helen.tyrrell","ian.forrester","craig.simmons","rosanna.collorafi","laura.thompson")
+
+
+$displayName = "Working Group - Plastics"
+$description = ""
+$managers = @("Pearl.Nemeth")
+$teamMembers = @("Pearl.Nemeth","Beth.Simpson")
+$memberOf =$null
+
+$displayName = "Energy Engineering Team (All)"
+$description = $null
+$managers = @("Ben.Lynch","Chris.Jennings")
+$teamMembers = convertTo-arrayOfEmailAddresses "Alex.Matthews@anthesisgroup.com
+Ben.Lynch@anthesisgroup.com
+Chris.Jennings@anthesisgroup.com
+Duncan.Faulkes@anthesisgroup.com
+Gavin.Way@anthesisgroup.com
+josep.porta@anthesisgroup.com
+Matt.Landick@anthesisgroup.com
+Matthew.Gitsham@anthesisgroup.com
+Stuart.Miller@anthesisgroup.com
+Thomas.Milne@anthesisgroup.com
+Ben.Lynch@anthesisgroup.com
+Huw.Blackwell@anthesisgroup.com
+Laurie.Eldridge@anthesisgroup.com
+Stuart.Miller@anthesisgroup.com
+pete.best@anthesisgroup.com
+Thomas.Milne@anthesisgroup.com"
+#$memberOf = @("ITTeam")
+$hideFromGal = $false
+$blockExternalMail = $true
+$isPublic = $false
+$autoSubscribe = $true
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+
+new-365Group -displayName $displayName -description $null -managers $managers -teamMembers $teamMembers -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -isPublic $false -autoSubscribe $autoSubscribe
+
+
+Cristina.Knapp@anthesisgroup.com
+
+#>
+
+#new-mailEnabledDistributionGroup -dgDisplayName "Software Team (PHI)" -members @("soren.mateo@anthesisgroup.com","michael.malate@anthesisgroup.com","gerber.manalo@anthesisgroup.com") -memberOf "Software Team (All)" -hideFromGal $false -blockExternalMail $true -owners "IT Team (All)"

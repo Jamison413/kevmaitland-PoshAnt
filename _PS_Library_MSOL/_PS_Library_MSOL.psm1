@@ -77,6 +77,7 @@ function connect-ToSpo($credential){
     if ($credential -eq $null){$credential = set-MsolCredentials}
     Import-Module Microsoft.Online.Sharepoint.PowerShell
     Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential
+    Connect-PnPOnline –Url https://anthesisllc.sharepoint.com –Credentials  $credential
     }
 function connect-to365(){
     $msolCredentials = set-MsolCredentials 
