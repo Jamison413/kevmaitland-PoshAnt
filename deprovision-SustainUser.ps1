@@ -168,20 +168,36 @@ $selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToR
 $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
 #region deprovision
 
-$jp = Get-User -Identity troy.childs@anthesisgroup.com
-Set-MsolUser -UserPrincipalName $jp.UserPrincipalName -BlockCredential $true
-Set-MsolUserPassword -UserPrincipalName $jp.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
-Get-DistributionGroup -Filter "Members -eq '$($jp.DistinguishedName)'" | % {
-    Remove-DistributionGroupMember -Identity $_.Id -Member $jp.UserPrincipalName -Confirm:$false
+
+$binMe = convertTo-arrayOfStrings "kevin.lewis"
+foreach($user in $binMe){
+    $jp = Get-User -Identity $user
+    Set-MsolUser -UserPrincipalName $jp.UserPrincipalName -BlockCredential $true
+    Set-MsolUserPassword -UserPrincipalName $jp.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
+    Get-DistributionGroup -Filter "Members -eq '$($jp.DistinguishedName)'" | % {
+        Remove-DistributionGroupMember -Identity $_.Id -Member $jp.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        }
+    Set-Mailbox $jp.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
+    Set-MsolUser -UserPrincipalName $jp.UserPrincipalName -DisplayName $("Ω_"+$jp.DisplayName) 
+    remove-msolLicenses -userSAM $($jp.UserPrincipalName.Replace("@anthesisgroup.com",""))
     }
-Set-Mailbox $jp.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
-Set-MsolUser -UserPrincipalName $jp.UserPrincipalName -DisplayName $("Ω_"+$jp.DisplayName) 
-remove-msolLicenses -userSAM $($jp.UserPrincipalName.Replace("@anthesisgroup.com",""))
 #-InactiveMailbox 
 
 
 
-@("ali.mahdavi","katie.swain","simon.white","laura.sponti","sion.fenwick","ben.buffery","laura.pugh","tilly.shaw","catherine.green") | % {
+
+
+
+
+
+
+
+
+
+
+
+#@("ali.mahdavi","katie.swain","simon.white","laura.sponti","sion.fenwick","ben.buffery","laura.pugh","tilly.shaw","catherine.green") | % {
+$binMe | %{
     $user = $_
     $u = Get-User -Identity $user@anthesisgroup.com
     Get-DistributionGroup -Filter "Members -eq '$($u.DistinguishedName)'" | % {

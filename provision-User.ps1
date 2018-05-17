@@ -29,7 +29,7 @@ $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -pass
 connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
 connect-toAAD -credential $msolCredentials
-connect-ToSpo -credential $msolCredentials
+#connect-ToSpo -credential $msolCredentials
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"
@@ -173,7 +173,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
-    Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true
+    Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
     if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN | Set-Mailbox -EmailAddresses @{add="$($pUPN.Split("@")[0])@sustain.co.uk"}}
     Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
     Get-Mailbox $pUPN | Set-Clutter -Enable $true

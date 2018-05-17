@@ -20,6 +20,7 @@ function set-MsolCredentials($username, $password){
     $credential
     }
 function connect-ToMsol($credential){
+    Write-Host -f Yellow Connecting to MSOL services
     <#
     .Synopsis
         Provides a standardised (and simplifed) way to connect to MSOL services
@@ -33,19 +34,26 @@ function connect-ToMsol($credential){
     #>
     if ($credential -eq $null){$credential = set-MsolCredentials}
     Import-Module MSOnline
+    Write-Host -f DarkYellow "Executing Connect-MsolService"
     Connect-MsolService -Credential $credential
     }
 function connect-toAAD($credential){
+    Write-Host -f Yellow Connecting to AAD services
     if ($(Get-Module -ListAvailable AzureAD) -ne $null){
+        Write-Host -f DarkYellow "Importing AzureAD (_not_ Preview)"
         Import-Module AzureAD
+        Write-Host -f DarkYellow "Executing Connect-AzureAD"
         Connect-AzureAD -Credential $credential
         }
     if ($(Get-Module -ListAvailable AzureADPreview) -ne $null){
+        Write-Host -f DarkYellow "Importing AzureADPreview"
         Import-Module AzureADPreview
+        Write-Host -f DarkYellow "Executing Connect-AzureAD"
         Connect-AzureAD -Credential $credential
         }
     }
 function connect-ToExo($credential){
+    Write-Host -f Yellow Connecting to EXO services
     <#
     .Synopsis
         Provides a standardised (and simplifed) way to connect to MSOL services
@@ -58,11 +66,14 @@ function connect-ToExo($credential){
        connect-ToExo -credential $creds
     #>
     if ($credential -eq $null){$credential = set-MsolCredentials}
+    Write-Host -f DarkYellow "Initiating New-PSSession"
     $ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://outlook.office365.com/powershell-liveid/" -Credential $credential -Authentication "Basic" -AllowRedirection
+    Write-Host -f DarkYellow "Importing New-PSSession"
     Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global
     }
 
 function connect-ToSpo($credential){
+    Write-Host -f Yellow Connecting to SPO services
     <#
     .Synopsis
         Provides a standardised (and simplifed) way to connect to MSOL services
@@ -74,17 +85,42 @@ function connect-ToSpo($credential){
     .EXAMPLE
        connect-ToSpo -credential $creds
     #>
-    if ($credential -eq $null){$credential = set-MsolCredentials}
+    if ($credential -eq $null){
+        Write-Host -f DarkYellow "Credentials not provided, requesting now."
+        $credential = set-MsolCredentials
+        }
+    
+    Write-Host -f DarkYellow "Importing Microsoft.Online.Sharepoint.PowerShell"
     Import-Module Microsoft.Online.Sharepoint.PowerShell
+    Write-Host -f DarkYellow "Executing Connect-SPOService"
     Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential
-    Connect-PnPOnline –Url https://anthesisllc.sharepoint.com –Credentials  $credential
+    Write-Host -f DarkYellow "Executing Connect-PnPOnline"
+    Connect-PnPOnline –Url https://anthesisllc.sharepoint.com -Credentials  $credential
     }
 function connect-to365(){
+    Write-Host -f Yellow "Importing Modules"
+    Write-Host -f DarkYellow "_PS_Library_GeneralFunctionality"
+    Import-Module _PS_Library_GeneralFunctionality
+    Write-Host -f DarkYellow "_PS_Library_Groups"
+    Import-Module _PS_Library_Groups
+    Write-Host -f DarkYellow "_CSOM_Library-SPO"
+    Import-Module _CSOM_Library-SPO
+    Write-Host -f DarkYellow "_REST_Library-SPO"
+    Import-Module _REST_Library-SPO
+    Write-Host -f DarkYellow "_REST_Library-Kimble"
+    Import-Module _REST_Library-Kimble
+
+    Write-Host -f Yellow Connecting to 365 services
+    Write-Host -f DarkYellow "Executing set-MsolCredentials"
     $msolCredentials = set-MsolCredentials 
+    Write-Host -f DarkYellow "Executing connect-ToMsol"
     connect-ToMsol $msolCredentials
+    Write-Host -f DarkYellow "Executing connect-toAAD"
     connect-toAAD $msolCredentials
+    Write-Host -f DarkYellow "Executing connect-ToExo"
     connect-ToExo $msolCredentials
-    connect-ToSpo $msolCredentials
-    $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
-    $restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
+    #Write-Host -f DarkYellow "connect-ToSpo"
+    #connect-ToSpo $msolCredentials
+    #$csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
+    #$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
     }
