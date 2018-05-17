@@ -12,4 +12,4 @@ $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -pass
 connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
 connect-toAAD -credential $msolCredentials
-connect-ToSpo -credential $msolCredentials
+#connect-ToSpo -credential $msolCredentials

@@ -67,7 +67,7 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
                 $mailAlias = $(guess-aliasFromDisplayName "$displayName 365")
                 if([string]::IsNullOrWhiteSpace($description)){$description = "Unified 365 Group for $displayName"}
                 if(Get-UnifiedGroup -Identity $mailAlias  -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "Unified Group already exists - not recreating!"}
-                else{New-UnifiedGroup -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -DisplayName $displayName -Members $teamMembers -AccessType $accessType -Name $mailAlias -Alias $mailAlias -Owner "Ben.Lynch" -Notes $description | Set-UnifiedGroup -HiddenFromAddressListsEnabled $true -Classification $groupClassification}
+                else{New-UnifiedGroup -DisplayName $displayName -Name $mailAlias -Alias $mailAlias -Notes $description -AccessType $accessType -Owner $($managers -join ",") -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Members $teamMembers   -Classification $groupClassification | Set-UnifiedGroup -HiddenFromAddressListsEnabled $true}
                 $ug = Get-UnifiedGroup -Identity $mailAlias
 
                 #Create a Shared Mailbox and autoforward mail to the Unified Group
@@ -409,6 +409,24 @@ new-365Group -displayName $displayName -description $null -managers $managers -t
 
 Cristina.Knapp@anthesisgroup.com
 
+
+	
+$displayName = "Health & Safety Team (GBR)"
+$description = $null
+$managers = @("Andy.Marsh")
+$teamMembers = convertTo-arrayOfStrings "Amanda.Cox
+Andy.Marsh
+Ben.Hardman
+Ian.Forrester
+Nigel.Arnott
+Sophie.Taylor
+Wai.Cheung"
+
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+
 #>
 
 #new-mailEnabledDistributionGroup -dgDisplayName "Software Team (PHI)" -members @("soren.mateo@anthesisgroup.com","michael.malate@anthesisgroup.com","gerber.manalo@anthesisgroup.com") -memberOf "Software Team (All)" -hideFromGal $false -blockExternalMail $true -owners "IT Team (All)"
+
+

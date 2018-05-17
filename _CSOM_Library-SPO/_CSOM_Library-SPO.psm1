@@ -8,7 +8,6 @@
 Import-Module _PS_Library_GeneralFunctionality
 $webUrl = "https://anthesisllc.sharepoint.com" 
 
-#region Functions
 function add-memberToGroup($credentials, $webUrl, $siteCollection, $sitePath, $groupName, $memberToAdd){
     $ctx = new-csomContext -fullSitePath ($webUrl+$siteCollection+$sitePath) -sharePointCredentials $credentials
     $groups = $ctx.Web.SiteGroups
@@ -852,4 +851,3 @@ function set-SPOGroupAsDefault($credentials, $webUrl, $siteCollection, $sitePath
     $ctx.ExecuteQuery()
     $ctx.Dispose()
     }
-#endregion
