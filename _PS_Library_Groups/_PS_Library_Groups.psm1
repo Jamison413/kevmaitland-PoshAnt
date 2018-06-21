@@ -65,6 +65,7 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
                 #Then, if that's worked, create the 365 Group
                 if($isPublic){$accessType = "Public"}else{$accessType = "Private"}
                 $mailAlias = $(guess-aliasFromDisplayName "$displayName 365")
+                if($mailAlias.length -gt 64){$mailAlias = $mailAlias.substring(0,63)}
                 if([string]::IsNullOrWhiteSpace($description)){$description = "Unified 365 Group for $displayName"}
                 if(Get-UnifiedGroup -Identity $mailAlias  -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "Unified Group already exists - not recreating!"}
                 else{New-UnifiedGroup -DisplayName $displayName -Name $mailAlias -Alias $mailAlias -Notes $description -AccessType $accessType -Owner $($managers -join ",") -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Members $teamMembers   -Classification $groupClassification | Set-UnifiedGroup -HiddenFromAddressListsEnabled $true}
@@ -424,8 +425,17 @@ Wai.Cheung"
 
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Corporate Social Responsibility (CSR) Team (All)"
+$description = $null
+$managers = @("Helen.Tyrrell")
+$teamMembers = convertTo-arrayOfStrings "Helen.Tyrrell"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+
 
 #>
+
+
 
 #new-mailEnabledDistributionGroup -dgDisplayName "Software Team (PHI)" -members @("soren.mateo@anthesisgroup.com","michael.malate@anthesisgroup.com","gerber.manalo@anthesisgroup.com") -memberOf "Software Team (All)" -hideFromGal $false -blockExternalMail $true -owners "IT Team (All)"
 
