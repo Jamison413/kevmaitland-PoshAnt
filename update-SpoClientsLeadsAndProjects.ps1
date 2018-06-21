@@ -159,7 +159,7 @@ foreach($dirtyClient in $dirtyClients){
         #Update the folder name
         try{
             log-action "update-list $($dirtyClient.PreviousName) > @{Title=$($dirtyClient.Title)}" -logFile $fullLogPathAndName
-            update-list -serverUrl $webUrl -sitePath $clientSite -listName $dirtyClient.PreviousName -hashTableOfUpdateData @{Title=$dirtyClient.Title} -restCreds $restCreds -digest $clientDigest
+            update-list -serverUrl $webUrl -sitePath $clientSite -listName $dirtyClient.PreviousName -hashTableOfUpdateData @{Title=$dirtyClient.Title} -restCreds $restCreds -digest $clientDigest -logFile $fullLogPathAndName
             #Update the Client in [Kimble Clients]
             try{
                 if((get-list -sitePath $clientSite -listName $dirtyClient.Title -serverUrl $webUrl -restCreds $restCreds) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing
