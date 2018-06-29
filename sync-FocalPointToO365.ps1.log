@@ -1,0 +1,79 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20180629144001
+Username: NETMON\Admin
+RunAs User: NETMON\Admin
+Configuration Name: 
+Machine: NETMON (Microsoft Windows NT 10.0.16299.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.EXE C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1
+Process ID: 6416
+PSVersion: 5.1.16299.431
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.16299.431
+BuildVersion: 10.0.16299.431
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1.log
+Exception calling "Open" with "0" argument(s): "Login failed. The login is from an untrusted domain and cannot be used 
+with Windows authentication."
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:89 char:1
++ $connDB.Open()
++ ~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : SqlException
+Exception calling "Open" with "0" argument(s): "Login failed. The login is from an untrusted
+domain and cannot be used with Windows authentication."
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:89 char:1
++ $connDB.Open()
++ ~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : SqlException
+
+Exception calling "ExecuteReader" with "0" argument(s): "ExecuteReader requires an open and available Connection. The 
+connection's current state is closed."
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:50 char:13
++             $oReader = $sql.ExecuteReader()
++             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : InvalidOperationException
+Exception calling "ExecuteReader" with "0" argument(s): "ExecuteReader requires an open and
+available Connection. The connection's current state is closed."
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:50 char:13
++             $oReader = $sql.ExecuteReader()
++             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : InvalidOperationException
+
+You cannot call a method on a null-valued expression.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:52 char:20
++             while ($oReader.Read()){
++                    ~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
+    + FullyQualifiedErrorId : InvokeMethodOnNull
+You cannot call a method on a null-valued expression.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:52 char:20
++             while ($oReader.Read()){
++                    ~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
+    + FullyQualifiedErrorId : InvokeMethodOnNull
+
+You cannot call a method on a null-valued expression.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:61 char:13
++             $oReader.Close()
++             ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
+    + FullyQualifiedErrorId : InvokeMethodOnNull
+You cannot call a method on a null-valued expression.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\sync-FocalPointToO365.ps1:61 char:13
++             $oReader.Close()
++             ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
+    + FullyQualifiedErrorId : InvokeMethodOnNull
+
+**********************
+Windows PowerShell transcript end
+End time: 20180629144003
+**********************

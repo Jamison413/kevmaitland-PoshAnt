@@ -4,7 +4,7 @@ Import-Module _PS_Library_Databases
 
 $sqlDbConn = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE"
 
-$filesToProcess = @("Scrape_dee.moloney@anthesisgroup.com_Filtered.csv")
+$filesToProcess = @("Scrape_mark.sayers@anthesisgroup.com_filtered.csv")
 
 foreach ($file in $filesToProcess){
     gci $env:USERPROFILE\Desktop\Scrapes\ | ?{$_.Name -match $file}   | % {
@@ -48,7 +48,7 @@ foreach ($file in $filesToProcess){
                     }
                 else{
                     #Try to find out more about the contact
-                    $sql = "SELECT AccountId, Domain, CompanyName FROM SUS_VW_Kimble_AccountDomains WHERE Domain = '$($thisContact.theirDomain)'"
+                    $sql = "SELECT AccountId, Domain, CompanyName FROM SUS_VW_Kimble_AccountDomains WHERE Domain = '$(sanitise-forSql $thisContact.theirDomain)'"
                     $results = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $sqlDbConn
                     if($results){
                         if($results.count -gt 1){

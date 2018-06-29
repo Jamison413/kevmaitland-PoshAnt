@@ -115,15 +115,15 @@ function Invoke-SPORestMethod {
         if ((Get-Module Microsoft.Online.SharePoint.PowerShell -ListAvailable) -eq $null) {
             throw "The Microsoft SharePoint Online PowerShell cmdlets have not been installed."
         }
-        if ($restCreds -eq $null) {
+        if ($credentials -eq $null) {
             [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
-            $cred = Get-Credential -Message "Enter your credentials for SharePoint Online:"
+            $credentials = Get-Credential -Message "Enter your credentials for SharePoint Online:"
         } 
 
     }
     Process {
         $request = [System.Net.WebRequest]::Create($Url)
-        $request.Credentials = $restCreds
+        $request.Credentials = $credentials
         $odata = ";odata=$($JSONVerbosity.ToLower())"
         $request.Accept = "application/json$odata"
         $request.ContentType = "application/json;charset=UTF-8$odata"   
@@ -286,7 +286,8 @@ function delete-folderInLibrary($serverUrl, $sitePath,$libraryName,$folderPathAn
     }
 function format-itemData($hashTableOfItemData){
     foreach($key in $hashTableOfItemData.Keys){
-        if($hashTableOfItemData[$key].GetType().Name -eq "DateTime"){$formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "} #If it's a DateTime, mark it up like a string
+        if($hashTableOfItemData[$key] -eq $null){$formattedItemData += "`'$key`':`"`", "}
+        elseif($hashTableOfItemData[$key].GetType().Name -eq "DateTime"){$formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "} #If it's a DateTime, mark it up like a string
         elseif($hashTableOfItemData[$key].GetType().Name -eq "Boolean"){$formattedItemData += "`'$key`':`"$($hashTableOfItemData[$key])`", "} #If it's a Boolean, mark it up like a string
         elseif([regex]::Match($hashTableOfItemData[$key],"^[0-9\-\.]+$").Success){$formattedItemData += "`'$key`':$($hashTableOfItemData[$key]), "} #If it's a numeric value
         elseif($hashTableOfItemData[$key].Trim()[0] -eq "{"){[string]$formattedItemData += "`'$key`':$($hashTableOfItemData[$key]), "}#If it's a compound value

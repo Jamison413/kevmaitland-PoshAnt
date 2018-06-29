@@ -6,11 +6,15 @@ $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object 
 $restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
 $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
 
+$logFile = "C:\ScriptLogs\manage-SpoSites.log"
+$errorLogFile = "C:\ScriptLogs\manage-SpoSites_Errors.log"
+$smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
+
 #region Get the Admin to pick the request/s to process
 #Get the Taxonomy Data for the Site Collection as there's Managed MetaData fields to retrieve 
 $webUrl = "https://anthesisllc.sharepoint.com"
 $taxonomyListName = "TaxonomyHiddenList"
-$taxononmyData = get-itemsInList -serverUrl $webUrl -sitePath "/" -listName $taxonomyListName -suppressProgress $true -restCreds $restCredentials
+$taxononmyData = get-itemsInList -serverUrl $webUrl -sitePath "/" -listName $taxonomyListName -suppressProgress $true -restCreds $restCredentials -verboseLogging $true -logFile $logFile
 
 #Get the Client Site requests that have a status of "Awaiting creation"
 $clientsSite = "/clients"
