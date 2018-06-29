@@ -61,7 +61,7 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
     $pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pManagerSAM=$userManagerSAM;$pPrimaryTeam=$userPrimaryTeam;$pSecondaryTeams=$userSecondaryTeams;$pJobTitle=$userJobTitle;$pBusinessUnit=$userBusinessUnit;$pPrimaryOffice=$userPrimaryOffice
     #> 
     switch ($pBusinessUnit) {
-        "Sustain Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "SustainLtd"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.sustain.co.uk"}
+        "Anthesis UK Energy Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
         "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
         "Anthesis Consulting Group Ltd (GBR)" {}
         "Anthesis LLC" {}
@@ -391,7 +391,7 @@ $selectedStarters | % {
         -userTimeZone $_.TimeZone `
         -user365License $_.Office_365_license 
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Sustain Ltd (GBR)"} | % {
+$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis UK Energy Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `

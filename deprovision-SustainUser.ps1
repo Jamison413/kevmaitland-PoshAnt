@@ -169,7 +169,7 @@ $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "
 #region deprovision
 
 
-$binMe = convertTo-arrayOfStrings "kevin.lewis"
+$binMe = convertTo-arrayOfStrings "Jack.Dodd.Sachdev@anthesisgroup.com"
 foreach($user in $binMe){
     $jp = Get-User -Identity $user
     Set-MsolUser -UserPrincipalName $jp.UserPrincipalName -BlockCredential $true
