@@ -1,0 +1,58 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20180629144501
+Username: NETMON\Admin
+RunAs User: NETMON\Admin
+Configuration Name: 
+Machine: NETMON (Microsoft Windows NT 10.0.16299.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.EXE C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1
+Process ID: 6412
+PSVersion: 5.1.16299.431
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.16299.431
+BuildVersion: 10.0.16299.431
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1.log
+WARNING: Error initializing default drive: 'The server has rejected the client credentials.'.
+PS>TerminatingError(Get-ADUser): "Cannot validate argument on parameter 'Identity'. The argument is null. Provide a valid value for the argument, and then try running the command again."
+Get-ADUser : Cannot validate argument on parameter 'Identity'. The argument is null. Provide a valid value for the 
+argument, and then try running the command again.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:94 char:17
++     (Get-ADUser $cNString -Credential $adCreds).SamAccountName
++                 ~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [Get-ADUser], ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationError,Microsoft.ActiveDirectory.Management.Commands.GetADUser
+Get-ADUser : Cannot validate argument on parameter 'Identity'. The argument is null. Provide a
+valid value for the argument, and then try running the command again.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:94
+char:17
++     (Get-ADUser $cNString -Credential $adCreds).SamAccountName
++                 ~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [Get-ADUser], ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationError,Microsoft.ActiveDirectory.Managemen
+   t.Commands.GetADUser
+
+Exception calling "LoadPropertiesForItems" with "2" argument(s): "The collection is empty.
+Parameter name: items"
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:150 char:5
++     [Void]$service.LoadPropertiesForItems($foundItems,$propertySet)
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : ArgumentException
+Exception calling "LoadPropertiesForItems" with "2" argument(s): "The collection is empty.
+Parameter name: items"
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:150
+char:5
++     [Void]$service.LoadPropertiesForItems($foundItems,$propertySet)
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : ArgumentException
+
+**********************
+Windows PowerShell transcript end
+End time: 20180629144517
+**********************

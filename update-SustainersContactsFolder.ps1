@@ -24,7 +24,7 @@ $ExchVer = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
 $ewsUrl = "https://outlook.office365.com/EWS/Exchange.asmx"
 $upnExtension = "anthesisgroup.com"
 $upnSMA = "sustainmailboxaccess@anthesisgroup.com"
-$passSMA = ConvertTo-SecureString -String 'B[=f~+z1:T$95Gt' -AsPlainText -Force #| ConvertFrom-SecureString
+$passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\SustainMailboxAccess.txt) 
 
 #$sustainFlowerLogoUrl = "http`://intranet.sustain.co.uk/PublishingImages/sustain_flower_mini.jpg"
 $sustainFlowerLogoUrl = "C:\Scripts\sustain_flower_mini.jpg"

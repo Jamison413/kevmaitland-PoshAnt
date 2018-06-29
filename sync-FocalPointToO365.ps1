@@ -28,9 +28,8 @@ $ExchVer = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
 $ewsUrl = "https://outlook.office365.com/EWS/Exchange.asmx"
 $maximumNumberOfSyncRetryAttempts = 10
 $upnSMA = "sustainmailboxaccess@anthesisgroup.com"
-#$passSMA = ConvertTo-SecureString -String 'B[=f~+z1:T$95Gt' -AsPlainText -Force | ConvertFrom-SecureString
-#$passSMA = ConvertTo-SecureString -String '01000000d08c9ddf0115d1118c7a00c04fc297eb010000005d4b5b99e721224db5c346588d730e910000000002000000000003660000c000000010000000446568177faf203631c73bd8fb7d0f950000000004800000a0000000100000000f36c0d00b26fbd13f6c4b099ebc2a8720000000171479ba9b43d966531ebfc74d874e875441250a716e339a02e4c3adfc726e45140000001a5ffb844776b5dde427d302df4f3aa634b7ee3d'
-$passSMA = ConvertTo-SecureString -String 'B[=f~+z1:T$95Gt' -AsPlainText -Force #| ConvertFrom-SecureString
+#$passSMA = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
+$passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\SustainMailboxAccess.txt) 
 
 $daysToLookBehind = 7
 $daysToLookAhead = 30

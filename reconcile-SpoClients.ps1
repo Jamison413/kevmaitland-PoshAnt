@@ -34,8 +34,8 @@ Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
 
 
 function reconcile-clientsInSpo(){
-    $clientList = Get-PnPList -Identity $listNam -Includes ContentTypes
+    $clientList = Get-PnPList -Identity $listName -Includes ContentTypes
     $clientListContentType = $clientList.ContentTypes | ? {$_.Name -eq "Item"}
-    $clientListItems = Get-PnPListItem -List $listNam -PageSize 1000 -Fields "Title","GUID","KimbleId","ClientDescription","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
+    $clientListItems = Get-PnPListItem -List $listName -PageSize 1000 -Fields "Title","GUID","KimbleId","ClientDescription","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
     $clientFoldersAlreadyCreated = Get-PnPList
     }

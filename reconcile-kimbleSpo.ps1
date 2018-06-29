@@ -74,7 +74,7 @@ function new-spoProject($kimbleProjectObject, $webUrl, $sitePath, $spoProjectLis
     #Create the new List item
     try-newListItem -webUrl $webUrl -sitePath $sitePath -newSpoItemData $newSpoProjectData -spoListToAddTo $spoProjectList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName
     }
-function reconcile-leads(){
+function reconcile-leadsBetweenKimbleAndSpo(){
     #Get the full list of Kimble Leads
     $allKimbleLeads = get-allKimbleLeads -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
     
@@ -113,7 +113,65 @@ function reconcile-leads(){
         }
 
     }
-function reconcile-projects(){
+function reconcile-clientsBetweenKimbleAndSpo(){
+    #Get the full list of Kimble Clients
+    $allKimbleClients = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))" 
+    #Get the full list of SPO Clients
+    try{
+        log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
+        $clientsDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -logFile $fullLogPathAndName -verboseLogging $true
+        if($clientsDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientsDigest.expiryTime)" -logFile $fullLogPathAndName}
+        else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for $webUrl$sitePath" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+    
+    Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
+    $clientList = Get-PnPList -Identity "Kimble Clients" -Includes ContentTypes
+    $clientListContentType = $clientList.ContentTypes | ? {$_.Name -eq "Item"}
+    $clientListItems2 = Get-PnPListItem -List "Kimble Clients" -PageSize 1000 -Fields "Title","GUID","KimbleId","ClientDescription","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
+    $clientListItems2.FieldValues | %{
+        $thisClient = $_
+        [array]$allSpoClients += New-Object psobject -Property $([ordered]@{"Id"=$thisClient["KimbleId"];"Name"=$thisClient["Title"];"GUID"=$thisClient["GUID"];"SPListItemID"=$thisClient["ID"];"IsDirty"=$thisClient["IsDirty"];"IsDeleted"=$thisClient["IsDeleted"];"LastModifiedDate"=$thisClient["LastModifiedDate"];"PreviousName"=$thisClient["PreviousName"];"PreviousDescription"=$thisClient["PreviousDescription"]})
+        }
+
+    $missingSpoClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $allSpoClients -Property "Id" -PassThru -CaseSensitive:$false
+    
+    $missingSpoClients | ?{$_.SideIndicator -eq "<="} | %{
+        $missingClient = $_
+        $newItem = Add-PnPListItem -List $clientList.Id -ContentType $clientListContentType.Id.StringValue -Values @{"Title"=$missingClient.Name;"KimbleId"=$missingClient.Id;"ClientDescription"=$missingClient.Description;"IsDirty"=$true;"IsDeleted"=$missingClient.IsDeleted;"LastModifiedDate"=$(Get-Date $missingClient.LastModifiedDate -Format "MM/dd/yyyy hh:mm")}
+        }
+
+    $updatedKimbleClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $allSpoClients -Property @("Id","LastModifiedDate") -PassThru -CaseSensitive:$false
+    $updatedKimbleClients | ?{$_.SideIndicator -eq "<="} | % {
+        $updatedClient = $_
+        $spoClient = $allSpoClients | ? {$_.Id -eq $updatedClient.Id}
+        $updatedValues = @{"IsDeleted"=$updatedClient.IsDeleted}
+        if($updatedClient.LastModifiedDate -ne $null){
+            $updatedValues.Add("LastModifiedDate",$(Get-Date $updatedClient.LastModifiedDate -Format "yyyy/MM/dd hh:mm:ss"))
+            }
+        if($updatedClient.Name -ne $spoClient.Name){
+            $updatedValues.Add("Title",$updatedClient.Name)
+            $updatedValues.Add("PreviousName",$spoClient.Name)
+            $updatedValues.Add("IsDirty",$true)
+            #Write-Host "$($spoClient.Name) renamed to $($updatedClient.Name)"
+            $testName = $updatedValues
+            }
+        if((sanitise-stripHtml $updatedClient.Description) -ne $(sanitise-stripHtml $spoClient.Description)){
+            $updatedValues.Add("ClientDescription",$(sanitise-stripHtml $updatedClient.Description))
+            $updatedValues.Add("PreviousDescription", $spoClient.Description)
+            #Write-Host "$($spoClient.Name) description change from $($spoClient.Description) to $($updatedClient.des)"
+            if($updatedValues.Keys -notcontains "IsDirty"){$($updatedValues.Add("IsDirty",$true))}
+            $testDesc = $updatedValues
+            }
+        Set-PnPListItem -List $clientList.Id -Identity $spoClient.SPListItemID -Values $updatedValues
+        #Re-run for borked ClientDescription field
+        <#if($updatedValues.Keys -contains "ClientDescription"){
+            Write-Host -ForegroundColor Yellow "Updating $($spoClient.Name)"
+            Set-PnPListItem -List $clientList.Id -Identity $spoClient.SPListItemID -Values $updatedValues
+            }#>
+        }
+    }
+function reconcile-projectsBetweenKimbleAndSpo(){
     #Get the full list of Kimble Projects
     $allKimbleProjects = get-allKimbleProjects -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
     #Get the full list of SPO Projects
@@ -151,61 +209,9 @@ function reconcile-projects(){
         }
 
     }
-function reconcile-clients(){
-    #Get the full list of Kimble Clients
-    $allKimbleClients = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))" 
-    #Get the full list of SPO Clients
-    try{
-        log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-        $clientsDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -logFile $fullLogPathAndName -verboseLogging $true
-        if($clientsDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientsDigest.expiryTime)" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for $webUrl$sitePath" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-    
-    Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
-    $clientList = Get-PnPList -Identity "Kimble Clients" -Includes ContentTypes
-    $clientListContentType = $clientList.ContentTypes | ? {$_.Name -eq "Item"}
-    $clientListItems2 = Get-PnPListItem -List "Kimble Clients" -PageSize 1000 -Fields "Title","GUID","KimbleId","ClientDescription","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
-    $clientListItems2.FieldValues | %{
-        $thisClient = $_
-        [array]$allSpoClients += New-Object psobject -Property $([ordered]@{"Id"=$thisClient["KimbleId"];"Name"=$thisClient["Title"];"GUID"=$thisClient["GUID"];"SPListItemID"=$thisClient["ID"];"IsDirty"=$thisClient["IsDirty"];"IsDeleted"=$thisClient["IsDeleted"];"LastModifiedDate"=$thisClient["LastModifiedDate"];"PreviousName"=$thisClient["PreviousName"];"PreviousDescription"=$thisClient["PreviousDescription"]})
-        }
-
-    $missingSpoClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $allSpoClients -Property "Id" -PassThru -CaseSensitive:$false
-    
-    $missingSpoClients | ?{$_.SideIndicator -eq "<="} | %{
-        $missingClient = $_
-        $newItem = Add-PnPListItem -List $clientList.Id -ContentType $clientListContentType.Id.StringValue -Values @{"Title"=$missingClient.Name;"KimbleId"=$missingClient.Id;"ClientDescription"=$missingClient.Description;"IsDirty"=$true;"IsDeleted"=$missingClient.IsDeleted;"LastModifiedDate"=$(Get-Date $missingClient.LastModifiedDate -Format "MM/dd/yyyy hh:mm")}
-        }
-
-    $updatedKimbleClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $allSpoClients -Property @("Id","LastModifiedDate") -PassThru -CaseSensitive:$false
-    $updatedKimbleClients | % {
-        $updatedClient = $_
-        $spoClient = $allSpoClients | ? {$_.Id -eq $updatedClient.Id}
-        $updatedValues = @{"IsDeleted"=$updatedClient.IsDeleted}
-        if($updatedClient.LastModifiedDate -ne $null){
-            $updatedValues.Add("LastModifiedDate",$(Get-Date $updatedClient.LastModifiedDate -Format "yyyy/MM/dd hh:mm:ss"))
-            }
-        if($updatedClient.Name -ne $spoClient.Name){
-            $updatedValues.Add("Title",$updatedClient.Name)
-            $updatedValues.Add("PreviousName",$spoClient.Name)
-            $updatedValues.Add("IsDirty",$true)
-            Write-Host "$($spoClient.Name) renamed to $($updatedClient.Name)"
-            $testName = $updatedValues
-            }
-        if((sanitise-stripHtml $updatedClient.Description) -ne $(sanitise-stripHtml $spoClient.Description)){
-            $updatedValues.Add("ClientDescription",$(sanitise-stripHtml $updatedClient.Description))
-            $updatedValues.Add("PreviousDescription", $spoClient.Description)
-            if($updatedValues.Keys -notcontains "IsDirty"){$($updatedValues.Add("IsDirty",$true))}
-            $testDesc = $updatedValues
-            }
-        Set-PnPListItem -List $clientList.Id -Identity $spoClient.SPListItemID -Values $updatedValues
-        }
     
 
 
-    }
 #endregion
 
 
