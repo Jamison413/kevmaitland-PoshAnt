@@ -19,27 +19,21 @@ $users | % {
     Add-DistributionGroupMember -Identity GuineapigsSpamExperimentalGroup@anthesisgroup.com -Member "Rebecca Hughes"
     }
 
-$users = convertTo-arrayOfStrings "Alex Peers
-Amy MacGrain
-Chris Jennings
-Curtis Harnanan
-Duncan Faulkes
-Harry Shepherd
-Jack Dodd Sachdev
-James Carberry
-Jennifer Clipsham
-Josep Porta
-Kath Addison-Scott
-Kev Maitland
-Lorna Kelly
-Margaret Davis
-Mary Short
-Matt Whitehead
-Matthew Gitsham
-Nigel Arnott
-Pearl Gyongi
-Rebecca Hughes
-Stuart Gray
-Stuart Miller
-Thomas Milne
-Wai Cheung"
+$users = convertTo-arrayOfEmailAddresses "Tom.Mitchell@anthesisgroup.com       Tom Mitchell       True      
+Thomas.Milne@anthesisgroup.com       Thomas Milne       True      
+James.Walker@anthesisgroup.com       James Walker       True      
+Fuchsia.Wildgoose@anthesisgroup.com  Fuchsia Wildgoose  True      
+Harry.Shepherd@anthesisgroup.com     Harry Shepherd     True      
+Nigel.Arnott@anthesisgroup.com       Nigel Arnott       True      
+Kath.Addison-Scott@anthesisgroup.com Kath Addison-Scott True      
+Alex.Peers@anthesisgroup.com         Alex Peers         True      
+Wai.Cheung@anthesisgroup.com         Wai Cheung         True      
+James.Carberry@anthesisgroup.com     James Carberry     True      
+Kirsty.Smart@anthesisgroup.com       Kirsty Smart       True      
+Alex.Matthews@anthesisgroup.com      Alex Matthews      True      
+Amy.MacGrain@anthesisgroup.com"
+
+
+$km = get-mailbox "kevin.maitland"
+$cj = get-mailbox Chris.jennings
+$km | fl

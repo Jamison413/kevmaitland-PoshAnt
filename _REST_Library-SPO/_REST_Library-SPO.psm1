@@ -153,6 +153,7 @@ function Invoke-SPORestMethod {
         }
         if ($manualTimeOut -ne 0){$request.Timeout = $manualTimeOut}
 
+        $global:dummy= $request
         $response = $request.GetResponse()
         try {
             $streamReader = New-Object System.IO.StreamReader $response.GetResponseStream()
@@ -582,7 +583,7 @@ function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $r
     $digest = check-digestExpiry -serverUrl $serverUrl -sitePath $sitePath -digest $digest -restCreds $restCreds #this needs to be checked for all POST queries
     #Build and execute REST statement
     $url = $serverUrl+$sitePath+"/_api/web/Lists/GetByTitle('$listName')"
-    $formattedItemData = format-itemData -hashTableOfItemData $hashTableOfItemData
+    $formattedItemData = format-itemData -hashTableOfItemData $hashTableOfUpdateData
     $metadata = "{'__metadata':{'type':'SP.List'},$formattedItemData}"
     try{
         if($verboseLogging){log-action "update-list: Invoke-SPORestMethod -Url $url -Method `"POST`" -XHTTPMethod `"MERGE`" -Metadata $metadata -RequestDigest $($digest.GetContextWebInformation.FormDigestValue) -ETag `"*`"" -logFile $logFile}

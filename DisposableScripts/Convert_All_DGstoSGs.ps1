@@ -9,7 +9,7 @@ $toUpdate | % {
 
     $memberOf = Get-DistributionGroup -Filter "Members -eq '$($thisGroup.DistinguishedName)'" 
 
-    $newGroup = new-mailEnabledDistributionGroup -dgDisplayName $thisGroup.DisplayName -description $("Geographical Group for $($thisGroup.DisplayName)") -members $members -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners $thisGroup.ManagedBy
+    $newGroup = new-mailEnabledDistributionGroup -dgDisplayName $thisGroup.DisplayName -description $("Geographical Group for $($thisGroup.DisplayName)") -members $members -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners "IT TEam"
     if($newGroup){
         #Move e-mail address
         $addressToMove = $thisGroup.EmailAddresses | ? {$_ -cmatch "SMTP:"}
@@ -23,3 +23,9 @@ $toUpdate | % {
         Set-DistributionGroup -Identity $thisGroup.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true
         }
     }
+
+$toUpdate | % {
+    Set-DistributionGroup $_.ExternalDirectoryObjectId -DisplayName $("∂_$($_.DisplayName)")
+    }
+
+new-mailEnabledDistributionGroup -dgDisplayName "All Europe" -description "Geographical Group for All Europe" -members 
