@@ -1,8 +1,8 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
 $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    $fullLogPathAndName = $logFileLocation+"sync-kimbleClientsToSpo_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = $logFileLocation+"sync-kimbleClientsToSpo_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    $fullLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
 else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
@@ -30,9 +30,11 @@ $mailFrom = "scriptrobot@sustain.co.uk"
 $mailTo = "kevin.maitland@anthesisgroup.com"
 #convertTo-localisedSecureString ""
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
+#$sharePointAdminPass = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-$restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
+$restCreds = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($adminCreds.UserName,$adminCreds.Password)
+new-spoCred  -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
 ########################################
 $kimbleCreds = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
@@ -62,58 +64,27 @@ function new-spoClient($kimbleClientObject, $webUrl, $sitePath, $spoClientList, 
     #Create the new List item
     try-newListItem -webUrl $webUrl -sitePath $sitePath -newSpoItemData $newSpoClientData -spoListToAddTo $spoClientList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName
     }
-function new-spoLead($kimbleLeadObject, $webUrl, $sitePath, $spoLeadsList, $restCreds, $clientsDigest, $fullLogPathAndName){
+function new-spoLead($kimbleLeadObject, $pnpLeadsList, $fullLogPathAndName, $verboseLogging){
+    #Assumes we're already connected to PNPOnline, and to the correct Site
     log-action -myMessage "CREATING NEW LEAD:`t[$($kimbleLeadObject.Name)]" -logFile $fullLogPathAndName
-    $newSpoLeadData = @{KimbleId=$kimbleLeadObject.Id;Title=$kimbleLeadObject.Name;IsDeleted=$kimbleLeadObject.IsDeleted;IsDirty=$true}
-    #Create the new List item
-    try-newListItem -webUrl $webUrl -sitePath $sitePath -newSpoItemData $newSpoLeadData -spoListToAddTo $spoLeadsList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName
-    }
-function new-spoProject($kimbleProjectObject, $webUrl, $sitePath, $spoProjectList, $restCreds, $clientsDigest, $fullLogPathAndName){
-    log-action -myMessage "CREATING NEW PROJECT:`t[$($kimbleProjectObject.Name)]" -logFile $fullLogPathAndName
-    $newSpoProjectData = @{KimbleId=$kimbleProjectObject.Id;Title=$kimbleProjectObject.Name;IsDeleted=$kimbleProjectObject.IsDeleted;IsDirty=$true}
-    #Create the new List item
-    try-newListItem -webUrl $webUrl -sitePath $sitePath -newSpoItemData $newSpoProjectData -spoListToAddTo $spoProjectList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName
-    }
-function reconcile-leadsBetweenKimbleAndSpo(){
-    #Get the full list of Kimble Leads
-    $allKimbleLeads = get-allKimbleLeads -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
+    $contentType = $pnpLeadsList.ContentTypes | ? {$_.Name -eq "Item"}
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Add-PnPListItem -List $($pnpLeadsList.Id) -ContentType $($contentType.Id.StringValue) -Values @{""Title""=$($kimbleLeadObject.Name);""KimbleId""=$($kimbleLeadObject.Id);""KimbleClientId""=$($kimbleLeadObject.KimbleOne__Account__c);""IsDirty""=$true;""IsDeleted""=$($kimbleLeadObject.IsDeleted);""LastModifiedDate""=$(Get-Date $kimbleLeadObject.LastModifiedDate -Format ""MM/dd/yyyy hh:mm"")}"}
+    Add-PnPListItem -List $pnpLeadsList.Id -ContentType $contentType.Id.StringValue -Values @{"Title"=$kimbleLeadObject.Name;"KimbleId"=$kimbleLeadObject.Id;"KimbleClientId"=$kimbleLeadObject.KimbleOne__Account__c;"IsDirty"=$true;"IsDeleted"=$kimbleLeadObject.IsDeleted;"LastModifiedDate"=$(Get-Date $kimbleLeadObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm")}
     
-    #Get the full list of SPO Leads
-    try{
-        log-action -myMessage "Getting List Items: [Kimble Leads]" -logFile $fullLogPathAndName
-        $spoLeadsItems = get-itemsInList -serverUrl $webUrl  -sitePath $sitePath -listName "Kimble Leads" -restCreds $restCreds -logFile $fullLogPathAndName
-        if($spoLeadsItems){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [Kimble Leads]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-
-    #Get the List to make creating new Items easier
-    try{
-        log-action -myMessage "Getting List: [Kimble Leads]" -logFile $fullLogPathAndName
-        $spoLeadsList = get-list -serverUrl $webUrl  -sitePath $sitePath -listName "Kimble Leads" -restCreds $restCreds
-        if($spoLeadsList){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-
-    #Get a digest so we can write stuff back
-    try{
-        log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-        $clientsDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds
-        if($clientsDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientsDigest.expiryTime)" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for https://anthesisllc.sharepoint.com/clients" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-
-    #Work out what's missing and create any omissions
-    $allKimbleLeads | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name KimbleId -Value $_.Id}
-    $missingLeads = Compare-Object -ReferenceObject $allKimbleLeads -DifferenceObject $spoLeadsItems -Property "KimbleId" -PassThru -CaseSensitive:$false
-    $missingLeads | % {
-        if ($_.SideIndicator -eq "<="){new-spoLead -kimbleLeadObject $_ -webUrl $webUrl -sitePath $sitePath -spoLeadsList $spoLeadsList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName}
-        }
-
+    #$newSpoLeadData = @{KimbleId=$kimbleLeadObject.Id;Title=$kimbleLeadObject.Name;IsDeleted=$kimbleLeadObject.IsDeleted;IsDirty=$true}
+    #Create the new List item
+    #try-newListItem -webUrl $webUrl -sitePath $sitePath -newSpoItemData $newSpoLeadData -spoListToAddTo $spoLeadsList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName
     }
-function reconcile-clientsBetweenKimbleAndSpo(){
+function new-spoProject($kimbleProjectObject, $webUrl, $sitePath, $pnpProjectList, $restCreds, $clientsDigest, $fullLogPathAndName, $verboseLogging){
+    log-action -myMessage "CREATING NEW PROJECT:`t[$($kimbleProjectObject.Name)]" -logFile $fullLogPathAndName
+    $contentType = $pnpProjectList.ContentTypes | ? {$_.Name -eq "Item"}
+    $updateData = @{"Title"=$kimbleProjectObject.Name;"KimbleId"=$kimbleProjectObject.Id;"KimbleClientId"=$kimbleProjectObject.KimbleOne__Account__c;"IsDirty"=$true;"IsDeleted"=$kimbleProjectObject.IsDeleted}
+    if($kimbleProjectObject.LastModifiedDate){$updateData.Add("LastModifiedDate",$(Get-Date $kimbleProjectObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
+
+    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Add-PnPListItem -List $($pnpLeadsList.Id) -ContentType $($contentType.Id.StringValue) -Values @{$(stringify-hashTable $updateData -interlimiter ":" -delimiter ", ")}"}
+    Add-PnPListItem -List $pnpProjectList.Id -ContentType $contentType.Id.StringValue -Values $updateData
+    }
+function reconcile-clientsBetweenKimbleAndSpo($standardKimbleQueryUri, $standardKimbleHeaders, $webUrl, $sitePath, $adminCreds){
     #Get the full list of Kimble Clients
     $allKimbleClients = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))" 
     #Get the full list of SPO Clients
@@ -128,7 +99,7 @@ function reconcile-clientsBetweenKimbleAndSpo(){
     Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
     $clientList = Get-PnPList -Identity "Kimble Clients" -Includes ContentTypes
     $clientListContentType = $clientList.ContentTypes | ? {$_.Name -eq "Item"}
-    $clientListItems2 = Get-PnPListItem -List "Kimble Clients" -PageSize 1000 -Fields "Title","GUID","KimbleId","ClientDescription","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
+    $clientListItems2 = Get-PnPListItem -List "Kimble Clients" -PageSize 5000 -Fields "Title","GUID","KimbleId","ClientDescription","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
     $clientListItems2.FieldValues | %{
         $thisClient = $_
         [array]$allSpoClients += New-Object psobject -Property $([ordered]@{"Id"=$thisClient["KimbleId"];"Name"=$thisClient["Title"];"GUID"=$thisClient["GUID"];"SPListItemID"=$thisClient["ID"];"IsDirty"=$thisClient["IsDirty"];"IsDeleted"=$thisClient["IsDeleted"];"LastModifiedDate"=$thisClient["LastModifiedDate"];"PreviousName"=$thisClient["PreviousName"];"PreviousDescription"=$thisClient["PreviousDescription"]})
@@ -171,45 +142,101 @@ function reconcile-clientsBetweenKimbleAndSpo(){
             }#>
         }
     }
-function reconcile-projectsBetweenKimbleAndSpo(){
+function reconcile-leadsBetweenKimbleAndSpo($standardKimbleQueryUri, $standardKimbleHeaders, $webUrl, $sitePath, $adminCreds){
+    #Get the full list of Kimble Leads
+    $allKimbleLeads = get-allKimbleLeads -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
+    
+    Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
+    $leadList = Get-PnPList -Identity "Kimble Leads" -Includes ContentTypes
+    $leadListContentType = $leadList.ContentTypes | ? {$_.Name -eq "Item"}
+    $leadListItems = Get-PnPListItem -List "Kimble Leads" -PageSize 1000 -Fields "Title","GUID","KimbleId","leadDescription","KimbleClientId","PreviousKimbleClientId","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
+    $leadListItems.FieldValues | %{
+        $thisLead = $_
+        [array]$allSpoLeads += New-Object psobject -Property $([ordered]@{"Id"=$thisLead["KimbleId"];"KimbleId"=$thisLead["KimbleId"];"KimbleClientId"=$thisLead["KimbleClientId"];"PreviousKimbleClientId"=$thisLead["PreviousKimbleClientId"];"Name"=$thisLead["Title"];"GUID"=$thisLead["GUID"];"SPListItemID"=$thisLead["ID"];"IsDirty"=$thisLead["IsDirty"];"IsDeleted"=$thisLead["IsDeleted"];"LastModifiedDate"=$thisLead["LastModifiedDate"];"PreviousName"=$thisLead["PreviousName"];"PreviousDescription"=$thisLead["PreviousDescription"]})
+        }
+    
+    #Work out what's missing and create any omissions
+    $allKimbleLeads | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name KimbleId -Value $_.Id}
+    $missingLeads = Compare-Object -ReferenceObject $allKimbleLeads -DifferenceObject $allSpoLeads -Property "KimbleId" -PassThru -CaseSensitive:$false
+    $missingLeads | % {
+        if ($_.SideIndicator -eq "<="){new-spoLead -kimbleLeadObject $_ -pnpLeadsList $leadList -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging}
+        }
+
+    $updatedKimbleLeads = Compare-Object -ReferenceObject $allKimbleLeads -DifferenceObject $allSpoLeads -Property @("Id","LastModifiedDate") -PassThru -CaseSensitive:$false
+    $updatedKimbleLeads | ?{$_.SideIndicator -eq "<="} | % {
+        $thisLead = $_
+        $spoLead = $allSpoLeads | ? {$_.Id -eq $thisLead.Id}
+        if($spoLead){
+            #We've found the corresponding spoObject
+            $updatedValues = @{"IsDeleted"=$thisLead.IsDeleted}
+            if($thisLead.LastModifiedDate -ne $null){
+                $updatedValues.Add("LastModifiedDate",$(Get-Date $thisLead.LastModifiedDate -Format "yyyy/MM/dd hh:mm:ss"))
+                }
+            if($thisLead.Name -ne $spoLead.Name){
+                $updatedValues.Add("Title",$thisLead.Name)
+                $updatedValues.Add("PreviousName",$thisLead.Name)
+                $updatedValues.Add("IsDirty",$true)
+                #Write-Host "$($spoClient.Name) renamed to $($updatedClient.Name)"
+                }
+            if($thisLead.KimbleOne__Account__c -ne $spoLead.KimbleClientId){
+                $updatedValues.Add("KimbleClientId",$thisLead.KimbleOne__Account__c)
+                $updatedValues.Add("PreviousKimbleClientId",$spoLead.KimbleClientId)
+                $updatedValues.Add("IsDirty",$true)
+                #Write-Host "$($spoClient.Name) renamed to $($updatedClient.Name)"
+                }
+            if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Set-PnPListItem -List $($leadList.Id) -Identity $($spoLead.SPListItemID) -Values @{$(stringify-hashTable $updatedValues -interlimiter ":" -delimiter ", ")}"}
+            Set-PnPListItem -List $leadList.Id -Identity $spoLead.SPListItemID -Values $updatedValues
+            }
+       
+        }
+    }
+function reconcile-projectsBetweenKimbleAndSpo($standardKimbleQueryUri, $standardKimbleHeaders, $webUrl, $sitePath, $adminCreds){
     #Get the full list of Kimble Projects
     $allKimbleProjects = get-allKimbleProjects -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
-    #Get the full list of SPO Projects
-    try{
-        log-action -myMessage "Getting List Items: [Kimble Projects]" -logFile $fullLogPathAndName
-        $spoProjectsItems = get-itemsInList -serverUrl $webUrl  -sitePath $sitePath -listName "Kimble Projects" -restCreds $restCreds -logFile $fullLogPathAndName
-        if($spoProjectsItems){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
+    
+    Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
+    $projectList = Get-PnPList -Identity "Kimble Projects" -Includes ContentTypes
+    $projectListContentType = $projectList.ContentTypes | ? {$_.Name -eq "Item"}
+    $projectListItems = Get-PnPListItem -List "Kimble Projects" -PageSize 1000 -Fields "Title","GUID","KimbleId","projectDescription","KimbleClientId","PreviousKimbleClientId","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
+    $projectListItems.FieldValues | %{
+        $thisProject = $_
+        [array]$allSpoProjects += New-Object psobject -Property $([ordered]@{"Id"=$thisProject["KimbleId"];"KimbleId"=$thisProject["KimbleId"];"KimbleClientId"=$thisProject["KimbleClientId"];"PreviousKimbleClientId"=$thisProject["PreviousKimbleClientId"];"Name"=$thisProject["Title"];"GUID"=$thisProject["GUID"];"SPListItemID"=$thisProject["ID"];"IsDirty"=$thisProject["IsDirty"];"IsDeleted"=$thisProject["IsDeleted"];"LastModifiedDate"=$thisProject["LastModifiedDate"];"PreviousName"=$thisProject["PreviousName"];"PreviousDescription"=$thisProject["PreviousDescription"]})
         }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [Kimble Projects]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-
-    #Get the List to make creating new Items easier
-    try{
-        log-action -myMessage "Getting List: [Kimble Projects]" -logFile $fullLogPathAndName
-        $spoProjectsList = get-list -serverUrl $webUrl  -sitePath $sitePath -listName "Kimble Projects" -restCreds $restCreds
-        if($spoProjectsList){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-
-    #Get a digest so we can write stuff back
-    try{
-        log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-        $clientsDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds
-        if($clientsDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientsDigest.expiryTime)" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for https://anthesisllc.sharepoint.com/clients" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-
+    
     #Work out what's missing and create any omissions
     $allKimbleProjects | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name KimbleId -Value $_.Id}
-    $missingProjects = Compare-Object -ReferenceObject $allKimbleProjects -DifferenceObject $spoProjectsItems -Property "KimbleId" -PassThru -CaseSensitive:$false
+    $missingProjects = Compare-Object -ReferenceObject $allKimbleProjects -DifferenceObject $allSpoProjects -Property "KimbleId" -PassThru -CaseSensitive:$false
     $missingProjects | % {
-        if ($_.SideIndicator -eq "<="){new-spoProject -kimbleProjectObject $_ -webUrl $webUrl -sitePath $sitePath -spoProjectList $spoProjectsList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName}
+        if ($_.SideIndicator -eq "<="){new-spoProject -kimbleProjectObject $_ -pnpProjectList $projectList -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging}
         }
 
+    $updatedKimbleProjects = Compare-Object -ReferenceObject $allKimbleProjects -DifferenceObject $allSpoProjects -Property @("Id","LastModifiedDate") -PassThru -CaseSensitive:$false
+    $updatedKimbleProjects | ?{$_.SideIndicator -eq "<="} | % {
+        $thisProject = $_
+        $spoProject = $allSpoProjects | ? {$_.Id -eq $thisProject.Id}
+        if($spoProject){
+            #We've found the corresponding spoObject
+            $updatedValues = @{"IsDeleted"=$thisProject.IsDeleted}
+            if($thisProject.LastModifiedDate -ne $null){
+                $updatedValues.Add("LastModifiedDate",$(Get-Date $thisProject.LastModifiedDate -Format "yyyy/MM/dd hh:mm:ss"))
+                }
+            if($thisProject.Name -ne $spoProject.Name){
+                $updatedValues.Add("Title",$thisProject.Name)
+                $updatedValues.Add("PreviousName",$thisProject.Name)
+                $updatedValues.Add("IsDirty",$true)
+                #Write-Host "$($spoClient.Name) renamed to $($updatedClient.Name)"
+                }
+            if($thisProject.KimbleOne__Account__c -ne $spoProject.KimbleClientId){
+                $updatedValues.Add("KimbleClientId",$thisProject.KimbleOne__Account__c)
+                $updatedValues.Add("PreviousKimbleClientId",$spoProject.KimbleClientId)
+                $updatedValues.Add("IsDirty",$true)
+                #Write-Host "$($spoClient.Name) renamed to $($updatedClient.Name)"
+                }
+            if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Set-PnPListItem -List $($projectList.Id) -Identity $($spoProject.SPListItemID) -Values @{$(stringify-hashTable $updatedValues -interlimiter ":" -delimiter ", ")}"}
+            Set-PnPListItem -List $projectList.Id -Identity $spoProject.SPListItemID -Values $updatedValues
+            }
+        }
     }
-    
 
 
 #endregion
@@ -222,5 +249,5 @@ function reconcile-projectsBetweenKimbleAndSpo(){
 ##################################
 
 reconcile-clients
-reconcile-leads
+#reconcile-leads
 reconcile-projects

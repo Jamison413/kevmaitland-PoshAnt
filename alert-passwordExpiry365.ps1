@@ -1,8 +1,8 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
 $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    $fullLogPathAndName = $logFileLocation+"update-SpoClientsLeadsAndProjects_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = $logFileLocation+"update-SpoClientsLeadsAndProjects_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    $fullLogPathAndName = $logFileLocation+"alert-passwordExpiry365_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"alert-passwordExpiry365_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
 else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"

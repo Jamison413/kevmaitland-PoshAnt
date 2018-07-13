@@ -6,7 +6,18 @@
 # Revised SQL view to flatten multiple contiguous all-day entries into single multi-day events
 # v1.2 Kev Maitland 18/1/17
 # Adapted to send data to Anthesis' O365 platform
-Start-Transcript "$($MyInvocation.MyCommand.Definition).log" #-Append
+$logFileLocation = "C:\ScriptLogs\"
+$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    $fullLogPathAndName = $logFileLocation+"sync-focalPointToO365_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"sync-focalPointToO365_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+else{
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+$debugLog = "$env:USERPROFILE\Desktop\debugdump.log"
+Start-Transcript $transcriptLogName -AppendStart-Transcript "$($MyInvocation.MyCommand.Definition).log" #-Append
 
 
 $EWSServicePath = 'C:\Program Files\Microsoft\Exchange\Web Services\2.2\Microsoft.Exchange.WebServices.dll'
@@ -26,16 +37,15 @@ $projectsView = "SUS_VW_Projects_KM"
 $bookingsView = "SUS_VW_Bookings_KM"
 $ExchVer = [Microsoft.Exchange.WebServices.Data.ExchangeVersion]::Exchange2016
 $ewsUrl = "https://outlook.office365.com/EWS/Exchange.asmx"
-$maximumNumberOfSyncRetryAttempts = 10
+$maximumNumberOfSyncRetryAttempts = 13
 $upnSMA = "sustainmailboxaccess@anthesisgroup.com"
 #$passSMA = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
 $passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\SustainMailboxAccess.txt) 
 
-$daysToLookBehind = 7
-$daysToLookAhead = 30
-
-$from = (Get-Date -Format yyyy-MM-dd (get-date).AddDays(-$daysToLookBehind))
-$to = (Get-Date -Format yyyy-MM-dd (get-date).AddDays($daysToLookAhead))
+#$daysToLookBehind = 30
+#$daysToLookAhead = 30
+#$from = (Get-Date -Format yyyy-MM-dd (get-date).AddDays(-$daysToLookBehind))
+#$to = (Get-Date -Format yyyy-MM-dd (get-date).AddDays($daysToLookAhead))
 
 #region functions
 function Execute-SQLQueryOnSQLDB([string]$query, [string]$queryType) { 
@@ -66,6 +76,11 @@ function Execute-SQLQueryOnSQLDB([string]$query, [string]$queryType) {
 function CatchNull([String]$x) {
    if ($x) { $x } else { -1 }
 }
+function CatchNull2($x,$returnIfNull) {
+   if ($x -eq $null -or $x -eq [System.DBNull]::Value){$returnIfNull}
+   else {$x}
+}
+
 function WriteOutputLogToSQL([double]$id, [string]$errorMessage, $previousNumberOfRetrys){
     if ("" -eq $entry.Retry) {Execute-SQLQueryOnSQLDB -query "INSERT INTO $calendarProcessingTable ($calendarProcessingTableId, $calendarProcessingTableError, $calendarProcessingTableRetry) VALUES ($id, `'$(CatchNull $errorMessage)`', $($(CatchNull $previousNumberOfRetrys)+1))" -queryType "NonQuery"}
     else {Execute-SQLQueryOnSQLDB -query "UPDATE $calendarProcessingTable SET $calendarProcessingTableError=`'$(CatchNull $errorMessage)`', $calendarProcessingTableRetry=$($(CatchNull $previousNumberOfRetrys)+1) WHERE $calendarProcessingTableId=$id" -queryType "NonQuery"}
@@ -119,10 +134,10 @@ $entriesToSync = Execute-SQLQueryOnSQLDB -query "SELECT
       ,TSCS_RETRY 
       ,Error
       ,Retry FROM $calendarSyncViewOutstanding" -queryType "Reader"
-#      ,Retry FROM $calendarSyncViewAll WHERE ((TSCS_PREV_START >= '$from' OR TSCS_NEW_START >= '$from') AND (TSCS_PREV_START <= '$to' OR TSCS_NEW_START <= '$to'))" -queryType "Reader"
+#      ,Retry FROM $calendarSyncViewOutstanding WHERE ((TSCS_PREV_START >= '$from' OR TSCS_NEW_START >= '$from') AND (TSCS_PREV_START <= '$to' OR TSCS_NEW_START <= '$to'))" -queryType "Reader"
 foreach ($entry in $entriesToSync){
     $spongesInThePatient = ""
-    if ($maximumNumberOfSyncRetryAttempts -gt $(CatchNull $entry.Retry)){
+    if ($maximumNumberOfSyncRetryAttempts -gt $(CatchNull $entry.Retry) -and (((CatchNull2 $entry.TSCS_NEW_START -returnIfNull "1900-01-01") -gt "2018-01-01") -or ((CatchNull2 $entry.TSCS_PREV_START -returnIfNull "1900-01-01") -gt "2018-01-01"))){
         $service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $(if("" -ne $entry.TSCS_PREV_MAILBOX){$entry.TSCS_PREV_MAILBOX}else{$entry.TSCS_NEW_MAILBOX}).replace("sustain.co.uk","anthesisgroup.com"))
 
         switch ($entry.TSCS_TYPE)
@@ -169,7 +184,7 @@ foreach ($entry in $entriesToSync){
                 }
             'E' {#Edit existing appointment
                 $spongesInThePatient = "Potential appointments found, but none with the Category `"$focalPointCategoryName`" and beginning $($($entry.TSCS_SUBJECT -split " ")[0])"
-                Write-Host -ForegroundColor Yellow "Searching for appointment to EDIT"
+                Write-Host -ForegroundColor Yellow "Searching for appointment to EDIT for $($entry.TSCS_NEW_MAILBOX) on $($entry.TSCS_NEW_START)"
                 $folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Calendar,$entry.TSCS_NEW_MAILBOX)
                 $CalendarFolder = [Microsoft.Exchange.WebServices.Data.CalendarFolder]::Bind($service,$folderid)
                 $cvCalendarview = new-object Microsoft.Exchange.WebServices.Data.CalendarView($entry.TSCS_PREV_START,$entry.TSCS_PREV_START,2000)
@@ -178,6 +193,7 @@ foreach ($entry in $entriesToSync){
                 if($null -eq $frCalendarResult){$spongesInThePatient = "No potential appointments found that match the criteria Start:$($entry.TSCS_PREV_START)"}
                 switch ($entry.TSCS_KEY_NAME){
                     'FP_Absence_ID' {
+                        $matchFound = $false
                         foreach($possibleMatch in $frCalendarResult.Items){
                             if(($possibleMatch.Categories -contains $focalPointCategoryName) -and ($($possibleMatch.Subject -split " ")[0] -eq $($entry.TSCS_SUBJECT +" dummyTextToEnsureMoreThanWordIsFound" -split " ")[0])){
                                 Write-Host -ForegroundColor DarkYellow "Updating EXISTING ABSENCE $($entry.TSCS_SUBJECT) appointment $($entry.TSCS_PRIMARY) for $($entry.TSCS_NEW_MAILBOX) on $($entry.TSCS_PREV_START)"
@@ -185,7 +201,20 @@ foreach ($entry in $entriesToSync){
                                 $possibleMatch.Start = $entry.TSCS_NEW_START
                                 $possibleMatch.End = $entry.TSCS_NEW_END
                                 $spongesInThePatient = $possibleMatch.Update([Microsoft.Exchange.WebServices.Data.ConflictResolutionMode]::AlwaysOverwrite)
+                                $matchFound = $true
                                 }
+                            }
+                        if(!$matchFound){
+                            Write-Host -ForegroundColor DarkYellow "No EXISTING ABSENCE $($entry.TSCS_SUBJECT) appointment found for $($entry.TSCS_NEW_MAILBOX) on $($entry.TSCS_PREV_START) - Creating new entry"
+                            $appointment = New-Object Microsoft.Exchange.WebServices.Data.Appointment -ArgumentList $service
+                            $appointment.Start = $entry.TSCS_NEW_START
+                            $appointment.End = $entry.TSCS_NEW_END
+                            $appointment.Categories.Add($focalPointCategoryName)
+                            $appointment.Categories.Add("Holiday")
+                            $appointment.Subject = $entry.TSCS_SUBJECT
+                            $appointment.IsAllDayEvent = $true
+                            $appointment.IsReminderSet = $false
+                            $spongesInThePatient = $appointment.Save([Microsoft.Exchange.WebServices.Data.SendInvitationsMode]::SendToAllAndSaveCopy)
                             }
                         }
                     'FP_Booking_ID'{
@@ -223,7 +252,7 @@ foreach ($entry in $entriesToSync){
                 }
             'D' {#Delete existing appointment}
                 $spongesInThePatient = "Potential appointments found, but none with the Category `"$focalPointCategoryName`""
-                Write-Host -ForegroundColor Yellow "Searching for appointment to DELETE"
+                Write-Host -ForegroundColor Yellow "Searching for appointment to DELETE for $($entry.TSCS_PREV_MAILBOX) on $($entry.TSCS_PREV_START)"
                 $folderid = new-object Microsoft.Exchange.WebServices.Data.FolderId([Microsoft.Exchange.WebServices.Data.WellKnownFolderName]::Calendar,$entry.TSCS_PREV_MAILBOX)
                 $CalendarFolder = [Microsoft.Exchange.WebServices.Data.CalendarFolder]::Bind($service,$folderid)
                 $cvCalendarview = new-object Microsoft.Exchange.WebServices.Data.CalendarView($entry.TSCS_PREV_START,$entry.TSCS_PREV_START,2000)
