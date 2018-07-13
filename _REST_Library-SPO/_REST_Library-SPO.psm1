@@ -1,61 +1,7 @@
-﻿#region SPO functions
-<#
-.Synopsis
-    Stores the credentials for Invoke-SPORestMethod.
-.DESCRIPTION
-    Stores the credentials for Invoke-SPORestMethod. This is done so that you
-    don't have to provide your credentials on every call to Invoke-SPORestMethod.
-.EXAMPLE
-   Set-SPORestCredentials
-.EXAMPLE
-   Set-SPORestCredentials -Credential $cred
-#>
-function global:Set-SPORestCredentials {
-    Param (
-        [Parameter(ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        $Credential = (Get-Credential -Message "Enter your credentials for SharePoint Online:")
-    )
-    Begin {
-        if ((Get-Module Microsoft.Online.SharePoint.PowerShell -ListAvailable) -eq $null) {
-            throw "The Microsoft SharePoint Online PowerShell cmdlets have not been installed."
-        }
-        [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
-    }
-    Process {
-        $global:spoCred = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($Credential.UserName, $Credential.Password)
-    }
-} 
-<#
-.Synopsis
-    Clears the SharePoint Online credentials stored in the global variable.
-.DESCRIPTION
-    Clears the SharePoint Online credentials stored in the global variable.
-    You can also manually clear the variable by explicitly setting 
-    $global:spoCred = $null.
-.EXAMPLE
-   Clear-SPORestCredentials
-#>
-function global:Clear-SPORestCredentials {
-    $global:spoCred = $null
-}
-<#
-.Synopsis
-    Sends an HTTP or HTTPS request to a SharePoint Online REST-compliant web service.
-.DESCRIPTION
-    This function sends an HTTP or HTTPS request to a Representational State 
-    Transfer (REST)-compliant ("RESTful") SharePoint Online web service.
-    When connecting, if Set-SPORestCredentials is not called then you will be
-    prompted for your credentials. Those credentials are stored in a global
-    variable $global:spoCred so that it will be available on subsequent calls.
-    Call Clear-SPORestCredentials to clear the variable.
-.EXAMPLE
-   Invoke-SPORestMethod -Url "https://contoso.sharepoint.com/_api/web"
-.EXAMPLE
-   Invoke-SPORestMethod -Url "https://contoso.sharepoint.com/_api/contextinfo" -Method "Post"
-#>
+﻿[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client")
+#region SPO functions
 function Invoke-SPORestMethod {
-    [CmdletBinding()]
+   [CmdletBinding()]
     [OutputType([int])]
     Param (
         # The REST endpoint URL to call.
@@ -123,7 +69,9 @@ function Invoke-SPORestMethod {
     }
     Process {
         $request = [System.Net.WebRequest]::Create($Url)
-        $request.Credentials = $credentials
+        $global:emptyRequest = $request
+        $request.Credentials = $restCreds
+        #$request.PreAuthenticate = $true
         $odata = ";odata=$($JSONVerbosity.ToLower())"
         $request.Accept = "application/json$odata"
         $request.ContentType = "application/json;charset=UTF-8$odata"   
@@ -151,6 +99,7 @@ function Invoke-SPORestMethod {
         } else {
             $request.ContentLength = 0
         }
+
         if ($manualTimeOut -ne 0){$request.Timeout = $manualTimeOut}
 
         $global:dummy= $request
@@ -573,7 +522,7 @@ function new-library($serverUrl, $sitePath, $libraryName, $libraryDesc, $digest,
         }
     }
 function new-spoCred($username, $securePassword){
-    New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($userName, $securePassword)
+    [Microsoft.SharePoint.Client.SharePointOnlineCredentials]::new($userName, $securePassword)
     }
 function update-list($serverUrl, $sitePath, $listName,$hashTableOfUpdateData, $restCreds, $digest,$verboseLogging,$logFile){
     #Sanitise parameters

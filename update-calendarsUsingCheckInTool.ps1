@@ -9,7 +9,17 @@
 #
 # Edited Kev Maitland 30/04/15 - added function FindSmsInEmail to handle a change in formatting from TextMagic
 # Edited Kev Maitland 01/02/17 - revised for Office 365 and changed Get-User to Get-ADUser to avoid hitting o365 Exchange
-Start-Transcript "$($MyInvocation.MyCommand.Definition).log" #-Append
+$logFileLocation = "C:\ScriptLogs\"
+$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    $fullLogPathAndName = $logFileLocation+"update-calendarsUsingCheckInTool_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"update-calendarsUsingCheckInTool_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+else{
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+Start-Transcript $transcriptLogName -Append
 
 $EWSServicePath = 'C:\Program Files\Microsoft\Exchange\Web Services\2.2\Microsoft.Exchange.WebServices.dll'
 Import-Module $EWSServicePath

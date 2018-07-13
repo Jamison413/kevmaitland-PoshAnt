@@ -30,43 +30,18 @@ $mailTo = "kevin.maitland@anthesisgroup.com"
 #convertTo-localisedSecureString ""
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-$restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
-
-
-########################################
-#Don't change these unless the Kimble account or App changes
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$callbackUri = "https://login.salesforce.com/services/oauth2/token" #"https://test.salesforce.com/services/oauth2/token"
-$grantType = "password"
-$myInstance = "https://eu5.salesforce.com"
-$queryUri = "$myInstance/services/data/v39.0/query/?q="
-$querySuffixStub = " -H `"Authorization: Bearer "
+$restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $kimbleLogin = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
-$clientId = $kimbleLogin.clientId
-$clientSecret = $kimbleLogin.clientSecret
-$username = $kimbleLogin.username
-$password = $kimbleLogin.password
-$securityToken = $kimbleLogin.securityToken
-########################################
+$kimbleRestHeaders = get-kimbleHeaders -clientId $kimbleLogin.clientId -clientSecret $kimbleLogin.clientSecret -username $kimbleLogin.username -password $kimbleLogin.password -securityToken $kimbleLogin.password -connectToLiveContext $true -verboseLogging $verboseLogging
 
-
-
-##################################
-#
-#Do Stuff
-#
-##################################
-$oAuthReqBody = Get-KimbleAuthorizationTokenWithUsernamePasswordFlowRequestBody -client_id $clientId -client_secret $clientSecret -user_name $username -pass_word $password -security_token $securityToken
-try{$kimbleAccessToken=Invoke-RestMethod -Method Post -Uri $callbackUri -Body $oAuthReqBody} catch {Failure}
-$kimbleRestHeaders = @{Authorization = "Bearer " + $kimbleAccessToken.access_token}
 
 
 #region Kimble Sync
 #Get the last Client modified in [/lists/Kimble Clients] to minimise the number of records to process
 try{
     log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-    $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds
+    $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -logFile $fullLogPathAndName -verboseLogging $verboseLogging
     if($clientDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientDigest.expiryTime)" -logFile $fullLogPathAndName}
     else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
     }
