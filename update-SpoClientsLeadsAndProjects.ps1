@@ -139,7 +139,7 @@ foreach($dirtyClient in $dirtyClients){
     log-action -myMessage "************************************************************************" -logFile $fullLogPathAndName
     log-action -myMessage "CLIENT [$($dirtyClient.Title)] needs updating!" -logFile $fullLogPathAndName
     #Check if the Client needs creating
-    if((!$dirtyClient.PreviousName -and !$dirtyClient.PreviousDescription) -OR $recreateAllFolders -eq $true){
+#    if((!$dirtyClient.PreviousName -and !$dirtyClient.PreviousDescription) -OR $recreateAllFolders -eq $true){
         #Create a new Library and subfolders
         try{
             new-clientFolder -clientName $($dirtyClient.Title) -clientDescription $($dirtyClient.ClientDescription) -listofClientSubfolders $listOfClientFolders -webUrl $webUrl -restCreds $restCreds -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName -digest $clientDigest
@@ -153,13 +153,14 @@ foreach($dirtyClient in $dirtyClients){
             }
         catch{log-error $_ -myFriendlyMessage "Failed to add $($dirtyClient.Title) to Term Store" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailFrom $mailFrom -mailTo $mailTo}
         
-        }
+#        }
     #Check if the Client Name needs updating
-    elseif(!([string]::IsNullOrEmpty($dirtyClient.PreviousName)) -and ($dirtyClient.PreviousName -ne $dirtyClient.Title)){
+#    elseif(!([string]::IsNullOrEmpty($dirtyClient.PreviousName)) -and ($dirtyClient.PreviousName -ne $dirtyClient.Title)){
+     if(!([string]::IsNullOrEmpty($dirtyClient.PreviousName)) -and ($dirtyClient.PreviousName -ne $dirtyClient.Title)){
         #Update the folder name
         try{
             log-action "update-list $($dirtyClient.PreviousName) > @{Title=$($dirtyClient.Title)}" -logFile $fullLogPathAndName
-            update-list -serverUrl $webUrl -sitePath $clientSite -listName $dirtyClient.PreviousName -hashTableOfUpdateData @{Title=$dirtyClient.Title} -restCreds $restCreds -digest $clientDigest -logFile $fullLogPathAndName
+            update-list -serverUrl $webUrl -sitePath $clientSite -listName $dirtyClient.PreviousName -hashTableOfUpdateData $(@{Title=$dirtyClient.Title}) -restCreds $restCreds -digest $clientDigest -logFile $fullLogPathAndName -verboseLogging $true
             #Update the Client in [Kimble Clients]
             try{
                 if((get-list -sitePath $clientSite -listName $dirtyClient.Title -serverUrl $webUrl -restCreds $restCreds) -ne $false){ #If it's worked, set the IsDirty flag to $false to prevent it reprocessing

@@ -28,7 +28,7 @@ $restCredentials = new-spoCred -username $msolCredentials.UserName -securePasswo
 $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
 connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
-connect-toAAD -credential $msolCredentials
+#connect-toAAD -credential $msolCredentials
 #connect-ToSpo -credential $msolCredentials
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
@@ -61,7 +61,7 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
     $pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pManagerSAM=$userManagerSAM;$pPrimaryTeam=$userPrimaryTeam;$pSecondaryTeams=$userSecondaryTeams;$pJobTitle=$userJobTitle;$pBusinessUnit=$userBusinessUnit;$pPrimaryOffice=$userPrimaryOffice
     #> 
     switch ($pBusinessUnit) {
-        "Anthesis UK Energy Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
+        "Anthesis Energy UK Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
         "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
         "Anthesis Consulting Group Ltd (GBR)" {}
         "Anthesis LLC" {}
@@ -118,22 +118,31 @@ function create-msolUser($pUPN,$pPlaintextPassword){
     }
 function license-msolUser($pUPN, $licenseType, $usageLocation){
     switch ($licenseType){
-        "E1" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:STANDARDPACK"}}
-        "E3" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:ENTERPRISEPACK"}}
+        "E1" {
+            $licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:STANDARDPACK"}
+            if((Get-MsolUser -UserPrincipalName $pUPN).Licenses.AccountSkuId -contains "AnthesisLLC:ENTERPRISEPACK"){$licenseToRemove = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:ENTERPRISEPACK"}}
+            }
+        "E3" {
+            $licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:ENTERPRISEPACK"}
+            if((Get-MsolUser -UserPrincipalName $pUPN).Licenses.AccountSkuId -contains "AnthesisLLC:STANDARDPACK"){$licenseToRemove = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:STANDARDPACK"}}
+            }
         "VISIO" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:VISIOCLIENT"}}
         "PROJECT" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:PROJECTPROFESSIONAL"}}
         "EMS" {$licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:EMS"}}
         }
-    Set-MsolUserLicense -UserPrincipalName $pUPN -AddLicenses $licenseToAssign.AccountSkuId 
+    Write-Host -ForegroundColor Yellow "Set-MsolUserLicense -UserPrincipalName $pUPN -AddLicenses $($licenseToAssign.AccountSkuId) -RemoveLicenses $($licenseToRemove.AccountSkuId)"
+    Set-MsolUserLicense -UserPrincipalName $pUPN -AddLicenses $licenseToAssign.AccountSkuId -RemoveLicenses $licenseToRemove.AccountSkuId
     }
 function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimaryTeam, $pSecondaryTeams, $pPrimaryOffice, $pSecondaryOffice, $pCountry, $pJobTitle, $pDDI, $pMobile){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pPrimaryTeam=$userPrimaryTeam;$pSecondaryTeams=$userSecondaryTeams;$pPrimaryOffice=$userPrimaryOffice;$pSecondaryOffice=$userSecondaryOffice;$pJobTitle=$userJobTitle;$pDDI=$userDDI;$pMobile=$userMobile
     $currentUser = Get-MsolUser -UserPrincipalName $pUPN
     if([string]::IsNullOrEmpty($pFirstName)){$firstName = $currentUser.FirstName}else{$firstname = $pFirstName}
+    if([string]::IsNullOrEmpty($firstName)){$firstName = $currentUser.DisplayName.Split(" ")[0]}
     if([string]::IsNullOrEmpty($pSurname)){$surName = $currentUser.LastName}else{$surName = $pSurname}
+    if([string]::IsNullOrEmpty($surname)){$surname = $currentUser.DisplayName.Split(" ")[$currentUser.DisplayName.Split(" ").Count-1]}
     if([string]::IsNullOrEmpty($pDisplayName)){$displayName = $currentUser.DisplayName}else{$displayName = $pDisplayName}
     if([string]::IsNullOrEmpty($pPrimaryOffice)){$primaryOffice = $currentUser.Office}else{$primaryOffice = $pPrimaryOffice}
-    if([string]::IsNullOrEmpty($pSecondaryOffice)){$secondaryOffice = $currentUser.City}else{$secondaryOffice = $pSecondaryOffice}
+    if([string]::IsNullOrEmpty($pSecondaryOffice)){$secondaryOffice = $primaryOffice}else{$secondaryOffice = $pSecondaryOffice}
     if([string]::IsNullOrEmpty($pJobTitle)){$jobTitle = $currentUser.Title}else{$jobTitle = $pJobTitle}
     if([string]::IsNullOrEmpty($pDDI)){$ddi = $currentUser.PhoneNumber}else{$ddi = $pDDI}
     if([string]::IsNullOrEmpty($pMobile)){$mobile = $currentUser.MobilePhone}else{$mobile = $pMobile}
@@ -145,7 +154,9 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
         "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
         "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
-        "Manila, PHI" {}
+        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All PHI"}
+        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All DEU"}
+        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All DEU"}
         "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)"}
         "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)"}
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
@@ -167,9 +178,9 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         -StrongPasswordRequired $true 
         #-Password "Welcome123" `
         #-ForceChangePassword $true
-    if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN}
-    if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN}}
-    if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN}
+    if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN -BypassSecurityGroupManagerCheck}
+    if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN -BypassSecurityGroupManagerCheck}}
+    if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
@@ -281,7 +292,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
     Start-Sleep -Seconds 5 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
-        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams
+        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle 
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{
@@ -391,7 +402,7 @@ $selectedStarters | % {
         -userTimeZone $_.TimeZone `
         -user365License $_.Office_365_license 
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis UK Energy Ltd (GBR)"} | % {
+$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
@@ -435,4 +446,6 @@ $selectedStarters | % {
     $user365License = $_.Office_365_license
     $userDDI="0117 403 2XXX"
     }
+
+
 

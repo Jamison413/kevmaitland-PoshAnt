@@ -26,7 +26,7 @@ $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-$restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
+$restCreds2 = new-spoCred -Credential -username $sharePointAdmin -securePassword $sharePointAdminPass
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
 ########################################
 Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
@@ -38,4 +38,6 @@ function reconcile-clientsInSpo(){
     $clientListContentType = $clientList.ContentTypes | ? {$_.Name -eq "Item"}
     $clientListItems = Get-PnPListItem -List $listNam -PageSize 1000 -Fields "Title","GUID","KimbleId","ClientDescription","IsDirty","IsDeleted","Modified","LastModifiedDate","PreviousName","PreviousDescription","Id"
     $clientFoldersAlreadyCreated = Get-PnPList
+    $clientFoldersAlreadyCreated = get-allLists -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds2 -logFile $fullLogPathAndName -verboseLogging $true 
+    $dummy2 = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "ITCoreNet" -restCreds $restCreds2 -logFile $fullLogPathAndName -verboseLogging $true
     }

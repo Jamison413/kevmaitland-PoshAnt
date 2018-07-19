@@ -160,6 +160,10 @@ function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
         default {"Unknown"}
         }
     }
+function get-2letterIsoCodeFromCountryName($pCountryName){
+    $3letterCode = get-3letterIsoCodeFromCountryName -pCountryName $pCountryName
+    get-2letterIsoCodeFrom3LetterIsoCode -p3letterIsoCode $3letterCode
+    }
 function get-timeZones(){
     $timeZones = Get-ChildItem "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Time zones" | foreach {Get-ItemProperty $_.PSPath}; $TimeZone | Out-Null
     $timeZones

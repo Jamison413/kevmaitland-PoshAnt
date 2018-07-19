@@ -93,6 +93,7 @@ function connect-ToSpo($credential){
     Write-Host -f DarkYellow "Importing Microsoft.Online.Sharepoint.PowerShell"
     Import-Module Microsoft.Online.Sharepoint.PowerShell
     Write-Host -f DarkYellow "Executing Connect-SPOService"
+    Write-Host -f DarkYellow "Credential: $($credential.UserName) $($credential.Password)"
     Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential
     Write-Host -f DarkYellow "Executing Connect-PnPOnline"
     Connect-PnPOnline –Url https://anthesisllc.sharepoint.com -Credentials  $credential

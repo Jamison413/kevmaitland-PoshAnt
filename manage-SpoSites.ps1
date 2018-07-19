@@ -1,4 +1,16 @@
-﻿Import-Module _PS_Library_MSOL
+﻿$logFileLocation = "C:\ScriptLogs\"
+$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    $fullLogPathAndName = $logFileLocation+"manage-SPpoSites_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"manage-SPpoSites_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+else{
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+Start-Transcript $transcriptLogName -Append
+
+Import-Module _PS_Library_MSOL
 Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-SPO.psm1
 
@@ -10,7 +22,7 @@ $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -pass
 #Get the Taxonomy Data for the Site Collection as there's Managed MetaData fields to retrieve 
 $webUrl = "https://anthesisllc.sharepoint.com"
 $taxonomyListName = "TaxonomyHiddenList"
-$taxononmyData = get-itemsInList -serverUrl $webUrl -sitePath "/" -listName $taxonomyListName -suppressProgress $true -restCreds $restCredentials
+$taxononmyData = get-itemsInList -serverUrl $webUrl -sitePath "/" -listName $taxonomyListName -suppressProgress $true -restCreds $restCredentials -logFile $fullLogPathAndName -verboseLogging $true
 
 #Get the Client Site requests that have a status of "Awaiting creation"
 $clientsSite = "/clients"
