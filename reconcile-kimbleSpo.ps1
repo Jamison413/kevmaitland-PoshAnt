@@ -15,6 +15,7 @@ Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-Kimble.psm1
 Import-Module _REST_Library-SPO.psm1
 Import-Module SharePointPnPPowerShellOnline
+Import-Module _PNP_Library_SPO
 
 #region Variables
 ##################################
@@ -58,32 +59,6 @@ function try-newListItem($webUrl, $sitePath, $newSpoItemData, $spoListToAddTo, $
     catch{log-error -myError $_ -myFriendlyMessage "Failed to create new [Kimble Leads].$($kimbleLeadObject.Name) with @{$($($newSpoLeadData.Keys | % {$_+":"+$newSpoLeadData[$_]+","}) -join "`r")}" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailTo $mailTo -mailFrom $mailFrom}
     
     }
-function new-spoClient($kimbleClientObject, $webUrl, $sitePath, $spoClientList, $restCreds, $clientsDigest, $fullLogPathAndName){
-    log-action -myMessage "CREATING NEW CLIENT:`t[$($kimbleClientObject.Name)]" -logFile $fullLogPathAndName
-    $newSpoClientData = @{KimbleId=$kimbleClientObject.Id;Title=$kimbleClientObject.Name;IsDeleted=$kimbleClientObject.IsDeleted;IsDirty=$true}
-    #Create the new List item
-    try-newListItem -webUrl $webUrl -sitePath $sitePath -newSpoItemData $newSpoClientData -spoListToAddTo $spoClientList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName
-    }
-function new-spoLead($kimbleLeadObject, $pnpLeadsList, $fullLogPathAndName, $verboseLogging){
-    #Assumes we're already connected to PNPOnline, and to the correct Site
-    log-action -myMessage "CREATING NEW LEAD:`t[$($kimbleLeadObject.Name)]" -logFile $fullLogPathAndName
-    $contentType = $pnpLeadsList.ContentTypes | ? {$_.Name -eq "Item"}
-    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Add-PnPListItem -List $($pnpLeadsList.Id) -ContentType $($contentType.Id.StringValue) -Values @{""Title""=$($kimbleLeadObject.Name);""KimbleId""=$($kimbleLeadObject.Id);""KimbleClientId""=$($kimbleLeadObject.KimbleOne__Account__c);""IsDirty""=$true;""IsDeleted""=$($kimbleLeadObject.IsDeleted);""LastModifiedDate""=$(Get-Date $kimbleLeadObject.LastModifiedDate -Format ""MM/dd/yyyy hh:mm"")}"}
-    Add-PnPListItem -List $pnpLeadsList.Id -ContentType $contentType.Id.StringValue -Values @{"Title"=$kimbleLeadObject.Name;"KimbleId"=$kimbleLeadObject.Id;"KimbleClientId"=$kimbleLeadObject.KimbleOne__Account__c;"IsDirty"=$true;"IsDeleted"=$kimbleLeadObject.IsDeleted;"LastModifiedDate"=$(Get-Date $kimbleLeadObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm")}
-    
-    #$newSpoLeadData = @{KimbleId=$kimbleLeadObject.Id;Title=$kimbleLeadObject.Name;IsDeleted=$kimbleLeadObject.IsDeleted;IsDirty=$true}
-    #Create the new List item
-    #try-newListItem -webUrl $webUrl -sitePath $sitePath -newSpoItemData $newSpoLeadData -spoListToAddTo $spoLeadsList -restCreds $restCreds -clientDigest $clientsDigest -fullLogPathAndName $fullLogPathAndName
-    }
-function new-spoProject($kimbleProjectObject, $webUrl, $sitePath, $pnpProjectList, $restCreds, $clientsDigest, $fullLogPathAndName, $verboseLogging){
-    log-action -myMessage "CREATING NEW PROJECT:`t[$($kimbleProjectObject.Name)]" -logFile $fullLogPathAndName
-    $contentType = $pnpProjectList.ContentTypes | ? {$_.Name -eq "Item"}
-    $updateData = @{"Title"=$kimbleProjectObject.Name;"KimbleId"=$kimbleProjectObject.Id;"KimbleClientId"=$kimbleProjectObject.KimbleOne__Account__c;"IsDirty"=$true;"IsDeleted"=$kimbleProjectObject.IsDeleted}
-    if($kimbleProjectObject.LastModifiedDate){$updateData.Add("LastModifiedDate",$(Get-Date $kimbleProjectObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
-
-    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "Add-PnPListItem -List $($pnpLeadsList.Id) -ContentType $($contentType.Id.StringValue) -Values @{$(stringify-hashTable $updateData -interlimiter ":" -delimiter ", ")}"}
-    Add-PnPListItem -List $pnpProjectList.Id -ContentType $contentType.Id.StringValue -Values $updateData
-    }
 function reconcile-clientsBetweenKimbleAndSpo($standardKimbleQueryUri, $standardKimbleHeaders, $webUrl, $sitePath, $adminCreds){
     #Get the full list of Kimble Clients
     $allKimbleClients = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))" 
@@ -109,13 +84,18 @@ function reconcile-clientsBetweenKimbleAndSpo($standardKimbleQueryUri, $standard
     
     $missingSpoClients | ?{$_.SideIndicator -eq "<="} | %{
         $missingClient = $_
-        $newItem = Add-PnPListItem -List $clientList.Id -ContentType $clientListContentType.Id.StringValue -Values @{"Title"=$missingClient.Name;"KimbleId"=$missingClient.Id;"ClientDescription"=$missingClient.Description;"IsDirty"=$true;"IsDeleted"=$missingClient.IsDeleted;"LastModifiedDate"=$(Get-Date $missingClient.LastModifiedDate -Format "MM/dd/yyyy hh:mm")}
+        log-action -myMessage "Creating missing client [$($missingClient.Name)]" -logFile $fullLogPathAndName
+        $newClient = new-spoKimbleClientItem -kimbleClientObject $missingClient -spoClientList $clientList -fullLogPathAndName $fullLogPathAndName  -verboseLogging $verboseLogging
+        if($newClient){log-result "SUCCESS: New Client [$($missingClient.Name)] created in [Kimble Clients]" -logFile $fullLogPathAndName}
+        else{log-result "FAILED: New Client [$($missingClient.Name)] NOT created in [Kimble Clients]" -logFile $fullLogPathAndName}
+        #$newItem = Add-PnPListItem -List $clientList.Id -ContentType $clientListContentType.Id.StringValue -Values @{"Title"=$missingClient.Name;"KimbleId"=$missingClient.Id;"ClientDescription"=$missingClient.Description;"IsDirty"=$true;"IsDeleted"=$missingClient.IsDeleted;"LastModifiedDate"=$(Get-Date $missingClient.LastModifiedDate -Format "MM/dd/yyyy hh:mm")}
         }
 
     $updatedKimbleClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $allSpoClients -Property @("Id","LastModifiedDate") -PassThru -CaseSensitive:$false
     $updatedKimbleClients | ?{$_.SideIndicator -eq "<="} | % {
         $updatedClient = $_
-        $spoClient = $allSpoClients | ? {$_.Id -eq $updatedClient.Id}
+        $fixedClient = update-spoKimbleClientItem -kimbleClientObject $updatedClient -pnpClientList $kc -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging
+<#        $spoClient = $allSpoClients | ? {$_.Id -eq $updatedClient.Id}
         $updatedValues = @{"IsDeleted"=$updatedClient.IsDeleted}
         if($updatedClient.LastModifiedDate -ne $null){
             $updatedValues.Add("LastModifiedDate",$(Get-Date $updatedClient.LastModifiedDate -Format "yyyy/MM/dd hh:mm:ss"))

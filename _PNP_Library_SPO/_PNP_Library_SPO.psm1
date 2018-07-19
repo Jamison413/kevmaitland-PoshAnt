@@ -215,6 +215,114 @@ function new-spoClientLibrary($clientName, $clientDescription, $spoCredentials, 
         }
     $clientLibrary
     }
+function new-spoKimbleClientItem($kimbleClientObject, $pnpClientList, $fullLogPathAndName,$verboseLogging){
+    #Create the new List item
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "new-spoKimbleClientItem($($kimbleClientObject.Name), $($pnpClientList.Title)"}
+    #Check that PNP is connected to Clients Site
+    #Check that the list is valid
+    #Get the Content Type
+    $contentType = $pnpClientList.ContentTypes | ? {$_.Name -eq "Item"}
+    $updateValues = @{"Title"=$kimbleClientObject.Name;"KimbleId"=$kimbleClientObject.Id;"ClientDescription"=$(sanitise-stripHtml $kimbleClientObject.Description);"IsDirty"=$true;"IsDeleted"=$kimbleClientObject.IsDeleted}
+    if($kimbleClientObject.LastModifiedDate){$updateValues.Add("LastModifiedDate",$(Get-Date $kimbleClientObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
+    try{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tAdd-PnPListItem -List $($pnpClientList.Title) -ContentType $($contentType.Id.StringValue) -Values @{$(stringify-hashTable $updateValues)}"}
+        $newItem = Add-PnPListItem -List $pnpClientList.Id -ContentType $($contentType.Id.StringValue) -Values $updateValues
+        }
+    catch{
+        log-error -myError $_ -myFriendlyMessage "Error creating new [Kimble Clients] list item [$($kimbleClientObject.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+        }
+    if($newItem){if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Item [$($kimbleClientObject.Name)] created in [Kimble Clients]"}}
+    else{Write-Host -ForegroundColor DarkRed "`tFAILED: Item NOT [$($kimbleClientObject.Name)] created in [Kimble Clients] :("}
+    $newItem
+    }
+function new-spoKimbleProjectItem($kimbleProjectObject, $pnpProjectList, $fullLogPathAndName, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "new-spoKimbleProjectItem($($kimbleProjectObject.Name), $($pnpProjectList.Title)"}
+    $contentType = $pnpProjectList.ContentTypes | ? {$_.Name -eq "Item"}
+    $updateValues = @{"Title"=$kimbleProjectObject.Name;"KimbleId"=$kimbleProjectObject.Id;"KimbleClientId"=$kimbleProjectObject.KimbleOne__Account__c;"IsDirty"=$true;"IsDeleted"=$kimbleProjectObject.IsDeleted}
+    if($kimbleProjectObject.LastModifiedDate){$updateValues.Add("LastModifiedDate",$(Get-Date $kimbleProjectObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
+    try{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tAdd-PnPListItem -List $($pnpProjectList.Id) -ContentType $($contentType.Id.StringValue) -Values @{$(stringify-hashTable $updateValues)}"}
+        $newItem = Add-PnPListItem -List $pnpProjectList.Id -ContentType $contentType.Id.StringValue -Values $updateValues
+        }
+    catch{
+        log-error -myError $_ -myFriendlyMessage "Error creating new [Kimble Projects] list item [$($kimbleProjectObject.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+        }
+    if($newItem){if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Item [$($kimbleProjectObject.Name)] created in [Kimble Projects]"}}
+    else{Write-Host -ForegroundColor DarkRed "`tFAILED: Item NOT [$($kimbleProjectObject.Name)] created in [Kimble Projects] :("}
+    $newItem
+    }
+function update-spoKimbleClientItem($kimbleClientObject, $pnpClientList, $fullLogPathAndName,$verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "update-spoKimbleClientItem($($kimbleClientObject.Name), $($pnpClientList.Title)"}
+    #Bodge the KimbeId value if it's not present
+    if([string]::IsNullOrWhiteSpace($kimbleClientObject.KimbleId) -and $kimbleClientObject.Id.Length -eq 18){
+        $kimbleClientObject | Add-Member -MemberType NoteProperty -Name KimbleId -Value $kimbleClientObject.Id
+        }
+    #Retrieve the existing item
+    try{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpClientList.Title) -Query <View><Query><Where><Eq><FieldRef Name='KimbleId'/><Value Type='Text'>$($kimbleClientObject.KimbleId)</Value></Eq></Where></Query></View> -ErrorAction Stop"}
+        $existingItem = Get-PnPListItem -List $pnpClientList -Query "<View><Query><Where><Eq><FieldRef Name='KimbleId'/><Value Type='Text'>$($kimbleClientObject.KimbleId)</Value></Eq></Where></Query></View>" -ErrorAction Stop
+        }
+    catch{
+        log-error -myError $_ -myFriendlyMessage "Error retrieving [Kimble Clients] list item [$($kimbleClientObject.Name)] in update-spoKimbleClientItem()" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+        }
+
+    #Update it
+    if(!$existingItem){
+        if($verboseLogging){Write-Host -ForegroundColor DarkRed "`tFAILED: Existing item [$($kimbleClientObject.Name)] in [Kimble Clients] not found"}
+        }
+    else{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Existing item [$($existingItem.FieldValues.Title)] in [Kimble Clients] found"}
+        $updateValues = @{"Title"=$kimbleClientObject.Name;"KimbleId"=$kimbleClientObject.Id;"ClientDescription"=$(sanitise-stripHtml $kimbleClientObject.Description);"IsDirty"=$true;"IsDeleted"=$kimbleClientObject.IsDeleted}
+        if($kimbleClientObject.LastModifiedDate){$updateValues.Add("LastModifiedDate",$(Get-Date $kimbleClientObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
+        try{
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPListItem -List $($pnpClientList.Id) -Identity $($existingItem.Id) -Values @{$(stringify-hashTable $updateValues)}"}
+            $updatedItem = Set-PnPListItem -List $pnpClientList.Id -Identity $existingItem.Id -Values $updateValues -ErrorAction Stop
+            }
+        catch{
+            log-error -myError $_ -myFriendlyMessage "Error updating [Kimble Clients] list item [$($existingItem.FieldValues.Title)] in update-spoKimbleClientItem()" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+            }
+        if($updatedItem){if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Item [$($updatedItem.FieldValues.Title)] updated in [Kimble Clients]"}}
+        else{Write-Host -ForegroundColor DarkRed "`tFAILED: Item [$($existingItem.FieldValues.Title)] NOT updated in [Kimble Clients], even though I found it to update :("}
+        }
+    #Return it
+    $updatedItem
+    }
+function update-spoKimbleProjectItem($kimbleProjectObject, $pnpProjectList, $fullLogPathAndName, $verboseLogging){
+     if($verboseLogging){Write-Host -ForegroundColor Magenta "update-spoKimbleProjectItem($($kimbleProjectObject.Name), $($pnpProjectList.Title)"}
+    #Bodge the KimbleId value if it's not present
+    if([string]::IsNullOrWhiteSpace($kimbleProjectObject.KimbleId) -and $kimbleProjectObject.Id.Length -eq 18){
+        $kimbleProjectObject | Add-Member -MemberType NoteProperty -Name KimbleId -Value $kimbleProjectObject.Id
+        }
+    #Retrieve the existing item
+    try{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpProjectList.Title) -Query <View><Query><Where><Eq><FieldRef Name='KimbleId'/><Value Type='Text'>$($kimbleProjectObject.KimbleId)</Value></Eq></Where></Query></View> -ErrorAction Stop"}
+        $existingItem = Get-PnPListItem -List $pnpProjectList -Query "<View><Query><Where><Eq><FieldRef Name='KimbleId'/><Value Type='Text'>$($kimbleProjectObject.KimbleId)</Value></Eq></Where></Query></View>" -ErrorAction Stop
+        }
+    catch{
+        log-error -myError $_ -myFriendlyMessage "Error retrieving [Kimble Projects] list item [$($kimbleProjectObject.Name)] in update-spoKimbleProjectItem()" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+        }
+
+    #Update it
+    if(!$existingItem){
+        if($verboseLogging){Write-Host -ForegroundColor DarkRed "`tFAILED: Existing item [$($kimbleProjectObject.Name)] in [Kimble Projects] not found"}
+        }
+    else{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Existing item [$($existingItem.FieldValues.Title)] in [Kimble Clients] found"}
+        $updateValues = @{"Title"=$kimbleProjectObject.Name;"KimbleId"=$kimbleProjectObject.Id;"KimbleClientId"=$kimbleProjectObject.KimbleOne__Account__c;"IsDirty"=$true;"IsDeleted"=$kimbleProjectObject.IsDeleted}
+        if($kimbleProjectObject.LastModifiedDate){$updateValues.Add("LastModifiedDate",$(Get-Date $kimbleProjectObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
+        try{
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPListItem -List $($pnpProjectList.Id) -Identity $($existingItem.Id) -Values @{$(stringify-hashTable $updateValues)}"}
+            $updatedItem = Set-PnPListItem -List $pnpProjectList.Id -Identity $existingItem.Id -Values $updateValues -ErrorAction Stop
+            }
+        catch{
+            log-error -myError $_ -myFriendlyMessage "Error updating [Kimble Projects] list item [$($existingItem.FieldValues.Title)] in update-spoKimbleProjectItem()" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+            }
+        if($updatedItem){if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Item [$($updatedItem.FieldValues.Title)] updated in [Kimble Projects]"}}
+        else{Write-Host -ForegroundColor DarkRed "`tFAILED: Item [$($existingItem.FieldValues.Title)] NOT updated in [Kimble Projects], even though I found it to update :("}
+        }
+    #Return it
+    $updatedItem
+   }
 function update-spoTerm($termGroup,$termSet,$oldTerm,$newTerm,$kimbleId,$verboseLogging){
      if($verboseLogging){Write-Host -ForegroundColor Magenta "update-spoTerm($termGroup,$termSet,$oldTerm,$newTerm)"}
      $cleanOldTerm = $(sanitise-forTermStore $oldTerm)

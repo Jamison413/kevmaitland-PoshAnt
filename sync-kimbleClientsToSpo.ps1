@@ -11,9 +11,10 @@ else{
 Start-Transcript $transcriptLogName -Append
 
 Import-Module _PS_Library_GeneralFunctionality
-Import-Module _CSOM_Library-SPO.psm1
+#Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-Kimble.psm1
-Import-Module _REST_Library-SPO.psm1
+#Import-Module _REST_Library-SPO.psm1
+Import-Module _PNP_Library_SPO
 
 ##################################
 #
@@ -32,35 +33,29 @@ $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desk
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
-$kimbleLogin = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
-$kimbleRestHeaders = get-kimbleHeaders -clientId $kimbleLogin.clientId -clientSecret $kimbleLogin.clientSecret -username $kimbleLogin.username -password $kimbleLogin.password -securityToken $kimbleLogin.password -connectToLiveContext $true -verboseLogging $verboseLogging
+$kimbleCreds = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
+$standardKimbleHeaders = get-kimbleHeaders -clientId $kimbleCreds.clientId -clientSecret $kimbleCreds.clientSecret -username $kimbleCreds.username -password $kimbleCreds.password -securityToken $kimbleCreds.securityToken -connectToLiveContext $true -verboseLogging $true
+$standardKimbleQueryUri = get-kimbleQueryUri
 
-
+Connect-PnPOnline -Url $($webUrl+$sitePath) -Credentials $adminCreds
 
 #region Kimble Sync
 #Get the last Client modified in [/lists/Kimble Clients] to minimise the number of records to process
 try{
-    log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-    $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -logFile $fullLogPathAndName -verboseLogging $verboseLogging
-    if($clientDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientDigest.expiryTime)" -logFile $fullLogPathAndName}
-    else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
+    log-action -myMessage "Getting [Kimble Clients] to minimise the number of records to process" -logFile $fullLogPathAndName 
+    $kc = Get-PnPList -Identity "Kimble Clients" -Includes ContentTypes, LastItemModifiedDate
+    if($kc){log-result -myMessage "SUCCESS: List retrieved" -logFile $fullLogPathAndName}
+    else{log-result -myMessage "FAILURE: List could not be retrieved" -logFile $fullLogPathAndName}
     }
-catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for https://anthesisllc.sharepoint.com/clients" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-try{
-    log-action -myMessage "Getting List: [$listName]" -logFile $fullLogPathAndName
-    $kp = get-list -serverUrl $webUrl  -sitePath $sitePath -listName $listName -restCreds $restCreds
-    if($kp){log-result -myMessage "SUCCESS: List retrieved!" -logFile $fullLogPathAndName}
-    else{log-result -myMessage "FAILED: Unable to retrieve list" -logFile $fullLogPathAndName}
-    }
-catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [Kimble Clients]" -fullLogFile $fullLogPathAndName -errorLogFile -doNotLogToEmail $true}
 
 #Get the Kimble Clients that have been modifed since the last update
-$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
+$cutoffDate = (Get-Date (Get-Date $kc.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
 #$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddYears(-1) -Format s) #Bodge this once for the initial Sync
 $soqlQuery = "SELECT Name,Id,Description,Type,KimbleOne__IsCustomer__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted FROM account WHERE ((LastModifiedDate > $cutoffDate`Z) AND ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client')))"
 try{
     log-action -myMessage "Getting Kimble Client data" -logFile $fullLogPathAndName
-    $kimbleModifiedClients = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $kimbleRestHeaders
+    $kimbleModifiedClients = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $standardKimbleHeaders
     if($kimbleModifiedClients){log-result -myMessage "SUCCESS: $($kimbleModifiedClients.Count) records retrieved!" -logFile $fullLogPathAndName}
     elseif($kimbleModifiedClients -eq $null){log-result -myMessage "SUCCESS: Connected, but no records to update." -logFile $fullLogPathAndName}
     else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
@@ -68,29 +63,22 @@ try{
 catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Client data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
 $kimbleChangedClients = $kimbleModifiedClients | ?{$_.LastModifiedDate -ge $cutoffDate -and $_.CreatedDate -lt $cutoffDate}
 $kimbleNewClients = $kimbleModifiedClients | ?{$_.CreatedDate -ge $cutoffDate}
-#Check any other Clients for changes
-#At what point does it become more efficent to dump the whole [Kimble Clients] List from SP, rather than query individual items?
-#SP pages results back in 100s, so when $spClient.Count/100 -gt $kimbleChangedClients.Count, it will take fewer requests to query each $kimbleChangedClients individually. This ought to happen most of the time (unless there is a batch update of Clients)
 
-<# Use this is a batch update...
-$spClients = get-itemsInList -sitePath $sitePath -listName "Kimble Clients"
-foreach($kimbleChangedClient in $kimbleChangedClients){
-    $spClient = $null
-    $spClient = $spClients | ?{$_.KimbleId -eq $kimbleChangedClient.Id}
-    if($spClient){
-        #Check whether spClient.Title = modClient.Name and update and mark IsDirty if necessary ;PreviousName=
-        #if($spClient)
-        }
-    else{#Client is missing from SP, so add it
-        $kimbleNewClients += $kimbleChangedClient
-        }
-    }
-#>
-#Otherwise, use this:
 foreach($kimbleChangedClient in $kimbleChangedClients){
     log-action -myMessage "CHANGED CLIENT:`t[$($kimbleChangedClient.Name)] needs updating!" -logFile $fullLogPathAndName
     try{
-        log-action -myMessage "Retrieving existing Client from SPO" -logFile $fullLogPathAndName
+        $updatedClient = update-spoKimbleClientItem -kimbleClientObject $kimbleChangedClient -pnpClientList $kc -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging
+        }
+    catch{
+        log-error -myError $_ -myFriendlyMessage "Error updating Client [$($kimbleChangedClient.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+        }
+    if($updatedClient){log-result -myMessage "SUCCESS: Looks like that worked!" -logFile $fullLogPathAndName}
+    else{
+        log-result -myMessage "FAILED: Looks like Client [$($kimbleChangedClient.Name)] didn't update correctly - will send it fcor re-creation" -logFile $fullLogPathAndName
+        $kimbleNewClients += $kimbleChangedClient
+        }
+    }
+<#        log-action -myMessage "Retrieving existing Client from SPO" -logFile $fullLogPathAndName
         $kpListItem = get-itemsInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Clients" -oDataQuery "?&`$filter=KimbleId eq `'$($kimbleChangedClient.Id)`'" -restCreds $restCreds -logFile $fullLogPathAndName
         if($kpListItem){
             log-result -myMessage "SUCCESS: list item [$($kpListItem.Title)] retrieved!" -logFile $fullLogPathAndName
@@ -124,11 +112,22 @@ foreach($kimbleChangedClient in $kimbleChangedClients){
         }
     catch{log-error -myError $_ -myFriendlyMessage "Error retrieving SPO List Item for Kimble Client [$($kimbleChangedClient.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
     }
-
+#>
 
 #Add the new Clients
 foreach ($kimbleNewClient in $kimbleNewClients){
-    new-spoClient -kimbleClientObject $kimbleNewClient -webUrl $webUrl -sitePath $sitePath -spoClientList $kp -restCreds $restCreds -clientDigest $clientDigest -fullLogPathAndName $fullLogPathAndName
+    #new-spoClient -kimbleClientObject $kimbleNewClient -webUrl $webUrl -sitePath $sitePath -spoClientList $kp -restCreds $restCreds -clientDigest $clientDigest -fullLogPathAndName $fullLogPathAndName
+    log-action -myMessage "NEW CLIENT:`t[$($kimbleNewClient.Name)] needs creating!" -logFile $fullLogPathAndName
+    try{
+        $newClient = new-spoKimbleClientItem -kimbleClientObject $kimbleNewClient -pnpClientList $kc -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging
+        }
+    catch{
+        log-error -myError $_ -myFriendlyMessage "Error creating Client [$($kimbleNewClient.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+        }
+    if($newClient){log-result -myMessage "SUCCESS: Looks like that worked!" -logFile $fullLogPathAndName}
+    else{
+        log-result -myMessage "FAILED: Looks like Client [$($kimbleNewClient.Name)] didn't create correctly :(  - that's a bit of a problem!" -logFile $fullLogPathAndName
+        }
     }
 
 #endregion
