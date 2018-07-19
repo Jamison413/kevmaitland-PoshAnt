@@ -127,9 +127,9 @@ function delete-userAccounts($userSAM){
     }
 #endregion
 
-$creds = set-MsolCredentials
-connect-ToMsol -credential $creds
-connect-ToExo -credential $creds
+$msolCredentials = set-MsolCredentials
+connect-ToMsol -credential $msolCredentials
+connect-ToExo -credential $msolCredentials
 Set-SPORestCredentials -Credential $creds
 
 $plaintextPassword = "Ttfn123!"
@@ -169,24 +169,25 @@ $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "
 #region deprovision
 
 
-$binMe = convertTo-arrayOfStrings "Jack.Dodd.Sachdev@anthesisgroup.com"
+$binMe = convertTo-arrayOfStrings "nicky.chambers@anthesisgroup.com
+Mahmoud.Abourich@anthesisgroup.comm"
 foreach($user in $binMe){
-    $jp = Get-User -Identity $user
-    Set-MsolUser -UserPrincipalName $jp.UserPrincipalName -BlockCredential $true
-    Set-MsolUserPassword -UserPrincipalName $jp.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
-    Get-DistributionGroup -Filter "Members -eq '$($jp.DistinguishedName)'" | % {
-        Remove-DistributionGroupMember -Identity $_.Id -Member $jp.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+    $userMsolObject = Get-User -Identity $user
+    Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -BlockCredential $true
+    Set-MsolUserPassword -UserPrincipalName $userMsolObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
+    Get-DistributionGroup -Filter "Members -eq '$($userMsolObject.DistinguishedName)'" | % {
+        Remove-DistributionGroupMember -Identity $_.Id -Member $userMsolObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
         }
-    Set-Mailbox $jp.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
-    Set-MsolUser -UserPrincipalName $jp.UserPrincipalName -DisplayName $("Ω_"+$jp.DisplayName) 
-    remove-msolLicenses -userSAM $($jp.UserPrincipalName.Replace("@anthesisgroup.com",""))
+    Set-Mailbox $userMsolObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
+    Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -DisplayName $("Ω_"+$userMsolObject.DisplayName) 
+    remove-msolLicenses -userSAM $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
     }
 #-InactiveMailbox 
 
 
 
 
-
+add-mailboxpermission -id Mahmoud.Abourich -access fullaccess -user simon.pickup
 
 
 

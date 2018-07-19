@@ -20,4 +20,4 @@ $duffers | %{
 $emailAddressesToCheck 
 
 $trace = get-allToAddressXHours -recipientAddress $emailAddressesToCheck -hoursAgo 720
-$trace | Export-Csv -Path C:\Users\kevin.maitland\Desktop\AuditLogs\duffDGMailTraces_2018_06_14.csv
+$trace | Export-Csv -Path C:\Users\kevin.maitland\Desktop\AuditLogs\duffDGMailTraces_$(Get-Date -Format "yyMMdd").csv
