@@ -241,7 +241,7 @@ function get-kimbleHeaders($clientId,$clientSecret,$username,$password,$security
         $kimbleAccessToken=Invoke-RestMethod -Method Post -Uri $callbackUri -Body $oAuthReqBody
         } 
     catch {
-        #Failure
+        Failure
         }
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t`$kimbleAccessToken = $kimbleAccessToken"}
     $kimbleRestHeaders = @{Authorization = "Bearer " + $kimbleAccessToken.access_token}
@@ -505,6 +505,5 @@ function update-kimbleOppToFocalPointCache($kimbleOpp, $dbConnection, $verboseLo
     if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: $result"}}
     $result
     }
-
 
 
