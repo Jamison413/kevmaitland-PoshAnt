@@ -158,7 +158,9 @@ foreach($kimbleChangedProject in $kimbleChangedProjects){
 foreach ($kimbleNewProject in $kimbleNewProjects){
     log-action -myMessage "NEW PROJECT:`t[$($kimbleNewProject.Name)] needs creating!" -logFile $fullLogPathAndName
     #SusChem don't want folders set up for specific types of Project
-    if(($kimbleNewProject.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleNewProject.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleNewProject.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
+    if(($kimbleNewProject.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleNewProject.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleNewProject.Project_Type__c -eq "Registration Consortia")) `
+        -or $kimbleModifiedProjects[0].Id -eq "0012400000TVyffAAD" #Anthesis LLC
+        ){$doNotProcess = $true} #Exemption for specific SusChem projects
         else{$doNotProcess = $false} #Everyone else wants Project folders set up
     $kimbleNewProjectData = @{KimbleId=$kimbleNewProject.Id;Title=$kimbleNewProject.Name;KimbleClientId=$kimbleNewProject.KimbleOne__Account__c;IsDeleted=$kimbleNewProject.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
     #Create the new List item

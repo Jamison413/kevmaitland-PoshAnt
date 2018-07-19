@@ -147,7 +147,7 @@ $service = New-Object Microsoft.Exchange.WebServices.Data.ExchangeService($exchv
 $service.Credentials = New-Object System.Net.NetworkCredential($upnSMA,$passSMA)
 $service.Url = $ewsUrl
 
-$listOfMailboxesToScrape = @("tim.clare","jono.adams","brad.blundell","ian.forrester","craig.simmons")
+$listOfMailboxesToScrape = @("louise.trimby","tobias.parker","chris.jennings","mark.griffin")
 foreach($user in $listOfMailboxesToScrape){
     $mailboxEmailAddress = "$user@$upnExtension"
     $service.ImpersonatedUserId = new-object Microsoft.Exchange.WebServices.Data.ImpersonatedUserId([Microsoft.Exchange.WebServices.Data.ConnectingIdType]::SmtpAddress, $mailboxEmailAddress) -ErrorAction Stop

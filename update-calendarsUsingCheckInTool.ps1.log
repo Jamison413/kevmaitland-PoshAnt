@@ -1,0 +1,74 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20180710065002
+Username: NETMON\Admin
+RunAs User: NETMON\Admin
+Configuration Name: 
+Machine: NETMON (Microsoft Windows NT 10.0.17134.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.EXE C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1
+Process ID: 8292
+PSVersion: 5.1.17134.137
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.17134.137
+BuildVersion: 10.0.17134.137
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1.log
+Import-Module : The specified module 'ActiveDirectory' was not loaded because no valid module file was found in any 
+module directory.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:16 char:1
++ Import-Module -Name ActiveDirectory
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ResourceUnavailable: (ActiveDirectory:String) [Import-Module], FileNotFoundException
+    + FullyQualifiedErrorId : Modules_ModuleNotFound,Microsoft.PowerShell.Commands.ImportModuleCommand
+Import-Module : The specified module 'ActiveDirectory' was not loaded because no valid module file
+was found in any module directory.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:16
+char:1
++ Import-Module -Name ActiveDirectory
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ResourceUnavailable: (ActiveDirectory:String) [Import-Module], FileN
+   otFoundException
+    + FullyQualifiedErrorId : Modules_ModuleNotFound,Microsoft.PowerShell.Commands.ImportModuleCom
+   mand
+
+Get-ADUser : The term 'Get-ADUser' is not recognized as the name of a cmdlet, function, script file, or operable 
+program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:134 char:18
++     $usersList = Get-ADUser -Filter * -SearchBase "OU=Users,OU=Sustai ...
++                  ~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (Get-ADUser:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+Get-ADUser : The term 'Get-ADUser' is not recognized as the name of a cmdlet, function, script
+file, or operable program. Check the spelling of the name, or if a path was included, verify that
+the path is correct and try again.
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:134
+char:18
++     $usersList = Get-ADUser -Filter * -SearchBase "OU=Users,OU=Sustai ...
++                  ~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (Get-ADUser:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+Exception calling "LoadPropertiesForItems" with "2" argument(s): "The collection is empty.
+Parameter name: items"
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:150 char:5
++     [Void]$service.LoadPropertiesForItems($foundItems,$propertySet)
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : ArgumentException
+Exception calling "LoadPropertiesForItems" with "2" argument(s): "The collection is empty.
+Parameter name: items"
+At C:\Users\kevinm\Documents\WindowsPowerShell\Modules\update-calendarsUsingCheckInTool.ps1:150
+char:5
++     [Void]$service.LoadPropertiesForItems($foundItems,$propertySet)
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : ArgumentException
+
+**********************
+Windows PowerShell transcript end
+End time: 20180710065025
+**********************

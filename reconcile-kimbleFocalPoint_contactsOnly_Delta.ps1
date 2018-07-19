@@ -22,11 +22,32 @@ $kimbleCreds = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
 $standardKimbleHeaders = get-kimbleHeaders -clientId $kimbleCreds.clientId -clientSecret $kimbleCreds.clientSecret -username $kimbleCreds.username -password $kimbleCreds.password -securityToken $kimbleCreds.securityToken -connectToLiveContext $true -verboseLogging $true
 $standardKimbleQueryUri = get-kimbleQueryUri
 
-$lastCreatedAccountInDbSql = "SELECT MAX(CreatedDate) AS LastCreatedDate FROM SUS_Kimble_Accounts"
-$lastCreatedAccountInDb = Execute-SQLQueryOnSQLDB -query $lastCreatedAccountInDbSql -queryType Scalar -sqlServerConnection $sqlDbConn
-$lastModifiedAccountInDbSql = "SELECT MAX(LastModifiedDate) AS LastModifiedDate FROM SUS_Kimble_Accounts"
-$lastModifiedAccountInDb = Execute-SQLQueryOnSQLDB -query $lastModifiedAccountInDbSql -queryType Scalar -sqlServerConnection $sqlDbConn
-$cutoffModifiedAccountDate = Get-Date $lastModifiedAccountInDb -Format s #Does this need to account for Daylight Saving Time?
+$kContacts = get-allKimbleContacts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders
+
+$kContacts | % {
+    if((Get-Date $_.CreatedDate) -gt $lastCreatedAccountInDb){
+        #Create any new Accounts
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow Creating Account [$($_.Name)]:[$($_.Id)]}
+        $result = add-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn -verboseLogging $verboseLogging
+        if($result -ne 1){[array]$duffCreateAccounts += @($_,$result)}
+        }
+    else{
+        #If it's not new, it must have been modified, so Update it
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow Updating Opp [$($_.Name)]:[$($_.Id)]}
+        $result = update-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn -verboseLogging $verboseLogging
+        if($result -ne 1){[array]$duffModifyAccounts += @($_,$result)}
+        }
+    }
+
+
+
+
+
+$lastCreatedContactInDbSql = "SELECT MAX(CreatedDate) AS LastCreatedDate FROM SUS_Kimble_Contacts"
+$lastCreatedContactInDb = Execute-SQLQueryOnSQLDB -query $lastCreatedAccountInDbSql -queryType Scalar -sqlServerConnection $sqlDbConn
+$lastModifiedContactInDbSql = "SELECT MAX(LastModifiedDate) AS LastModifiedDate FROM SUS_Kimble_Contacts"
+$lastModifiedContactInDb = Execute-SQLQueryOnSQLDB -query $lastModifiedAccountInDbSql -queryType Scalar -sqlServerConnection $sqlDbConn
+$cutoffModifiedContactDate = Get-Date $lastModifiedAccountInDb -Format s #Does this need to account for Daylight Saving Time?
 
 #Get all modified Accounts records since the last update (delta update) - this will necessarily include all created records
 $modifiedKimbleAccounts = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE LastModifiedDate > $cutoffModifiedAccountDate`Z"
