@@ -63,7 +63,7 @@ $kimbleRestHeaders = @{Authorization = "Bearer " + $kimbleAccessToken.access_tok
 
 
 #region Kimble Sync
-#Get the last Project modified in /Projects/lists/Kimble Projects to minimise the number of records to process
+#Get the last Lead modified in /lists/Kimble Leads to minimise the number of records to process
 try{
     log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
     $clientDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -verboseLogging $verboseLogging -logFile $fullLogPathAndName
@@ -124,7 +124,7 @@ foreach($kimbleChangedLead in $kimbleChangedLeads){
                 #If it has, update the entry in [Kimble Leads]
                 #SusChem don't want folders set up for specific sorts of Leads
                 if(($kimbleChangedLead.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleChangedLead.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleChangedLead.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
-                    else{$doNotProcess = $false} #Everyone else wants Project folders set up
+                    else{$doNotProcess = $false} #Everyone else wants Lead folders set up
                 $updateData = @{PreviousName=$kpListItem.LeadName;PreviousKimbleClientId=$kpListItem.KimbleClientId;Title=$kimbleChangedLead.Name;KimbleClientId=$kimbleChangedLead.KimbleOne__Account__c;IsDeleted=$kimbleChangedLead.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
                 try{
                     log-action -myMessage "Updating SPO [Kimble Lead] item $($kpListItem.Title)" -logFile $fullLogPathAndName
@@ -141,7 +141,7 @@ foreach($kimbleChangedLead in $kimbleChangedLeads){
                 }            
             else{
                 log-result -myMessage "WARNING: SPO [Kimble Leads].[$($kpListItem.Title)] has changed, but I can't work out what needs changing (this might be because this Lead has alrady been processed, or because the changes don't affect the SPO object)." -logFile $fullLogPathAndName
-                #$kimbleNewProjects += $kimbleChangedProject  #Only uncomment this to reprocess borked Leads
+                #$kimbleNewLeads += $kimbleChangedLead  #Only uncomment this to reprocess borked Leads
                 }
             }
         else{
@@ -158,19 +158,19 @@ foreach($kimbleChangedLead in $kimbleChangedLeads){
 foreach ($kimbleNewLead in $kimbleNewLeads){
     log-action -myMessage "NEW LEAD:`t[$($kimbleNewLead.Name)] needs creating!" -logFile $fullLogPathAndName
     #SusChem don't want folders set up for specific types of Lead
-    if(($kimbleNewLead.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleNewLead.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleNewLead.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem projects
-        else{$doNotProcess = $false} #Everyone else wants Project folders set up
+    if(($kimbleNewLead.Community__c -eq "UK - Sustainable Chemistry" -and ($kimbleNewLead.Project_Type__c -eq "Only Representative (including TPR)" -or $kimbleNewLead.Project_Type__c -eq "Registration Consortia"))){$doNotProcess = $true} #Exemption for specific SusChem Leads
+        else{$doNotProcess = $false} #Everyone else wants Lead folders set up
     $kimbleNewLeadData = @{KimbleId=$kimbleNewLead.Id;Title=$kimbleNewLead.Name;KimbleClientId=$kimbleNewLead.KimbleOne__Account__c;IsDeleted=$kimbleNewLead.IsDeleted;IsDirty=$true;DoNotProcess=$doNotProcess}
     #Create the new List item
     try{
         log-action -myMessage "Creating new SPO List item [$($kimbleNewLead.Name)]" -logFile $fullLogPathAndName
-        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewLeadData -restCreds $restCreds -digest $clientDigest -verboseLogging $verboseLogging -logFile $fullLogPathAndName
+        $newItem = new-itemInList -serverUrl $webUrl -sitePath $sitePath -listName "Kimble Leads" -predeterminedItemType $kp.ListItemEntityTypeFullName -hashTableOfItemData $kimbleNewLeadData -restCreds $restCreds -digest $clientDigest -verboseLogging $TRUE -logFile $fullLogPathAndName
         #Check it's worked
         if($newItem){log-result -myMessage "SUCCESS: SPO [Kimble Lead] item $($newItem.Title) created!" -logFile $fullLogPathAndName}
         else{
             log-result -myMessage "FAILED: SPO [Kimble Lead] item $($kimbleNewLead.Name) did not create!" -logFile $fullLogPathAndName
-            #Bodge this with an e-mail alert as we don't want Projects going missing
-            Send-MailMessage -SmtpServer $smtpServer -To $mailTo -From $mailFrom -Subject "Kimble Lead [$($kimbleNewLead.Name)] could not be created in SPO" -Body "Project: $($kimbleNewLead.Id)"
+            #Bodge this with an e-mail alert as we don't want Leads going missing
+            Send-MailMessage -SmtpServer $smtpServer -To $mailTo -From $mailFrom -Subject "Kimble Lead [$($kimbleNewLead.Name)] could not be created in SPO" -Body "Lead: $($kimbleNewLead.Id)"
             }
         }
     catch{log-error -myError $_ -myFriendlyMessage "Failed to create new [Kimble Leads].$($kimbleNewLead.Name) with @{$($($kimbleNewLeadData.Keys | % {$_+":"+$kimbleNewLeadData[$_]+","}) -join "`r")}" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailTo $mailTo -mailFrom $mailFrom}

@@ -29,7 +29,7 @@ $lastModifiedAccountInDb = Execute-SQLQueryOnSQLDB -query $lastModifiedAccountIn
 $cutoffModifiedAccountDate = Get-Date $lastModifiedAccountInDb -Format s #Does this need to account for Daylight Saving Time?
 
 #Get all modified Accounts records since the last update (delta update) - this will necessarily include all created records
-$modifiedKimbleAccounts = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE LastModifiedDate > $cutoffModifiedAccountDate`Z"
+$modifiedKimbleAccounts = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE LastModifiedDate > $cutoffModifiedAccountDate`Z" -verboseLogging $true
 $modifiedKimbleAccounts | % {
     if((Get-Date $_.CreatedDate) -gt $lastCreatedAccountInDb){
         #Create any new Accounts

@@ -5,7 +5,7 @@
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles")
-Import-Module _PS_Library_GeneralFunctionality
+#Import-Module _PS_Library_GeneralFunctionality
 $webUrl = "https://anthesisllc.sharepoint.com" 
 
 function add-memberToGroup($credentials, $webUrl, $siteCollection, $sitePath, $groupName, $memberToAdd){

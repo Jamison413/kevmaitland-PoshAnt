@@ -1,10 +1,33 @@
-﻿$expiryUsers = Get-MsolUser -All | ?{($(get-date )-$(Get-Date $_.LastPasswordChangeTimestamp)).Days -ge 105 -and $_.islicensed}
+﻿$logFileLocation = "C:\ScriptLogs\"
+$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    $fullLogPathAndName = $logFileLocation+"alert-passwordExpiry365_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"alert-passwordExpiry365_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+else{
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+$debugLog = "$env:USERPROFILE\Desktop\debugdump.log"
+Start-Transcript $transcriptLogName -Append
+
+
+Import-Module _PS_Library_MSOL
+Import-Module _PS_Library_GeneralFunctionality
+
+$groupAdmin = "groupbot@anthesisgroup.com"
+#convertTo-localisedSecureString ""
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
+connect-ToMsol -credential $adminCreds
+
+$expiryUsers = Get-MsolUser -All | ?{($(get-date )-$(Get-Date $_.LastPasswordChangeTimestamp)).Days -ge 105 -and $_.islicensed}
 
 $expiryUsers | % {
     $thisUser = $_
      write-host $thisUser.DisplayName `t $($($(Get-Date $thisUser.LastPasswordChangeTimestamp).AddDays(120) - $(Get-Date)).Days)
-    #if(@(1,7,15) -contains ($(get-date )-$(Get-Date $thisUser.LastPasswordChangeTimestamp)).Days){
-    if($($($(Get-Date $thisUser.LastPasswordChangeTimestamp).AddDays(120) - $(Get-Date)).Days) -ge 0){
+    if(@(1,7,15) -contains ($(get-date )-$(Get-Date $thisUser.LastPasswordChangeTimestamp)).Days){
+    #if($($($(Get-Date $thisUser.LastPasswordChangeTimestamp).AddDays(120) - $(Get-Date)).Days) -ge 0){
         Write-Host -for Yellow "ExpiringIn" $thisUser.UserPrincipalName
         $subject = "365 password expiry in $($($(Get-Date $thisUser.LastPasswordChangeTimestamp).AddDays(120) - $(Get-Date)).Days) days"
         $body = "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FirstName),`r`n`r`n<BR><BR>"
@@ -30,8 +53,8 @@ $expiryUsers | % {
         $body += "The Helpful 365 Password Robot`r`n`r`n<BR><BR></FONT></HTML>"
         Send-MailMessage -To $thisUser.UserPrincipalName -From "thehelpful365passwordrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
-    #elseif(($(get-date )-$(Get-Date $thisUser.LastPasswordChangeTimestamp)).Days -le 0 -and ($(get-date )-$(Get-Date $thisUser.LastPasswordChangeTimestamp)).Days %7 -eq 0){
-    else{
+    elseif(($(get-date )-$(Get-Date $thisUser.LastPasswordChangeTimestamp)).Days -le 0 -and ($(get-date )-$(Get-Date $thisUser.LastPasswordChangeTimestamp)).Days %7 -eq 0){
+    #else{
         Write-Host -for Magenta "Expired" $thisUser.UserPrincipalName
         $subject = "365 password expired $($($(Get-Date $thisUser.LastPasswordChangeTimestamp).AddDays(120) - $(Get-Date)).Days*-1) days ago"
         $body = "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FirstName),`r`n`r`n<BR><BR>"
@@ -59,3 +82,4 @@ $expiryUsers | % {
         }
     }
 
+Stop-Transcript
