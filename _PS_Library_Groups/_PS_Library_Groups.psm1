@@ -207,8 +207,8 @@ function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwne
     if($type -eq "owner"){$body += "To help us all remain compliant and secure, group <I>ownership</I> is still managed centrally by your IT Team, and you will need to liaise with them to make changes to group ownership.`r`n`r`n<BR><BR>"}
     $body += "As an owner, you can manage the membership of this group (and there is a <A HREF=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Group-membership-management-(for-Team-Managers).aspx`">guide available to help you</A>), or you can contact the IT team for your region,`r`n`r`n<BR><BR>"
     $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
-    Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-    #Send-MailMessage -To $ownerReport.To -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+    #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+    Send-MailMessage -To $ownerReport.To -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
     #$body
     }
 function sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport){
@@ -257,7 +257,7 @@ function sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[b
             #Nah - let's just alert for now.
             }
         }
-    if(!$dontSendEmailReport){report-groupMembershipSync -groupChangesArray $membersChanged -changesAreToGroupOwners $false -actionedGroupIs365 $false -emailAddressForOverviewReport $itAdminEmailAddress}
+    if(!$dontSendEmailReport -and $membersChanged){report-groupMembershipSync -groupChangesArray $membersChanged -changesAreToGroupOwners $false -actionedGroupIs365 $false -emailAddressForOverviewReport $itAdminEmailAddress}
     }
 function sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport){
     $itAdminEmailAddress = "kevin.maitland@anthesisgroup.com"
@@ -324,7 +324,7 @@ function sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$d
             #Nah - let's just alert for now.
             }
         }   
-    if(!$dontSendEmailReport){report-groupMembershipSync -groupChangesArray $ownersChanged -changesAreToGroupOwners $true -actionedGroupIs365 $true -emailAddressForOverviewReport $itAdminEmailAddress}
+    if(!$dontSendEmailReport -and $ownersChanged){report-groupMembershipSync -groupChangesArray $ownersChanged -changesAreToGroupOwners $true -actionedGroupIs365 $true -emailAddressForOverviewReport $itAdminEmailAddress}
     }
 
 <#

@@ -1,14 +1,35 @@
-﻿
+﻿$logFileLocation = "C:\ScriptLogs\"
+$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    $fullLogPathAndName = $logFileLocation+"enableMFA_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"enableMFA_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+else{
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+Start-Transcript $transcriptLogName -Append
+
+Import-Module _PS_Library_GeneralFunctionality
+Import-Module _PS_Library_MSOL
+
+$Admin = "kevin.maitland@anthesisgroup.com"
+$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Kev.txt) 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+
+connect-ToMsol -credential $adminCreds
+
 $auth = New-Object -TypeName Microsoft.Online.Administration.StrongAuthenticationRequirement
 $auth.RelyingParty = "*"
-$auth.State = "Enabled"
+$auth.State = "Enforced"
 $auth.RememberDevicesNotIssuedBefore = (Get-Date)
 
-$users = convertTo-arrayOfEmailAddresses "Matt Whitehead <Matt.Whitehead@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>; Mark Sayers <Mark.Sayers@anthesisgroup.com>; Amy Dartington <Amy.Dartington@anthesisgroup.com>; Debra Haylings <debra.haylings@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>; Debra Haylings <debra.haylings@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "Alex McKay <alex.mckay@anthesisgroup.com>; Fiona Place <Fiona.Place@anthesisgroup.com>; Andrew Noone <Andrew.Noone@anthesisgroup.com>; Chris Morris <Chris.Morris@anthesisgroup.com>; Harriet Bell <Harriet.Bell@anthesisgroup.com>; Jennifer Wilson <jennifer.wilson@anthesisgroup.com>; Graeme Hadley <Graeme.Hadley@anthesisgroup.com>; Ben Tuxworth <Ben.Tuxworth@anthesisgroup.com>; Claire Richards <Claire.Richards@anthesisgroup.com>; James MacPherson <James.MacPherson@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "Chris Stanley <Chris.Stanley@anthesisgroup.com>; Chris Turner <Chris.Turner@anthesisgroup.com>; Helen Kean <Helen.Kean@anthesisgroup.com>; Ian Forrester <Ian.Forrester@anthesisgroup.com>; Jessica Onyshko <jessica.onyshko@anthesisgroup.com>; Karen Cooksey <Karen.Cooksey@anthesisgroup.com>; Paul Ashford <Paul.Ashford@anthesisgroup.com>; Paul Dornan <Paul.Dornan@anthesisgroup.com>; Pearl Németh <Pearl.Nemeth@anthesisgroup.com>; Terry Wood <Terry.Wood@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "Alan Spray <Alan.Spray@anthesisgroup.com>; Alec Burslem <Alec.Burslem@anthesisgroup.com>; Chloe McCloskey <Chloe.McCloskey@anthesisgroup.com>; Claire Stentiford <Claire.Stentiford@anthesisgroup.com>; Eleanor Penney <Eleanor.Penney@anthesisgroup.com>; Matt Fishwick <Matt.Fishwick@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>; Sophie Sapienza <Sophie.Sapienza@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>"
+#$users = convertTo-arrayOfEmailAddresses "Matt Whitehead <Matt.Whitehead@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>; Mark Sayers <Mark.Sayers@anthesisgroup.com>; Amy Dartington <Amy.Dartington@anthesisgroup.com>; Debra Haylings <debra.haylings@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>"
+#$users = convertTo-arrayOfEmailAddresses "Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>; Debra Haylings <debra.haylings@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>"
+#$users = convertTo-arrayOfEmailAddresses "Alex McKay <alex.mckay@anthesisgroup.com>; Fiona Place <Fiona.Place@anthesisgroup.com>; Andrew Noone <Andrew.Noone@anthesisgroup.com>; Chris Morris <Chris.Morris@anthesisgroup.com>; Harriet Bell <Harriet.Bell@anthesisgroup.com>; Jennifer Wilson <jennifer.wilson@anthesisgroup.com>; Graeme Hadley <Graeme.Hadley@anthesisgroup.com>; Ben Tuxworth <Ben.Tuxworth@anthesisgroup.com>; Claire Richards <Claire.Richards@anthesisgroup.com>; James MacPherson <James.MacPherson@anthesisgroup.com>"
+#$users = convertTo-arrayOfEmailAddresses "Chris Stanley <Chris.Stanley@anthesisgroup.com>; Chris Turner <Chris.Turner@anthesisgroup.com>; Helen Kean <Helen.Kean@anthesisgroup.com>; Ian Forrester <Ian.Forrester@anthesisgroup.com>; Jessica Onyshko <jessica.onyshko@anthesisgroup.com>; Karen Cooksey <Karen.Cooksey@anthesisgroup.com>; Paul Ashford <Paul.Ashford@anthesisgroup.com>; Paul Dornan <Paul.Dornan@anthesisgroup.com>; Pearl Németh <Pearl.Nemeth@anthesisgroup.com>; Terry Wood <Terry.Wood@anthesisgroup.com>"
+#$users = convertTo-arrayOfEmailAddresses "Alan Spray <Alan.Spray@anthesisgroup.com>; Alec Burslem <Alec.Burslem@anthesisgroup.com>; Chloe McCloskey <Chloe.McCloskey@anthesisgroup.com>; Claire Stentiford <Claire.Stentiford@anthesisgroup.com>; Eleanor Penney <Eleanor.Penney@anthesisgroup.com>; Matt Fishwick <Matt.Fishwick@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>; Sophie Sapienza <Sophie.Sapienza@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>"
+$users = convertTo-arrayOfEmailAddresses "paul.crewe@anthesisgroup.com"
 
 $users | % {
     $thisUser = Get-MsolUser -UserPrincipalName $_
@@ -21,7 +42,7 @@ $users | % {
     
     }
     
-
+<#
 Get-MsolUser -UserPrincipalName ben.lynch@anthesisgroup.com | fl
 $allUsers = Get-MsolUser -all 
 $allUsers | ? {$_.StrongAuthenticationRequirements -ne $null -and $_.StrongAuthenticationUserDetails -eq $null}
@@ -72,4 +93,4 @@ Enquiries and statements to energyfinance@anthesisgroup.com
 If you have any queries then please contact kath.addison-scott@anthesisgroup.com or greg.francis@anthesisgroup.com
 
 Kind Regards,
-Anthesis  Energy UK's AutoReply Robot"
+Anthesis  Energy UK's AutoReply Robot"#>

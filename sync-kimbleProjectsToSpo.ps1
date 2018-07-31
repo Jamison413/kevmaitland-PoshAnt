@@ -1,5 +1,4 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
     $fullLogPathAndName = $logFileLocation+"sync-kimbleProjectsToSpo_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = $logFileLocation+"sync-kimbleProjectsToSpo_ErrorLog_$(Get-Date -Format "yyMMdd").log"
@@ -8,7 +7,10 @@ else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
-Start-Transcript $transcriptLogName -Append
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
 
 Import-Module _PS_Library_GeneralFunctionality
 #Import-Module _CSOM_Library-SPO.psm1
@@ -24,11 +26,11 @@ Import-Module _PNP_Library_SPO
 $webUrl = "https://anthesisllc.sharepoint.com" 
 $sitePath = "/clients"
 $listName = "Kimble Clients"
-$sharePointAdmin = "kimblebot@anthesisgroup.com"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $mailFrom = "scriptrobot@sustain.co.uk"
 $mailTo = "kevin.maitland@anthesisgroup.com"
 #convertTo-localisedSecureString ""
+$sharePointAdmin = "kimblebot@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password

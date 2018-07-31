@@ -1,5 +1,4 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
     $fullLogPathAndName = $logFileLocation+"alert-passwordExpiry365_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = $logFileLocation+"alert-passwordExpiry365_ErrorLog_$(Get-Date -Format "yyMMdd").log"
@@ -8,9 +7,10 @@ else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
-$debugLog = "$env:USERPROFILE\Desktop\debugdump.log"
-Start-Transcript $transcriptLogName -Append
-
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
 
 Import-Module _PS_Library_MSOL
 Import-Module _PS_Library_GeneralFunctionality
@@ -37,6 +37,6 @@ foreach ($User in $allUsers)
 
 $SMTPForwarding = Get-Mailbox -ResultSize Unlimited | select DisplayName,ForwardingAddress,ForwardingSMTPAddress,DeliverToMailboxandForward | where {$_.ForwardingSMTPAddress -ne $null}
 
-$UserInboxRules | Export-Csv $env:USERPROFILE\Desktop\AuditLogs\MailForwardingRulesToExternalDomains_$(Get-Date -Format "yyMMdd").csv
-$UserDelegates | Export-Csv $env:USERPROFILE\Desktop\AuditLogs\MailboxDelegatePermissions_$(Get-Date -Format "yyMMdd").csv
-$SMTPForwarding | Export-Csv $env:USERPROFILE\Desktop\AuditLogs\Mailboxsmtpforwarding_$(Get-Date -Format "yyMMdd").csv
+$UserInboxRules | Export-Csv C:\Users\kevinm\Desktop\AuditLogs\MailForwardingRulesToExternalDomains_$(Get-Date -Format "yyMMdd").csv
+$UserDelegates | Export-Csv C:\Users\kevinm\Desktop\AuditLogs\MailboxDelegatePermissions_$(Get-Date -Format "yyMMdd").csv
+$SMTPForwarding | Export-Csv C:\Users\kevinm\Desktop\AuditLogs\Mailboxsmtpforwarding_$(Get-Date -Format "yyMMdd").csv

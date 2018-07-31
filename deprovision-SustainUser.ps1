@@ -1,4 +1,5 @@
-﻿Import-Module _PS_Library_Databases.psm1
+﻿Import-Module _PS_Library_GeneralFunctionality
+Import-Module _PS_Library_Databases.psm1
 Import-Module _PS_Library_MSOL.psm1
 Import-Module _REST_Library-SPO.psm1
 
@@ -168,26 +169,27 @@ $selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToR
 $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
 #region deprovision
 
-
-$binMe = convertTo-arrayOfStrings "nicky.chambers@anthesisgroup.com
-Mahmoud.Abourich@anthesisgroup.comm"
+$binMe = convertTo-arrayOfStrings "lucy.boreham@anthesisgroup.com"
 foreach($user in $binMe){
-    $userMsolObject = Get-User -Identity $user
-    Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -BlockCredential $true
-    Set-MsolUserPassword -UserPrincipalName $userMsolObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
-    Get-DistributionGroup -Filter "Members -eq '$($userMsolObject.DistinguishedName)'" | % {
-        Remove-DistributionGroupMember -Identity $_.Id -Member $userMsolObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+    if($user){
+        $userMsolObject = Get-User -Identity $user
+        Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -BlockCredential $true
+        Set-MsolUserPassword -UserPrincipalName $userMsolObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
+        Get-DistributionGroup -Filter "Members -eq '$($userMsolObject.DistinguishedName)'" | % {
+            Remove-DistributionGroupMember -Identity $_.Id -Member $userMsolObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+            }
+        Set-Mailbox $userMsolObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
+        Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -DisplayName $("Ω_"+$userMsolObject.DisplayName) 
+        remove-msolLicenses -userSAM $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
         }
-    Set-Mailbox $userMsolObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
-    Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -DisplayName $("Ω_"+$userMsolObject.DisplayName) 
-    remove-msolLicenses -userSAM $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
     }
 #-InactiveMailbox 
 
 
 
 
-add-mailboxpermission -id Mahmoud.Abourich -access fullaccess -user simon.pickup
+add-mailboxpermission -id lucy.boreham -access fullaccess -user kirsten.doddy
+
 
 
 
