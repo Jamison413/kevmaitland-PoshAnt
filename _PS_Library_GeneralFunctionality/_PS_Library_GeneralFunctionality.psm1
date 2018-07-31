@@ -8,6 +8,29 @@
     $output = $output.Replace("http:/","http://").Replace("https:/","https://")
     $output
     }
+function compare-objectProperties {
+    #https://blogs.technet.microsoft.com/janesays/2017/04/25/compare-all-properties-of-two-objects-in-windows-powershell/
+    Param(
+        [PSObject]$ReferenceObject,
+        [PSObject]$DifferenceObject 
+        )
+    $objprops = $ReferenceObject | Get-Member -MemberType Property,NoteProperty | % Name
+    $objprops += $DifferenceObject | Get-Member -MemberType Property,NoteProperty | % Name
+    $objprops = $objprops | Sort | Select -Unique
+    $diffs = @()
+    foreach ($objprop in $objprops) {
+        $diff = Compare-Object $ReferenceObject $DifferenceObject -Property $objprop
+        if ($diff) {            
+            $diffprops = @{
+                PropertyName=$objprop
+                RefValue=($diff | ? {$_.SideIndicator -eq '<='} | % $($objprop))
+                DiffValue=($diff | ? {$_.SideIndicator -eq '=>'} | % $($objprop))
+                }
+            $diffs += New-Object PSObject -Property $diffprops
+            }        
+        }
+    if ($diffs) {return ($diffs | Select PropertyName,RefValue,DiffValue)}     
+    }
 function convertTo-arrayOfEmailAddresses($blockOfText){
     $addresses = @()
     $blockOfText | %{
@@ -164,6 +187,14 @@ function get-2letterIsoCodeFromCountryName($pCountryName){
     $3letterCode = get-3letterIsoCodeFromCountryName -pCountryName $pCountryName
     get-2letterIsoCodeFrom3LetterIsoCode -p3letterIsoCode $3letterCode
     }
+function get-keyFromValue($value, $hashTable){
+    foreach ($Key in ($hashTable.GetEnumerator() | Where-Object {$_.Value -eq $value})){
+        $Key.name}
+    }
+function get-keyFromValueViaAnotherKey($value, $interimKey, $hashTable){
+    foreach ($Key in ($hashTable.GetEnumerator() | Where-Object {$_.Value[$interimKey] -eq $value})){
+        $Key.name}
+    }
 function get-timeZones(){
     $timeZones = Get-ChildItem "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Time zones" | foreach {Get-ItemProperty $_.PSPath}; $TimeZone | Out-Null
     $timeZones
@@ -275,6 +306,11 @@ function matchContains($term, $arrayOfStrings){
     # match against that regex
     $term -match $singleRegex
     }
+function sanitise-forPnpSharePoint($dirtyString){ 
+    $cleanerString = sanitise-forSharePointStandard -dirtyString $dirtyString
+    $cleanerString.Replace(":","").Replace("/","")
+    if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
+    }
 function sanitise-forSharePointStandard($dirtyString){
     $dirtyString = $dirtyString.Trim()
     $dirtyString = $dirtyString.Replace(" "," ") #Weird instance where a space character is not a space character...
@@ -340,11 +376,11 @@ function sanitise-forResourcePath($dirtyString){
     }
 function sanitise-forSql([string]$dirtyString){
     if([string]::IsNullOrWhiteSpace($dirtyString)){}
-    else{$dirtyString.Replace("'","`'`'")}
+    else{$dirtyString.Replace("'","`'`'").Replace("`'`'","`'`'")}
     }
 function sanitise-forTermStore($dirtyString){
     #$dirtyString.Replace("\t", " ").Replace(";", ",").Replace("\", "\uFF02").Replace("<", "\uFF1C").Replace(">", "\uFF1E").Replace("|", "\uFF5C")
-    $cleanerString = $dirtyString.Replace("`t", "").Replace(";", "").Replace("\", "").Replace("<", "").Replace(">", "").Replace("|", "")
+    $cleanerString = $dirtyString.Replace("`t", "").Replace(";", "").Replace("\", "").Replace("<", "").Replace(">", "").Replace("|", "").Replace("＆","&").Replace(" "," ").Trim()
     if($cleanerString.Length -gt 255){$cleanerString.Substring(0,254)}
     else{$cleanerString}
     }
@@ -358,13 +394,10 @@ function smartReplace($mysteryString,$findThis,$replaceWithThis){
     else{$result = $mysteryString.ToString().Replace($findThis,$replaceWithThis)}
     $result
     }
+function stringify-hashTable($hashtable,$interlimiter,$delimiter){
+    if([string]::IsNullOrWhiteSpace($interlimiter)){$interlimiter = ":"}
+    if([string]::IsNullOrWhiteSpace($delimiter)){$delimiter = ", "}
+    $dirty = $($($hashtable.Keys | % {$_+"$interlimiter"+$hashtable[$_]+"$delimiter"}) -join "`r")
+    $dirty.Substring(0,$dirty.Length-$delimiter.length)
+    }
 #endregion
-
-$blockOfText = "Chris Keller       Chris.Keller@anthesisgroup.com       Frankfurt, DEU Germany              03/08/2017 14:48:38        
-Michael Hoffmann   michael.hoffmann@anthesisgroup.com                  Germany              04/11/2014 17:27:34        
-Richard Wiles      Richard.Wiles@anthesisgroup.com      Dubai, ARE     United Arab Emirates 14/06/2015 11:22:48        
-endsight           endsight@anthesisgroup.com                          United States        20/08/2015 20:00:41        
-UK HR              UKHR@anthesisgroup.com                              United Kingdom       15/06/2017 14:39:23        
-Mahmoud Abourich   Mahmoud.Abourich@anthesisgroup.com   Dubai, ARE     United Arab Emirates 31/05/2015 08:40:16        
-Mikaela Stojanovic Mikaela.Stojanovic@anthesisgroup.com Stockholm, SWE Sweden               16/09/2016 11:05:33        
-"
