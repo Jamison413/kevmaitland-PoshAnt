@@ -66,12 +66,18 @@ function connect-ToExo($credential){
        connect-ToExo -credential $creds
     #>
     if ($credential -eq $null){$credential = set-MsolCredentials}
+    Import-Module Microsoft.Exchange.Management.ExoPowershellModule
     Write-Host -f DarkYellow "Initiating New-PSSession"
-    $ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri "https://outlook.office365.com/powershell-liveid/" -Credential $credential -Authentication "Basic" -AllowRedirection
+    try {
+        $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+        }
+    catch{
+        Write-Host -ForegroundColor DarkRed "MFA might be required"
+        $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+        }
     Write-Host -f DarkYellow "Importing New-PSSession"
     Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global
     }
-
 function connect-ToSpo($credential){
     Write-Host -f Yellow Connecting to SPO services
     <#

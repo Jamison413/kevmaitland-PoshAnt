@@ -1,4 +1,5 @@
 ﻿[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client")
+Import-Module  "C:\Program Files\SharePoint Online Management Shell\Microsoft.Online.SharePoint.PowerShell"
 #region SPO functions
 function Invoke-SPORestMethod {
    [CmdletBinding()]
@@ -58,9 +59,9 @@ function Invoke-SPORestMethod {
     )
 
     Begin {
-        if ((Get-Module Microsoft.Online.SharePoint.PowerShell -ListAvailable) -eq $null) {
-            throw "The Microsoft SharePoint Online PowerShell cmdlets have not been installed."
-        }
+        #if ((Get-Module Microsoft.Online.SharePoint.PowerShell -ListAvailable) -eq $null) {
+        #    throw "The Microsoft SharePoint Online PowerShell cmdlets have not been installed."
+        #}
         if ($credentials -eq $null) {
             [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime") | Out-Null
             $credentials = Get-Credential -Message "Enter your credentials for SharePoint Online:"

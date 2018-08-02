@@ -1,5 +1,4 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
     $fullLogPathAndName = $logFileLocation+"manage-SPpoSites_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = $logFileLocation+"manage-SPpoSites_ErrorLog_$(Get-Date -Format "yyMMdd").log"
@@ -8,7 +7,10 @@ else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
-Start-Transcript $transcriptLogName -Append
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
 
 Import-Module _PS_Library_MSOL
 Import-Module _CSOM_Library-SPO.psm1
@@ -34,6 +36,7 @@ $oDataUnprocessedClientRequests += ',Site_x0020_MembersId,Site_x0020_Members/Id,
 $oDataUnprocessedClientRequests += ',Site_x0020_VisitorsId,Site_x0020_Visitors/Id,Site_x0020_Visitors/Title'
 $oDataUnprocessedClientRequests += '&$expand=Site_x0020_Admin/Id,Site_x0020_Owners/Id,Site_x0020_Members/Id,Site_x0020_Visitors/Id'    #,Site_x0020_Members,Site_x0020_Visitors
 $oDataUnprocessedClientRequests += '&$filter=Status eq ''Awaiting creation'''
+if($unprocessedClientRequests){rv unprocessedClientRequests}
 $unprocessedClientRequests = get-itemsInList -serverUrl $webUrl -sitePath $clientsSite -listName $clientSiteRequestListName -suppressProgress $false -oDataQuery $oDataUnprocessedClientRequests -restCreds $restCredentials
 #Standardise the Requests:
 foreach($request in $unprocessedClientRequests){

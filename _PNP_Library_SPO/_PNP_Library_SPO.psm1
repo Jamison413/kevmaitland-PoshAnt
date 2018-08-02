@@ -163,6 +163,46 @@ function format-asServerRelativeUrls($serverRelativeUrl,$arrayOfStringToFormat){
     #else{$formattedThings} #If $thingsToFormat was an array, return an array
     $formattedArrayOfClientSubfolders #Change of plan - always return an array
     }
+function get-allSpoListItemsWithUniquePermissions($pnpList,$adminCredentials, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "get-allSpoListItemsWithUniquePermissions($($pnpList.Title))"}
+    try{Get-PnPConnection | Out-Null}
+    catch{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "No Connect-PnPOnline connection available. Creating new Connect-PnpOnline to [$($pnpList.Context.Url)]"}
+        Connect-PnPOnline -Url $pnpList.Context.Url -Credentials $adminCredentials
+        }
+        $tempConnection = Get-PnPConnection
+    if((Get-PnPConnection).Url -eq $pnpList.Context.Url){$tempConnection = Get-PnPConnection}
+    else{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Current Connect-PnPOnline connection [$((Get-PnPConnection).Url)] does not match target site. Creating temporary Connect-PnpOnline to [$($pnpList.Context.Url)]"}
+        Write-Warning "Current Connect-PnPOnline connection [$((Get-PnPConnection).Url)] does not match target site. Creating new Connect-PnpOnline to [$($pnpList.Context.Url)]"
+        $oldPnPConnection = (Get-PnPConnection).Url
+        $tempConnection = Connect-PnPOnline -Url $pnpList.Context.Url -ReturnConnection -Credentials $adminCredentials
+        }
+    #Best to enumrate everything and test
+    if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpList.Title) -Query '<View><Query><Where><IsNotNull><FieldRef Name='SharedWithDetails' /></IsNotNull></Where></Query></View>'"}
+    Get-PnPListItem -List $pnpList.Id -Query "<View><Query><Where><IsNotNull><FieldRef Name='SharedWithDetails' /></IsNotNull></Where></Query></View>"
+    if($oldPnPConnection){
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Disconecting temporary Connect-PnpOnline to [$($pnpList.Context.Url)] and reconnecting to [$oldPnPConnection]"}
+        Connect-PnPOnline -ur $oldPnPConnection -Credentials $adminCredentials
+        #Disconnect-PnPOnline -Connection $tempConnection
+        }
+    }
+function get-allSpoListsWithItemsWithUniquePermissions($siteAbsoluteUrl,$adminCredentials, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "get-allSpoListsWithItemsWithUniquePermissions($siteAbsoluteUrl)"}
+    $siteServerRelativeUrl = ([System.Uri]$siteAbsoluteUrl).LocalPath
+    try{Get-PnPConnection | Out-Null}
+    catch{Connect-PnPOnline -Url $siteAbsoluteUrl -Credentials $adminCredentials}
+    if(([System.Uri](Get-PnPConnection).Url).LocalPath -eq $siteServerRelativeUrl){$tempConnection = Get-PnPConnection}
+    else{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Current Connect-PNPOnline connection [$((Get-PnPConnection).Url)] does not match target site. Creating temporary Connect-PnpOnline to [$siteAbsoluteUrl]"}
+        $tempConnection = Connect-PnPOnline -Url $siteAbsoluteUrl -ReturnConnection -Credentials $adminCredentials
+        $tempConnectionInitiated = $true
+        }
+    #Setting unique permissions on a list item seems to add a flag to the List XML too. Presumably this is how /_layouts/15/uniqperm.aspx works so quickly?
+    if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPList -Includes SchemaXml | ? {$_.SchemaXML -match 'SharedWithDetails'"}
+    Get-PnPList -Includes SchemaXml -Connection $thisConnection | ? {$_.SchemaXML -match "SharedWithDetails"}
+    if($tempConnectionInitiated){Disconnect-PnPOnline -Connection $tempConnection}
+    }
 function get-spoKimbleClientListItems($spoCredentials, $verboseLogging){
     if($(Get-PnPConnection).Url -ne "https://anthesisllc.sharepoint.com/clients"){
         Connect-PnPOnline –Url $("https://anthesisllc.sharepoint.com/clients") –Credentials $spoCredentials
@@ -250,6 +290,94 @@ function new-spoKimbleProjectItem($kimbleProjectObject, $pnpProjectList, $fullLo
     if($newItem){if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Item [$($kimbleProjectObject.Name)] created in [Kimble Projects]"}}
     else{Write-Host -ForegroundColor DarkRed "`tFAILED: Item NOT [$($kimbleProjectObject.Name)] created in [Kimble Projects] :("}
     $newItem
+    }
+function report-itemsWithUniquePermissions($pnpListItems,$permissionsHaveBeenReset,$verboseLogging){
+    
+    $managers = Get-UnifiedGroupLinks -LinkType Owners -Identity $(Split-Path $pnpListItems[0].Context.Url -Leaf)
+    $web = $pnpListItems[0].Context.Web
+    $pnpListItems[0].Context.ExecuteQuery()
+    $siteTitle = $web.Title
+    $siteUrl = $web.Url
+    $pnpListItems | %{
+        $thisItem = $_
+        if($thisItem.FieldValues.FSObjType -eq 0){$iAmA = "File"}
+        elseif($thisItem.FieldValues.FSObjType -eq 1){$iAmA = "Folder"}
+        else{$iAmA = "Unknown Object"}
+        $thisItem | Add-Member -MemberType NoteProperty -Name ItemType -Value $iAmA
+        [array]$itemsToReport += $thisItem
+        }
+
+    send-itemsWithUniquePermissionsReport -arrayOfManagerMailboxes $managers -arrayOfItemsToReport $itemsToReport -siteName $siteTitle -siteUrl $siteUrl -permissionsHaveBeenReset $permissionsHaveBeenReset
+    }
+function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOfItemsToReport,$siteName,$siteUrl,$permissionsHaveBeenReset){
+    $subject = "Non-standard sharing activity in $siteName Site"
+    $arrayOfManagerMailboxes | % {
+        [array]$to += $_.PrimarySmtpAddress
+        $names += $_.FirstName+", "
+        $finalName = $_.FirstName
+        }
+    if($names.Split(",").Count -gt 2){$names = $names.Replace(", $finalName"," & $finalName")}
+    $body = "<HTML><FONT FACE=`"Calibri`">Hello $names`r`n`r`n<BR><BR>"
+    $body += "The following items have been Shared with specific users in the <A HREF=`"$siteUrl`">$siteName</A> Site, which isn't a good way of managing access to your data (partly because it's not very transparent to see who-has-access-to-what, and partly because these unique permissions will prevent newly-added Team Members from accessing these items). "
+    if($permissionsHaveBeenReset){$body += "I've reset these permissions for you, so there are no actions to take unless you want to speak with the sharer and remind them of best practices."}
+    $body += "`r`n`r`n<BR><BR><UL>"
+    if($arrayOfItemsToReport){
+        $arrayOfItemsToReport | % {
+            $with = $_.FieldValues.SharedWithDetails.Split("{")[1].Replace("`"i:0#.f|membership|","").Replace("`":","")
+            $on = $_.FieldValues.SharedWithDetails.Split("{")[2].Split(",")[0].Replace(")\/`"","")
+            $on = $on.Substring($on.Length-13,13)
+            $on = ([datetime]'1/1/1970').AddSeconds([int]($on / 1000))
+            $by = $_.FieldValues.SharedWithDetails.Split("{")[2].Split(",")[1].Split(":")[1].Replace('"','').Replace("}","")
+            $body += "<LI>$($_.ItemType)`t<B>$($_.FieldValues.FileLeafRef)</B>`tin <A HREF=`"https://anthesisllc.sharepoint.com$($_.FieldValues.FileRef)`">$($_.FieldValues.FileRef)</A> was shared with $with by $by on $on</LI>"
+            }
+        }
+    $body += "</UL>"
+    $body += "As an owner, you can manage the membership of this group (and there is a <A HREF=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Group-membership-management-(for-Team-Managers).aspx`">guide available to help you</A>) with this and other tips for best practise, or you can contact the IT team for your region,`r`n`r`n<BR><BR>"
+    $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
+    Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+
+
+    }
+function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging){
+    #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365"
+    #Untick Members can share boxes
+    $thisConnection = Connect-PnPOnline -Url $teamSiteAbsoluteUrl -Credentials $adminCredentials -ReturnConnection
+    $thisWeb = Get-PnPWeb -Connection $thisConnection -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
+    $thisWeb.MembersCanShare = $false
+    $thisWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
+    $thisWeb.AssociatedMemberGroup.Update()
+    $thisWeb.Update()
+    $thisWeb.Context.ExecuteQuery()
+    #Add Managers group to Site Coll Admins
+    $ownersSpoGroup = Get-PnPGroup -Connection $thisConnection -AssociatedOwnerGroup
+    $managersAdGroup =  $ownersSpoGroup | Get-PnPGroupMembers | ? {$_.Title -match "Managers"}
+    if($managersAdGroup){Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $managersAdGroup.Title -Connection $thisConnection}
+    #Block all external sharing
+    Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled -Connection $thisConnection
+    #Break inheritance on Documents folder and prevent Owners from sharing contents
+    $standardDocumentLibrary = Get-PnPList -Includes FirstUniqueAncestorSecurableObject,HasUniqueRoleAssignments -Connection $thisConnection -Identity "Shared Documents"
+    if($standardDocumentLibrary.FirstUniqueAncestorSecurableObject.Id -eq $standardDocumentLibrary.Id){
+        $standardDocumentLibrary.ResetRoleInheritance()
+        $standardDocumentLibrary.Update()
+        $standardDocumentLibrary.Context.ExecuteQuery()
+        $standardDocumentLibrary.BreakRoleInheritance($true,$true)
+        $standardDocumentLibrary.Update()
+        $standardDocumentLibrary.Context.ExecuteQuery()
+        Set-PnPListPermission -Connection $thisConnection -Identity "Documents" -Group $ownersSpoGroup -AddRole "Edit" -RemoveRole "Full Control"
+        #E-mail Managers to let them know that content had been shared.
+        }
+    #Check whether any items in the Documents have unique permissions on them
+    if ((get-allSpoListsWithItemsWithUniquePermissions -siteAbsoluteUrl $teamSiteAbsoluteUrl -adminCredentials $adminCredentials -verboseLogging $verboseLogging).Title -contains $standardDocumentLibrary.Title){
+        $itemsWithUniquePermissions = get-allSpoListItemsWithUniquePermissions -pnpList $standardDocumentLibrary -adminCredentials $adminCredentials -verboseLogging $verboseLogging
+        if($itemsWithUniquePermissions){
+            $itemsWithUniquePermissions | % {
+                $_.ResetRoleInheritance()
+                $_.Update()
+                }
+            $itemsWithUniquePermissions[0].Context.ExecuteQuery()
+            report-itemsWithUniquePermissions -pnpListItems $itemsWithUniquePermissions -permissionsHaveBeenReset $true
+            }
+        }
     }
 function update-spoKimbleClientItem($kimbleClientObject, $pnpClientList, $fullLogPathAndName,$verboseLogging){
     if($verboseLogging){Write-Host -ForegroundColor Magenta "update-spoKimbleClientItem($($kimbleClientObject.Name), $($pnpClientList.Title)"}
