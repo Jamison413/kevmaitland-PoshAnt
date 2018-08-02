@@ -29,7 +29,9 @@ $auth.RememberDevicesNotIssuedBefore = (Get-Date)
 #$users = convertTo-arrayOfEmailAddresses "Alex McKay <alex.mckay@anthesisgroup.com>; Fiona Place <Fiona.Place@anthesisgroup.com>; Andrew Noone <Andrew.Noone@anthesisgroup.com>; Chris Morris <Chris.Morris@anthesisgroup.com>; Harriet Bell <Harriet.Bell@anthesisgroup.com>; Jennifer Wilson <jennifer.wilson@anthesisgroup.com>; Graeme Hadley <Graeme.Hadley@anthesisgroup.com>; Ben Tuxworth <Ben.Tuxworth@anthesisgroup.com>; Claire Richards <Claire.Richards@anthesisgroup.com>; James MacPherson <James.MacPherson@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Chris Stanley <Chris.Stanley@anthesisgroup.com>; Chris Turner <Chris.Turner@anthesisgroup.com>; Helen Kean <Helen.Kean@anthesisgroup.com>; Ian Forrester <Ian.Forrester@anthesisgroup.com>; Jessica Onyshko <jessica.onyshko@anthesisgroup.com>; Karen Cooksey <Karen.Cooksey@anthesisgroup.com>; Paul Ashford <Paul.Ashford@anthesisgroup.com>; Paul Dornan <Paul.Dornan@anthesisgroup.com>; Pearl Németh <Pearl.Nemeth@anthesisgroup.com>; Terry Wood <Terry.Wood@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Alan Spray <Alan.Spray@anthesisgroup.com>; Alec Burslem <Alec.Burslem@anthesisgroup.com>; Chloe McCloskey <Chloe.McCloskey@anthesisgroup.com>; Claire Stentiford <Claire.Stentiford@anthesisgroup.com>; Eleanor Penney <Eleanor.Penney@anthesisgroup.com>; Matt Fishwick <Matt.Fishwick@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>; Sophie Sapienza <Sophie.Sapienza@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "paul.crewe@anthesisgroup.com"
+$users = convertTo-arrayOfEmailAddresses "craig.simmons@anthesisgroup.com
+susan.harris@anthesisgroup.com
+katie.livesey@anthesisgroup.com"
 
 $users | % {
     $thisUser = Get-MsolUser -UserPrincipalName $_

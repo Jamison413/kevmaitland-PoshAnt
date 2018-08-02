@@ -59,7 +59,9 @@ try{
 catch{log-error -myError $_ -myFriendlyMessage "Error retrieving List: [$listName]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
 
 #Get the Kimble Projects that have been modifed since the last update
-$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
+Get-PnPListItem -List "Kimble Projects" -Query "<View><Query> <OrderBy> <FieldRef Name='LastModifiedDate' Ascending='False' /> </OrderBy> </Query> </View>" -ErrorAction SilentlyContinue | % {if($dummyArray){rv dummyArray};[array]$dummyArray += $_;break} #Get the list item with the most recent LastModifedDate (from Kimble)
+$cutoffDate = Get-Date $dummyArray[0].FieldValues.LastModifiedDate -Format s
+#$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
 #$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddYears(-1) -Format s) #Bodge this once for the initial Sync
 $soqlQuery = "SELECT Name,Id,KimbleOne__Account__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted,Community__c,Project_Type__c FROM KimbleOne__DeliveryGroup__c WHERE LastModifiedDate > $cutoffDate`Z"
 try{
