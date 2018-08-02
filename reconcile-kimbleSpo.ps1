@@ -1,5 +1,4 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
     $fullLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_ErrorLog_$(Get-Date -Format "yyMMdd").log"
@@ -8,7 +7,10 @@ else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
-Start-Transcript $transcriptLogName -Append
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
 
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _CSOM_Library-SPO.psm1
