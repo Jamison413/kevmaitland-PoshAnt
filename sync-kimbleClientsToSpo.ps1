@@ -52,12 +52,14 @@ try{
 catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [Kimble Clients]" -fullLogFile $fullLogPathAndName -errorLogFile -doNotLogToEmail $true}
 
 #Get the Kimble Clients that have been modifed since the last update
-$cutoffDate = (Get-Date (Get-Date $kc.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
+Get-PnPListItem -List "Kimble Clients" -Query "<View><Query> <OrderBy> <FieldRef Name='LastModifiedDate' Ascending='False' /> </OrderBy> </Query> </View>" -PageSize 10 -ErrorAction SilentlyContinue | % {if($dummyArray){rv dummyArray};[array]$dummyArray += $_;break} #Get the list item with the most recent LastModifedDate (from Kimble)
+$cutoffDate = Get-Date $dummyArray[0].FieldValues.LastModifiedDate -Format s
+#$cutoffDate = (Get-Date (Get-Date $kc.LastItemModifiedDate).AddHours(-1) -Format s) #Look one hour behind just in case there is ever a delay between polling Kimble and updating SharePoint
 #$cutoffDate = (Get-Date (Get-Date $kp.LastItemModifiedDate).AddYears(-1) -Format s) #Bodge this once for the initial Sync
 $soqlQuery = "SELECT Name,Id,Description,Type,KimbleOne__IsCustomer__c,LastModifiedDate,SystemModStamp,CreatedDate,IsDeleted FROM account WHERE ((LastModifiedDate > $cutoffDate`Z) AND ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client')))"
 try{
     log-action -myMessage "Getting Kimble Client data" -logFile $fullLogPathAndName
-    $kimbleModifiedClients = Get-KimbleSoqlDataset -queryUri $queryUri -soqlQuery $soqlQuery -restHeaders $standardKimbleHeaders
+    $kimbleModifiedClients = Get-KimbleSoqlDataset -queryUri $standardKimbleQueryUri -soqlQuery $soqlQuery -restHeaders $standardKimbleHeaders
     if($kimbleModifiedClients){log-result -myMessage "SUCCESS: $($kimbleModifiedClients.Count) records retrieved!" -logFile $fullLogPathAndName}
     elseif($kimbleModifiedClients -eq $null){log-result -myMessage "SUCCESS: Connected, but no records to update." -logFile $fullLogPathAndName}
     else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}

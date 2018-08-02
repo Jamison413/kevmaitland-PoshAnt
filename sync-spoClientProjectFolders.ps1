@@ -1,5 +1,4 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
     $fullLogPathAndName = $logFileLocation+"sync-spoClientsProjectsFolders_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = $logFileLocation+"sync-spoClientsProjectsFolders_ErrorLog_$(Get-Date -Format "yyMMdd").log"
@@ -8,10 +7,13 @@ else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
-$debugLog = "$env:USERPROFILE\Desktop\debugdump.log"
-Start-Transcript $transcriptLogName -Append
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
 
 Import-Module _PS_Library_GeneralFunctionality
+Import-Module SharePointPnPPowerShellOnline
 #Import-Module _CSOM_Library-SPO
 #Import-Module _REST_Library-SPO
 
@@ -20,7 +22,7 @@ $webUrl = "https://anthesisllc.sharepoint.com"
 $clientSite = "/clients"
 $listOfClientFolders = @("_Kimble automatically creates Project folders","Background","Non-specific BusDev")
 $listOfLeadProjSubFolders = @("Admin & contracts", "Analysis","Data & refs","Meetings","Proposal","Reports","Summary (marketing) - end of project")
-$defaultProjectFilesToCopy = @(@{"fromList"="/teams/communities/heathandsafetyteam";"from"="/teams/communities/heathandsafetyteam/Shared Documents/RAs/Projects/Anthesis UK Project Risk Assessment.xlsx";"to"="/Admin & contracts/Anthesis UK Project Risk Assessment.xlsx";"conditions"="UK"})
+$defaultProjectFilesToCopy = @(@{"fromList"="/sites/Resources-HealthSafetyGBR";"from"="/sites/Resources-HealthSafetyGBR/Shared Documents/Safety Risk Management/Risk Assessments/Anthesis UK Project Risk Assessment.xlsx";"to"="/Admin & contracts/";"conditions"="UK"})
 
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $mailFrom = "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"
