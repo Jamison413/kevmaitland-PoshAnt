@@ -21,7 +21,7 @@ connect-ToMsol -credential $adminCreds
 
 $auth = New-Object -TypeName Microsoft.Online.Administration.StrongAuthenticationRequirement
 $auth.RelyingParty = "*"
-$auth.State = "Enforced"
+$auth.State = "Enabled"
 $auth.RememberDevicesNotIssuedBefore = (Get-Date)
 
 #$users = convertTo-arrayOfEmailAddresses "Matt Whitehead <Matt.Whitehead@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>; Mark Sayers <Mark.Sayers@anthesisgroup.com>; Amy Dartington <Amy.Dartington@anthesisgroup.com>; Debra Haylings <debra.haylings@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>"
@@ -29,16 +29,14 @@ $auth.RememberDevicesNotIssuedBefore = (Get-Date)
 #$users = convertTo-arrayOfEmailAddresses "Alex McKay <alex.mckay@anthesisgroup.com>; Fiona Place <Fiona.Place@anthesisgroup.com>; Andrew Noone <Andrew.Noone@anthesisgroup.com>; Chris Morris <Chris.Morris@anthesisgroup.com>; Harriet Bell <Harriet.Bell@anthesisgroup.com>; Jennifer Wilson <jennifer.wilson@anthesisgroup.com>; Graeme Hadley <Graeme.Hadley@anthesisgroup.com>; Ben Tuxworth <Ben.Tuxworth@anthesisgroup.com>; Claire Richards <Claire.Richards@anthesisgroup.com>; James MacPherson <James.MacPherson@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Chris Stanley <Chris.Stanley@anthesisgroup.com>; Chris Turner <Chris.Turner@anthesisgroup.com>; Helen Kean <Helen.Kean@anthesisgroup.com>; Ian Forrester <Ian.Forrester@anthesisgroup.com>; Jessica Onyshko <jessica.onyshko@anthesisgroup.com>; Karen Cooksey <Karen.Cooksey@anthesisgroup.com>; Paul Ashford <Paul.Ashford@anthesisgroup.com>; Paul Dornan <Paul.Dornan@anthesisgroup.com>; Pearl Németh <Pearl.Nemeth@anthesisgroup.com>; Terry Wood <Terry.Wood@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Alan Spray <Alan.Spray@anthesisgroup.com>; Alec Burslem <Alec.Burslem@anthesisgroup.com>; Chloe McCloskey <Chloe.McCloskey@anthesisgroup.com>; Claire Stentiford <Claire.Stentiford@anthesisgroup.com>; Eleanor Penney <Eleanor.Penney@anthesisgroup.com>; Matt Fishwick <Matt.Fishwick@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>; Sophie Sapienza <Sophie.Sapienza@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "craig.simmons@anthesisgroup.com
-susan.harris@anthesisgroup.com
-katie.livesey@anthesisgroup.com"
+$users = convertTo-arrayOfEmailAddresses "Amanda Brockinton <Amanda.Brockinton@anthesisgroup.com>; Andy Marsh <Andy.Marsh@anthesisgroup.com>; Chris Turner <Chris.Turner@anthesisgroup.com>; Danny Chivers <Danny.Chivers@anthesisgroup.com>; Joe Morrison <Joe.Morrison@anthesisgroup.com>; Karen Messer <Karen.Messer@anthesisgroup.com>; Katie Livesey <katie.livesey@anthesisgroup.com>; Marek Kaminski <Marek.Kaminski@anthesisgroup.com>; Mike Hoggan <Mike.Hoggan@anthesisgroup.com>"
 
 $users | % {
     $thisUser = Get-MsolUser -UserPrincipalName $_
     Write-Host -ForegroundColor DarkYellow "MFA is currently set to $($thisUser.StrongAuthenticationRequirements.State) for $_"
     if([string]::IsNullOrWhiteSpace($thisUser.StrongAuthenticationRequirements)){
         Write-Host -ForegroundColor Yellow "Enabling MFA for $_"
-        Set-MsolUser -UserPrincipalName $_ -StrongAuthenticationRequirements $auth
+        Set-MsolUser -UserPrincipalName $thisUser.UserPrincipalName -StrongAuthenticationRequirements $auth
         }
     else{Write-Host -ForegroundColor DarkYellow "MFA already $($thisUser.StrongAuthenticationRequirements.State) for $_"}
     

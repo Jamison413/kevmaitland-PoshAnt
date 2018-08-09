@@ -195,6 +195,17 @@ function get-keyFromValueViaAnotherKey($value, $interimKey, $hashTable){
     foreach ($Key in ($hashTable.GetEnumerator() | Where-Object {$_.Value[$interimKey] -eq $value})){
         $Key.name}
     }
+function get-managersGroupNameFromTeamUrl($teamSiteUrl){
+    if(![string]::IsNullOrWhiteSpace($teamSiteUrl)){
+        $leaf = Split-Path $teamSiteUrl -Leaf
+        $guess = $leaf.Replace("_","")
+        if($guess.Substring($guess.Length-3,3) -eq "365"){
+            $managerGuess = $guess.Substring(0,$guess.Length-3)+"-Managers"
+            }
+        else{Write-Warning "The URL [$teamSiteUrl] doesn't look like a standardised O365 Group Name - I can't guess this"}
+        }
+    $managerGuess
+    }
 function get-timeZones(){
     $timeZones = Get-ChildItem "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Time zones" | foreach {Get-ItemProperty $_.PSPath}; $TimeZone | Out-Null
     $timeZones
