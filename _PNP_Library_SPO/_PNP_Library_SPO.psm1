@@ -180,7 +180,15 @@ function get-allSpoListItemsWithUniquePermissions($pnpList,$adminCredentials, $v
         }
     #Best to enumrate everything and test
     if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpList.Title) -Query '<View><Query><Where><IsNotNull><FieldRef Name='SharedWithDetails' /></IsNotNull></Where></Query></View>'"}
-    Get-PnPListItem -List $pnpList.Id -Query "<View><Query><Where><IsNotNull><FieldRef Name='SharedWithDetails' /></IsNotNull></Where></Query></View>"
+    try{
+        $results = Get-PnPListItem -List $pnpList.Id -Query "<View><Query><Where><IsNotNull><FieldRef Name='SharedWithDetails' /></IsNotNull></Where></Query></View>" -ErrorAction stop
+        $results | ? {$_.FieldValues["SharedWithUsers"]} #Remove any results that have been shared (creating the SharedWithDetails field), but then unshared (removing all entries from the SharedWithUsers field)
+        }
+    catch{
+        $false
+        if($_.Exception -eq "One or more field types are not installed properly. Go to the list settings page to delete these fields."){write-warning "Error in get-allSpoListItemsWithUniquePermissions searching for ListItems with SharedWithDetails - this *probably* just mean that there were none"}
+        else{Write-Error $_}
+        }
     if($oldPnPConnection){
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Disconecting temporary Connect-PnpOnline to [$($pnpList.Context.Url)] and reconnecting to [$oldPnPConnection]"}
         Connect-PnPOnline -ur $oldPnPConnection -Credentials $adminCredentials
@@ -307,9 +315,10 @@ function report-itemsWithUniquePermissions($pnpListItems,$permissionsHaveBeenRes
         [array]$itemsToReport += $thisItem
         }
 
-    send-itemsWithUniquePermissionsReport -arrayOfManagerMailboxes $managers -arrayOfItemsToReport $itemsToReport -siteName $siteTitle -siteUrl $siteUrl -permissionsHaveBeenReset $permissionsHaveBeenReset
+    send-itemsWithUniquePermissionsReport -arrayOfManagerMailboxes $managers -arrayOfItemsToReport $itemsToReport -siteName $siteTitle -siteUrl $siteUrl -permissionsHaveBeenReset $permissionsHaveBeenReset -verboseLogging $verboseLogging
     }
-function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOfItemsToReport,$siteName,$siteUrl,$permissionsHaveBeenReset){
+function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOfItemsToReport,$siteName,$siteUrl,$permissionsHaveBeenReset,$verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "send-itemsWithUniquePermissionsReport"}
     $subject = "Non-standard sharing activity in $siteName Site"
     $arrayOfManagerMailboxes | % {
         [array]$to += $_.PrimarySmtpAddress
@@ -323,6 +332,7 @@ function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOf
     $body += "`r`n`r`n<BR><BR><UL>"
     if($arrayOfItemsToReport){
         $arrayOfItemsToReport | % {
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSharesWithDetails: $($_.FieldValues.SharedWithDetails)"}
             $with = $_.FieldValues.SharedWithDetails.Split("{")[1].Replace("`"i:0#.f|membership|","").Replace("`":","")
             $on = $_.FieldValues.SharedWithDetails.Split("{")[2].Split(",")[0].Replace(")\/`"","")
             $on = $on.Substring($on.Length-13,13)
@@ -339,44 +349,116 @@ function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOf
 
     }
 function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging){
-    #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365"
-    #Untick Members can share boxes
-    $thisConnection = Connect-PnPOnline -Url $teamSiteAbsoluteUrl -Credentials $adminCredentials -ReturnConnection
-    $thisWeb = Get-PnPWeb -Connection $thisConnection -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
-    $thisWeb.MembersCanShare = $false
-    $thisWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
-    $thisWeb.AssociatedMemberGroup.Update()
-    $thisWeb.Update()
-    $thisWeb.Context.ExecuteQuery()
-    #Add Managers group to Site Coll Admins
-    $ownersSpoGroup = Get-PnPGroup -Connection $thisConnection -AssociatedOwnerGroup
-    $managersAdGroup =  $ownersSpoGroup | Get-PnPGroupMembers | ? {$_.Title -match "Managers"}
-    if($managersAdGroup){Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $managersAdGroup.Title -Connection $thisConnection}
-    #Block all external sharing
-    Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled -Connection $thisConnection
-    #Break inheritance on Documents folder and prevent Owners from sharing contents
-    $standardDocumentLibrary = Get-PnPList -Includes FirstUniqueAncestorSecurableObject,HasUniqueRoleAssignments -Connection $thisConnection -Identity "Shared Documents"
-    if($standardDocumentLibrary.FirstUniqueAncestorSecurableObject.Id -eq $standardDocumentLibrary.Id){
-        $standardDocumentLibrary.ResetRoleInheritance()
-        $standardDocumentLibrary.Update()
-        $standardDocumentLibrary.Context.ExecuteQuery()
-        $standardDocumentLibrary.BreakRoleInheritance($true,$true)
-        $standardDocumentLibrary.Update()
-        $standardDocumentLibrary.Context.ExecuteQuery()
-        Set-PnPListPermission -Connection $thisConnection -Identity "Documents" -Group $ownersSpoGroup -AddRole "Edit" -RemoveRole "Full Control"
-        #E-mail Managers to let them know that content had been shared.
+    #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_Engineering_Team_All_365/"
+   if($verboseLogging){Write-Host -ForegroundColor Magenta "set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $($adminCredentials.Username))"}
+    if([string]::IsNullOrWhiteSpace($teamSiteAbsoluteUrl)){
+        $false
+        Write-Error "Null or Empty value passed to set-standardTeamSitePermissions() for `$teamSiteAbsoluteUrl"
         }
-    #Check whether any items in the Documents have unique permissions on them
-    if ((get-allSpoListsWithItemsWithUniquePermissions -siteAbsoluteUrl $teamSiteAbsoluteUrl -adminCredentials $adminCredentials -verboseLogging $verboseLogging).Title -contains $standardDocumentLibrary.Title){
-        $itemsWithUniquePermissions = get-allSpoListItemsWithUniquePermissions -pnpList $standardDocumentLibrary -adminCredentials $adminCredentials -verboseLogging $verboseLogging
-        if($itemsWithUniquePermissions){
-            $itemsWithUniquePermissions | % {
-                $_.ResetRoleInheritance()
-                $_.Update()
-                }
-            $itemsWithUniquePermissions[0].Context.ExecuteQuery()
-            report-itemsWithUniquePermissions -pnpListItems $itemsWithUniquePermissions -permissionsHaveBeenReset $true
+    else{
+        $teamSiteAbsoluteUrl = $teamSiteAbsoluteUrl.TrimEnd("/")
+        if(!(test-pnpConnectionMatchesResource -resourceUrl $teamSiteAbsoluteUrl -verboseLogging $verboseLogging)){
+            Write-Warning "Connect-PnPOnline connection mismatch - connecting to [$teamSiteAbsoluteUrl]"
+            Connect-PnPOnline -Url $teamSiteAbsoluteUrl -Credentials $adminCredentials
             }
+
+        #Add Managers group to Site Coll Admins & Site Owners Group
+        $guessedManagerGroupName = get-managersGroupNameFromTeamUrl -teamSiteUrl $teamSiteAbsoluteUrl
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-managersGroupNameFromTeamUrl -teamSiteUrl $teamSiteAbsoluteUrl = [$guessedManagerGroupName]"}
+        if($guessedManagerGroupName){
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Getting OwnersGroup: Get-PnPGroup -AssociatedOwnerGroup"}
+            $ownersSpoGroup = Get-PnPGroup -AssociatedOwnerGroup
+            $managersGroup = Get-PnPUser | ? {$_.Email -eq $($guessedManagerGroupName+"@anthesisgroup.com")}
+            if(!$managersGroup){$managersGroup = New-PnPUser -LoginName $($guessedManagerGroupName+"@anthesisgroup.com")}
+            if($managersGroup){
+                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Add-PnPUserToGroup -EmailAddress $($managersGroup.Email) -Identity $($ownersSpoGroup.Title) -SendEmail:$false"}
+                Add-PnPUserToGroup -EmailAddress $managersGroup.Email -Identity $ownersSpoGroup.Id -SendEmail:$false
+                #if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $($guessedManagerGroupName+"@anthesisgroup.com")"}
+                Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $managersGroup.LoginName
+                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners 'kimblebot@anthesisgroup.com'"}
+                Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners "kimblebot@anthesisgroup.com"
+                }
+            else{Write-Warning "No Managers group could be guessed for [$teamSiteAbsoluteUrl] - it cannot be added to the Site Owners Group, nor as a Site Collection Admin"}
+            }
+        #Check the Site Collection Administrators
+        $siteCollectionAdmins = Get-PnPSiteCollectionAdmin
+        $o365Group = $siteCollectionAdmins | ? {$_.Email -eq $((Split-Path $teamSiteAbsoluteUrl -Leaf)+"@anthesisgroup.com")}
+        if($o365Group){
+            #Remove O365 Group from Site Collection Admins
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Remove-PnPSiteCollectionAdmin -Owners $((Split-Path $teamSiteAbsoluteUrl -Leaf)+"@anthesisgroup.com")"}
+            Remove-PnPSiteCollectionAdmin -Owners $o365Group.LoginName
+            }
+        if($siteCollectionAdmins.Title -notcontains "Kimble Bot"){Write-Warning "KimbleBot is not a Site Collection Administrator"}
+        if($siteCollectionAdmins.Email -notcontains $managersGroup.Email){
+            if($managersGroup){Write-Warning "$($managersGroup.Title) was not added as a Site Collection Administrator"}
+            }
+
+        #Block all external sharing
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Blocking external Sharing: Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled"}
+        Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled
+        
+        #Untick Members can share boxes 
+        #***************************************************************************************************************************
+        # Requires temporary elevation to Site Owners Group (assumes Site Collection administrator rights already granted)
+        #***************************************************************************************************************************
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Restricting internal Sharing: (MembersCanShare & AllowMembersEditMembership = `$false)"}
+        Add-PnPUserToGroup -EmailAddress (Get-PnPConnection).PSCredential.UserName -Identity $ownersSpoGroup.Id -SendEmail:$false
+        $thisWeb = Get-PnPWeb -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
+        $thisWeb.MembersCanShare = $false
+        $thisWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
+        $thisWeb.AssociatedMemberGroup.Update()
+        $thisWeb.Update()
+        $thisWeb.Context.ExecuteQuery()
+        if((Get-PnPConnection).PSCredential.UserName -eq "kimblebot@anthesisgroup.com"){Remove-PnPUserFromGroup -LoginName "i:0#.f|membership|kimblebot@anthesisgroup.com" -Identity $ownersSpoGroup.Id} #Special case for KimbleBot as it (intentionally) doesn't have an E1 license
+        else{Remove-PnPUserFromGroup -LoginName (Get-PnPConnection).PSCredential.UserName -Identity $ownersSpoGroup.Id}
+
+        #Break inheritance on Documents folder and prevent Owners from sharing contents
+        $standardDocumentLibrary = Get-PnPList -Includes FirstUniqueAncestorSecurableObject,HasUniqueRoleAssignments -Identity "Shared Documents"
+        #if($standardDocumentLibrary.FirstUniqueAncestorSecurableObject.Id -eq $standardDocumentLibrary.Id){
+        if($standardDocumentLibrary){
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Resetting permissions on Documents Library"}
+            $standardDocumentLibrary.ResetRoleInheritance()
+            $standardDocumentLibrary.Update()
+            $standardDocumentLibrary.Context.ExecuteQuery()
+            $standardDocumentLibrary.BreakRoleInheritance($true,$true)
+            $standardDocumentLibrary.Update()
+            $standardDocumentLibrary.Context.ExecuteQuery()
+            Set-PnPListPermission -Identity "Documents" -Group $ownersSpoGroup -AddRole "Edit" -RemoveRole "Full Control"
+            #E-mail Managers to let them know that content had been shared.
+            }
+        #Check whether any items in the Documents have unique permissions on them
+        if ((get-allSpoListsWithItemsWithUniquePermissions -siteAbsoluteUrl $teamSiteAbsoluteUrl -adminCredentials $adminCredentials -verboseLogging $verboseLogging).Title -contains $standardDocumentLibrary.Title){
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Custom permissions found on LIst Items - resetting them"}
+            [array]$itemsWithUniquePermissions = get-allSpoListItemsWithUniquePermissions -pnpList $standardDocumentLibrary -adminCredentials $adminCredentials -verboseLogging $verboseLogging
+            if($itemsWithUniquePermissions){
+                $itemsWithUniquePermissions | % {
+                    $_.ResetRoleInheritance()
+                    $_.Update()
+                    }
+                $itemsWithUniquePermissions[0].Context.ExecuteQuery()
+                report-itemsWithUniquePermissions -pnpListItems $itemsWithUniquePermissions -permissionsHaveBeenReset $true -verboseLogging $verboseLogging
+                }
+            }
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "All finished"}
+        }
+
+
+    }
+function test-pnpConnectionMatchesResource($resourceUrl, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "test-pnpConnectionMatchesResource($resourceUrl, $($adminCredentials.UserName)"}
+    try{Get-PnPConnection | Out-Null}
+    catch{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "No Connect-PnPOnline connection available. Creating new Connect-PnpOnline to [$resourceUrl]"}
+        $false
+        break
+        }
+    if((split-path ([System.Uri](Get-PnPConnection).Url).LocalPath -Leaf) -eq (Split-Path $resourceUrl -Leaf)){
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Connect-PnPOnline connection matches [$resourceUrl]"}
+        $true
+        }
+    else{
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Connect-PnPOnline connection [$([System.Uri](Get-PnPConnection).Url).LocalPath)] does not match [$resourceUrl]"}
+        $false
         }
     }
 function update-spoKimbleClientItem($kimbleClientObject, $pnpClientList, $fullLogPathAndName,$verboseLogging){
@@ -416,7 +498,7 @@ function update-spoKimbleClientItem($kimbleClientObject, $pnpClientList, $fullLo
     $updatedItem
     }
 function update-spoKimbleProjectItem($kimbleProjectObject, $pnpProjectList, $fullLogPathAndName, $verboseLogging){
-     if($verboseLogging){Write-Host -ForegroundColor Magenta "update-spoKimbleProjectItem($($kimbleProjectObject.Name), $($pnpProjectList.Title)"}
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "update-spoKimbleProjectItem($($kimbleProjectObject.Name), $($pnpProjectList.Title)"}
     #Bodge the KimbleId value if it's not present
     if([string]::IsNullOrWhiteSpace($kimbleProjectObject.KimbleId) -and $kimbleProjectObject.Id.Length -eq 18){
         $kimbleProjectObject | Add-Member -MemberType NoteProperty -Name KimbleId -Value $kimbleProjectObject.Id
