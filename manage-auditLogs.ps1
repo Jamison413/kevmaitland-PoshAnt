@@ -1,10 +1,10 @@
 ﻿Import-Module _PS_Library_MSOL
 connect-ToExo
 
-$daysToLookBack = 5
+$daysToLookBack = 90
 if(!$toDate){$toDate = $(Get-Date).AddDays(1)}
 $fromDate = $toDate.AddDays(-($daysToLookBack+1))
-[array]$arrayOfUsers = @("Jim.FAva@anthesisgroup.com")
+[array]$arrayOfUsers = @("mark.griffin@anthesisgroup.com")
 #[array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
 $title = "$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd)"
 

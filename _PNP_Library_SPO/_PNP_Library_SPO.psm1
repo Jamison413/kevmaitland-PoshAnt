@@ -432,8 +432,17 @@ function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials
             [array]$itemsWithUniquePermissions = get-allSpoListItemsWithUniquePermissions -pnpList $standardDocumentLibrary -adminCredentials $adminCredentials -verboseLogging $verboseLogging
             if($itemsWithUniquePermissions){
                 $itemsWithUniquePermissions | % {
-                    $_.ResetRoleInheritance()
-                    $_.Update()
+                    $thisItem = $_
+                    $thisItem.ResetRoleInheritance()
+                    $thisItem.Update()
+                    $thisItem.BreakRoleInheritance($true,$true)
+                    $thisItem.Update()
+                    $thisItem.ResetRoleInheritance()
+                    $thisItem.FieldValues["SharedWithUsers"].SetValue([Microsoft.SharePoint.Client.FieldLookupValue]::new())
+                    
+                    $thisItem.Update()
+                    $thisItem.Context.ExecuteQuery()
+                    #Set-PnPListItemPermission -List $standardDocumentLibrary.Id -Identity $thisItem.Id -InheritPermissions
                     }
                 $itemsWithUniquePermissions[0].Context.ExecuteQuery()
                 report-itemsWithUniquePermissions -pnpListItems $itemsWithUniquePermissions -permissionsHaveBeenReset $true -verboseLogging $verboseLogging

@@ -29,7 +29,9 @@ $auth.RememberDevicesNotIssuedBefore = (Get-Date)
 #$users = convertTo-arrayOfEmailAddresses "Alex McKay <alex.mckay@anthesisgroup.com>; Fiona Place <Fiona.Place@anthesisgroup.com>; Andrew Noone <Andrew.Noone@anthesisgroup.com>; Chris Morris <Chris.Morris@anthesisgroup.com>; Harriet Bell <Harriet.Bell@anthesisgroup.com>; Jennifer Wilson <jennifer.wilson@anthesisgroup.com>; Graeme Hadley <Graeme.Hadley@anthesisgroup.com>; Ben Tuxworth <Ben.Tuxworth@anthesisgroup.com>; Claire Richards <Claire.Richards@anthesisgroup.com>; James MacPherson <James.MacPherson@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Chris Stanley <Chris.Stanley@anthesisgroup.com>; Chris Turner <Chris.Turner@anthesisgroup.com>; Helen Kean <Helen.Kean@anthesisgroup.com>; Ian Forrester <Ian.Forrester@anthesisgroup.com>; Jessica Onyshko <jessica.onyshko@anthesisgroup.com>; Karen Cooksey <Karen.Cooksey@anthesisgroup.com>; Paul Ashford <Paul.Ashford@anthesisgroup.com>; Paul Dornan <Paul.Dornan@anthesisgroup.com>; Pearl Németh <Pearl.Nemeth@anthesisgroup.com>; Terry Wood <Terry.Wood@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Alan Spray <Alan.Spray@anthesisgroup.com>; Alec Burslem <Alec.Burslem@anthesisgroup.com>; Chloe McCloskey <Chloe.McCloskey@anthesisgroup.com>; Claire Stentiford <Claire.Stentiford@anthesisgroup.com>; Eleanor Penney <Eleanor.Penney@anthesisgroup.com>; Matt Fishwick <Matt.Fishwick@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>; Sophie Sapienza <Sophie.Sapienza@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "Amanda Brockinton <Amanda.Brockinton@anthesisgroup.com>; Andy Marsh <Andy.Marsh@anthesisgroup.com>; Chris Turner <Chris.Turner@anthesisgroup.com>; Danny Chivers <Danny.Chivers@anthesisgroup.com>; Joe Morrison <Joe.Morrison@anthesisgroup.com>; Karen Messer <Karen.Messer@anthesisgroup.com>; Katie Livesey <katie.livesey@anthesisgroup.com>; Marek Kaminski <Marek.Kaminski@anthesisgroup.com>; Mike Hoggan <Mike.Hoggan@anthesisgroup.com>"
+#$users = convertTo-arrayOfEmailAddresses "Mark Hawker <Mark.Hawker@anthesisgroup.com>; Heather Ball <Heather.Ball@anthesisgroup.com>; Jaime Dingle <Jaime.Dingle@anthesisgroup.com>; Tharaka Naga <Tharaka.Naga@anthesisgroup.com>; Ashwini Arul <Ashwini.Arul@anthesisgroup.com>; Alan Dow <Alan.Dow@anthesisgroup.com>; Matt Rooney <Matt.Rooney@anthesisgroup.com>; Sarah Gilby <Sarah.Gilby@anthesisgroup.com>; Tim Clare <Tim.Clare@anthesisgroup.com>"
+#$users = convertTo-arrayOfEmailAddresses "Bethany Munyard <Bethany.Munyard@anthesisgroup.com>; Ellen Upton <Ellen.Upton@anthesisgroup.com>; Jono Adams <Jono.Adams@anthesisgroup.com>; Polly Stebbings <Polly.Stebbings@anthesisgroup.com>; Alan Matthews <Alan.Matthews@anthesisgroup.com>; Dee Moloney <Dee.Moloney@anthesisgroup.com>; Enda Colfer <Enda.Colfer@anthesisgroup.com>; Ian Bailey <Ian.Bailey@anthesisgroup.com>; Paul Crewe <Paul.Crewe@anthesisgroup.com>; Anne O’Brien <Anne.OBrien@anthesisgroup.com>; Beth Simpson <Beth.Simpson@anthesisgroup.com>; Julian Parfitt <Julian.Parfitt@anthesisgroup.com>; Nick Cuomo <Nick.Cuomo@anthesisgroup.com>; Peter Scholes <Peter.Scholes@anthesisgroup.com>; Simone Aplin <Simone.Aplin@anthesisgroup.com>; Stephanie Egee <Stephanie.Egee@anthesisgroup.com>"
+$users = convertTo-arrayOfEmailAddresses "Ellen Struthers <Ellen.Struthers@anthesisgroup.com>; Ben Hopkins <Ben.Hopkins@anthesisgroup.com>; Jason Urry <Jason.Urry@anthesisgroup.com>; UKcareers@anthesisgroup.com; Stuart McLachlan <Stuart.McLachlan@anthesisgroup.com>; Emma Hampsey <Emma.Hampsey@anthesisgroup.com>; Pravin Selvarajah <Pravin.Selvarajah@anthesisgroup.com>; Andrew McGregor <Andrew.McGregor@anthesisgroup.com>; Anne O’Brien <Anne.OBrien@anthesisgroup.com>; Sarah Hayes <Sarah.Hayes@anthesisgroup.com>; AnthesisUKFinance <AnthesisUKFinance@anthesisgroup.com>; Hannah Dick <Hannah.Dick@anthesisgroup.com>; UK HR <UKHR@anthesisgroup.com>; Ellen Upton <Ellen.Upton@anthesisgroup.com>; Malcolm Paul <malcolm.paul@anthesisgroup.com>; Carl van Tonder <Carl.van.Tonder@anthesisgroup.com>; Tim Davis <Tim.Davis@anthesisgroup.com>; Debbie Hitchen <debbie.hitchen@anthesisgroup.com>; Larry Cody <Larry.Cody@anthesisgroup.com>"
 
 $users | % {
     $thisUser = Get-MsolUser -UserPrincipalName $_
@@ -93,4 +95,21 @@ Enquiries and statements to energyfinance@anthesisgroup.com
 If you have any queries then please contact kath.addison-scott@anthesisgroup.com or greg.francis@anthesisgroup.com
 
 Kind Regards,
-Anthesis  Energy UK's AutoReply Robot"#>
+Anthesis  Energy UK's AutoReply Robot"
+
+
+
+
+$gb = Get-MsolUser -all | ?{($_.Country -eq "United Kingdom" -or $_.UsageLocation -eq "GB") -and $_.IsLicensed -eq $true}
+
+
+$gb | %{
+    Write-Host $_.DisplayName`t $_.UserPrincipalName`t$_.Country`t$_.UsageLocation`t $_.StrongAuthenticationRequirements[0].State`t $($_.StrongAuthenticationMethods | ?{$_.IsDefault}).MethodType
+    }
+
+Get-MsolUser -all | ? {$_.IsLicensed -eq $true} | %{
+    Write-Host $_.DisplayName`t$($_.UserPrincipalName)`t$($_.Country)`t$($_.UsageLocation)`t $_.StrongAuthenticationRequirements[0].State`t $($_.StrongAuthenticationMethods | ?{$_.IsDefault}).MethodType
+    }
+#>
+
+
