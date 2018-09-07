@@ -3,11 +3,11 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Shared Mailbox - Finance Team (Anthesis Consulting Group)"
-$owner = "jason.urry@anthesisgroup.com"
-$arrayOfFullAccessMembers = @("jason.urry@anthesisgroup.com","alan.matthews@anthesisgroup.com","pravin.Selvarajah@anthesisgroup.com")
+$displayName = "Shared Mailbox - Stevenage Borough Council"
+$owner = "chris.jennings@anthesisgroup.com"
+$arrayOfFullAccessMembers = @("gavin.way@anthesisgroup.com","chris.jennings@anthesisgroup.com","duncan.faulkes@anthesisgroup.com")
 $grantSendAsToo = $true
-$hideFromGal = $false
+$hideFromGal = $true
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){

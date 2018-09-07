@@ -147,21 +147,25 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if([string]::IsNullOrEmpty($pDDI)){$ddi = $currentUser.PhoneNumber}else{$ddi = $pDDI}
     if([string]::IsNullOrEmpty($pMobile)){$mobile = $currentUser.MobilePhone}else{$mobile = $pMobile}
 
+    Write-Host -ForegroundColor DarkYellow "`t$($currentUser.DisplayName) is retrieved"
+
     switch($pPrimaryOffice){
-        "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers")}
-        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)"}
-        "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)"}
-        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
-        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
-        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
-        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All PHI"}
-        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All DEU"}
-        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All DEU"}
-        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)"}
-        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)"}
-        default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
+        "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers");Write-Host -ForegroundColor DarkYellow "`t$displayName is Homeworker"}
+        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)";Write-Host -ForegroundColor DarkYellow "`t$displayName is Bristol-based"}
+        "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)";Write-Host -ForegroundColor DarkYellow "`t$displayName is London-based"}
+        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)";Write-Host -ForegroundColor DarkYellow "`t$displayName is Oxford-based"}
+        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)";Write-Host -ForegroundColor DarkYellow "`t$displayName is Macclesfield-based"}
+        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)";Write-Host -ForegroundColor DarkYellow "`t$displayName is Manchester-based"}
+        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All PHI";Write-Host -ForegroundColor DarkYellow "`t$displayName is Manila-based"}
+        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All DEU";Write-Host -ForegroundColor DarkYellow "`t$displayName is Frankfurt-based"}
+        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All DEU";Write-Host -ForegroundColor DarkYellow "`t$displayName is Nuremberg-based"}
+        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)";Write-Host -ForegroundColor DarkYellow "`t$displayName is Boulder-based"}
+        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)";Write-Host -ForegroundColor DarkYellow "`t$displayName is Emeryville-based"}
+        "Helsinki, FIN" {$streetAddress = "Aleksanterinkatu 48 B";$postalCode="00100";$country="Finland";$usageLocation="FI";$group = "All FIN";Write-Host -ForegroundColor DarkYellow "`t$displayName is Helsinki-based"}
+        default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation;Write-Host -ForegroundColor DarkYellow "`t$displayName location could not be determined"}
         }
     #$msolUser = New-MsolUser `
+    Write-Host -ForegroundColor DarkYellow "`tSetting user details"
     Set-MsolUser -UserPrincipalName "$($pUPN.Split("@")[0])@anthesisgroup.com" `
         -FirstName $firstName `
         -LastName $surname `
@@ -178,9 +182,9 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         -StrongPasswordRequired $true 
         #-Password "Welcome123" `
         #-ForceChangePassword $true
-    if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN -BypassSecurityGroupManagerCheck}
-    if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN -BypassSecurityGroupManagerCheck}}
-    if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
+    if($pPrimaryTeam -ne $null){Write-Host -ForegroundColor DarkYellow "`tAdding $displayName to $pPrimaryTeam";Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN -BypassSecurityGroupManagerCheck}
+    if($pSecondaryTeams -ne $null){Write-Host -ForegroundColor DarkYellow "`tAdding $displayName to $($pSecondaryTeams -join ", ")";$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN -BypassSecurityGroupManagerCheck}}
+    if($group -ne $null){Write-Host -ForegroundColor DarkYellow "`tAdding $displayName to $group";Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
@@ -289,7 +293,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         log-Error "Failed to create MSOL account"
         log-Error $Error
         }
-    Start-Sleep -Seconds 5 #Let MSOL & EXO Syncronise
+    Start-Sleep -Seconds 10 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
         update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle 
@@ -393,6 +397,8 @@ $selectedStarters | % {
         -userCommunity $null `
         -userPrimaryTeam $_.Primary_Team `
         -userSecondaryTeams $_.Additional_Teams `
+        -userPrimaryOffice $_.Primary_Workplace `
+        -userSecondaryOffice $_.Nearest_Office `
         -userBusinessUnit $_.Finance_Cost_Attribu `
         -userJobTitle $_.Job_title `
         -plaintextPassword "Welcome123" `
