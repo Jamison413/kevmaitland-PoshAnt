@@ -65,14 +65,6 @@ function reconcile-clientsBetweenKimbleAndSpo($standardKimbleQueryUri, $standard
     #Get the full list of Kimble Clients
     $allKimbleClients = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))" 
     #Get the full list of SPO Clients
-    try{
-        log-action -myMessage "Getting new Digest for https://anthesisllc.sharepoint.com/clients" -logFile $fullLogPathAndName
-        $clientsDigest = new-spoDigest -serverUrl $webUrl -sitePath $sitePath -restCreds $restCreds -logFile $fullLogPathAndName -verboseLogging $true
-        if($clientsDigest){log-result -myMessage "SUCCESS: New digest expires at $($clientsDigest.expiryTime)" -logFile $fullLogPathAndName}
-        else{log-result -myMessage "FAILED: Unable to retrieve digest" -logFile $fullLogPathAndName}
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving digest for $webUrl$sitePath" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-    
     Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
     $clientList = Get-PnPList -Identity "Kimble Clients" -Includes ContentTypes
     $clientListContentType = $clientList.ContentTypes | ? {$_.Name -eq "Item"}
@@ -87,7 +79,7 @@ function reconcile-clientsBetweenKimbleAndSpo($standardKimbleQueryUri, $standard
     $missingSpoClients | ?{$_.SideIndicator -eq "<="} | %{
         $missingClient = $_
         log-action -myMessage "Creating missing client [$($missingClient.Name)]" -logFile $fullLogPathAndName
-        $newClient = new-spoKimbleClientItem -kimbleClientObject $missingClient -spoClientList $clientList -fullLogPathAndName $fullLogPathAndName  -verboseLogging $verboseLogging
+        $newClient = new-spoKimbleClientItem -kimbleClientObject $missingClient -pnpClientList $clientList -fullLogPathAndName $fullLogPathAndName  -verboseLogging $verboseLogging
         if($newClient){log-result "SUCCESS: New Client [$($missingClient.Name)] created in [Kimble Clients]" -logFile $fullLogPathAndName}
         else{log-result "FAILED: New Client [$($missingClient.Name)] NOT created in [Kimble Clients]" -logFile $fullLogPathAndName}
         #$newItem = Add-PnPListItem -List $clientList.Id -ContentType $clientListContentType.Id.StringValue -Values @{"Title"=$missingClient.Name;"KimbleId"=$missingClient.Id;"ClientDescription"=$missingClient.Description;"IsDirty"=$true;"IsDeleted"=$missingClient.IsDeleted;"LastModifiedDate"=$(Get-Date $missingClient.LastModifiedDate -Format "MM/dd/yyyy hh:mm")}
@@ -96,7 +88,7 @@ function reconcile-clientsBetweenKimbleAndSpo($standardKimbleQueryUri, $standard
     $updatedKimbleClients = Compare-Object -ReferenceObject $allKimbleClients -DifferenceObject $allSpoClients -Property @("Id","LastModifiedDate") -PassThru -CaseSensitive:$false
     $updatedKimbleClients | ?{$_.SideIndicator -eq "<="} | % {
         $updatedClient = $_
-        $fixedClient = update-spoKimbleClientItem -kimbleClientObject $updatedClient -pnpClientList $kc -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging
+        $fixedClient = update-spoKimbleClientItem -kimbleClientObject $updatedClient -pnpClientList $clientList -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging
 <#        $spoClient = $allSpoClients | ? {$_.Id -eq $updatedClient.Id}
         $updatedValues = @{"IsDeleted"=$updatedClient.IsDeleted}
         if($updatedClient.LastModifiedDate -ne $null){
@@ -189,7 +181,7 @@ function reconcile-projectsBetweenKimbleAndSpo($standardKimbleQueryUri, $standar
     $allKimbleProjects | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name KimbleId -Value $_.Id}
     $missingProjects = Compare-Object -ReferenceObject $allKimbleProjects -DifferenceObject $allSpoProjects -Property "KimbleId" -PassThru -CaseSensitive:$false
     $missingProjects | % {
-        if ($_.SideIndicator -eq "<="){new-spoProject -kimbleProjectObject $_ -pnpProjectList $projectList -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging}
+        if ($_.SideIndicator -eq "<="){new-spoKimbleProjectItem -kimbleProjectObject $_ -pnpProjectList $projectList -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging}
         }
 
     $updatedKimbleProjects = Compare-Object -ReferenceObject $allKimbleProjects -DifferenceObject $allSpoProjects -Property @("Id","LastModifiedDate") -PassThru -CaseSensitive:$false
@@ -230,6 +222,6 @@ function reconcile-projectsBetweenKimbleAndSpo($standardKimbleQueryUri, $standar
 #
 ##################################
 
-reconcile-clients
+reconcile-clientsBetweenKimbleAndSpo -standardKimbleQueryUri $standardKimbleQueryUri -standardKimbleHeaders $standardKimbleHeaders -webUrl $webUrl -sitePath $sitePath -adminCreds $adminCreds
 #reconcile-leads
-reconcile-projects
+reconcile-projectsBetweenKimbleAndSpo -standardKimbleQueryUri $standardKimbleQueryUri -standardKimbleHeaders $standardKimbleHeaders -webUrl $webUrl -sitePath $sitePath -adminCreds $adminCreds

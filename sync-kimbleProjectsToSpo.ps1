@@ -72,8 +72,8 @@ try{
     else{log-result -myMessage "FAILED: Unable to retrieve data!" -logFile $fullLogPathAndName}
     }
 catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Kimble Project data" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
-$kimbleChangedProjects = $kimbleModifiedProjects | ?{$_.LastModifiedDate -ge $cutoffDate} #-and $_.CreatedDate -lt $cutoffDate} These can be both Created and Modified
-$kimbleNewProjects = $kimbleModifiedProjects | ?{$_.CreatedDate -ge $cutoffDate}
+[array]$kimbleChangedProjects = $kimbleModifiedProjects | ?{$_.LastModifiedDate -ge $cutoffDate} #-and $_.CreatedDate -lt $cutoffDate} These can be both Created and Modified
+[array]$kimbleNewProjects = $kimbleModifiedProjects | ?{$_.CreatedDate -ge $cutoffDate}
 
 
 foreach($kimbleChangedProject in $kimbleChangedProjects){

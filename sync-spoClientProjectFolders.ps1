@@ -335,12 +335,12 @@ catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [Kimble Clien
 
 #Get the list of Projects to update *before* we get the list of Clients, so we don't create a race condition where any Projects created while we're processing the Clients incorrectly appear orphaned
 $dirtyProjects = get-spoKimbleProjectListItems -camlQuery "<View><Query><Where><Eq><FieldRef Name='IsDirty'/><Value Type='Boolean'>1</Value></Eq></Where></Query></View>" -spoCredentials $adminCreds -verboseLogging $verboseLogging
+#$dirtyProjects = get-spoKimbleProjectListItems -camlQuery "<View><Query><Where><Geq><FieldRef Name='Created'/><Value Type='DateTime' IncludeTimeValue='FALSE'>2018-02-01T00:00:00</Value></Geq></Where></Query></View>" -spoCredentials $adminCreds -verboseLogging $verboseLogging
 #Retrieve (and update if necessary) the full Clients Cache as we'll need it to set up any new Leads/Projects
 $clientCache = cache-kimbleClients -pnpKimbleClientsList $kc -kimbleClientsCachePathAndFileName $($cacheFilePath+$clientsCacheFile)
 #Build a hashtable so we can look up Client name by it's KimbleId
 $kimbleClientHashTable = @{}
 $clientCache | % {$kimbleClientHashTable.Add($_.Id, @{"Name"=$_.Name;"LibraryId"=$_.LibraryGUID})}
-
 #Process any [Kimble Clients] flagged as IsDirty
 $dirtyClients = $clientCache | ?{$_.IsDirty -eq $true -and $_.IsDeleted -eq $false}
 $i = 1
