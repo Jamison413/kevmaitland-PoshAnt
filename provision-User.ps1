@@ -408,7 +408,7 @@ $selectedStarters | % {
         -userTimeZone $_.TimeZone `
         -user365License $_.Office_365_license 
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
+$selectedStarters | ? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
@@ -427,10 +427,12 @@ $selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"
         -user365License $_.Office_365_license 
     }
 
-$selectedStarters | % {
+$selectedStarters | ? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
     update-msolUserFromAd -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")
     }
 
+
+#To troubleshoot
 $selectedStarters | % {
     $userUPN = $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
     $userFirstName = $_.Title.Split(" ")[0] 
