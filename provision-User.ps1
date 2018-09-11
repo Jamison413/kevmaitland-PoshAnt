@@ -165,7 +165,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation;Write-Host -ForegroundColor DarkYellow "`t$displayName location could not be determined"}
         }
     #$msolUser = New-MsolUser `
-    Write-Host -ForegroundColor DarkYellow "`tSetting user details"
+    Write-Host -ForegroundColor DarkYellow "`tSetting user details: Set-MsolUser -UserPrincipalName $($pUPN.Split("@")[0])@anthesisgroup.com -FirstName $firstName -LastName $surname -DisplayName $displayName -Title $jobTitle -Department $primaryTeam -Office $primaryOffice -PhoneNumber $ddi -StreetAddress $streetAddress -City $secondaryOffice -PostalCode $postalCode -Country $country -UsageLocation $usageLocation -StrongPasswordRequired $true  "
     Set-MsolUser -UserPrincipalName "$($pUPN.Split("@")[0])@anthesisgroup.com" `
         -FirstName $firstName `
         -LastName $surname `
@@ -296,7 +296,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
     Start-Sleep -Seconds 10 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
-        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle 
+        update-MsolUser -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle 
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{
@@ -450,7 +450,7 @@ $selectedStarters | % {
     $newUserListItem = $_ 
     $userTimeZone = $_.TimeZone 
     $user365License = $_.Office_365_license
-    $userDDI="0117 403 2XXX"
+    #$userDDI="0117 403 2XXX"
     }
 
 
