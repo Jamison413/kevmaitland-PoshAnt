@@ -293,7 +293,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         log-Error "Failed to create MSOL account"
         log-Error $Error
         }
-    Start-Sleep -Seconds 10 #Let MSOL & EXO Syncronise
+    Start-Sleep -Seconds 30 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
         update-MsolUser -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle 
@@ -401,7 +401,7 @@ $selectedStarters | % {
         -userSecondaryOffice $_.Nearest_Office `
         -userBusinessUnit $_.Finance_Cost_Attribu `
         -userJobTitle $_.Job_title `
-        -plaintextPassword "Welcome123" `
+        -plaintextPassword "Anthesis123" `
         -adCredentials $adCredentials `
         -restCredentials $restCredentials `
         -newUserListItem $_ `

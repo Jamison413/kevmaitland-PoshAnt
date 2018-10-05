@@ -85,6 +85,7 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
                 #Create a Shared Mailbox and autoforward mail to the Unified Group
                 Write-Host -ForegroundColor Yellow "Creating Shared Mailbox [Shared Mailbox Bodge - $displayName]"
                 $sm = New-Mailbox -Shared -DisplayName "Shared Mailbox Bodge - $displayName" -Name "Shared Mailbox Bodge - $displayName" -Alias $(guess-aliasFromDisplayName ("Shared Mailbox Bodge - $displayName")) -ErrorAction Continue
+                sleep -Seconds 15
                 if($sm -eq $null){
                     Write-Host -ForegroundColor DarkYellow "Shared Mailbox could not create - trying to retrieve instead"
                     $sm = Get-Mailbox $(guess-aliasFromDisplayName ("Shared Mailbox Bodge - $displayName"))
@@ -116,6 +117,8 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
 function new-mailEnabledDistributionGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate){
     Write-Host -ForegroundColor Magenta "new-mailEnabledDistributionGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate)"
     $mailAlias = guess-aliasFromDisplayName $dgDisplayName
+    $mailName = $dgDisplayName
+    if($mailName.length -gt 64){$mailName = $mailName.SubString(0,64)}
     if($onlyUpdate){
         $members  | % {
             Write-Host -ForegroundColor DarkMagenta "Adding TeamMembers Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
@@ -124,8 +127,8 @@ function new-mailEnabledDistributionGroup($dgDisplayName, $description, $members
         }
     else{
         try{
-            Write-Host -ForegroundColor DarkMagenta "New-DistributionGroup -Name $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias"
-            New-DistributionGroup -Name $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias | Out-Null
+            Write-Host -ForegroundColor DarkMagenta "New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias"
+            New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias #| Out-Null
             }
         catch{$Error}
         }
@@ -596,6 +599,73 @@ $description = $null
 $managers = @("kevin.maitland","praveenaa.kathirvasan")
 $teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Analysts Team (All)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Sales Team (All)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Sales Team (GBR)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Sales Team (North America)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Diversity & Inclusivity (GBR)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Data Visualisation Team (All)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Carbon Consulting Team (All)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Environmental, Social & Governance (ESG) Team (All)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "STEP Team (All)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Pulse Team (All)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Diversity & Inclusivity (GBR)"
+$description = $null
+$managers = @("kevin.maitland","praveenaa.kathirvasan")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
 
 #>
 
