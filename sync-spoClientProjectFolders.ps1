@@ -13,6 +13,7 @@ if($PSCommandPath){
     }
 
 Import-Module _PS_Library_GeneralFunctionality
+Import-Module _PNP_Library_SPO
 Import-Module SharePointPnPPowerShellOnline
 #Import-Module _CSOM_Library-SPO
 #Import-Module _REST_Library-SPO
@@ -253,8 +254,11 @@ function update-projectFolder($spoKimbleProjectList, $spoKimbleProjectListItem, 
     #Move the folder to the new client
                 log-result -myMessage "SUCCESS: Previous Client Library [$($clientCacheHashTable[$spoKimbleProjectListItem.PreviousKimbleClientId]["Name"])] retrieved" -logFile $fullLogPathAndName
                 log-action -myMessage "Looking for Project folder in Previous Client Library [$($clientCacheHashTable[$spoKimbleProjectListItem.PreviousKimbleClientId]["Name"])]" -logFile $fullLogPathAndName
-                $misplacedProjectFolder = get-spoFolder -pnpList $oldClientLibrary -folderServerRelativeUrl $(format-asServerRelativeUrl -serverRelativeUrl $oldClientLibrary.RootFolder.ServerRelativeUrl -stringToFormat $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.PreviousName)) -folderGuid $spoKimbleProjectListItem.FolderGUID -verboseLogging $verboseLogging
-                if(!$misplacedProjectFolder){$misplacedProjectFolder = get-spoFolder -pnpList $oldClientLibrary -folderServerRelativeUrl $(format-asServerRelativeUrl -serverRelativeUrl $oldClientLibrary.RootFolder.ServerRelativeUrl -stringToFormat $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name)) -verboseLogging $verboseLogging}
+                $misplacedProjectFolder = get-spoProjectFolder -pnpList $oldClientLibrary -kimbleEngagementCodeToLookFor $(get-kimbleEngagementCodeFromString $spoKimbleProjectListItem.Name -verboseLogging $verboseLogging) -adminCreds $adminCreds -verboseLogging $verboseLogging
+                #Hopefully these shouldn't be needed any more as get-spoProjectFolder uses the (hopefully) immutable Kimble Engagement Code to identify the correct folder
+                if(!$misplacedProjectFolder){$misplacedProjectFolder = get-spoFolder -pnpList $oldClientLibrary -folderServerRelativeUrl $(format-asServerRelativeUrl -serverRelativeUrl $oldClientLibrary.RootFolder.ServerRelativeUrl -stringToFormat $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.PreviousName)) -folderGuid $spoKimbleProjectListItem.FolderGUID -verboseLogging $verboseLogging -adminCreds $adminCreds}
+                if(!$misplacedProjectFolder){$misplacedProjectFolder = get-spoFolder -pnpList $oldClientLibrary -folderServerRelativeUrl $(format-asServerRelativeUrl -serverRelativeUrl $oldClientLibrary.RootFolder.ServerRelativeUrl -stringToFormat $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name)) -verboseLogging $verboseLogging -adminCreds $adminCreds} 
+                
                 if($misplacedProjectFolder -and $clientLibrary){
                     log-result -myMessage "SUCCESS: Project folder [$($misplacedProjectFolder.FieldValues.FileRef)] found in Previous Client [$($clientCacheHashTable[$spoKimbleProjectListItem.PreviousKimbleClientId]["Name"])]" -logFile $fullLogPathAndName
                     log-action -myMessage "Moving Project folder [$($misplacedProjectFolder.FieldValues.FileRef)] from [$($clientCacheHashTable[$spoKimbleProjectListItem.PreviousKimbleClientId]["Name"])] to [$($clientCacheHashTable[$spoKimbleProjectListItem.KimbleClientId]["Name"])]" -logFile $fullLogPathAndName
@@ -272,14 +276,16 @@ function update-projectFolder($spoKimbleProjectList, $spoKimbleProjectListItem, 
     #Get the ProjectFolder
         log-result -myMessage "SUCCESS: $($clientLibrary.RootFolder.ServerRelativeUrl) retrieved" -logFile $fullLogPathAndName
         log-action -myMessage "Retrieving Project Folder [$($spoKimbleProjectListItem.Name)] in Client Library [$($clientCacheHashTable[$spoKimbleProjectListItem.KimbleClientId]["Name"])]" -logFile $fullLogPathAndName
-        $misnamedProjectFolder = get-spoFolder -pnpList $clientLibrary -folderServerRelativeUrl $(format-asServerRelativeUrl -serverRelativeUrl $clientLibrary.RootFolder.ServerRelativeUrl -stringToFormat $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.PreviousName)) -folderGuid $spoKimbleProjectListItem.FolderGUID -verboseLogging $verboseLogging
-        if($misnamedProjectFolder){
+        $currentProjectFolder = get-spoProjectFolder -pnpList $clientLibrary -kimbleEngagementCodeToLookFor $(get-kimbleEngagementCodeFromString $spoKimbleProjectListItem.Name)
+        if(($currentProjectFolder.FieldValues.FileLeafRef -ne $spoKimbleProjectListItem.Name) -and $currentProjectFolder){
+        #$misnamedProjectFolder = get-spoFolder -pnpList $clientLibrary -folderServerRelativeUrl $(format-asServerRelativeUrl -serverRelativeUrl $clientLibrary.RootFolder.ServerRelativeUrl -stringToFormat $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.PreviousName)) -folderGuid $spoKimbleProjectListItem.FolderGUID -verboseLogging $verboseLogging
+        #if($misnamedProjectFolder){
     #Rename the ProjectFolder
-            log-result -myMessage "SUCCESS: Misnamed Project Folder [$($misnamedProjectFolder.FieldValues.FileRef)] retrieved - will rename to $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name)" -logFile $fullLogPathAndName
-            $misnamedProjectFolder.ParseAndSetFieldValue("Title",$(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name))
-            $misnamedProjectFolder.ParseAndSetFieldValue("FileLeafRef",$(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name))
-            $misnamedProjectFolder.Update()
-            $misnamedProjectFolder.Context.ExecuteQuery()
+            log-result -myMessage "SUCCESS: Misnamed Project Folder [$($currentProjectFolder.FieldValues.FileRef)] retrieved - will rename to $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name)" -logFile $fullLogPathAndName
+            $currentProjectFolder.ParseAndSetFieldValue("Title",$(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name))
+            $currentProjectFolder.ParseAndSetFieldValue("FileLeafRef",$(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name))
+            $currentProjectFolder.Update()
+            $currentProjectFolder.Context.ExecuteQuery()
             }
         $correctlyNamedProjectFolder = get-spoFolder -pnpList $clientLibrary -folderServerRelativeUrl $(format-asServerRelativeUrl -serverRelativeUrl $clientLibrary.RootFolder.ServerRelativeUrl -stringToFormat $(sanitise-forPnpSharePoint $spoKimbleProjectListItem.Name)) -verboseLogging $verboseLogging
         if($correctlyNamedProjectFolder){
@@ -408,10 +414,13 @@ catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [Kimble Proje
 
 #Process any [Kimble Projects] flagged as IsDirty
 #We got $dirtyProjects before the Clients to avoid a race condition
+$i = 1
 $dirtyProjects | % {
+    Write-Progress -Id 1000 -Status "Processing DirtyProjects" -Activity "$i/$($dirtyProjects.Count)" -PercentComplete ($i*100/$dirtyProjects.Count) #Display the overall progress
+
     $dirtyProject = $_
     log-action -myMessage "************************************************************************" -logFile $fullLogPathAndName
-    log-action -myMessage "Project [$($dirtyProject.Name)] IsDirty" -dirtyProject $fullLogPathAndName -logFile $fullLogPathAndName
+    log-action -myMessage "PROJECT [$($dirtyProject.Name)][$i/$($dirtyProjects.Count)] IsDirty" -logFile $fullLogPathAndName
     log-action -myMessage "Checking that Client with Id [$($dirtyProject.KimbleClientId)] is in the Cache" -logFile $fullLogPathAndName
     try{
         if ($kimbleClientHashTable[$dirtyProject.KimbleClientId]){
@@ -490,6 +499,7 @@ $dirtyProjects | % {
             log-error -myError $_ -myFriendlyMessage "Error updating project folder [$($dirtyProject.Name)] for [$($kimbleClientHashTable[$dirtyProject.KimbleClientId]["Name"]))]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
             }
         }
+    $i++
     }
 #endregion
 
