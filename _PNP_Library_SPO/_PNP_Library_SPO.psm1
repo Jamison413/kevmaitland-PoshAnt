@@ -83,59 +83,6 @@ function copy-spoFile($fromList,$from,$to,$spoCredentials){
         Connect-PnPOnline -Url $oldConnection.Url -Credentials $spoCredentials
         }
     }
-function get-spoClientLibrary($clientName, $clientLibraryGuid, $adminCreds, $verboseLogging){
-    #Check that the Client Library is retrievable
-    try{
-        if($verboseLogging){Write-Host -ForegroundColor Magenta "get-spoClientLibrary($clientName, $clientLibraryGuid)"}
-        if(![string]::IsNullOrWhiteSpace($clientLibraryGuid)){
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Found LibraryGUID for Client - trying that!"}
-            try{
-                $thisClientLibrary = Get-PnPList -Identity $($clientLibraryGuid) 
-                if($verboseLogging){if(!$thisClientLibrary){Write-Host -ForegroundColor DarkMagenta "`tDidn't work :("}}
-                }
-            catch{<#Meh.#>}
-            }
-        if(!$thisClientLibrary){
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Trying to retrieve Library by Client Name: Get-PnPList -Identity $($clientName)"}
-            try{$thisClientLibrary = Get-PnPList -Identity $(sanitise-forSql $clientName)}
-            catch{<#Meh.#>}
-            }
-        $thisClientLibrary
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Client Library in get-spoClientLibrary" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
-    }
-function get-spoFolder($pnpList, $folderServerRelativeUrl, $folderGuid, $adminCreds, $verboseLogging){
-    if($verboseLogging){Write-Host -ForegroundColor Magenta "get-spoFolder($($pnpList.Title), $folderServerRelativeUrl)"}
-    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><RowLimit>5</RowLimit></View>" #This RowLimit doesn't work at the moment, but hopefully it'll get fixed in the future and this'll be efficient https://github.com/SharePoint/PnP-PowerShell/issues/879
-    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileLeafRef'/><Value Type='Text'>DummyOp5 (E003941)</Value></Eq></Where></Query></View>" 
-    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileRef'/><Value Type='Text'>/clients/DummyCo Ltd/DummyOp5 (E003941)</Value></Eq></Where></Query></View>" 
-    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileRef'/><Value Type='Text'>/clients/DummyCo Ltd/DummyOp5 (E003941)/Analysis</Value></Eq></Where></Query></View>" 
-    if(![string]::IsNullOrWhiteSpace($folderGuid)){
-        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpList.Title) -UniqueId $folderGuid"}
-        $pnpListItem = Get-PnPListItem -List $pnpList -UniqueId $folderGuid
-        }
-    if($pnpListItem.Count -eq 0){
-        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPFolder -Url $folderServerRelativeUrl -Includes UniqueId,ServerRelativeUrl,ServerRelativePath,ListItemAllFields"}# -Query <Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where>"}
-        try{
-            $pnpFolder = Get-PnPFolder -Url $folderServerRelativeUrl -Includes UniqueId,ServerRelativeUrl,ServerRelativePath,ListItemAllFields -ErrorAction Stop
-            }
-        catch{
-            #Weirdly, Get-PnPFolder throws a non-terminating Exception if it can't find the folder. We don't want that, we either want it to return $null, or Stop so we can return $null from the catch{} block like this
-            }
-        if($pnpFolder){
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpList.Title) -Id $($pnpFolder.ListItemAllFields.Id)"}# -Query <Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where>"}
-            $pnpListItem = Get-PnPListItem -List $pnpList -Id $($pnpFolder.ListItemAllFields.Id)
-            }
-        #$test = Get-PnPListItem -List $pnpList -Query "<View Scope='RecursiveAll'><Query><Where><Eq><FieldRef Name='ID'/><Value Type='Integer'>$($hasItems.ListItemAllFields.Id)</Value></Eq></Where></Query></View>"
-        #$hasItems2 = Get-PnPListItem -List $pnpList #-Query "<View Scope='RecursiveAll'><Query><Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where></Query></View>" #FileRef CAML shit doesn't work for >5000 list items
-        #$hasItems3 = $hasItems2 | ? {$_.FieldValues.FileRef -eq $folderServerRelativeUrl} 
-        }
-    if($verboseLogging){
-        if($pnpListItem){Write-Host -ForegroundColor DarkMagenta "Found $($pnpListItem.Count) items: $($pnpListItem.FieldValues.FileRef)"}# -Query <Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where>"}
-        else{Write-Host -ForegroundColor DarkMagenta "No item found"}
-        }
-    $pnpListItem
-    }
 function format-asServerRelativeUrl($serverRelativeUrl,$stringToFormat){
     $formattedString = $stringToFormat
     if([string]::IsNullOrWhiteSpace($formattedString)){$formattedString = "/"}
@@ -162,6 +109,75 @@ function format-asServerRelativeUrls($serverRelativeUrl,$arrayOfStringToFormat){
     #if($formattedThings.Count -eq 1){$formattedThings[0]} #If $thingsToFormat was just a single string, return a string
     #else{$formattedThings} #If $thingsToFormat was an array, return an array
     $formattedArrayOfClientSubfolders #Change of plan - always return an array
+    }
+function get-spoClientLibrary($clientName, $clientLibraryGuid, $adminCreds, $verboseLogging){
+    #Check that the Client Library is retrievable
+    try{
+        if($verboseLogging){Write-Host -ForegroundColor Magenta "get-spoClientLibrary($clientName, $clientLibraryGuid)"}
+        if(![string]::IsNullOrWhiteSpace($clientLibraryGuid)){
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Found LibraryGUID for Client - trying that!"}
+            try{
+                $thisClientLibrary = Get-PnPList -Identity $($clientLibraryGuid) 
+                if($verboseLogging){if(!$thisClientLibrary){Write-Host -ForegroundColor DarkMagenta "`tDidn't work :("}}
+                }
+            catch{<#Meh.#>}
+            }
+        if(!$thisClientLibrary){
+            $sanitisedClientName = $(sanitise-forPnpSharePoint $clientName)
+            if($clientName.SubString($clientName.Length-1,1) -eq "."){$sanitisedClientName+="."} #Trailing fullstops /are/ allowed in this context
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Trying to retrieve Library by Client Name: Get-PnPList -Identity [$sanitisedClientName]"}
+            try{$thisClientLibrary = Get-PnPList -Identity $sanitisedClientName}
+            catch{<#Meh.#>}
+            }
+        $thisClientLibrary
+        }
+    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Client Library in get-spoClientLibrary" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
+    }
+function get-spoFolder($pnpList, $folderServerRelativeUrl, $folderGuid, $adminCreds, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "get-spoFolder($($pnpList.Title), $folderServerRelativeUrl)"}
+    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><RowLimit>5</RowLimit></View>" #This RowLimit doesn't work at the moment, but hopefully it'll get fixed in the future and this'll be efficient https://github.com/SharePoint/PnP-PowerShell/issues/879
+    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileLeafRef'/><Value Type='Text'>DummyOp5 (E003941)</Value></Eq></Where></Query></View>" 
+    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileRef'/><Value Type='Text'>/clients/DummyCo Ltd/DummyOp5 (E003941)</Value></Eq></Where></Query></View>" 
+    #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileRef'/><Value Type='Text'>/clients/DummyCo Ltd/DummyOp5 (E003941)/Analysis</Value></Eq></Where></Query></View>" 
+    if(![string]::IsNullOrWhiteSpace($folderGuid)){
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpList.Title) -UniqueId $folderGuid"}
+        $pnpListItem = Get-PnPListItem -List $pnpList -UniqueId $folderGuid
+        }
+    if($pnpListItem.Count -eq 0){
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPFolder -Url $folderServerRelativeUrl -Includes UniqueId,ServerRelativeUrl,ServerRelativePath,ListItemAllFields"}# -Query <Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where>"}
+        try{
+            $pnpFolder = Get-PnPFolder -Url $folderServerRelativeUrl -Includes UniqueId,ServerRelativeUrl,ServerRelativePath,ListItemAllFields -ErrorAction Stop
+            }
+        catch{
+            #Weirdly, Get-PnPFolder throws a non-terminating Exception if it can't find the folder. We don't want that, we either want it to return $null, or Stop so we can return $null from the catch{} block like this
+            }
+        if($pnpFolder.ListItemAllFields.Id){
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPListItem -List $($pnpList.Title) -Id $($pnpFolder.ListItemAllFields.Id)"}# -Query <Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where>"}
+            $pnpListItem = Get-PnPListItem -List $pnpList -Id $($pnpFolder.ListItemAllFields.Id)
+            }
+        #$test = Get-PnPListItem -List $pnpList -Query "<View Scope='RecursiveAll'><Query><Where><Eq><FieldRef Name='ID'/><Value Type='Integer'>$($hasItems.ListItemAllFields.Id)</Value></Eq></Where></Query></View>"
+        #$hasItems2 = Get-PnPListItem -List $pnpList #-Query "<View Scope='RecursiveAll'><Query><Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where></Query></View>" #FileRef CAML shit doesn't work for >5000 list items
+        #$hasItems3 = $hasItems2 | ? {$_.FieldValues.FileRef -eq $folderServerRelativeUrl} 
+        }
+    if($verboseLogging){
+        if($pnpListItem){Write-Host -ForegroundColor DarkMagenta "Found $($pnpListItem.Count) items: $($pnpListItem.FieldValues.FileRef)"}# -Query <Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where>"}
+        else{Write-Host -ForegroundColor DarkMagenta "No item found"}
+        }
+    $pnpListItem
+    }
+function get-spoProjectFolder($pnpList, $kimbleEngagementCodeToLookFor,$adminCreds, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "get-spoProjectFolder($($pnpList.Title), $kimbleEngagementCodeToLookFor)"}
+    if($kimbleEngagementCodeToLookFor){
+        $pnpQuery = "<View><Query><Where><Contains><FieldRef Name='Title'/><Value Type='Text'>$kimbleEngagementCodeToLookFor</Value></Eq></Where></Query></View>"
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-PnPListItem -list [$($pnpList.Title)] -Query [$pnpQuery]"}
+        $pnpListItem = Get-PnPListItem -List $pnpList -Query $pnpQuery
+        }
+    if($verboseLogging){
+        if($pnpListItem){Write-Host -ForegroundColor DarkMagenta "Found $($pnpListItem.Count) items: $($pnpListItem.FieldValues.FileRef)"}# -Query <Where><Eq><FieldRef Name='FSObjType' /><Value Type='int'>1</Value></Eq></Where>"}
+        else{Write-Host -ForegroundColor DarkMagenta "No item found"}
+        }
+
+    $pnpListItem
     }
 function get-allSpoListItemsWithUniquePermissions($pnpList,$adminCredentials, $verboseLogging){
     if($verboseLogging){Write-Host -ForegroundColor Magenta "get-allSpoListItemsWithUniquePermissions($($pnpList.Title))"}
@@ -492,7 +508,10 @@ function update-spoKimbleClientItem($kimbleClientObject, $pnpClientList, $fullLo
     else{
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Existing item [$($existingItem.FieldValues.Title)] in [Kimble Clients] found"}
         $updateValues = @{"Title"=$kimbleClientObject.Name;"KimbleId"=$kimbleClientObject.Id;"ClientDescription"=$(sanitise-stripHtml $kimbleClientObject.Description);"IsDirty"=$true;"IsDeleted"=$kimbleClientObject.IsDeleted}
-        if($kimbleClientObject.LastModifiedDate){$updateValues.Add("LastModifiedDate",$(Get-Date $kimbleClientObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
+        if($kimbleClientObject.LastModifiedDate){
+            $updateValues.Add("LastModifiedDate",$(Get-Date $kimbleClientObject.LastModifiedDate -Format "MM/dd/yyyy HH:mm:ss"))
+            if((Get-Date $kimbleClientObject.LastModifiedDate) -lt $(get-date).AddDays(-30)){$updateValues["IsDirty"]=$false} #Bodge fuckup where 24h time was converted to 12h by clearing IsDirty flag for unmodified Clients
+            }
         try{
             if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPListItem -List $($pnpClientList.Id) -Identity $($existingItem.Id) -Values @{$(stringify-hashTable $updateValues)}"}
             $updatedItem = Set-PnPListItem -List $pnpClientList.Id -Identity $existingItem.Id -Values $updateValues -ErrorAction Stop
@@ -528,7 +547,7 @@ function update-spoKimbleProjectItem($kimbleProjectObject, $pnpProjectList, $ful
     else{
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`tSUCCESS: Existing item [$($existingItem.FieldValues.Title)] in [Kimble Clients] found"}
         $updateValues = @{"Title"=$kimbleProjectObject.Name;"KimbleId"=$kimbleProjectObject.Id;"KimbleClientId"=$kimbleProjectObject.KimbleOne__Account__c;"IsDirty"=$true;"IsDeleted"=$kimbleProjectObject.IsDeleted}
-        if($kimbleProjectObject.LastModifiedDate){$updateValues.Add("LastModifiedDate",$(Get-Date $kimbleProjectObject.LastModifiedDate -Format "MM/dd/yyyy hh:mm"))}
+        if($kimbleProjectObject.LastModifiedDate){$updateValues.Add("LastModifiedDate",$(Get-Date $kimbleProjectObject.LastModifiedDate -Format "MM/dd/yyyy HH:mm:ss"))}
         try{
             if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPListItem -List $($pnpProjectList.Id) -Identity $($existingItem.Id) -Values @{$(stringify-hashTable $updateValues)}"}
             $updatedItem = Set-PnPListItem -List $pnpProjectList.Id -Identity $existingItem.Id -Values $updateValues -ErrorAction Stop

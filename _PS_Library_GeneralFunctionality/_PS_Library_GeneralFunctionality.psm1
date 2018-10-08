@@ -67,6 +67,13 @@ function convertTo-localisedSecureString($plainText){
     if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
     ConvertTo-SecureString $plainText -AsPlainText -Force | ConvertFrom-SecureString
     }
+function get-kimbleEngagementCodeFromString($stringMaybeContainingEngagementCode,$verboseLogging){
+    if($stringMaybeContainingEngagementCode -match 'E(\d){6}'){
+        $Matches[0]
+        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContainingEngagementCode"}
+        }
+    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Kimble Project Code not found in $stringMaybeContainingEngagementCode"}}
+    }
 function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[boolean]$localise){
     if($pDirtyNumber.Length -gt 0){
         $dirtynumber = $pDirtyNumber.Split("ext")[0]
@@ -318,6 +325,7 @@ function matchContains($term, $arrayOfStrings){
     $term -match $singleRegex
     }
 function sanitise-forPnpSharePoint($dirtyString){ 
+    if([string]::IsNullOrWhiteSpace($dirtyString)){return}
     $cleanerString = sanitise-forSharePointStandard -dirtyString $dirtyString
     $cleanerString.Replace(":","").Replace("/","")
     if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."

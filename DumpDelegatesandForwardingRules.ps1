@@ -40,3 +40,7 @@ $SMTPForwarding = Get-Mailbox -ResultSize Unlimited | select DisplayName,Forward
 $UserInboxRules | Export-Csv C:\Users\kevinm\Desktop\AuditLogs\MailForwardingRulesToExternalDomains_$(Get-Date -Format "yyMMdd").csv
 $UserDelegates | Export-Csv C:\Users\kevinm\Desktop\AuditLogs\MailboxDelegatePermissions_$(Get-Date -Format "yyMMdd").csv
 $SMTPForwarding | Export-Csv C:\Users\kevinm\Desktop\AuditLogs\Mailboxsmtpforwarding_$(Get-Date -Format "yyMMdd").csv
+
+
+$SMTPForwarding | ? {$_.ForwardingSmtpAddress -notmatch "anthesisgroup.com"}
+$UserDelegates[0]
