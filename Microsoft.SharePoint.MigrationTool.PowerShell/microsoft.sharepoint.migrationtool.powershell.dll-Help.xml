@@ -1,0 +1,1263 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<helpItems schema="maml" xmlns="http://msh">
+  <!-- Cmdlet: Get-SPMTMigration -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Get-SPMTMigration</command:name>
+      <command:verb>Get</command:verb>
+      <command:noun>SPMTMigration</command:noun>
+      <maml:description>
+        <maml:para>Get the registered SPMT Migration.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Return the object of current session. It includes current tasks status and current session level settings.</maml:para>
+    </maml:description>
+    <command:syntax />
+    <command:parameters />
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code>Get-SPMTMigration</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Register-SPMTMigration -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Register-SPMTMigration</command:name>
+      <command:verb>Register</command:verb>
+      <command:noun>SPMTMigration</command:noun>
+      <maml:description>
+        <maml:para>Register one SPMT Migration Session.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>This cmdlet will create a migration session and initialize it. The initialization will configure migration settings at session level. If no specific setting parameters are defined, default settings will be used. After a session is registered, the user can add a migration task to the migration session and start migration.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <!-- Parameter set: __AllParameterSets -->
+      <command:syntaxItem>
+        <maml:name>Register-SPMTMigration</maml:name>
+        <!-- Parameter: Force -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Force</maml:name>
+          <maml:description>
+            <maml:para>Forcibly stop and unregister existing migration.</maml:para>
+			<maml:para>Note: If you have never run “Register-SPMTMigration”, with or without the Force parameter, a new session will be created. If you have a registered SPMT migration session already, the Force parameter will register a new session anyway.The Force parameter performs the function of Stop-SMPTMigration and Unregister-SPMTMigration together.</maml:para>
+			<maml:para>If you have an active migration and didn’t use the Force parameter, you need to run Stop-SPMTMigration, and then run Unregister-SPMTMigration to unregister the exiting migration session first.  </maml:para>
+          </maml:description>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: SPOCredential -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SPOCredential</maml:name>
+          <maml:description>
+            <maml:para>The credentials are used to connect SharePoint Online tenant. If no credentials are passed in, use ADAL OAuth2.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">PSCredential</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: ScanOnly -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ScanOnly</maml:name>
+          <maml:description>
+            <maml:para>The default is Off. When ScanOnly is On, only a scan will be performed. If you wish to scan migrated items as a pre-assessment to migration, turn it On.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: StartMigrationAutomaticallyWhenNoScanIssue -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>StartMigrationAutomaticallyWhenNoScanIssue</maml:name>
+          <maml:description>
+            <maml:para>By default, this is set to On.When StartMigrationAutomaticallyWhenNoScanIssue is turned on, it means to start migration automatically if no scan issue.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: Incremental -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Incremental</maml:name>
+          <maml:description>
+            <maml:para>The default setting is On. This lets you rerun the migration with the same source and target at a later date, migrating only the changes or additions since the previous run.</maml:para>
+            <maml:para>Important: If you wish to be able to submit the same job again for incremental migration, this setting must be set to On * before* the initial migration job is submitted.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: MigrateFileVersionHistory -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>MigrateFileVersionHistory</maml:name>
+          <maml:description>
+            <maml:para>If set to No, only the most recent versions of the file will be migrated. If set to Yes, you can choose whether to keep all versions, or limit it to a specific number. By default, it is set to On.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: KeepAllVersions -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>KeepAllVersions</maml:name>
+          <maml:description>
+            <maml:para>The default is set to On.  If set to On, all version numbers of the file will be migrated.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: NumberOfVersionToMigrate -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>NumberOfVersionToMigrate</maml:name>
+          <maml:description>
+            <maml:para>You can choose a specific version number for the files to be migrated. By default, the number of versions kept is 10.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">int</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: MigrateHiddenFiles -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>MigrateHiddenFiles</maml:name>
+          <maml:description>
+            <maml:para>If set to On, hidden system files will be migrated. By default, it is set to On.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: MigrateFilesCreatedAfter -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>MigrateFilesCreatedAfter</maml:name>
+          <maml:description>
+            <maml:para>If you choose to limit which files are to be migrated based on creation dates, set your values in this section. This may be to limit the number of files migrated or to adhere to overall company governance policy regarding to file retention. The default value is null.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">DateTime</command:parameterValue>
+          <dev:type>
+            <maml:name>System.DateTime</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: MigrateFilesModifiedAfter -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>MigrateFilesModifiedAfter</maml:name>
+          <maml:description>
+            <maml:para>If you choose to limit what files are to be migrated based on modified dates, set your values in this section. This may be to limit the number of files migrated or to adhere to overall company governance policy regarding to file retention. The default value is null.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">DateTime</command:parameterValue>
+          <dev:type>
+            <maml:name>System.DateTime</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: SkipFilesWithExtension -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SkipFilesWithExtension</maml:name>
+          <maml:description>
+            <maml:para>To prevent certain file types from migrating, list each extension, separate them with colons. The default value is null.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">List`1</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Collections.Generic.List`1[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: MigrateFilesAndFoldersWithInvalidChars -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>MigrateFilesAndFoldersWithInvalidChars</maml:name>
+          <maml:description>
+            <maml:para><![CDATA[The default is On. Files and folders with invalid characters (for example:<, >, :, ", |, ?, *, /, \,\u007f) in the names will be migrated by default. If set to Off, files and folders with invalid characters in names will not be migrated.]]></maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: MigrateOneNoteFolderAsOneNoteNoteBook -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>MigrateOneNoteFolderAsOneNoteNoteBook</maml:name>
+          <maml:description>
+            <maml:para>By default, MigrateOneNoteFolderAsOneNoteNoteBook is set to Off. OneNote notebooks comprise of folders containing OneNote files and potentially nested subfolders with these files. The root folder of such a hierarchy is a OneNote notebook and it must contain a .onetoc2 file.</maml:para>
+            <maml:para>The current implementation is to mark the folders as notebooks at the end of the migration. If a folder contains any non-onenote files, it won’t be marked as a notebook.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: AzureActiveDirectoryLookup -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>AzureActiveDirectoryLookup</maml:name>
+          <maml:description>
+            <maml:para>By default, this is set to On. If no User mapping file is provided by the user, then Azure Active Directory is used as the default for user mapping.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: PreserveUserPermissionsForSharePointSource -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>PreserveUserPermissionsForSharePointSource</maml:name>
+          <maml:description>
+            <maml:para>By default, this is set to On. If set to Off, no permissions will be preserved.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+		    <!-- Parameter: PreserveUserPermissionsForFileShare -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>PreserveUserPermissionsForFileShare</maml:name>
+          <maml:description>
+            <maml:para>By default, this is set to Off. If set to On, permissions will be preserved.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: SkipListWithAudienceTargetingEnabled -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SkipListWithAudienceTargetingEnabled</maml:name>
+          <maml:description>
+            <maml:para>By default, this is set to On. Lists with an audience field, the migration will fail with warning “Does not support list with audience settings’ unless customer enable the ‘Ignore audience’ setting.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: UserMappingFile -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>UserMappingFile</maml:name>
+          <maml:description>
+            <maml:para>By default, Azure AD lookup is used to map users when submitting migration jobs. If you choose to use a custom user mapping file and you want to preserve user permissions, turn off Azure Active Directory lookup.By doing so, if a user isn't found in the mapping file, the tool won't look it up in AAD.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: WorkingFolder -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>WorkingFolder</maml:name>
+          <maml:description>
+            <maml:para>By default, a temp folder will be created as working folder. If you wish to specify your own specific working folder, enter the name here. Note: By default, the working folder is %appdata%\Microsoft\MigrationToolStorage.Please make sure that your working folder has a minimum of 150 GB of free space.It may need more depending on the size of the data you plan to migrate.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: UseCustomAzureStorage -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>UseCustomAzureStorage</maml:name>
+          <maml:description>
+            <maml:para>If you use your own Azure storage, you will set your account and key, and select if you want to enable or disable encryption, and whether temporary files are deleted when migration is completed.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: EnableEncryption -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>EnableEncryption</maml:name>
+          <maml:description>
+            <maml:para>The default is set to On. If you use your own Azure storage, you will set and define your account and key, and decide and configure enable or disable encryption in settings, and whether temporary files are deleted when migration is completed.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: DeleteTempFilesWhenMigrationDone -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>DeleteTempFilesWhenMigrationDone</maml:name>
+          <maml:description>
+            <maml:para>The default is set to On. The temp files in working folder %appdata% will be deleted when migration is completed.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">bool</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: CustomAzureStorageAccount -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CustomAzureStorageAccount</maml:name>
+          <maml:description>
+            <maml:para>The default is Off.If you wish to use your own Azure storage, set this value to On.</maml:para>
+            <maml:para>If you choose to turn it On, additional fields will appear for you to enter your account and key, and settings to select if you want to enable or disable encryption. You also need to decide whether temporary files are deleted when migration is completed.</maml:para>
+            <maml:para>*Note: * This feature is supported only for *General Purpose storage accounts* as General-Purpose accounts support Azure blobs and queues. This feature is not available for Blob Storage accounts.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: CustomAzureAccessKey -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>CustomAzureAccessKey</maml:name>
+          <maml:description>
+            <maml:para>If you use your own Azure storage, you need to set azure storage account to On, enter your account and key. You also need to select if you want to enable or disable encryption, and whether temporary files are deleted when migration is completed.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: Force -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Force</maml:name>
+        <maml:description>
+          <maml:para>Forcibly stop and unregister existing migration.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: SPOCredential -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SPOCredential</maml:name>
+        <maml:description>
+          <maml:para>The credentials are used to connect SharePoint Online tenant. If no credentials are passed in, use ADAL OAuth2.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">PSCredential</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.PSCredential</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: ScanOnly -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>ScanOnly</maml:name>
+        <maml:description>
+          <maml:para>The default is Off. When ScanOnly is On, only a scan will be performed. If you wish to scan migrated items as a pre-assessment to migration, turn it On.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: StartMigrationAutomaticallyWhenNoScanIssue -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>StartMigrationAutomaticallyWhenNoScanIssue</maml:name>
+        <maml:description>
+          <maml:para>By default, this is set to On.  When StartMigrationAutomaticallyWhenNoScanIssue is turned on, migration starts automatically if no scan issue is found.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: Incremental -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Incremental</maml:name>
+        <maml:description>
+          <maml:para>The default setting is On. This lets you rerun the migration with same source and target at a later date, migrating only the changes or additions since the previous run.</maml:para>
+          <maml:para>Important: If you wish to be able to submit the same job again for incremental migration, this setting must be set to On * before* the initial migration job is submitted.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: MigrateFileVersionHistory -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>MigrateFileVersionHistory</maml:name>
+        <maml:description>
+          <maml:para>If set to No, only the most recent versions of the file will be migrated. If set to Yes, you can choose whether to keep all versions, or limit it to a specific number. By default, it is set to on.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: KeepAllVersions -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>KeepAllVersions</maml:name>
+        <maml:description>
+          <maml:para>The default is set to On.  If set to On, all version numbers of the file will be migrated.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: NumberOfVersionToMigrate -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>NumberOfVersionToMigrate</maml:name>
+        <maml:description>
+          <maml:para>You can choose a specific version number for the files to be migrated.By default, the number of versions kept is 10.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">int</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: MigrateHiddenFiles -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>MigrateHiddenFiles</maml:name>
+        <maml:description>
+          <maml:para>If set to On, hidden system files will be migrated. by default, it is set to On.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: MigrateFilesCreatedAfter -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>MigrateFilesCreatedAfter</maml:name>
+        <maml:description>
+          <maml:para>If you choose to limit which files are to be migrated based on creation dates, set your values in this section. This may be to limit the number of files migrated or to adhere to overall company governance policy regarding file retention.The default value is null.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">DateTime</command:parameterValue>
+        <dev:type>
+          <maml:name>System.DateTime</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: MigrateFilesModifiedAfter -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>MigrateFilesModifiedAfter</maml:name>
+        <maml:description>
+          <maml:para>If you choose to limit what files are migration based on modified dates, set your values in this section. This may be to limit the number of files migrated or to adhere to overall company governance policy regarding to file retention.The default value is null.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">DateTime</command:parameterValue>
+        <dev:type>
+          <maml:name>System.DateTime</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: SkipFilesWithExtension -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SkipFilesWithExtension</maml:name>
+        <maml:description>
+          <maml:para>To prevent certain file types from migrating, list each extension,separate them with colons. The default value is null.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">List`1</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Collections.Generic.List`1[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]]</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: MigrateFilesAndFoldersWithInvalidChars -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>MigrateFilesAndFoldersWithInvalidChars</maml:name>
+        <maml:description>
+          <maml:para><![CDATA[The default is On. Files and folders with invalid characters (for example:<, >, :, ", |, ?, *, /, \,\u007f) in the names will be migrated by default. If set to Off, files and folders with invalid characters in names will not be migrated.]]></maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: MigrateOneNoteFolderAsOneNoteNoteBook -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>MigrateOneNoteFolderAsOneNoteNoteBook</maml:name>
+        <maml:description>
+          <maml:para>By default, MigrateOneNoteFolderAsOneNoteNoteBook is set to Off. OneNote notebooks comprise of folders containing OneNote files and potentially nested subfolders with these files. The root folder of such a hierarchy is a OneNote notebook and it MUST contain a .onetoc2 file.</maml:para>
+          <maml:para>The current implementation is mark the folders as notebooks at the end of the migration. If a folder contains any non-onenote files, it won’t be marked as a notebook.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: AzureActiveDirectoryLookup -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>AzureActiveDirectoryLookup</maml:name>
+        <maml:description>
+          <maml:para>By default, this is set to On. If no User mapping file is provided by the user, then Azure Active Directory is used as the default for user mapping.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: PreserveUserPermissionsForFileShare -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>PreserveUserPermissionsForFileShare</maml:name>
+        <maml:description>
+          <maml:para>By default, this is set to Off. If set to On, permissions will be preserved.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+	        <!-- Parameter: PreserveUserPermissionsForSharePointSource -->
+	  <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>PreserveUserPermissionsForSharePointSource</maml:name>
+        <maml:description>
+          <maml:para>By default, this is set to On. If set to Off, no permissions will be preserved.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: SkipListWithAudienceTargetingEnabled -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SkipListWithAudienceTargetingEnabled</maml:name>
+        <maml:description>
+          <maml:para>By default, this is set to On. Lists with audience field migration will fail with the warning “Does not support list with audience settings’ unless customer enable the ‘Ignore audience’ setting.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: UserMappingFile -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>UserMappingFile</maml:name>
+        <maml:description>
+          <maml:para>By default, Azure AD lookup is used to map users when submitting migration jobs. If you choose to use a custom user mapping file and you want to preserve user permissions, turn off Azure Active Directory lookup . By doing so, if a user isn't found in the mapping file, the tool won't look it up in AAD.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: WorkingFolder -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>WorkingFolder</maml:name>
+        <maml:description>
+          <maml:para>By default, a temp folder will be created as a working folder.  If you wish to specify your own specific working folder, enter the name here. Note: By default, the working folder is %appdata%\Microsoft\MigrationToolStorage.Make sure that your working folder has a minimum of 150 GB of free space.It may need more depending on the size of the data you plan to migrate.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: UseCustomAzureStorage -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>UseCustomAzureStorage</maml:name>
+        <maml:description>
+          <maml:para>If you use your own Azure storage, you will set your account and Azure key, and select if you want to enable or disable encryption, and whether temporary files are deleted when migration is completed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: EnableEncryption -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>EnableEncryption</maml:name>
+        <maml:description>
+          <maml:para>By default, this is set to On. If you use your own Azure storage, you will set and define your account and key, and decide and configure enable or disable encryption in settings, and whether temporary files are deleted when migration is completed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: DeleteTempFilesWhenMigrationDone -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>DeleteTempFilesWhenMigrationDone</maml:name>
+        <maml:description>
+          <maml:para>The default is set to On. The temp files in working folder %appdata% will be deleted when migration is completed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">bool</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Boolean</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: CustomAzureStorageAccount -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CustomAzureStorageAccount</maml:name>
+        <maml:description>
+          <maml:para>The default is Off.  If you wish to use your own Azure storage, set this value to On.</maml:para>
+          <maml:para>If you choose to turn it On, additional fields will appear for you to enter your account and key, and settings to select if you want to enable or disable encryption. You also need to decide whether temporary files are deleted when migration is completed.</maml:para>
+          <maml:para>Note: This feature is supported only for General Purpose storage accounts as General-Purpose accounts support Azure blobs and queues. This feature is not available for blob storage accounts.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: CustomAzureAccessKey -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>CustomAzureAccessKey</maml:name>
+        <maml:description>
+          <maml:para>If you use your own Azure storage, you need to set azure storage account to On, and enter your account and key.You also need to select if you want to enable or disable encryption, and whether temporary files are deleted when migration is completed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code>Register-SPMTMigration -Force -SPOCredential $MyCredential</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Show-SPMTMigration -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Show-SPMTMigration</command:name>
+      <command:verb>Show</command:verb>
+      <command:noun>SPMTMigration</command:noun>
+      <maml:description>
+        <maml:para>Show the progress of the registered SPMT Migration in the console.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>If the user starts the migration with -NoShow parameter, running the ‘Show-SPMTMigration’ cmdlet will display the task ID, data source location, target location and migration status in the console. Pressing Ctrl+C will return to NoShow mode.</maml:para>
+    </maml:description>
+    <command:syntax />
+    <command:parameters />
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code>Show-SPMTMigration</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Start-SPMTMigration -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Start-SPMTMigration</command:name>
+      <command:verb>Start</command:verb>
+      <command:noun>SPMTMigration</command:noun>
+      <maml:description>
+        <maml:para>Start the registered SPMT Migration.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>This cmdlet will start the registered SPMT Migration.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <!-- Parameter set: __AllParameterSets -->
+      <command:syntaxItem>
+        <maml:name>Start-SPMTMigration</maml:name>
+        <!-- Parameter: NoShow -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>NoShow</maml:name>
+          <maml:description>
+            <maml:para>In "-NoShow" mode, a message will be displayed to indicate that the migration is running in the background.</maml:para>
+            <maml:para>Note:Use the 'Show-SPMTMigration' to bring the migration from background to foreground. The task ID, data source location, target location and migration status will be displayed.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: ParametersValidationOnly -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>ParametersValidationOnly</maml:name>
+          <maml:description>
+            <maml:para>Validate the parameters: check source access permissions, source existence and if TargetUrl is valid.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: NoShow -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>NoShow</maml:name>
+        <maml:description>
+          <maml:para>In "-NoShow" mode, a message will be displayed to indicate that the migration is running in the background.</maml:para>
+          <maml:para>Note:Use the 'Show-SPMTMigration' to bring the migration from background to foreground. The task ID, data source location, target location and migration status will be displayed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: ParametersValidationOnly -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>ParametersValidationOnly</maml:name>
+        <maml:description>
+          <maml:para>Validate the parameters: check source access permissions, source existence and if TargetUrl is valid.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code>Start-SPMTMigration</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Stop-SPMTMigration -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Stop-SPMTMigration</command:name>
+      <command:verb>Stop</command:verb>
+      <command:noun>SPMTMigration</command:noun>
+      <maml:description>
+        <maml:para>Cancel the current migration session.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Cancel the current migration session.</maml:para>
+    </maml:description>
+    <command:syntax />
+    <command:parameters />
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code>Stop-SPMTMigration</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Unregister-SPMTMigration -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Unregister-SPMTMigration</command:name>
+      <command:verb>Unregister</command:verb>
+      <command:noun>SPMTMigration</command:noun>
+      <maml:description>
+        <maml:para>Remove the SPMT migration session created.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Remove the SPMT migration session created.</maml:para>
+    </maml:description>
+    <command:syntax />
+    <command:parameters />
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code>Unregister-SPMTMigration</dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Add-SPMTTask -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Add-SPMTTask</command:name>
+      <command:verb>Add</command:verb>
+      <command:noun>SPMTTask</command:noun>
+      <maml:description>
+        <maml:para>Add a new migration task.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Add a new migration task to the registered migration session. Currently there are three different types of tasks allowed: File Share task, SharePoint task and JSON defined task.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <!-- Parameter set: FileShare -->
+      <command:syntaxItem>
+        <maml:name>Add-SPMTTask</maml:name>
+        <!-- Parameter: FileShareSource -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>FileShareSource</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory for file share migration.Please specify the source folder path. For example: C:\SourceFiles.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: TargetSiteUrl -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TargetSiteUrl</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory for file share and on-prem migration and defines the target site URL.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: TargetList -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TargetList</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory and defines target library name or list name.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: TargetListRelativePath -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TargetListRelativePath</maml:name>
+          <maml:description>
+            <maml:para>This parameter is optional. You can define one or more target relative paths in a list and make the value to this parameter.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: SharePointMigrateAll -->
+      <command:syntaxItem>
+        <maml:name>Add-SPMTTask</maml:name>
+        <!-- Parameter: MigrateAll -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>MigrateAll</maml:name>
+          <maml:description>
+            <maml:para>This is a switch parameter. If set to true, all lists will be migrated. If set to false, the customer will migrate selected lists.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: SharePointSourceSiteUrl -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SharePointSourceSiteUrl</maml:name>
+          <maml:description>
+            <maml:para>Use this parameter to define SharePoint data source site URL.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: SharePointSourceCredential -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SharePointSourceCredential</maml:name>
+          <maml:description>
+            <maml:para>Use this parameter to define SharePoint on-prem 2013 sign in credentials.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">PSCredential</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: TargetSiteUrl -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TargetSiteUrl</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory for both file share and on-prem migration and defines the target site URL.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: SharePointMigrateSelected -->
+      <command:syntaxItem>
+        <maml:name>Add-SPMTTask</maml:name>
+        <!-- Parameter: SharePointSourceSiteUrl -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SharePointSourceSiteUrl</maml:name>
+          <maml:description>
+            <maml:para>Use this parameter to define SharePoint data source site URL.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: SharePointSourceCredential -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SharePointSourceCredential</maml:name>
+          <maml:description>
+            <maml:para>Use this parameter to define SharePoint on-prem 2013 sign in credentials.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">PSCredential</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.PSCredential</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: SourceListRelativePath -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SourceListRelativePath</maml:name>
+          <maml:description>
+            <maml:para>This parameter is optional and is to define one or more migration data source relative paths.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: SourceList -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>SourceList</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory and defines source document library name or list name.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: TargetSiteUrl -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TargetSiteUrl</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory for both file share and on-prem migration and defines the target site URL.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: TargetList -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TargetList</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory and defines target library name or list name.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+        <!-- Parameter: TargetListRelativePath -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TargetListRelativePath</maml:name>
+          <maml:description>
+            <maml:para>This parameter is optional. You can define one or more target relative path in a list and make the value to this parameter.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+      <!-- Parameter set: Json -->
+      <command:syntaxItem>
+        <maml:name>Add-SPMTTask</maml:name>
+        <!-- Parameter: JsonDefinition -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>JsonDefinition</maml:name>
+          <maml:description>
+            <maml:para>Define one File Share task or SharePoint task in JSON format.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">string</command:parameterValue>
+          <dev:type>
+            <maml:name>System.String</maml:name>
+            <maml:uri />
+          </dev:type>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: FileShareSource -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>FileShareSource</maml:name>
+        <maml:description>
+          <maml:para>This parameter is mandatory for file share migration. Please specify the source folder path. For example: C:\SourceFiles.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: MigrateAll -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>MigrateAll</maml:name>
+        <maml:description>
+          <maml:para>This is a switch parameter. If set to True, all lists will be migrated. If set to False, the customer will migrate selected lists.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: SharePointSourceSiteUrl -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SharePointSourceSiteUrl</maml:name>
+        <maml:description>
+          <maml:para>Use this parameter to define SharePoint task source site URL.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: SharePointSourceCredential -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SharePointSourceCredential</maml:name>
+        <maml:description>
+          <maml:para>Use this parameter to define SharePoint on-prem 2013 sign in credentials.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">PSCredential</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.PSCredential</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: SourceListRelativePath -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SourceListRelativePath</maml:name>
+        <maml:description>
+          <maml:para>This parameter is optional and is to define one or more migration data source relative paths.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: SourceList -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>SourceList</maml:name>
+        <maml:description>
+          <maml:para>This parameter is mandatory and defines source document library name or list name.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: TargetSiteUrl -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>TargetSiteUrl</maml:name>
+        <maml:description>
+          <maml:para>This parameter is mandatory for both file share and on-prem migration and defines the target site URL.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: TargetList -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>TargetList</maml:name>
+        <maml:description>
+          <maml:para>This parameter is mandatory and defines target library name or list name.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: TargetListRelativePath -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>TargetListRelativePath</maml:name>
+        <maml:description>
+          <maml:para>This parameter is optional. You can define one or more target relative paths in a list and make the value to this parameter.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+      <!-- Parameter: JsonDefinition -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>JsonDefinition</maml:name>
+        <maml:description>
+          <maml:para>Define one File share task or SharePoint task in JSON format.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">string</command:parameterValue>
+        <dev:type>
+          <maml:name>System.String</maml:name>
+          <maml:uri />
+        </dev:type>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code></dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+  <!-- Cmdlet: Remove-SPMTTask -->
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+    <command:details>
+      <command:name>Remove-SPMTTask</command:name>
+      <command:verb>Remove</command:verb>
+      <command:noun>SPMTTask</command:noun>
+      <maml:description>
+        <maml:para>Remove an existing task.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Remove an existing migration task from the registered migration.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <!-- Parameter set: __AllParameterSets -->
+      <command:syntaxItem>
+        <maml:name>Remove-SPMTTask</maml:name>
+        <!-- Parameter: TaskId -->
+        <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+          <maml:name>TaskId</maml:name>
+          <maml:description>
+            <maml:para>This parameter is mandatory and defines the ID of task to be removed.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">Guid</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Guid</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>00000000-0000-0000-0000-000000000000</dev:defaultValue>
+        </command:parameter>
+        <!-- Parameter: Force -->
+        <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+          <maml:name>Force</maml:name>
+          <maml:description>
+            <maml:para>This parameter is optional. To remove a task already started, the Force parameter is required. .</maml:para>
+          </maml:description>
+          <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>False</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <!-- Parameter: TaskId -->
+      <command:parameter required="true" globbing="false" pipelineInput="false" position="named">
+        <maml:name>TaskId</maml:name>
+        <maml:description>
+          <maml:para>This parameter is mandatory and defines the ID of task to be removed.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">Guid</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Guid</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>00000000-0000-0000-0000-000000000000</dev:defaultValue>
+      </command:parameter>
+      <!-- Parameter: Force -->
+      <command:parameter required="false" globbing="false" pipelineInput="false" position="named">
+        <maml:name>Force</maml:name>
+        <maml:description>
+          <maml:para>This parameter is optional. To remove a task already started, force parameter is required.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>System.Management.Automation.SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>False</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes />
+    <command:returnValues />
+    <command:examples>
+      <command:example>
+        <maml:title>----------  EXAMPLE 1  ----------</maml:title>
+        <dev:code></dev:code>
+      </command:example>
+    </command:examples>
+  </command:command>
+</helpItems>

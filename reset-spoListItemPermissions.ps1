@@ -84,10 +84,8 @@ Add-Type -Path "c:\Program Files\Common Files\microsoft shared\Web Server Extens
 Add-Type -Path "c:\Program Files\Common Files\microsoft shared\Web Server Extensions\16\ISAPI\Microsoft.SharePoint.Client.Runtime.dll"
 
 #Enter the data
-$AdminPassword=Read-Host -Prompt "Enter password" -AsSecureString
-$username="arleta@TENANT.onmicrosoft.com"
-$Url="https://TENANT.sharepoint.com/sites/testID1de"
-$ListTitle="testitems"
+$Url="https://anthesisllc.sharepoint.com/teams/communities/intsus"
+$ListTitle="Documents"
 
 
-Restore-SPOListAllItemsInheritance -Username $username -Url $Url -AdminPassword $AdminPassword -ListTitle $ListTitle
+Restore-SPOListAllItemsInheritance -Username $msolCredentials.UserName -Url $Url -AdminPassword $msolCredentials.Password -ListTitle $ListTitle
