@@ -22,7 +22,6 @@ $logFile = "C:\ScriptLogs\provision-User.log"
 $errorLogFile = "C:\ScriptLogs\provision-User_Errors.log"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 
-$adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
 $restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
 $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
@@ -30,6 +29,9 @@ connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
 #connect-toAAD -credential $msolCredentials
 #connect-ToSpo -credential $msolCredentials
+
+$adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
+
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"
@@ -62,7 +64,8 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
     #> 
     switch ($pBusinessUnit) {
         "Anthesis Energy UK Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
-        "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
+        #"Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
+        "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
         "Anthesis Consulting Group Ltd (GBR)" {}
         "Anthesis LLC" {}
         default {}
@@ -402,7 +405,7 @@ $selectedStarters | % {
         -userTimeZone $_.TimeZone `
         -user365License $_.Office_365_license 
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
+$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis (UK) Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
@@ -446,6 +449,5 @@ $selectedStarters | % {
     $user365License = $_.Office_365_license
     $userDDI="0117 403 2XXX"
     }
-
 
 

@@ -43,13 +43,16 @@ function connect-toAAD($credential){
         Write-Host -f DarkYellow "Importing AzureAD (_not_ Preview)"
         Import-Module AzureAD
         Write-Host -f DarkYellow "Executing Connect-AzureAD"
-        Connect-AzureAD -Credential $credential
         }
     if ($(Get-Module -ListAvailable AzureADPreview) -ne $null){
         Write-Host -f DarkYellow "Importing AzureADPreview"
         Import-Module AzureADPreview
         Write-Host -f DarkYellow "Executing Connect-AzureAD"
-        Connect-AzureAD -Credential $credential
+        }
+    try{Connect-AzureAD -Credential $credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop}
+    catch{
+        Write-Host -ForegroundColor DarkRed "MFA might be required"
+        Connect-AzureAD
         }
     }
 function connect-ToExo($credential){
