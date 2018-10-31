@@ -64,11 +64,11 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
     #> 
     switch ($pBusinessUnit) {
         "Anthesis Energy UK Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
+        "Anthesis (UK) Ltd (GBR)"  {write-host -ForegroundColor Magenta "AUK, but creating Sustain account"; $upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
         #"Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
-        "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
         "Anthesis Consulting Group Ltd (GBR)" {}
         "Anthesis LLC" {}
-        default {}
+        default {Write-Host -ForegroundColor DarkRed "Warning: Could not not identify Business Unit [$pBusinessUnit]"}
         }
     #Create a new AD User account
     write-host -ForegroundColor DarkYellow "UPN:`t$pUPN"
@@ -254,11 +254,12 @@ function create-personalFolder($pUPN){
     }
 function set-mailboxPermissions($pUPN,$pManagerSAM,$pBusinessUnit){
     Add-MailboxPermission -Identity $pUPN -AccessRights FullAccess -User $pManagerSAM -InheritanceType all -AutoMapping $false
-    if($pBusinessUnit -match "Sustain"){
+    Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "All$(get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $pBusinessUnit)@anthesisgroup.com" -AccessRights "LimitedDetails"
+    if($pBusinessUnit -match "Anthesis Energy UK Ltd (GBR)"){
         Add-MailboxPermission -Identity $pUPN -AccessRights FullAccess -user SustainMailboxAccess@anthesisgroup.com
         #Add-MailboxPermission -Identity $pUPN -AccessRights SendAs -User SustainMailboxAccess@anthesisgroup.com -InheritanceType all
-        Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "View all Sustain calendars" -AccessRights "Reviewer"
-        Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "Edit all Sustain calendars" -AccessRights "PublishingEditor"
+        #Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "View all Sustain calendars" -AccessRights "Reviewer"
+        #Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "Edit all Sustain calendars" -AccessRights "PublishingEditor"
         }
     }
 function update-newUserRequest($listItem, $digest, $restCredentials, $logFile){
@@ -314,7 +315,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         }
     try{
         log-Message "Updating mailbox for $userUPN" -colour "Yellow"
-        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone
+        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone -
         log-Message "Mailbox updated" -colour "DarkYellow"
         }
     catch{

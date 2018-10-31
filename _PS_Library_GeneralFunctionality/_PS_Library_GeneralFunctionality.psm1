@@ -173,6 +173,13 @@ function get-3letterIsoCodeFromCountryName($pCountryName){
         default {"GBR"}
         }
     }
+function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verboseLogging){
+    if($stringMaybeContaining3LettersInBrackets -match '\([a-zA-Z]{3}\)'){
+        $Matches[0].Replace('(',"").Replace(')',"")
+        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContainingEngagementCode"}
+        }
+    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "3 letters in brackets not found in $stringMaybeContainingEngagementCode"}}
+    }
 function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
     switch ($p3letterIsoCode) {
         "ARE" {"AE"}
