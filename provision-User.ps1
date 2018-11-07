@@ -22,7 +22,6 @@ $logFile = "C:\ScriptLogs\provision-User.log"
 $errorLogFile = "C:\ScriptLogs\provision-User_Errors.log"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 
-$adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
 $restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
 $csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
@@ -30,6 +29,9 @@ connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
 #connect-toAAD -credential $msolCredentials
 #connect-ToSpo -credential $msolCredentials
+
+$adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
+
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"
@@ -62,10 +64,11 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
     #> 
     switch ($pBusinessUnit) {
         "Anthesis Energy UK Ltd (GBR)" {$upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
-        "Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
+        "Anthesis (UK) Ltd (GBR)"  {write-host -ForegroundColor Magenta "AUK, but creating Sustain account"; $upnSuffix = "@anthesisgroup.com"; $twitterAccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
+        #"Anthesis (UK) Limited (GBR)" {$upnSuffix = "@bf.local"; $twitterAccount = "anthesis_group"; $DDI = ""; $receptionDDI = "";$ouDn = "???,DC=Bf,DC=local"; $website = "www.anthesisgroup.com"}
         "Anthesis Consulting Group Ltd (GBR)" {}
         "Anthesis LLC" {}
-        default {}
+        default {Write-Host -ForegroundColor DarkRed "Warning: Could not not identify Business Unit [$pBusinessUnit]"}
         }
     #Create a new AD User account
     write-host -ForegroundColor DarkYellow "UPN:`t$pUPN"
@@ -154,6 +157,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
         "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
         "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
+        "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)"}
         "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All PHI"}
         "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All DEU"}
         "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All DEU"}
@@ -250,11 +254,12 @@ function create-personalFolder($pUPN){
     }
 function set-mailboxPermissions($pUPN,$pManagerSAM,$pBusinessUnit){
     Add-MailboxPermission -Identity $pUPN -AccessRights FullAccess -User $pManagerSAM -InheritanceType all -AutoMapping $false
-    if($pBusinessUnit -match "Sustain"){
+    Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "All$(get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $pBusinessUnit)@anthesisgroup.com" -AccessRights "LimitedDetails"
+    if($pBusinessUnit -match "Anthesis Energy UK Ltd (GBR)"){
         Add-MailboxPermission -Identity $pUPN -AccessRights FullAccess -user SustainMailboxAccess@anthesisgroup.com
         #Add-MailboxPermission -Identity $pUPN -AccessRights SendAs -User SustainMailboxAccess@anthesisgroup.com -InheritanceType all
-        Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "View all Sustain calendars" -AccessRights "Reviewer"
-        Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "Edit all Sustain calendars" -AccessRights "PublishingEditor"
+        #Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "View all Sustain calendars" -AccessRights "Reviewer"
+        #Add-MailboxFolderPermission "$($pUPN):\Calendar" -User "Edit all Sustain calendars" -AccessRights "PublishingEditor"
         }
     }
 function update-newUserRequest($listItem, $digest, $restCredentials, $logFile){
@@ -289,7 +294,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         log-Error "Failed to create MSOL account"
         log-Error $Error
         }
-    Start-Sleep -Seconds 5 #Let MSOL & EXO Syncronise
+    Start-Sleep -Seconds 10 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
         update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle 
@@ -310,7 +315,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         }
     try{
         log-Message "Updating mailbox for $userUPN" -colour "Yellow"
-        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone
+        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone -
         log-Message "Mailbox updated" -colour "DarkYellow"
         }
     catch{
@@ -395,14 +400,14 @@ $selectedStarters | % {
         -userSecondaryTeams $_.Additional_Teams `
         -userBusinessUnit $_.Finance_Cost_Attribu `
         -userJobTitle $_.Job_title `
-        -plaintextPassword "Welcome123" `
+        -plaintextPassword "Anthesis123" `
         -adCredentials $adCredentials `
         -restCredentials $restCredentials `
         -newUserListItem $_ `
         -userTimeZone $_.TimeZone `
         -user365License $_.Office_365_license 
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
+$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis (UK) Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
@@ -446,6 +451,5 @@ $selectedStarters | % {
     $user365License = $_.Office_365_license
     $userDDI="0117 403 2XXX"
     }
-
 
 
