@@ -366,6 +366,7 @@ function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOf
     }
 function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging){
     #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_Engineering_Team_All_365/"
+    #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_&_Carbon_Consulting_Analysts_&_Software_ECCAST_Community_"
    if($verboseLogging){Write-Host -ForegroundColor Magenta "set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $($adminCredentials.Username))"}
     if([string]::IsNullOrWhiteSpace($teamSiteAbsoluteUrl)){
         $false
@@ -378,31 +379,68 @@ function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials
             Connect-PnPOnline -Url $teamSiteAbsoluteUrl -Credentials $adminCredentials
             }
 
-        #Add Managers group to Site Coll Admins & Site Owners Group
-        $guessedManagerGroupName = get-managersGroupNameFromTeamUrl -teamSiteUrl $teamSiteAbsoluteUrl
-        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-managersGroupNameFromTeamUrl -teamSiteUrl $teamSiteAbsoluteUrl = [$guessedManagerGroupName]"}
-        if($guessedManagerGroupName){
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Getting OwnersGroup: Get-PnPGroup -AssociatedOwnerGroup"}
-            $ownersSpoGroup = Get-PnPGroup -AssociatedOwnerGroup
-            $managersGroup = Get-PnPUser | ? {$_.Email -eq $($guessedManagerGroupName+"@anthesisgroup.com")}
-            if(!$managersGroup){$managersGroup = New-PnPUser -LoginName $($guessedManagerGroupName+"@anthesisgroup.com")}
-            if($managersGroup){
-                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Add-PnPUserToGroup -EmailAddress $($managersGroup.Email) -Identity $($ownersSpoGroup.Title) -SendEmail:$false"}
-                Add-PnPUserToGroup -EmailAddress $managersGroup.Email -Identity $ownersSpoGroup.Id -SendEmail:$false
-                #if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $($guessedManagerGroupName+"@anthesisgroup.com")"}
-                Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $managersGroup.LoginName
-                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners 'kimblebot@anthesisgroup.com'"}
-                Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners "kimblebot@anthesisgroup.com"
-                }
-            else{Write-Warning "No Managers group could be guessed for [$teamSiteAbsoluteUrl] - it cannot be added to the Site Owners Group, nor as a Site Collection Admin"}
+        #Find the 365 Group associated with this Team Site
+        $ownersSpoGroup = Get-PnPGroup -AssociatedOwnerGroup 
+        $owner365Group = $ownersSpoGroup.Users | ? {$_.LoginName -match "federateddirectoryclaimprovider"}
+        Get-PnPProperty -ClientObject $owner365Group -Property AadObjectId
+        
+        $unifiedGroup = Get-UnifiedGroup -Identity $owner365Group.AadObjectId.NameId
+        $aadManagersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute2
+        $aadMembersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute3
+        $aadOverallGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute4
+
+        #Get the corresponding Mail-Enabeld Security Groups from AAD
+        $associatedAadGroups = Get-DistributionGroup | ? {$_.CustomAttribute1 -eq $($owner365Group.AadObjectId.NameId)}
+        $aadMembersGroup = $associatedAadGroups | ? {$_.Name -match "365 Mirror"}
+        $aadManagersGroup = $associatedAadGroups | ? {$_.Name -match "Managers"}
+        $aadOverallGroup = $associatedAadGroups | ? {$_.Name -notmatch "Managers" -and $_.Name -notmatch "365 Mirror"}
+        #Get-DistributionGroup -Filter "CustomAttribute1 eq $($owner365Group.AadObjectId.NameId)"
+
+        if([string]::IsNullOrWhiteSpace($aadMembersGroup)){
+            #Notify someone that there is no Members Group associated with this 365 Group
             }
+        if([string]::IsNullOrWhiteSpace($aadManagersGroup)){
+            #Notify someone that there is no Managers Group associated with this 365 Group
+            }
+
+
+        #Add Managers group to Site Coll Admins & Site Owners Group
+        if($aadManagersGroup){
+            #Add the AAD Managers group to the Site Owners Group #I'm not sure we want to do this :/
+            #Add-PnPUserToGroup -EmailAddress $aadManagersGroup.PrimarySmtpAddress -Identity $ownersSpoGroup.Id -SendEmail:$false
+            #Get the SPO version of the AAD Managers Group (as we need the SharePoint LoginName)
+            $managersSpoObject = Get-PnPUser | ? {$_.Email -eq $($aadManagersGroup.PrimarySmtpAddress)}
+            #If we didn;t find it, we need to add it like this:
+            if(!$managersSpoObject){$managersSpoObject = New-PnPUser -LoginName $($aadManagersGroup.PrimarySmtpAddress)}
+            #Add the Managers group as a Site Collection Administrator
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $($managersSpoObject.LoginName)"}
+            Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $managersSpoObject.LoginName
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners 'kimblebot@anthesisgroup.com'"}
+            Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners "kimblebot@anthesisgroup.com"
+            }
+
         #Check the Site Collection Administrators
         $siteCollectionAdmins = Get-PnPSiteCollectionAdmin
-        $o365Group = $siteCollectionAdmins | ? {$_.Email -eq $((Split-Path $teamSiteAbsoluteUrl -Leaf)+"@anthesisgroup.com")}
-        if($o365Group){
-            #Remove O365 Group from Site Collection Admins
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Remove-PnPSiteCollectionAdmin -Owners $((Split-Path $teamSiteAbsoluteUrl -Leaf)+"@anthesisgroup.com")"}
-            Remove-PnPSiteCollectionAdmin -Owners $o365Group.LoginName
+        if($aadMembersGroup){
+            $siteCollectionAdmins | ? {$_.Email -eq $aadMembersGroup.PrimarySmtpAddress} | % {
+                #Remove the AAD Members Group from Site Collection admins (if it's there)
+                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Remove-PnPSiteCollectionAdmin -Owners $($_.Email)"}
+                Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
+                }
+            }
+        if($aadOverallGroup){
+            $siteCollectionAdmins | ? {$_.Email -eq $aadOverallGroup.PrimarySmtpAddress} | % {
+                #Remove the AAD Members Group from Site Collection admins (if it's there)
+                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Remove-PnPSiteCollectionAdmin -Owners $($_.Email)"}
+                Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
+                }
+            }
+        if($aadOverallGroup.CustomAttribute1){
+                $siteCollectionAdmins | ? {$_.LoginName -match $aadOverallGroup.CustomAttribute1} | % {
+                #Remove the AAD Members Group from Site Collection admins (if it's there)
+                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Remove-PnPSiteCollectionAdmin -Owners $($_.Email)"}
+                Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
+                }
             }
         if($siteCollectionAdmins.Title -notcontains "Kimble Bot"){Write-Warning "KimbleBot is not a Site Collection Administrator"}
         if($siteCollectionAdmins.Email -notcontains $managersGroup.Email){
@@ -428,6 +466,7 @@ function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials
         if((Get-PnPConnection).PSCredential.UserName -eq "kimblebot@anthesisgroup.com"){Remove-PnPUserFromGroup -LoginName "i:0#.f|membership|kimblebot@anthesisgroup.com" -Identity $ownersSpoGroup.Id} #Special case for KimbleBot as it (intentionally) doesn't have an E1 license
         else{Remove-PnPUserFromGroup -LoginName (Get-PnPConnection).PSCredential.UserName -Identity $ownersSpoGroup.Id}
 
+        <#
         #Break inheritance on Documents folder and prevent Owners from sharing contents
         $standardDocumentLibrary = Get-PnPList -Includes FirstUniqueAncestorSecurableObject,HasUniqueRoleAssignments -Identity "Shared Documents"
         #if($standardDocumentLibrary.FirstUniqueAncestorSecurableObject.Id -eq $standardDocumentLibrary.Id){
@@ -464,6 +503,7 @@ function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials
                 report-itemsWithUniquePermissions -pnpListItems $itemsWithUniquePermissions -permissionsHaveBeenReset $true -verboseLogging $verboseLogging
                 }
             }
+            #>
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "All finished"}
         }
 

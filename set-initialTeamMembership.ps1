@@ -32,12 +32,16 @@ Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $shareP
 #$membersToAdd = convertTo-arrayOfEmailAddresses "Andy Marsh <Andy.Marsh@anthesisgroup.com>; Anne O’Brien <Anne.OBrien@anthesisgroup.com>; Beth Simpson <Beth.Simpson@anthesisgroup.com>; Claudia Amos <Claudia.Amos@anthesisgroup.com>; Debbie Hitchen <debbie.hitchen@anthesisgroup.com>; Ellen Struthers <Ellen.Struthers@anthesisgroup.com>; Emma Hampsey <Emma.Hampsey@anthesisgroup.com>; Hannah Dick <Hannah.Dick@anthesisgroup.com>; Julian Parfitt <Julian.Parfitt@anthesisgroup.com>; Mark Sayers <Mark.Sayers@anthesisgroup.com>; Nick Cuomo <Nick.Cuomo@anthesisgroup.com>; Peter Scholes <Peter.Scholes@anthesisgroup.com>; Richard Peagam <richard.peagam@anthesisgroup.com>; Simone Aplin <Simone.Aplin@anthesisgroup.com>; Stephanie Egee <Stephanie.Egee@anthesisgroup.com>"
 #$ownersToAdd = convertTo-arrayOfEmailAddresses " Richard Peagam <richard.peagam@anthesisgroup.com>"
 
-$membersToAdd = Get-DistributionGroupMember "Senior Management Team (Energy Division)"
-$groupStub = "Senior Management Team (GBR)"
+$membersToAdd = Get-DistributionGroupMember "KimbleWorkingGroup@anthesisgroup.com"
+$groupStub = "STEP Team (All)"
 
 
 $sg = Get-DistributionGroup $($groupStub.Replace(" ","").Replace("(","").Replace(")","")+"@anthesisgroup.com")
 $mirror = Get-DistributionGroup $($groupStub.Replace(" ","").Replace("(","").Replace(")","")+"-365Mirror@anthesisgroup.com")
+$mirror = Get-DistributionGroup $($groupStub.Replace(" ","_").Replace("(","").Replace(")","")+"_-_365_Mirror@anthesisgroup.com")
+$mirror = Get-DistributionGroup $("WorkingGroup-Kimble-365Mirror@anthesisgroup.com")
+
+	
 $managers = Get-DistributionGroup $($groupStub.Replace(" ","").Replace("(","").Replace(")","")+"-Managers@anthesisgroup.com")
 $365 = Get-UnifiedGroup $($groupStub.Replace(" ","_").Replace("(","").Replace(")","")+"_365@anthesisgroup.com")
 
@@ -45,7 +49,7 @@ Add-UnifiedGroupLinks -Identity $365.Id -LinkType Member -Links $($membersToAdd.
 #Add-UnifiedGroupLinks -Identity $365.Id -LinkType Owner -Links $ownersToAdd
 
 $membersToAdd | % {
-    Add-DistributionGroupMember -Identity $sg.ExternalDirectoryObjectId -Member $_.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck
+    #Add-DistributionGroupMember -Identity $sg.ExternalDirectoryObjectId -Member $_.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck
     Add-DistributionGroupMember -Identity $mirror.ExternalDirectoryObjectId -Member $_.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck
     }
 #$ownersToAdd | % {
