@@ -27,20 +27,24 @@ $groupAdmin = "groupbot@anthesisgroup.com"
 $groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $adminCreds
-<#
-$modules = @(Get-ChildItem -Path "$($env:LOCALAPPDATA)\Apps\2.0" -Filter "Microsoft.Exchange.Management.ExoPowershellModule.manifest" -Recurse )
-$moduleName =  Join-Path $modules[0].Directory.FullName "Microsoft.Exchange.Management.ExoPowershellModule.dll"
-Import-Module -FullyQualifiedName $moduleName -Force
-$scriptName =  Join-Path $modules[0].Directory.FullName "CreateExoPSSession.ps1"
-. $scriptName
-Connect-EXOPSSession -Credential $adminCreds
-$exchangeOnlineSession = (Get-PSSession | Where-Object { ($_.ConfigurationName -eq 'Microsoft.Exchange') -and ($_.State -eq 'Opened') })[0]
-#>
+
+$all365Groups = Get-UnifiedGroup
+$toExclude = @("Sym - Supply Chain","Apparel Team (All)","All North America","Business Development Team (GBR)","Pre Sales Team (All)","Teams Testing Team", "Finance Team (North America)","Finance Team (North America)")
+$365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential"}
 
 
-sync-all365GroupMembersToMirroredSecurityGroups -reallyDoIt $true -dontSendEmailReport $false
-sync-allSecurityGroupOwnersTo365Groups -reallyDoIt $true -dontSendEmailReport $false
+$365GroupsToProcess | % {
+    $365Group = $_
+    sync-365GroupMembersToMirroredSecurityGroup -unifiedGroupObject $365Group -reallyDoIt $true -dontSendEmailReport $false -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+    sync-managersTo365GroupOwners -unifiedGroupObject $365Group -reallyDoIt $true -dontSendEmailReport $false -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+    }
 
-Get-PSSession | Remove-PSSession
+
 
 Stop-Transcript
+
+<#
+$365Group = Get-UnifiedGroup "Software Team (PHI)"
+Remove-Module _PS_Library_Groups
+Import-Module _PS_Library_Groups
+#>

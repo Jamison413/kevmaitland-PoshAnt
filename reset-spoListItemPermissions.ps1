@@ -85,9 +85,9 @@ Add-Type -Path "c:\Program Files\Common Files\microsoft shared\Web Server Extens
 
 #Enter the data
 $AdminPassword=Read-Host -Prompt "Enter password" -AsSecureString
-$username="arleta@TENANT.onmicrosoft.com"
-$Url="https://TENANT.sharepoint.com/sites/testID1de"
-$ListTitle="testitems"
+$username="kevin.maitland@anthesisgroup.com"
+$Url="https://anthesisllc.sharepoint.com/teams/communities/resc"
+$ListTitle="Documents"
 
 
 Restore-SPOListAllItemsInheritance -Username $username -Url $Url -AdminPassword $AdminPassword -ListTitle $ListTitle

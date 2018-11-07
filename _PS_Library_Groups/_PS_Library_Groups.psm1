@@ -80,6 +80,9 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
                 if(Get-UnifiedGroup -Identity $mailAlias  -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "Unified Group already exists - not recreating!"}
                 else{New-UnifiedGroup -DisplayName $displayName -Name $mailAlias -Alias $mailAlias -Notes $description -AccessType $accessType -Owner $managers[0] -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Members $teamMembers   -Classification $groupClassification | Set-UnifiedGroup -HiddenFromAddressListsEnabled $true}
                 $ug = Get-UnifiedGroup -Identity $mailAlias
+                #Set the group associations
+                $ug | Set-UnifiedGroup -CustomAttribute1 $ug.ExternalDirectoryObjectId -CustomAttribute2 $managerSG.ExternalDirectoryObjectId -CustomAttribute3 $mirrorSG.ExternalDirectoryObjectId -CustomAttribute4 $sg.ExternalDirectoryObjectId
+                
                 if($managers.Count -gt 1){Add-UnifiedGroupLinks -Identity $ug.Identity -LinkType Owner -Links $managers -Confirm:$false}
 
                 #Create a Shared Mailbox and autoforward mail to the Unified Group
@@ -169,7 +172,7 @@ function report-groupMembershipEnumeration($allGroupStubs,$filePathAndName){
     $formattedGroupStubs | Sort-Object GroupName | Export-Csv -Path $filePathAndName -Encoding UTF8 -NoTypeInformation -Append
     }
 function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGroupOwners,[boolean]$actionedGroupIs365,$emailAddressForOverviewReport){
-    Write-Host -ForegroundColor Magenta "report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGroupOwners,[boolean]$actionedGroupIs365,$emailAddressForOverviewReport"
+    Write-Host -ForegroundColor Magenta "report-groupMembershipSync($($groupChangesArray.Count) Users changed,[boolean]$changesAreToGroupOwners,[boolean]$actionedGroupIs365,$emailAddressForOverviewReport"
     #$groupChangesArray = $ownersChanged
     if($actionedGroupIs365){$groupChangesArray = $groupChangesArray | Sort-Object ActionedGroupName,Result,Change,DisplayName}
     else{$groupChangesArray = $groupChangesArray | Sort-Object SourceGroupName,Result,Change,DisplayName}
@@ -188,6 +191,7 @@ function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGro
             #Get the owners' e-mail addresses
             #[array]$owners = Get-AzureADMSGroup -SearchString $current365GroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName}
             [array]$owners = $current365Group | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName}
+            [array]$owners = $(Get-AzureADGroupMember -ObjectId $(Get-UnifiedGroup -Identity $current365Group.Id).CustomAttribute2).UserPrincipalName
             
             if($owners){$ownerReport.To = $owners}
             else{
@@ -227,6 +231,7 @@ function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwne
     else{$type = "member"}
     $subject = "$($ownerReport.groupName) $($type)ship updated"
     $body = "<HTML><FONT FACE=`"Calibri`">Hello owners of <B>$($ownerReport.groupName)</B>,`r`n`r`n<BR><BR>"
+    #$body += $ownerReport.To+"`r`n`r`n<BR><BR>"
     $body += "Changes have been made to the <B><U>$($type)</U>ship</B> of $($ownerReport.groupName)`r`n`r`n<BR><BR>"
     if($ownerReport.added)  {$body += "The following users have been <B>added</B> as Group <B>$($type)s</B>:      `r`n`t<BR><PRE>&#9;$($ownerReport.added -join     "`r`n`t")</PRE>`r`n`r`n<BR>"}
     if($ownerReport.removed){$body += "The following users have been <B>removed</B> from the Group <B>$($type)s</B>:  `r`n`t<BR><PRE>&#9;$($ownerReport.removed -join   "`r`n`t")</PRE>`r`n`r`n<BR>"}
@@ -243,122 +248,132 @@ function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwne
     Send-MailMessage -To $ownerReport.To -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
     #$body
     }
-function sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport){
-    Write-Host -ForegroundColor Magenta "sync-all365GroupMembersToMirroredSecurityGroups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport"
+function sync-365GroupMembersToMirroredSecurityGroup($unifiedGroupObject,[boolean]$reallyDoIt,[boolean]$dontSendEmailReport,$fullLogFile, $errorLogFile){
+    Write-Host -ForegroundColor Magenta "sync-365GroupMembersToMirroredSecurityGroup($($unifiedGroupObject.DisplayName),[boolean]$reallyDoIt,[boolean]$dontSendEmailReport"
+    #$unifiedGroupObject = Get-UnifiedGroup "Energy Engineering Team (All)"
     $itAdminEmailAddress = "kevin.maitland@anthesisgroup.com"
-    Get-AzureADMSGroup -All:$true | ?{$_.GroupTypes -contains "Unified"} | %{
-        $365Group = $_
-        #Look for the corresponding Security Group (search by alias by swapping the "_365" suffix of the 365 group for the "-365Mirror" suffix of the Mirror Groups as Owners can alter DisplayName)
-        $securityGroup = Get-AzureADMSGroup -Filter "MailNickname eq '$($365Group.MailNickname.Replace("_365","_-_365") + "_Mirror")'" | ?{$_.MailEnabled -eq $true -and $_.SecurityEnabled -eq $true -and $_.GroupTypes -notcontains "Unified"}
-        if($securityGroup.Count -eq 1){
-            #Get the members for the 365 Group from AAD
-            $365GroupMembers = @() #Not only do we /never/ want to add users to the wrong group, having an intantiated empty array helps with compare-object later
-            $secGroupMembers = @()
-            Get-AzureADGroupMember -All:$true -ObjectId  $365Group.Id | %{[array]$365GroupMembers += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
-            #Get the members of the Security Group (this currently has to be done via Exchange for mail-enabled security groups)
-            Get-DistributionGroupMember -Identity $securityGroup.Id | %{[array]$secGroupMembers += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.WindowsLiveId;"displayName"=$_.DisplayName;"objectId"=$_.Guid})}
 
-            #Update the Security Group membership based on the 365 Group membership
-            $membersDelta = Compare-Object -ReferenceObject $365GroupMembers -DifferenceObject $secGroupMembers -Property userPrincipalName -PassThru 
-            #Add extra members in the 365 Group
-            $membersDelta | ?{$_.SideIndicator -eq "<="} | %{ 
-                $userStub = $_
-                try {
-                    if($reallyDoIt){Add-DistributionGroupMember -Identity $securityGroup.Id -Member $userStub.objectId -BypassSecurityGroupManagerCheck:$true}
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$securityGroup.Mail;"SourceGroupName"=$365Group.Mail;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+    #$foundManagersGroup = Get-AzureADMSGroup -Id $($unifiedGroupObject.CustomAttribute2)
+    $foundMembersGroup = Get-AzureADMSGroup -Id $($unifiedGroupObject.CustomAttribute3)
+    #$foundOverallGroup = Get-AzureADMSGroup -id $($unifiedGroupObject.CustomAttribute4)
+    if(![string]::IsNullOrWhiteSpace($365GroupMembers)){rv 365GroupMembers}
+    if(![string]::IsNullOrWhiteSpace($membersDelta)){rv membersDelta}
+    if(![string]::IsNullOrWhiteSpace($secGroupMembers)){rv secGroupMembers}
+    if(![string]::IsNullOrWhiteSpace($membersChanged)){rv membersChanged}
+    if(![string]::IsNullOrWhiteSpace($userStub)){rv userStub}
+
+    if($foundMembersGroup){
+        #Get the members for the 365 Group from AAD
+        $365GroupMembers = @() #Not only do we /never/ want to add users to the wrong group, having an intantiated empty array helps with compare-object later
+        $secGroupMembers = @()
+        Get-AzureADGroupMember -All:$true -ObjectId $unifiedGroupObject.ExternalDirectoryObjectId | %{[array]$365GroupMembers += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
+        #Get the members of the Security Group (this currently has to be done via Exchange for mail-enabled security groups)
+        Get-DistributionGroupMember -Identity $foundMembersGroup.Id | %{[array]$secGroupMembers += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.WindowsLiveId;"displayName"=$_.DisplayName;"objectId"=$_.Guid})}
+
+        #Update the Security Group membership based on the 365 Group membership
+        $membersDelta = Compare-Object -ReferenceObject $365GroupMembers -DifferenceObject $secGroupMembers -Property userPrincipalName -PassThru 
+        #Add extra members in the 365 Group
+        $membersDelta | ?{$_.SideIndicator -eq "<="} | %{ 
+            $userStub = $_
+            try {
+                log-action -myMessage "Attempting to add new 365 Group Member [$($userStub.displayName) | $($userStub.objectId)] to AAD Group [$($foundMembersGroup.DisplayName)]" -logFile $fullLogFile
+                if($reallyDoIt){
+                    Add-DistributionGroupMember -Identity $foundMembersGroup.Id -Member $userStub.objectId -BypassSecurityGroupManagerCheck:$true
+                    log-result -myMessage "Success! (or, at least no error!)" -logFile $fullLogFile
                     }
-                catch {
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$securityGroup.Mail;"SourceGroupName"=$365Group.Mail;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
-                    }
+                else{log-result -myMessage "We're only pretending to do this anyway..." -logFile $fullLogFile}
+                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
                 }
-            #Remove "removed" members in the 365 Group
-            $membersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
-                $userStub = $_
-                 try {
-                    if($reallyDoIt){Remove-DistributionGroupMember -Identity $securityGroup.Id -Member $_.userPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true}
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$securityGroup.Mail;"SourceGroupName"=$365Group.Mail;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
-                    }
-                catch {
-                    [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$securityGroup.Mail;"SourceGroupName"=$365Group.Mail;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
-                    }
+            catch {
+                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                log-error -myError $_ -myFriendlyMessage "Failed to add new 365 Group Member [$($userStub.displayName) | $($userStub.objectId)] to [$($unifiedGroupObject.DisplayName)]" -fullLogFile $fullLogFile -errorLogFile $errorLogFile
                 }
-            }  
-        else{
-            if($securityGroup){[array]$multiMatched365Groups += $365Group.DisplayName}
-            else{[array]$unmatched365Groups += $365Group.DisplayName}
-            #Create a Mail-enabled Security Group and populate it based on 365 Group Owners/Memebers
-            #Nah - let's just alert for now.
             }
-        }
+        #Remove "removed" members in the 365 Group
+        $membersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
+            $userStub = $_
+            try {
+                log-action -myMessage "Attempting to remove incorrect 365 Group Owner [$($userStub.displayName)] from 365 Group [$($unifiedGroupObject.DisplayName)]" -logFile $fullLogFile
+                if($reallyDoIt){
+                    Remove-DistributionGroupMember -Identity $foundMembersGroup.Id -Member $_.userPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+                    log-result -myMessage "Success! (or, at least no error!)" -logFile $fullLogFile
+                    }
+                else{log-result -myMessage "We're only pretending to do this anyway..." -logFile $fullLogFile}
+                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+                }
+            catch {
+                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                log-error -myError $_ -myFriendlyMessage "Failed to remove incorrect 365 Group Member [$($userStub.displayName)] from AAD Group [$($foundMembersGroup.DisplayName)]" -fullLogFile $fullLogFile -errorLogFile $errorLogFile
+                }
+            }
+        }  
     if(!$dontSendEmailReport -and $membersChanged){report-groupMembershipSync -groupChangesArray $membersChanged -changesAreToGroupOwners $false -actionedGroupIs365 $false -emailAddressForOverviewReport $itAdminEmailAddress}
+    if(!$dontSendEmailReport -and !$ownersChanged){log-result -myMessage "No Changes to Members" -logFile $fullLogFile}
+    if($dontSendEmailReport){log-result -myMessage "Report specifically not requested" -logFile $fullLogFile}
     }
-function sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport){
-    Write-Host -ForegroundColor Magenta "sync-allSecurityGroupOwnersTo365Groups([boolean]$reallyDoIt,[boolean]$dontSendEmailReport)"
+function sync-managersTo365GroupOwners($unifiedGroupObject,[boolean]$reallyDoIt,[boolean]$dontSendEmailReport,$fullLogFile, $errorLogFile){
+    Write-Host -ForegroundColor Magenta "sync-managersTo365GroupOwners($($unifiedGroupObject.DisplayName),[boolean]$reallyDoIt,[boolean]$dontSendEmailReport)"
+    log-action -myMessage "Syncronising Manager/Owner members for [$($unifiedGroupObject.DisplayName)]" -logFile $fullLogFile
+
+    #$unifiedGroupObject = Get-UnifiedGroup "IT Team (All)"
     $itAdminEmailAddress = "kevin.maitland@anthesisgroup.com"
-    #This should be less important now as Owners cannot add Owners, it should just synchronise IT-led changes to the [Dummy Team (All) - Managers] group
-    #Start with the 365 Groups as there are fewer of them
-    Get-AzureADMSGroup -All:$true | ?{$_.GroupTypes -contains "Unified"} | %{
-        $365Group = $_
-        #Look for the corresponding Security Group
-        $securityGroup = Get-AzureADMSGroup -Filter "MailNickname eq '$($365Group.MailNickname.Replace("_365",'') + "_-_Managers")'" | ?{$_.MailEnabled -eq $true -and $_.SecurityEnabled -eq $true -and $_.GroupTypes -notcontains "Unified"}
-        if($securityGroup.Count -eq 1){
-            #Get the owners for the 365 Group from AAD
-            $365GroupOwners = @()
-            $secGroupOwners = @()
-            Get-AzureADGroupOwner -All:$true -ObjectId $365Group.Id | %{[array]$365GroupOwners += New-Object psobject -Property $([ordered]@{"windowsLiveID"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
-            #region Getting the "owners" of a mail-enabled distribution group is more complicated
-            <#What are you blithering about you dopey bastard? We're never letting users manage the Managers groups - we want the /Members/ of the Managers Group
-            $managedBy = $(Get-DistributionGroup -Identity $securityGroup.Id).ManagedBy 
-            $managedBy | % {
-                $hopefullyASingleUserMailbox = @()
-                $hopefullyASingleUserMailbox += Get-Mailbox -Identity $_ #Get all the mailboxes that match each entry in the ManagedBy property
-                if($hopefullyASingleUserMailbox.Count -eq 1){ #If there's only one, carry on processding
-                    [array]$secGroupOwners += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $hopefullyASingleUserMailbox[0].UserPrincipalName;"displayName"=$hopefullyASingleUserMailbox[0].DisplayName;"objectId"=$hopefullyASingleUserMailbox[0].ExternalDirectoryObjectId})
+
+    $foundManagersGroup = Get-AzureADMSGroup -Id $($unifiedGroupObject.CustomAttribute2)
+    if(![string]::IsNullOrWhiteSpace($365GroupOwners)){rv 365GroupOwners}
+    if(![string]::IsNullOrWhiteSpace($ownersDelta)){rv ownersDelta}
+    if(![string]::IsNullOrWhiteSpace($managerGroupMembers)){rv managerGroupMembers}
+    if(![string]::IsNullOrWhiteSpace($ownersChanged)){rv ownersChanged}
+    if(![string]::IsNullOrWhiteSpace($userStub)){rv userStub}
+
+    if($foundManagersGroup){
+        #Get the members for the 365 Group from AAD
+        $365GroupOwners = @() #Not only do we /never/ want to add users to the wrong group, having an intantiated empty array helps with compare-object later
+        $managerGroupMembers = @()
+        Get-AzureADGroupOwner -All:$true -ObjectId $unifiedGroupObject.ExternalDirectoryObjectId | %{[array]$365GroupOwners += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
+        #Get the members of the Security Group (this currently has to be done via Exchange for mail-enabled security groups)
+        Get-DistributionGroupMember -Identity $foundManagersGroup.Id | %{[array]$managerGroupMembers += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.WindowsLiveId;"displayName"=$_.DisplayName;"objectId"=$_.ExternalDirectoryObjectId})}
+
+        #Update the Security Group membership based on the 365 Group membership
+        $ownersDelta = Compare-Object -ReferenceObject $365GroupOwners -DifferenceObject $managerGroupMembers -Property userPrincipalName -PassThru 
+        #Add extra members in the AD Managers Group
+        $ownersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
+            $userStub = $_
+            try {
+                log-action -myMessage "Attempting to add new 365 Group Owner [$($userStub.displayName) | $($userStub.objectId)] to 365 Group [$($unifiedGroupObject.DisplayName)]" -logFile $fullLogFile
+                if($reallyDoIt){
+                    Add-AzureADGroupOwner -ObjectId $unifiedGroupObject.ExternalDirectoryObjectId -RefObjectId $userStub.objectId
+                    log-result -myMessage "Success! (or, at least no error!)" -logFile $fullLogFile
                     }
-                else{ #If there isn't exactly one, log an error
-                    if($hopefullyASingleUserMailbox.Count -lt 1){[array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="FindSecGroupOwner";"365GroupName"=$365Group.DisplayName;"UPN"=$_;"DisplayName"=$_;"Result"="Failed";"ErrorMessage"="No mailbox matches ManagedBy Alias - WTF?!?"}))}
-                    else{
-                        [string]$multipleAliasMatches = $hopefullyASingleUserMailbox.Alias -join ","
-                        [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="FindSecGroupOwner";"365GroupName"=$365Group.DisplayName;"UPN"=$managedByStub;"DisplayName"=$managedByStub;"Result"="Failed";"ErrorMessage"="Multiple mailbox match ManagedBy Alias [$_] @($multipleAliasMatches)"}))
-                        }
-                    }
+                else{log-result -myMessage "We're only pretending to do this anyway..." -logFile $fullLogFile}
+                [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundManagersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
                 }
-            #>
-            $membersOfManagersGroup = Get-DistributionGroupMember -Identity $securityGroup.Id
-            #endregion
-            #Update the 365 Group ownership based on the Security Group ownership (the opposite direction to Members)
-            $ownersDelta = Compare-Object -ReferenceObject $membersOfManagersGroup -DifferenceObject $365GroupOwners -Property windowsLiveID -PassThru 
-            #Add extra members in the 365 Group
-            $ownersDelta | ?{$_.SideIndicator -eq "<="} | %{
-                $userStub = $_
-                try {
-                    if($reallyDoIt){Add-AzureADGroupOwner -ObjectId $365Group.Id -RefObjectId $userStub.objectId}
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$365Group.Mail;"SourceGroupName"=$securityGroup.Mail;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
-                    }
-                catch {
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$365Group.Mail;"SourceGroupName"=$securityGroup.Mail;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
-                    }
-                }
-            #Remove "removed" members in the 365 Group
-            $ownersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
-                $userStub = $_
-                 try {
-                    if($reallyDoIt){Remove-AzureADGroupOwner -ObjectId $365Group.Id -OwnerId $_.objectId}
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$365Group.Mail;"SourceGroupName"=$securityGroup.Mail;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
-                    }
-                catch {
-                    [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$365Group.Mail;"SourceGroupName"=$securityGroup.Mail;"UPN"=$userStub.windowsLiveID;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
-                    }
+            catch {
+                [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundManagersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                log-error -myError $_ -myFriendlyMessage "Failed to add new 365 Group Owner [$($userStub.displayName) | $($userStub.objectId)] to [$($unifiedGroupObject.DisplayName)]" -fullLogFile $fullLogFile -errorLogFile $errorLogFile
                 }
             }
-        else{
-            if($securityGroup){[array]$multiMatched365Groups += $365Group.DisplayName}
-            else{[array]$unmatched365Groups += $365Group.DisplayName}
-            #Create a Mail-enabled Security Group and populate it based on 365 Group Owners/Memebers
-            #Nah - let's just alert for now.
+        #Remove unexpected Owners from the 365 Group
+        $ownersDelta | ?{$_.SideIndicator -eq "<="} | %{ 
+            $userStub = $_
+            try {
+                log-action -myMessage "Attempting to remove incorrect 365 Group Owner [$($userStub.displayName)] from 365 Group [$($unifiedGroupObject.DisplayName)]" -logFile $fullLogFile
+                if($reallyDoIt){
+                    Remove-AzureADGroupOwner -ObjectId $unifiedGroupObject.ExternalDirectoryObjectId -OwnerId $userStub.objectId
+                    log-result -myMessage "Success! (or, at least no error!)" -logFile $fullLogFile
+                    }
+                else{log-result -myMessage "We're only pretending to do this anyway..." -logFile $fullLogFile}
+                [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$foundManagersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+                }
+            catch {
+                [array]$ownersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"ActionedGroupName"=$foundManagersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                log-error -myError $_ -myFriendlyMessage "Failed to remove incorrect 365 Group Owner [$($userStub.displayName)] from [$($unifiedGroupObject.DisplayName)]" -fullLogFile $fullLogFile -errorLogFile $errorLogFile
+                }
             }
-        }   
-    if(!$dontSendEmailReport -and $ownersChanged){report-groupMembershipSync -groupChangesArray $ownersChanged -changesAreToGroupOwners $true -actionedGroupIs365 $true -emailAddressForOverviewReport $itAdminEmailAddress}
+        }  
+    if(!$dontSendEmailReport -and $ownersChanged){report-groupMembershipSync -groupChangesArray $ownersChanged -changesAreToGroupOwners $true -actionedGroupIs365 $false -emailAddressForOverviewReport $itAdminEmailAddress}
+    if(!$dontSendEmailReport -and !$ownersChanged){log-result -myMessage "No Changes to Managers" -logFile $fullLogFile}
+    if($dontSendEmailReport){log-result -myMessage "Report specifically not requested" -logFile $fullLogFile}
+
     }
 #endregion
 
@@ -664,6 +679,12 @@ $displayName = "Diversity & Inclusivity (GBR)"
 $description = $null
 $managers = @("kevin.maitland","praveenaa.kathirvasan")
 $teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>; Praveenaa Kathirvasan <Praveenaa.Kathirvasan@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Health & Safety Team (North America)"
+$description = $null
+$managers = @("kevin.maitland")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
 

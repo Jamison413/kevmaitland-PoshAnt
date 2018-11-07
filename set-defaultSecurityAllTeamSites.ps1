@@ -17,7 +17,10 @@ connect-ToExo -credential $exoCreds
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $sharePointCreds
 
 $teamSites = Get-PnPTenantSite -Template GROUP#0
-$teamSites | ? {$_.Url -cmatch "Team" -and $_.Url -notmatch "Confidential"} | % {
+
+$excludeThese = @("https://anthesisllc.sharepoint.com/sites/AccountsPayable","https://anthesisllc.sharepoint.com/sites/anthesisnorthamerica","https://anthesisllc.sharepoint.com/sites/apparel","https://anthesisllc.sharepoint.com/sites/bdcontacts42","https://anthesisllc.sharepoint.com/teams/BusinessDevelopmentTeam-GBR-","https://anthesisllc.sharepoint.com/teams/PreSalesTeam","https://anthesisllc.sharepoint.com/teams/teamstestingteam","https://anthesisllc.sharepoint.com/sites/sparke","https://anthesisllc.sharepoint.com/sites/supplychainsym")
+
+$teamSites | ? {$excludeThese -notcontains $_.Url -and $_.Url -notmatch "Confidential"} | % {
     $thisTeamSite = $_
     set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.Url -adminCredentials $sharePointCreds -verboseLogging $verboseLogging
     }
