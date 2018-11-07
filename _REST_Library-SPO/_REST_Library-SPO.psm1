@@ -1,5 +1,6 @@
 ﻿[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client")
-Import-Module  "C:\Program Files\SharePoint Online Management Shell\Microsoft.Online.SharePoint.PowerShell"
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.Online.SharePoint.PowerShell")
+#Import-Module  "C:\Program Files\SharePoint Online Management Shell\Microsoft.Online.SharePoint.PowerShell"
 #region SPO functions
 function Invoke-SPORestMethod {
    [CmdletBinding()]
