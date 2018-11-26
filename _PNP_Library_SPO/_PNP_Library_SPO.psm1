@@ -1,19 +1,26 @@
 ﻿function add-spoLibrarySubfolders($pnpList, $arrayOfSubfolderNames, $recreateIfNotEmpty, $spoCredentials, $verboseLogging){
+    #$arrayOfSubfolderNames - I think these are supposed to be serverRelativeUrls
     if($verboseLogging){Write-Host -ForegroundColor Magenta "add-spoLibrarySubfolders($($pnpList.Title), $($arrayOfSubfolderNames -join ", "), `$recreateIfNotEmpty=$recreateIfNotEmpty"}
     if($(Get-PnPConnection).Url -notmatch $pnpList.ParentWebUrl){
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Connected to wrong site - connecting to $($pnpList.RootFolder.Context.Url)"}
         Connect-PnPOnline –Url $($pnpList.RootFolder.Context.Url) –Credentials $spoCredentials
         }
-    [array]$formattedArrayOfSubfolderNames = $arrayOfSubfolderNames | % {format-asServerRelativeUrl -serverRelativeUrl $pnpList.RootFolder.ServerRelativeUrl -stringToFormat $_}
+    #[array]$formattedArrayOfSubfolderNames = $arrayOfSubfolderNames | % {format-asServerRelativeUrl -serverRelativeUrl $pnpList.RootFolder.ServerRelativeUrl -stringToFormat $_}
+    #Get the site-relative Url by comparing the List's ServerRelativeUrl with the Site's ServerRelativeUrl and eliminating any overlap e.g. "/clients/MyClient" becomes "/MyClient"
+    $checkForServerSiteOverlap = [regex]::Match($pnpList.RootFolder.ServerRelativeUrl,"^$($pnpList.RootFolder.Context.Web.ServerRelativeUrl)(.+)*")
+    if($checkForServerSiteOverlap.Success){$siteRelativeUrlPrefix = $checkForServerSiteOverlap.Groups[$checkForServerSiteOverlap.Groups.Count-1].Value}
+    else{$siteRelativeUrlPrefix = $pnpList.RootFolder.Context.Web.ServerRelativeUrl}
+    [array]$formattedArrayOfSiteRelativeSubfolderNames = $arrayOfSubfolderNames | % {$siteRelativeUrlPrefix+$_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")}
     try{
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-spoFolder -pnpList $($pnpList.Title) -folderServerRelativeUrl $($formattedArrayOfSubfolderNames[$formattedArrayOfSubfolderNames.Length-1])"}
-        $hasItems = get-spoFolder -pnpList $pnpList -folderServerRelativeUrl $($formattedArrayOfSubfolderNames[$formattedArrayOfSubfolderNames.Length-1]) -adminCreds $adminCreds -verboseLogging $verboseLogging
+        #$hasItems = get-spoFolder -pnpList $pnpList -folderServerRelativeUrl $($formattedArrayOfSubfolderNames[$formattedArrayOfSubfolderNames.Length-1]) -adminCreds $adminCreds -verboseLogging $verboseLogging
         #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><RowLimit>5</RowLimit></View>" #This RowLimit doesn't work at the moment, but hopefully it'll get fixed in the future and this'll be efficient https://github.com/SharePoint/PnP-PowerShell/issues/879
         #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileLeafRef'/><Value Type='Text'>DummyOp5 (E003941)</Value></Eq></Where></Query></View>" 
         #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileRef'/><Value Type='Text'>/clients/DummyCo Ltd/DummyOp5 (E003941)</Value></Eq></Where></Query></View>" 
         #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileRef'/><Value Type='Text'>/clients/DummyCo Ltd/DummyOp5 (E003941)/Analysis</Value></Eq></Where></Query></View>" 
         #$hasItems = Get-PnPListItem -List $pnpList #-Query "<View><Query><Where><Eq><FieldRef Name='FileLeafRef'/><Value Type='Text'>$($arrayOfSubfolderNames[0])</Value></Eq></Where></Query></View>" 
         #$hasItems = $hasItems | ? {$_.FieldValues.FileRef -eq "$($arrayOfSubfolderNames[$arrayOfSubfolderNames.Length-1])"}
+        $hasItems = Get-PnPFolder -Url $formattedArrayOfSiteRelativeSubfolderNames[$formattedArrayOfSiteRelativeSubfolderNames.Count-1] -ErrorAction Stop
         }
     catch{
         #Meh.
@@ -23,14 +30,22 @@
             if(!$hasItems){Write-Host -ForegroundColor DarkMagenta "$($pnpList.RootFolder.ServerRelativeUrl) has no conflicting item - creating subfolder/s"}
             else{Write-Host -ForegroundColor DarkMagenta "$($pnpList.RootFolder.ServerRelativeUrl) has items, but override set - creating subfolders"}
             }
-        $formattedArrayOfSubfolderNames | % {
-            #We have to search for these using ServerRelativeUrls, but create them using LibraryRelativeUrls
+        <#$formattedArrayOfSubfolderNames | % {
+            #We have to search for these using ServerRelativeUrls, but create them using LibraryRelativeUrls. Oh no we fucking don't. 
             $libraryRelativePath = $_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")
             if($libraryRelativePath.Substring(0,1) -eq "/"){$libraryRelativePath = $libraryRelativePath.Substring(1,$libraryRelativePath.Length-1)} #Trim any leading "/"
             if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Add-PnPDocumentSet -List $($pnpList.Id) [$($pnpList.Title)] -Name [$libraryRelativePath] -ContentType ""Document Set"""}
             $newFolderUrl = Add-PnPDocumentSet -List $pnpList.Id -Name $libraryRelativePath -ContentType "Document Set"
             }
-        $newFolder = get-spoFolder -pnpList $pnpList -folderServerRelativeUrl $newFolderUrl.Replace("https://anthesisllc.sharepoint.com","") -adminCreds $spoCredentials -verboseLogging $verboseLogging
+        $newFolder = get-spoFolder -pnpList $pnpList -folderServerRelativeUrl $newFolderUrl.Replace("https://anthesisllc.sharepoint.com","") -adminCreds $spoCredentials -verboseLogging $verboseLogging #>
+        $formattedArrayOfSiteRelativeSubfolderNames | % {
+            $folderName = Split-Path $_ -Leaf
+            $folderPath = $_.Substring(0,$_.Length-$folderName.Length)
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Add-PnPFolder -Folder $($folderPath) -Name $($folderName)"}
+            Add-PnPFolder -Folder $folderPath -Name $folderName            
+            }
+
+        $newFolder = Get-PnPFolder $formattedArrayOfSiteRelativeSubfolderNames[$formattedArrayOfSiteRelativeSubfolderNames.Count-1]
         $newFolder #Return last folder created (we have to do this separately as Add-PnPDocumentSet only returns the Absolute URL)
         }
     else{
@@ -364,7 +379,7 @@ function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOf
 
 
     }
-function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging){
+function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging,$fullLogPathAndName,$errorLogPathAndName){
     #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_Engineering_Team_All_365/"
     #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_&_Carbon_Consulting_Analysts_&_Software_ECCAST_Community_"
    if($verboseLogging){Write-Host -ForegroundColor Magenta "set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $($adminCredentials.Username))"}
@@ -380,21 +395,26 @@ function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials
             }
 
         #Find the 365 Group associated with this Team Site
-        $ownersSpoGroup = Get-PnPGroup -AssociatedOwnerGroup 
-        $owner365Group = $ownersSpoGroup.Users | ? {$_.LoginName -match "federateddirectoryclaimprovider"}
-        Get-PnPProperty -ClientObject $owner365Group -Property AadObjectId
+        log-action "Finding 365 group associated with [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -logFile $fullLogPathAndName
+        try{
+            $ownersSpoGroup = Get-PnPGroup -AssociatedOwnerGroup 
+            $owner365Group = $ownersSpoGroup.Users | ? {$_.LoginName -match "federateddirectoryclaimprovider"}
+            if(Get-PnPProperty -ClientObject $owner365Group -Property AadObjectId){log-result "SUCCESS: [$($owner365Group.Title)] [$($owner365Group.AadObjectId.NameId)] owns [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -logFile $fullLogPathAndName}
+            else{log-result "FAILED: Could not identify Guid for [$($owner365Group.Title)]" -logFile $fullLogPathAndName}
+            }
+        catch{log-error -myError $_ -myFriendlyMessage "Error finding 365 group associated with [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
         
-        $unifiedGroup = Get-UnifiedGroup -Identity $owner365Group.AadObjectId.NameId
-        $aadManagersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute2
-        $aadMembersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute3
-        $aadOverallGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute4
-
         #Get the corresponding Mail-Enabeld Security Groups from AAD
-        $associatedAadGroups = Get-DistributionGroup | ? {$_.CustomAttribute1 -eq $($owner365Group.AadObjectId.NameId)}
-        $aadMembersGroup = $associatedAadGroups | ? {$_.Name -match "365 Mirror"}
-        $aadManagersGroup = $associatedAadGroups | ? {$_.Name -match "Managers"}
-        $aadOverallGroup = $associatedAadGroups | ? {$_.Name -notmatch "Managers" -and $_.Name -notmatch "365 Mirror"}
-        #Get-DistributionGroup -Filter "CustomAttribute1 eq $($owner365Group.AadObjectId.NameId)"
+        log-action "Finding the AAD groups associated with [$($owner365Group.Title)] [$($owner365Group.AadObjectId.NameId)]" -logFile $fullLogPathAndName
+        try{
+            $unifiedGroup = Get-UnifiedGroup -Identity $owner365Group.AadObjectId.NameId
+            $aadManagersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute2
+            $aadMembersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute3
+            $aadOverallGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute4
+            if($unifiedGroup -and $aadManagersGroup -and $aadMembersGroup -and $aadOverallGroup){log-result "SUCCESS: For [$($unifiedGroup.DisplayName)], the Managers group is [$($aadManagersGroup.DisplayName)], the Members Group is [$($aadMembersGroup.DisplayName)] and the combined Group is [$($aadOverallGroup.DisplayName)]" -logFile $fullLogPathAndName}
+            else{log-result "FAILED: For [$($unifiedGroup.DisplayName)], the Managers group is [$($aadManagersGroup.DisplayName)], the Members Group is [$($aadMembersGroup.DisplayName)] and the combined Group is [$($aadOverallGroup.DisplayName)]"}
+            }
+        catch{log-error -myError $_ -myFriendlyMessage "Error finding AAD groups associated with [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
 
         if([string]::IsNullOrWhiteSpace($aadMembersGroup)){
             #Notify someone that there is no Members Group associated with this 365 Group
