@@ -1,4 +1,4 @@
-﻿$csvFile = "C:\Users\kevin.maitland\Desktop\eco3_deemed_scores_2018.csv"
+﻿$csvFile = "C:\Users\kevinm\Desktop\eco3_deemed_scores_2018.csv"
 
 $csvData = import-csv $csvFile
 
@@ -203,5 +203,5 @@ $csvData | %{
                 }
             }
         }
-    Add-Content -Value ",ECO3,$measure,$measureVariant,$propertyType,$bedrooms,$preHeatingSystem,$postHeatingSystem,$annualSaving,$costSaving,$uValueDelta,$wallType,$lifetime,$meanPopt,$ageBand" -Path C:\Users\kevin.maitland\Desktop\eco3_deemedScoresParsed.csv
+    Add-Content -Value ",ECO3,$measure,$measureVariant,$propertyType,$bedrooms,$preHeatingSystem,$postHeatingSystem,$annualSaving,$costSaving,$uValueDelta,$wallType,$lifetime,$meanPopt,$ageBand" -Path C:\Users\kevinm\Desktop\eco3_deemedScoresParsed.csv
     }
