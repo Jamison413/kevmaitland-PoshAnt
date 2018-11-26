@@ -169,11 +169,11 @@ $selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToR
 $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
 #region deprovision
 
-$binMe = convertTo-arrayOfStrings "laurie.eldridge@anthesisgroup.com"
+$binMe = convertTo-arrayOfStrings "Pravin Selvarajah,Joe.Morrison@anthesisgroup.com,katie.livesey@anthesisgroup.com"
 foreach($user in $binMe){
     if($user){
         $userMsolObject = Get-User -Identity $user
-        if($userMsolObject){
+        if($userMsolObject.DistinguishedName -ne $null){
             write-host "Disabling $($userMsolObject.DisplayName)"
             Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -BlockCredential $true
             Set-MsolUserPassword -UserPrincipalName $userMsolObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true

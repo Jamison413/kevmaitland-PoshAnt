@@ -23,7 +23,7 @@ $webUrl = "https://anthesisllc.sharepoint.com"
 $clientSite = "/clients"
 $listOfClientFolders = @("_Kimble automatically creates Project folders","Background","Non-specific BusDev")
 $listOfLeadProjSubFolders = @("Admin & contracts", "Analysis","Data & refs","Meetings","Proposal","Reports","Summary (marketing) - end of project")
-$defaultProjectFilesToCopy = @(@{"fromList"="/sites/Resources-HealthSafetyGBR";"from"="/sites/Resources-HealthSafetyGBR/Shared Documents/Safety Risk Management/Risk Assessments/Anthesis UK Project Risk Assessment.xlsx";"to"="/Admin & contracts/";"conditions"="UK"})
+$defaultProjectFilesToCopy = @(@{"fromList"="/sites/Resources-HealthSafetyGBR";"from"="/sites/Resources-HealthSafetyGBR/Shared Documents/Risk assessments, Safe Systems of Work & emergency plans/Risk Assessments/Anthesis UK Project Risk Assessment.xlsx";"to"="/Admin & contracts/";"conditions"="UK"})
 
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $mailFrom = "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"

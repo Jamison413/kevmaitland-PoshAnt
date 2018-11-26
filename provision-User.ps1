@@ -149,7 +149,8 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if([string]::IsNullOrEmpty($pJobTitle)){$jobTitle = $currentUser.Title}else{$jobTitle = $pJobTitle}
     if([string]::IsNullOrEmpty($pDDI)){$ddi = $currentUser.PhoneNumber}else{$ddi = $pDDI}
     if([string]::IsNullOrEmpty($pMobile)){$mobile = $currentUser.MobilePhone}else{$mobile = $pMobile}
-
+    
+    Write-Host -ForegroundColor DarkYellow "`tPrimaryOffice: $pPrimaryOffice"
     switch($pPrimaryOffice){
         "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers")}
         "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)"}
@@ -158,13 +159,25 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
         "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
         "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)"}
-        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All PHI"}
-        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All DEU"}
-        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All DEU"}
+        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)"}
+        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
+        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
         "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)"}
         "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)"}
+        "Stockholm, SWE" {$streetAddress = "Barnhusgatan 4";$postalCode="SE-111 23";$country="Sweden";$usageLocation="SE";$group = "All (SWE)"}
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
         }
+    Write-Host -ForegroundColor DarkYellow "`tUsername:`t`t`t$($pUPN.Split("@")[0])@anthesisgroup.com"
+    Write-Host -ForegroundColor DarkYellow "`tfirstName:`t`t`t$firstName"
+    Write-Host -ForegroundColor DarkYellow "`tsurname:`t`t`t$surname"
+    Write-Host -ForegroundColor DarkYellow "`tdisplayName:`t`t$displayName"
+    Write-Host -ForegroundColor DarkYellow "`tjobTitle:`t`t`t$jobTitle"
+    Write-Host -ForegroundColor DarkYellow "`tprimaryTeam:`t`t$primaryTeam"
+    Write-Host -ForegroundColor DarkYellow "`tddi:`t`t`t`t$ddi"
+    Write-Host -ForegroundColor DarkYellow "`tStreetAddress:`t`t$streetAddress"
+    Write-Host -ForegroundColor DarkYellow "`tsecondaryOffice:`t$secondaryOffice"
+    Write-Host -ForegroundColor DarkYellow "`tpostalCode:`t`t`t$postalCode"
+    Write-Host -ForegroundColor DarkYellow "`tusageLocation:`t`t$usageLocation"
     #$msolUser = New-MsolUser `
     Set-MsolUser -UserPrincipalName "$($pUPN.Split("@")[0])@anthesisgroup.com" `
         -FirstName $firstName `
@@ -297,7 +310,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
     Start-Sleep -Seconds 10 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
-        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle 
+        update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle #-pSurname $userSurname -pDisplayName $userDisplayName
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{
@@ -315,7 +328,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         }
     try{
         log-Message "Updating mailbox for $userUPN" -colour "Yellow"
-        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone -
+        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone
         log-Message "Mailbox updated" -colour "DarkYellow"
         }
     catch{
@@ -390,11 +403,12 @@ function update-msolUserFromAd($userUPN){
 
 
 $selectedStarters | % {
-    provision-365user -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
-        -userFirstName $_.Title.Split(" ")[0] `
-        -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
-        -userDisplayName $($_.Title) `
+    provision-365user -userUPN $(remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")) `
+        -userFirstName $_.Title.Split(" ")[0].Trim() `
+        -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]).Trim() `
+        -userDisplayName $($_.Title).Trim() `
         -userManagerSAM $_.Line_Manager `
+        -userPrimaryOffice $_.Primary_Workplace `
         -userCommunity $null `
         -userPrimaryTeam $_.Primary_Team `
         -userSecondaryTeams $_.Additional_Teams `
@@ -405,7 +419,8 @@ $selectedStarters | % {
         -restCredentials $restCredentials `
         -newUserListItem $_ `
         -userTimeZone $_.TimeZone `
-        -user365License $_.Office_365_license 
+        -user365License $_.Office_365_license `
+        -userSecondaryOffice $_.Nearest_Office
     }
 $selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis (UK) Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
@@ -430,11 +445,11 @@ $selectedStarters | % {
     update-msolUserFromAd -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")
     }
 
-$selectedStarters | % {
-    $userUPN = $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
-    $userFirstName = $_.Title.Split(" ")[0] 
-    $userSurname = $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) 
-    $userDisplayName = $($_.Title)
+$selectedStarters[2] | % {
+    $userUPN = remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
+    $userFirstName = $_.Title.Split(" ")[0].Trim()
+    $userSurname = $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]).Trim()
+    $userDisplayName = $($_.Title).Trim()
     $userManagerSAM = $($_.Line_Manager).Replace("@anthesisgroup.com","")
     $userCommunity = $null 
     $userPrimaryTeam = $_.Primary_Team 
