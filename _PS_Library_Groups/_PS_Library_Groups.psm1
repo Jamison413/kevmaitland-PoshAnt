@@ -43,108 +43,180 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
     # [Dummy Team (All)] - Unified Group (DisplayName)
     # [Dummy_Team_All] - Mail-enabled Security Group (Alias)
     # [Dummy_Team_All_365] - Unified Group (Alias)
-    # [Shared Mailbox Bodge - Dummy Team (All)] - Shared Mailbox (for bodging DG membership)
-    # [Dummy Team (All) - Managers] - Mail-enabled Security Group for Managers
-    # [Dummy Team (All) - 365 Mirror] - Mail-enabled Security Group Mirroring Unified Group Members
+    # [Shared Mailbox - Dummy Team (All)] - Shared Mailbox (for bodging DG membership)
+    # [Dummy Team (All) - Data Managers Subgroup] - Mail-enabled Security Group for Managers
+    # [Dummy Team (All) - Members Subgroup] - Mail-enabled Security Group Mirroring Unified Group Members
+    #$UnifiedGroupObject.CustomAttribute1 = Own ExternalDirectoryObjectId
+    #$UnifiedGroupObject.CustomAttribute2 = Data Managers Subgroup ExternalDirectoryObjectId
+    #$UnifiedGroupObject.CustomAttribute3 = Members Subgroup ExternalDirectoryObjectId
+    #$UnifiedGroupObject.CustomAttribute4 = Mail-Enabled Security Group ExternalDirectoryObjectId
+    #$UnifiedGroupObject.CustomAttribute5 = Shared Mailbox ExternalDirectoryObjectId
+
     Write-Host -ForegroundColor Magenta "new-365Group($displayName, $description, $managers, $teamMembers, $memberOf, $hideFromGal, $blockExternalMail, $isPublic, $autoSubscribe, $additionalEmailAddress, $groupClassification, $ownersAreRealManagers)"
     $shortName = $displayName.Replace(" (All)","")
-    try{
-        #First, create a corresponding mail-enabled Security group
-        Write-Host -ForegroundColor Yellow "Creating Mail-Enabled Security Group [$displayName]"
-        if(Get-DistributionGroup -Identity $(guess-aliasFromDisplayName $displayName) -ErrorAction SilentlyContinue){Write-Host -ForegroundColor DarkYellow "`tCorresponding Security Group already exists";$onlyUpdate = $true}
-        else{$onlyUpdate = $false}
-        $sg = new-mailEnabledDistributionGroup -dgDisplayName $displayName -members $teamMembers -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName" -onlyUpdate $onlyUpdate
-        
-        try{
-            #Then create a Managers mail-enabled Security group
-            Write-Host -ForegroundColor Yellow "Creating Managers Mail-Enabled Security Group [$displayName - Managers]"
-            if(Get-DistributionGroup -Identity $("$displayName - Managers") -ErrorAction SilentlyContinue){Write-Host -ForegroundColor DarkYellow "`tManagers Security Group already exists";$onlyUpdate = $true}
-            else{$onlyUpdate = $false}
-            
-            $managersMemberOf =@($sg.ExternalDirectoryObjectId)
-            if($ownersAreRealManagers){$managersMemberOf += "Managers (All)"}
-            $managerSG = new-mailEnabledDistributionGroup -dgDisplayName $("$displayName - Managers") -members $managers -memberOf $managersMemberOf -hideFromGal $true -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Managers" -onlyUpdate $onlyUpdate
+    #Firstly, check whether we have already created a Unified Group for this DisplayName
+    $365MailAlias = $(guess-aliasFromDisplayName "$displayName 365")
+    if($365MailAlias.length -gt 64){$365MailAlias = $365MailAlias.substring(0,63)}
 
-            Write-Host -ForegroundColor Yellow "Creating 365 Mirror Mail-Enabled Security Group [$displayName - 365 Mirror]"
-            if(Get-DistributionGroup -Identity $("$displayName - 365 Mirror") -ErrorAction SilentlyContinue){Write-Host -ForegroundColor DarkYellow "`t365 Mirror Security Group already exists";$onlyUpdate = $true}
-            else{$onlyUpdate = $false}
-            $mirrorSG = new-mailEnabledDistributionGroup -dgDisplayName $("$displayName - 365 Mirror") -members $teamMembers -memberOf $sg.ExternalDirectoryObjectId -hideFromGal $true -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -onlyUpdate $onlyUpdate
+    $365Group = Get-UnifiedGroup -Filter "DisplayName -eq `'$displayName`'"
+    if(!$365Group){$365Group = Get-UnifiedGroup -Filter "Alias -eq `'$365MailAlias`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
 
-            try{
-                #Then, if that's worked, create the 365 Group
-                Write-Host -ForegroundColor Yellow "Creating Unified 365 Group [$displayName]"
-                if($isPublic){$accessType = "Public"}else{$accessType = "Private"}
-                $mailAlias = $(guess-aliasFromDisplayName "$displayName 365")
-                if($mailAlias.length -gt 64){$mailAlias = $mailAlias.substring(0,63)}
-                if([string]::IsNullOrWhiteSpace($description)){$description = "Unified 365 Group for $displayName"}
-                if(Get-UnifiedGroup -Identity $mailAlias  -ErrorAction SilentlyContinue){Write-Host -ForegroundColor Yellow "Unified Group already exists - not recreating!"}
-                else{New-UnifiedGroup -DisplayName $displayName -Name $mailAlias -Alias $mailAlias -Notes $description -AccessType $accessType -Owner $managers[0] -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Members $teamMembers   -Classification $groupClassification | Set-UnifiedGroup -HiddenFromAddressListsEnabled $true}
-                $ug = Get-UnifiedGroup -Identity $mailAlias
-                #Set the group associations
-                $ug | Set-UnifiedGroup -CustomAttribute1 $ug.ExternalDirectoryObjectId -CustomAttribute2 $managerSG.ExternalDirectoryObjectId -CustomAttribute3 $mirrorSG.ExternalDirectoryObjectId -CustomAttribute4 $sg.ExternalDirectoryObjectId
+    #If we have a UG, check whether we can find the associated groups (we certainly should be able to!)
+    if($365Group){
+        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute2)){
+            $managersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq `'$($365Group.CustomAttribute2)`'"
+            if(!$managersSg){Write-Warning "Data Managers Group [$($365Group.CustomAttribute2)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+            }
+        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute2 (Data Managers Subgroup) property set!"}
+        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute3)){
+            $membersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($365Group.CustomAttribute3)'"
+            if(!$membersSg){Write-Warning "Members Group [$($365Group.CustomAttribute3)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+            }
+        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute3 (Members Subgroup) property set!"}
+        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute4)){
+            $combinedSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($365Group.CustomAttribute4)'"
+            if(!$combinedSg){Write-Warning "Combined Group [$($365Group.CustomAttribute4)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+            }
+        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute4 (Combined Subgroup) property set!"}
+        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute5)){
+            $sharedMailbox = Get-Mailbox -Filter "ExternalDirectoryObjectId -eq '$($365Group.CustomAttribute5)'"
+            if(!$sharedMailbox){Write-Warning "Shared Mailbox [$($365Group.CustomAttribute5)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+            }
+        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute5 (Shared Mailbox) property set!"}
+        Write-Information "Pre-existing 365 Group found [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)]"
+        }
+    else{
+        $combinedSgDisplayName = $displayName
+        $managersSgDisplayName = "$displayName - Data Managers Subgroup"
+        $membersSgDisplayName = "$displayName - Members Subgroup"
+        $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
+
+        #Check whether any of these MESG exist
+        $combinedSg = Get-DistributionGroup -Filter "DisplayName -eq `'$combinedSgDisplayName`'"
+        if(!$combinedSg){$combinedSg = Get-DistributionGroup -Filter "Alias -eq `'$(guess-aliasFromDisplayName $combinedSgDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
+        if($combinedSg.Count -gt 1){#If we get too many results (e.g. we've collided with an existing group name) try again using the Alias
+            $tryAgain = Get-DistributionGroup -Filter "Alias -eq `'$(guess-aliasFromDisplayName $combinedSgDisplayName)`'"
+            if($tryAgain -ne $null -and !($tryAgain.Count -gt 1)){$combinedSg = $tryAgain}
+            else{
+                Write-Warning "Multiple Groups matched for Combined Group [$combinedSgDisplayName]`r`n`t $($combinedSg.PrimarySmtpAddress)"
+                $combinedSg = $null
+                }
+            } 
+        $managersSg = Get-DistributionGroup -Filter "DisplayName -eq `'$managersSgDisplayName`'"
+        if(!$managersSg){$managersSg = Get-DistributionGroup -Filter "Alias -eq `'$(guess-aliasFromDisplayName $managersSgDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
+        $membersSg = Get-DistributionGroup -Filter "DisplayName -eq `'$membersSgDisplayName`'"
+        if(!$membersSg){$membersSg = Get-DistributionGroup -Filter "Alias -eq `'$(guess-aliasFromDisplayName $membersSgDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
+        $sharedMailbox = Get-Mailbox -Filter "DisplayName -eq `'$sharedMailboxDisplayName`'"
+        if(!$sharedMailbox){$sharedMailbox = Get-DistributionGroup -Filter "Alias -eq `'$(guess-aliasFromDisplayName $sharedMailboxDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
+
+        #Create any groups that don't already exist
+        if(!$combinedSg){
+            Write-Host -ForegroundColor Yellow "Creating Combined Security Group [$combinedSgDisplayName]"
+            try{$combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $combinedSgDisplayName -members $null -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName" -onlyUpdate $onlyUpdate}
+            catch{$Error}
+            }
+
+        if($combinedSg){ #If we now have a Combined SG
+            if(!$managersSg){ #Create a Managers SG if required
+                Write-Host -ForegroundColor Yellow "Creating Data Managers Security Group [$managersSgDisplayName]"
+                $managersMemberOf =@($combinedSg.ExternalDirectoryObjectId)
+                if($ownersAreRealManagers){$managersMemberOf += "Managers (All)"}
+                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -members $managers -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers" -onlyUpdate $onlyUpdate}
+                catch{$Error}
+                }
+
+            if(!$membersSg){ #And create a Members SG if required
+                Write-Host -ForegroundColor Yellow "Creating Members Security Group [$membersSgDisplayName]"
+                try{$membersSg = new-mailEnabledSecurityGroup -dgDisplayName $("$membersSgDisplayName") -members $teamMembers -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -onlyUpdate $onlyUpdate}
+                catch{$Error}
+                }
+
+            #Check that everything's worked so far
+            if(!$managersSg){Write-Error "Managers Security Group [$managersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation"}
+            if(!$membersSg){Write-Error "Members Security Group [$membersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation"}
+            if($managersSg -and $membersSg){#If we now have a Managers SG & Members SG
+                #Create a UG
+                try{
+                    Write-Host -ForegroundColor DarkMagenta "Creating Unified 365 Group [$displayName]"
+                    if($isPublic){$accessType = "Public"}else{$accessType = "Private"}
+                    if([string]::IsNullOrWhiteSpace($description)){$description = "Unified 365 Group for $displayName"}
+                    #Create the UG
+                    Write-Host -ForegroundColor DarkMagenta "`tNew-UnifiedGroup -DisplayName $displayName -Name $365MailAlias -Alias $365MailAlias -Notes $description -AccessType $accessType -Owner $($managers[0]) -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Members $teamMembers   -Classification $groupClassification" 
+                    $365Group = New-UnifiedGroup -DisplayName $displayName -Name $365MailAlias -Alias $365MailAlias -Notes $description -AccessType $accessType -Owner $managers[0] -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Members $teamMembers   -Classification $groupClassification
+                    #Set the additional Properties and associations
+                    Write-Host -ForegroundColor DarkMagenta "`tSet-UnifiedGroup -Identity $($365Group.ExternalDirectoryObjectId) -HiddenFromAddressListsEnabled $true -CustomAttribute1 [$($365Group.ExternalDirectoryObjectId)] -CustomAttribute2 [$($managersSg.ExternalDirectoryObjectId)] -CustomAttribute3 [$($membersSg.ExternalDirectoryObjectId)] -CustomAttribute4 [$($combinedSg.ExternalDirectoryObjectId)"] 
+                    Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -CustomAttribute1 $365Group.ExternalDirectoryObjectId -CustomAttribute2 $managersSg.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId
+                    if($managers.Count -gt 1){Add-UnifiedGroupLinks -Identity $ug.Identity -LinkType Owner -Links $managers -Confirm:$false}
+                    }
+                catch{$Error}
                 
-                if($managers.Count -gt 1){Add-UnifiedGroupLinks -Identity $ug.Identity -LinkType Owner -Links $managers -Confirm:$false}
+                if($365Group){ #If we now have a 365 UG, create a Shared Mailbox (if required) and configure it
+                    if(!$sharedMailbox){
+                        Write-Host -ForegroundColor DarkMagenta  "Creating Shared Mailbox [$sharedMailboxDisplayName]"
+                        try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue}
+                        catch{$Error}
+                        }
 
-                #Create a Shared Mailbox and autoforward mail to the Unified Group
-                Write-Host -ForegroundColor Yellow "Creating Shared Mailbox [Shared Mailbox Bodge - $displayName]"
-                $sm = New-Mailbox -Shared -DisplayName "Shared Mailbox Bodge - $displayName" -Name "Shared Mailbox Bodge - $displayName" -Alias $(guess-aliasFromDisplayName ("Shared Mailbox Bodge - $displayName")) -ErrorAction Continue
-                sleep -Seconds 15
-                if($sm -eq $null){
-                    Write-Host -ForegroundColor DarkYellow "Shared Mailbox could not create - trying to retrieve instead"
-                    $sm = Get-Mailbox $(guess-aliasFromDisplayName ("Shared Mailbox Bodge - $displayName"))
+                    if($sharedMailbox){
+                        Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $ug.PrimarySmtpAddress -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $ug.PrimarySmtpAddress -Confirm:$false
+                        Set-user -Identity $sharedMailbox.ExternalDirectoryObjectId -Manager kevin.maitland #For want of someone better....
+                        #DeliverToMailboxAndForward has to be true, otherwise it just doesn't forward :/
+                        #Assign the Shared Mailbox as a member of the Security Group
+                        Add-DistributionGroupMember -Identity $combinedSg.ExternalDirectoryObjectId -Member $sharedMailbox.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck
+                        Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -CustomAttribute5 $sharedMailbox.ExternalDirectoryObjectId
+                        }
+                    else{Write-Error "Shared Mailbox not available. Cannot complete UG setup."}
                     }
-                if($sm){
-                    #DeliverToMailboxAndForward has to be true, otherwise it just doesn't forward :/
-                    Set-Mailbox -Identity $sm.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $ug.PrimarySmtpAddress -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $ug.PrimarySmtpAddress -Confirm:$false
-                    Set-user -Identity $sm.ExternalDirectoryObjectId -Manager kevin.maitland #For want of someone better....
-                    #Assign the Shared Mailbox as a member of the Security Group
-                    Add-DistributionGroupMember -Identity $sg.ExternalDirectoryObjectId -Member $sm.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck
-                    }
-                else{Write-Host -ForegroundColor DarkMagenta "Failed to create 365 Shared Mailbox "}
+                else{Write-Error "Unified Group [$displayName] not available. Cannot proceed with Shared Mailbox creation."}
                 }
-            catch{
-                Write-Host -ForegroundColor DarkMagenta "Failed to create 365 Group (but Security groups seemed to work)"
-                $_
-                }
+            else{Write-Error "Managers/Members Security Group [$managersSgDisplayName]/[$membersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation"}        
+
             }
-        catch{
-            Write-Host -ForegroundColor DarkMagenta "Failed to create the Managers security group (but the basic Security group seemed to work) (not attempting 365 group)"
-            $_
-            }
+        else{Write-Error "Combined Security Group [$combinedSgDisplayName] not available. Cannot proceed with SubGroup creation"}        
+        Write-Information "New 365 Group created [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)]"
         }
-    catch{
-        Write-Host -ForegroundColor DarkMagenta "Failed to create the corresponding security group (not attempting Manager or 365 group)"
-        $_
-        }
+    $365Group
     }
-function new-mailEnabledDistributionGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate){
-    Write-Host -ForegroundColor Magenta "new-mailEnabledDistributionGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate)"
+function new-mailEnabledSecurityGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate){
+    Write-Host -ForegroundColor Magenta "new-mailEnabledSecurityGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate)"
     $mailAlias = guess-aliasFromDisplayName $dgDisplayName
     $mailName = $dgDisplayName
     if($mailName.length -gt 64){$mailName = $mailName.SubString(0,64)}
-    if($onlyUpdate){
-        $members  | % {
-            Write-Host -ForegroundColor DarkMagenta "Adding TeamMembers Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
-            Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck
+
+    #Check to see if this already exists. This is based on DisplayName, which is mutable :(    
+    $mesg = Get-DistributionGroup -Filter "Alias -eq `'$mailAlias`'"
+    if($mesg){ #If the group already exists, add the new Members (ignore any removals)
+        if($onlyUpdate){
+            $members  | % {
+                Write-Host -ForegroundColor DarkMagenta "Adding TeamMembers Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
+                Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck
+                }
+            }
+        else{Write-Warning "`$onlyUpdate = $false, but existing Group found. DisplayName may have been altered :/"}
+        }
+    else{ #If the group doesn't exist, try creating it
+        if($onlyUpdate){Write-Warning "`$onlyUpdate = $true, but existing Group not found. DisplayName may have been altered :/"}
+        else{
+            try{
+                Write-Host -ForegroundColor DarkMagenta "New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias"
+                $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias #| Out-Null
+                }
+            catch{$Error}
             }
         }
-    else{
-        try{
-            Write-Host -ForegroundColor DarkMagenta "New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias"
-            New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias #| Out-Null
-            }
-        catch{$Error}
-        }
-    Write-Host -ForegroundColor DarkMagenta "Set-DistributionGroup -Identity $mailAlias -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy $owners"
-    Set-DistributionGroup -Identity $mailAlias -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy $owners
-    $memberOf | % {
-        if(![string]::IsNullOrWhiteSpace($_)){
-            Write-Host -ForegroundColor DarkYellow "Adding As MemberOf Add-DistributionGroupMember [$_] -Member [$mailAlias] -Confirm:$false -BypassSecurityGroupManagerCheck"
-            Add-DistributionGroupMember $_ -Member $mailAlias -Confirm:$false -BypassSecurityGroupManagerCheck
+
+    if(!$mesg){Write-Error "Mail-Enabled Security Group [$dgDisplayName] neither found, nor created :/"}
+    else{ #Now set the additional properties and MemberOf
+        Write-Host -ForegroundColor DarkMagenta "Set-DistributionGroup -Identity $mailAlias -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy $owners"
+        Set-DistributionGroup -Identity $mesg.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy $owners
+        $memberOf | % {
+            if(![string]::IsNullOrWhiteSpace($_)){
+                Write-Host -ForegroundColor DarkYellow "Adding As MemberOf Add-DistributionGroupMember [$_] -Member [$mailAlias] -Confirm:$false -BypassSecurityGroupManagerCheck"
+                Add-DistributionGroupMember $_ -Member $mailAlias -Confirm:$false -BypassSecurityGroupManagerCheck
+                }
             }
         }
-    Write-Host -ForegroundColor DarkMagenta "Get-DistributionGroup $mailAlias | ? {$_.alias -eq $mailAlias}"
-    Get-DistributionGroup $mailAlias | ? {$_.alias -eq $mailAlias}
+    $mesg
     }
 function new-externalGroup(){}
 function new-symGroup($displayName, $description, $managers, $teamMembers, $memberOf, $additionalEmailAddress){
@@ -686,13 +758,19 @@ $description = $null
 $managers = @("kevin.maitland")
 $teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
-
-
 #>
+$displayName = "Recruitment Team7 (GBR)"
+$description = $null
+$managers = @("kevin.maitland")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
 
 
 
-#new-mailEnabledDistributionGroup -dgDisplayName "Software Team (PHI)" -members @("soren.mateo@anthesisgroup.com","michael.malate@anthesisgroup.com","gerber.manalo@anthesisgroup.com") -memberOf "Software Team (All)" -hideFromGal $false -blockExternalMail $true -owners "IT Team (All)"
+
+
+
+#new-mailEnabledSecurityGroup -dgDisplayName "Software Team (PHI)" -members @("soren.mateo@anthesisgroup.com","michael.malate@anthesisgroup.com","gerber.manalo@anthesisgroup.com") -memberOf "Software Team (All)" -hideFromGal $false -blockExternalMail $true -owners "IT Team (All)"
 
 

@@ -1,4 +1,17 @@
 ﻿#set-defaultSecurityAllTeamSites
+$logFileLocation = "C:\ScriptLogs\"
+if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    $fullLogPathAndName = $logFileLocation+"set-defaultSecurityAllTeamSites_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"set-defaultSecurityAllTeamSites_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+else{
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    }
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
 
 Import-Module SharePointPnPPowerShellOnline
 Import-Module _PNP_Library_SPO
@@ -11,7 +24,7 @@ $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -Argu
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-$sharePointCreds = set-MsolCredentials
+#$sharePointCreds = set-MsolCredentials
 
 connect-ToExo -credential $exoCreds
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $sharePointCreds
@@ -22,6 +35,7 @@ $excludeThese = @("https://anthesisllc.sharepoint.com/sites/AccountsPayable","ht
 
 $teamSites | ? {$excludeThese -notcontains $_.Url -and $_.Url -notmatch "Confidential"} | % {
     $thisTeamSite = $_
-    set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.Url -adminCredentials $sharePointCreds -verboseLogging $verboseLogging
+    Set-PnPTenantSite -Url $thisTeamSite.Url -Owners (Get-PnPConnection).PSCredential.UserName # This will be automatically removed in the set-standardTeamSitePermissions script
+    set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.Url -adminCredentials $sharePointCreds -verboseLogging $verboseLogging -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName 
     }
 
