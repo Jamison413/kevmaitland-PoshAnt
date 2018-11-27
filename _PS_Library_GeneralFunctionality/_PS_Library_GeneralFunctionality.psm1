@@ -67,6 +67,10 @@ function convertTo-localisedSecureString($plainText){
     if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
     ConvertTo-SecureString $plainText -AsPlainText -Force | ConvertFrom-SecureString
     }
+function decrypt-SecureString($secureString){
+    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
+    [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+    }
 function get-kimbleEngagementCodeFromString($stringMaybeContainingEngagementCode,$verboseLogging){
     if($stringMaybeContainingEngagementCode -match 'E(\d){6}'){
         $Matches[0]
@@ -173,13 +177,6 @@ function get-3letterIsoCodeFromCountryName($pCountryName){
         default {"GBR"}
         }
     }
-function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verboseLogging){
-    if($stringMaybeContaining3LettersInBrackets -match '\([a-zA-Z]{3}\)'){
-        $Matches[0].Replace('(',"").Replace(')',"")
-        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContainingEngagementCode"}
-        }
-    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "3 letters in brackets not found in $stringMaybeContainingEngagementCode"}}
-    }
 function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
     switch ($p3letterIsoCode) {
         "ARE" {"AE"}
@@ -216,7 +213,9 @@ function get-managersGroupNameFromTeamUrl($teamSiteUrl){
         if($guess.Substring($guess.Length-3,3) -eq "365"){
             $managerGuess = $guess.Substring(0,$guess.Length-3)+"-Managers"
             }
-        else{Write-Warning "The URL [$teamSiteUrl] doesn't look like a standardised O365 Group Name - I can't guess this"}
+        else{
+            Write-Warning "The URL [$teamSiteUrl] doesn't look like a standardised O365 Group Name - I can't guess this"
+            }
         }
     $managerGuess
     }
