@@ -160,6 +160,13 @@ function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[
     if($cleanNumber -eq $null){$cleanNumber = $pDirtyNumber}
     $cleanNumber
     }
+function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verboseLogging){
+    if($stringMaybeContaining3LettersInBrackets -match '\([a-zA-Z]{3}\)'){
+        $Matches[0].Replace('(',"").Replace(')',"")
+        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContainingEngagementCode"}
+        }
+    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "3 letters in brackets not found in $stringMaybeContainingEngagementCode"}}
+    }
 function get-3letterIsoCodeFromCountryName($pCountryName){
     switch ($pCountryName) {
         {@("UAE","UE","AE","ARE","United Arab Emirates","Dubai") -contains $_} {"ARE"}
@@ -173,6 +180,7 @@ function get-3letterIsoCodeFromCountryName($pCountryName){
         {@("PH","PHL","PHI","FIL","Philippenes","Phillippenes","Philipenes","Phillipenes") -contains $_} {"IRL"}
         {@("SE","SWE","SW","SWD","Sweden","Sweeden","Sverige") -contains $_} {"SWE"}
         {@("US","USA","United States","United States of America") -contains $_} {"USA"}
+        {@("IT","ITA","Italy","Italia") -contains $_} {"ITA"}
         #Add more countries
         default {"GBR"}
         }
@@ -187,6 +195,7 @@ function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
         "FIN" {"FI"}
         "GBR" {"GB"}
         "IRL" {"IE"}
+        "ITA" {"IT"}
         "PHL" {"PH"}
         "SWE" {"SE"}
         "USA" {"US"}

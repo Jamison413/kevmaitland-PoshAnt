@@ -31,7 +31,7 @@ $auth.RememberDevicesNotIssuedBefore = (Get-Date)
 #$users = convertTo-arrayOfEmailAddresses "Alan Spray <Alan.Spray@anthesisgroup.com>; Alec Burslem <Alec.Burslem@anthesisgroup.com>; Chloe McCloskey <Chloe.McCloskey@anthesisgroup.com>; Claire Stentiford <Claire.Stentiford@anthesisgroup.com>; Eleanor Penney <Eleanor.Penney@anthesisgroup.com>; Matt Fishwick <Matt.Fishwick@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>; Sophie Sapienza <Sophie.Sapienza@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Mark Hawker <Mark.Hawker@anthesisgroup.com>; Heather Ball <Heather.Ball@anthesisgroup.com>; Jaime Dingle <Jaime.Dingle@anthesisgroup.com>; Tharaka Naga <Tharaka.Naga@anthesisgroup.com>; Ashwini Arul <Ashwini.Arul@anthesisgroup.com>; Alan Dow <Alan.Dow@anthesisgroup.com>; Matt Rooney <Matt.Rooney@anthesisgroup.com>; Sarah Gilby <Sarah.Gilby@anthesisgroup.com>; Tim Clare <Tim.Clare@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Bethany Munyard <Bethany.Munyard@anthesisgroup.com>; Ellen Upton <Ellen.Upton@anthesisgroup.com>; Jono Adams <Jono.Adams@anthesisgroup.com>; Polly Stebbings <Polly.Stebbings@anthesisgroup.com>; Alan Matthews <Alan.Matthews@anthesisgroup.com>; Dee Moloney <Dee.Moloney@anthesisgroup.com>; Enda Colfer <Enda.Colfer@anthesisgroup.com>; Ian Bailey <Ian.Bailey@anthesisgroup.com>; Paul Crewe <Paul.Crewe@anthesisgroup.com>; Anne O’Brien <Anne.OBrien@anthesisgroup.com>; Beth Simpson <Beth.Simpson@anthesisgroup.com>; Julian Parfitt <Julian.Parfitt@anthesisgroup.com>; Nick Cuomo <Nick.Cuomo@anthesisgroup.com>; Peter Scholes <Peter.Scholes@anthesisgroup.com>; Simone Aplin <Simone.Aplin@anthesisgroup.com>; Stephanie Egee <Stephanie.Egee@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "heather.ball@anthesisgroup.com"
+$users = convertTo-arrayOfEmailAddresses "paul.ashford@anthesisgroup.com"
 
 $users | % {
     $thisUser = Get-MsolUser -UserPrincipalName $_
@@ -43,7 +43,18 @@ $users | % {
     else{Write-Host -ForegroundColor DarkYellow "MFA already $($thisUser.StrongAuthenticationRequirements.State) for $_"}
     
     }
+
+$disabledUsers | % {
+    $thisUser = $_
+    Write-Host -ForegroundColor DarkYellow "MFA is currently set to [$($thisUser.StrongAuthenticationRequirements.State)] for [$($thisUser.DisplayName)]"
+    if([string]::IsNullOrWhiteSpace($thisUser.StrongAuthenticationRequirements)){
+        Write-Host -ForegroundColor Yellow "Enabling MFA for [$($thisUser.DisplayName)]"
+        Set-MsolUser -UserPrincipalName $thisUser.UserPrincipalName -StrongAuthenticationRequirements $auth
+        }
+    else{Write-Host -ForegroundColor DarkYellow "MFA already $($thisUser.StrongAuthenticationRequirements.State) for [$($thisUser.DisplayName)]"}
     
+    }
+  
 <#
 Get-MsolUser -UserPrincipalName ben.lynch@anthesisgroup.com | fl
 $allUsers = Get-MsolUser -all 
