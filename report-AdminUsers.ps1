@@ -25,4 +25,5 @@ $roleDataHash.Keys | %{$_+","+$roleDataHash[$_] | Add-Content -Path $outputFile}
 $roleUsers = $roleUsers | select -Unique | sort DisplayName
 $msolUsers = Get-MsolUser -All | ?{$roleUsers -contains $_.UserPrincipalName}
 "" | Add-Content -Path $outputFile
-$msolUsers | %{$_.DisplayName+","+$_.UserPrincipalName+","+$_.IsLicensed+","+$_.LastPasswordChangeTimestamp | Add-Content -Path $outputFile} 
+"DisplayName,UPN,IsLicensed,MFAState,MFADefault" | Add-Content -Path $outputFile
+$msolUsers | %{$_.DisplayName+","+$_.UserPrincipalName+","+$_.IsLicensed+","+$_.LastPasswordChangeTimestamp,$_.StrongAuthenticationRequirements.State+","+$($msolUsers[0].StrongAuthenticationMethods | ? {$_.IsDefault -eq $true}).MethodType | Add-Content -Path $outputFile} 

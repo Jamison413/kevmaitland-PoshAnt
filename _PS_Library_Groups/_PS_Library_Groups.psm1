@@ -4,11 +4,18 @@ Import-Module _PS_Library_MSOL.psm1
 Import-Module _PS_Library_GeneralFunctionality
 #Import-Module *pnp*
 
-#region Functions
 function guess-aliasFromDisplayName($displayName){
     Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
     if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","")}
     if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
+    Write-Debug -Message "guess-aliasFromDisplayName($displayName) = [$guessedAlias]"
+    $guessedAlias
+    }
+function guess-shorterAliasFromDisplayName($displayName){
+    Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
+    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","").Replace("(","").Replace(")","").Replace(",","").Replace("&","")}
+    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
+    Write-Debug -Message "guess-shorterAliasFromDisplayName($displayName) = [$(guess-aliasFromDisplayName($displayName))]"
     $guessedAlias
     }
 function enumerate-groupMemberships(){
@@ -56,7 +63,6 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
     $shortName = $displayName.Replace(" (All)","")
     #Firstly, check whether we have already created a Unified Group for this DisplayName
     $365MailAlias = $(guess-aliasFromDisplayName "$displayName 365")
-    if($365MailAlias.length -gt 64){$365MailAlias = $365MailAlias.substring(0,63)}
 
     $365Group = Get-UnifiedGroup -Filter "DisplayName -eq `'$displayName`'"
     if(!$365Group){$365Group = Get-UnifiedGroup -Filter "Alias -eq `'$365MailAlias`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
@@ -112,7 +118,7 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
         #Create any groups that don't already exist
         if(!$combinedSg){
             Write-Host -ForegroundColor Yellow "Creating Combined Security Group [$combinedSgDisplayName]"
-            try{$combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $combinedSgDisplayName -members $null -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName" -onlyUpdate $onlyUpdate}
+            try{$combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $combinedSgDisplayName -members $null -memberOf $memberOf -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName"}
             catch{$Error}
             }
 
@@ -121,13 +127,13 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
                 Write-Host -ForegroundColor Yellow "Creating Data Managers Security Group [$managersSgDisplayName]"
                 $managersMemberOf =@($combinedSg.ExternalDirectoryObjectId)
                 if($ownersAreRealManagers){$managersMemberOf += "Managers (All)"}
-                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -members $managers -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers" -onlyUpdate $onlyUpdate}
+                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -members $managers -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers"}
                 catch{$Error}
                 }
 
             if(!$membersSg){ #And create a Members SG if required
                 Write-Host -ForegroundColor Yellow "Creating Members Security Group [$membersSgDisplayName]"
-                try{$membersSg = new-mailEnabledSecurityGroup -dgDisplayName $("$membersSgDisplayName") -members $teamMembers -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -onlyUpdate $onlyUpdate}
+                try{$membersSg = new-mailEnabledSecurityGroup -dgDisplayName $("$membersSgDisplayName") -members $teamMembers -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group"}
                 catch{$Error}
                 }
 
@@ -158,7 +164,7 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
                         }
 
                     if($sharedMailbox){
-                        Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $ug.PrimarySmtpAddress -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $ug.PrimarySmtpAddress -Confirm:$false
+                        Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $365Group.PrimarySmtpAddress -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $365Group.PrimarySmtpAddress -Confirm:$false
                         Set-user -Identity $sharedMailbox.ExternalDirectoryObjectId -Manager kevin.maitland #For want of someone better....
                         #DeliverToMailboxAndForward has to be true, otherwise it just doesn't forward :/
                         #Assign the Shared Mailbox as a member of the Security Group
@@ -177,32 +183,28 @@ function new-365Group($displayName, $description, $managers, $teamMembers, $memb
         }
     $365Group
     }
-function new-mailEnabledSecurityGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate){
-    Write-Host -ForegroundColor Magenta "new-mailEnabledSecurityGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners, [boolean]$onlyUpdate)"
+function new-mailEnabledSecurityGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners){
+    Write-Host -ForegroundColor Magenta "new-mailEnabledSecurityGroup($dgDisplayName, $description, $members, $memberOf, $hideFromGal, $blockExternalMail, $owners)"
     $mailAlias = guess-aliasFromDisplayName $dgDisplayName
+    $shortMailAlias = guess-shorterAliasFromDisplayName $dgDisplayName #There are two ways now to guess the Alias because Kev is rubbish
     $mailName = $dgDisplayName
     if($mailName.length -gt 64){$mailName = $mailName.SubString(0,64)}
 
-    #Check to see if this already exists. This is based on DisplayName, which is mutable :(    
+    #Check to see if this already exists. This is based on Alias, which is mutable :(    
     $mesg = Get-DistributionGroup -Filter "Alias -eq `'$mailAlias`'"
+    if(!$mesg){$mesg = Get-DistributionGroup -Filter "Alias -eq `'$shortMailAlias`'"}
     if($mesg){ #If the group already exists, add the new Members (ignore any removals)
-        if($onlyUpdate){
-            $members  | % {
-                Write-Host -ForegroundColor DarkMagenta "Adding TeamMembers Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
-                Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck
-                }
+        $members  | % {
+            Write-Host -ForegroundColor DarkMagenta "Adding TeamMembers Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
+            Add-DistributionGroupMember $mailAlias -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck
             }
-        else{Write-Warning "`$onlyUpdate = $false, but existing Group found. DisplayName may have been altered :/"}
         }
     else{ #If the group doesn't exist, try creating it
-        if($onlyUpdate){Write-Warning "`$onlyUpdate = $true, but existing Group not found. DisplayName may have been altered :/"}
-        else{
-            try{
-                Write-Host -ForegroundColor DarkMagenta "New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias"
-                $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias #| Out-Null
-                }
-            catch{$Error}
+        try{
+            Write-Host -ForegroundColor DarkMagenta "New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias"
+            $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $members -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes $description -Alias $mailAlias #| Out-Null
             }
+        catch{$Error}
         }
 
     if(!$mesg){Write-Error "Mail-Enabled Security Group [$dgDisplayName] neither found, nor created :/"}
@@ -447,7 +449,6 @@ function sync-managersTo365GroupOwners($unifiedGroupObject,[boolean]$reallyDoIt,
     if($dontSendEmailReport){log-result -myMessage "Report specifically not requested" -logFile $fullLogFile}
 
     }
-#endregion
 
 <#
 $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
@@ -758,19 +759,43 @@ $description = $null
 $managers = @("kevin.maitland")
 $teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
-#>
-$displayName = "Recruitment Team7 (GBR)"
+
+$displayName = "Recruitment Team (GBR)"
 $description = $null
 $managers = @("kevin.maitland")
 $teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Administration & Human Resources (HR) Team (ITA)"
+$description = $null
+$managers = @("kevin.maitland")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Management Team (ITA)"
+$description = $null
+$managers = @("kevin.maitland")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Environmental Planning and Permitting Team (All)"
+$description = $null
+$managers = @("kevin.maitland")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Recruitment Team (SWE)"
+$description = $null
+$managers = @("kevin.maitland")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Finance Team (SWE)"
+$description = $null
+$managers = @("kevin.maitland")
+$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
-
-#new-mailEnabledSecurityGroup -dgDisplayName "Software Team (PHI)" -members @("soren.mateo@anthesisgroup.com","michael.malate@anthesisgroup.com","gerber.manalo@anthesisgroup.com") -memberOf "Software Team (All)" -hideFromGal $false -blockExternalMail $true -owners "IT Team (All)"
+#>
 
 

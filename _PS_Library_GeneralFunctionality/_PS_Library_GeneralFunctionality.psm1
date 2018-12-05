@@ -173,6 +173,7 @@ function get-3letterIsoCodeFromCountryName($pCountryName){
         {@("PH","PHL","PHI","FIL","Philippenes","Phillippenes","Philipenes","Phillipenes") -contains $_} {"IRL"}
         {@("SE","SWE","SW","SWD","Sweden","Sweeden","Sverige") -contains $_} {"SWE"}
         {@("US","USA","United States","United States of America") -contains $_} {"USA"}
+        {@("IT","ITA","Italy","Italia") -contains $_} {"ITA"}
         #Add more countries
         default {"GBR"}
         }
@@ -187,6 +188,7 @@ function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
         "FIN" {"FI"}
         "GBR" {"GB"}
         "IRL" {"IE"}
+        "ITA" {"IT"}
         "PHL" {"PH"}
         "SWE" {"SE"}
         "USA" {"US"}
