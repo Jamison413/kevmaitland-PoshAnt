@@ -470,7 +470,13 @@ function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials
             #Block all external sharing
             if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Blocking external Sharing: Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled"}
             Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled
-        
+
+            #Enable the DocID service
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Enabling Document ID Service Feature on Site Collection"}
+            $site = Get-PnPSite
+            $site.Features.Add([guid]"b50e3104-6812-424f-a011-cc90e6327318",$false,[Microsoft.SharePoint.Client.FeatureDefinitionScope]::None)
+            $site.Context.ExecuteQuery()
+                    
             #Untick Members can share boxes 
             #***************************************************************************************************************************
             # Requires temporary elevation to Site Owners Group (assumes Site Collection administrator rights already granted)
