@@ -70,7 +70,7 @@ function cache-kimbleProjects($pnpKimbleProjectsList, $kimbleProjectsCachePathAn
             log-action -myMessage "[Kimble Projects] needs recaching - downloading full list" -logFile $fullLogPathAndName 
             $duration = Measure-Command {$spoProjects = get-spoKimbleProjectListItems -spoCredentials $adminCreds}
             if($spoProjects){
-                log-result -myMessage "SUCCESS: $($spoProjects.Count) Kimble Project records retrieved [$($duration.Seconds) secs]!" -logFile $fullLogPathAndName
+                log-result -myMessage "SUCCESS: $($spoProjects.Count) Kimble Project records retrieved [$($duration.TotalSeconds) secs]!" -logFile $fullLogPathAndName
                 if(!(Test-Path -Path $cacheFilePath)){New-Item -Path $cacheFilePath -ItemType Directory}
                 $spoProjects | Export-Csv -Path $cacheFilePath$projectsCacheFile -Force -NoTypeInformation -Encoding UTF8
                 }
@@ -86,20 +86,20 @@ function new-clientFolder($spoKimbleClientList, $spoKimbleClientListItem, $array
     log-action "new-clientFolder [$($spoKimbleClientListItem.Name)] Description: $(sanitise-stripHtml $spoKimbleClientListItem.ClientDescription)" -logFile $fullLogPathAndName
     $duration = Measure-Command {$newLibrary = new-spoClientLibrary -clientName $spoKimbleClientListItem.Name -clientDescription $spoKimbleClientListItem.ClientDescription -spoCredentials $adminCreds -verboseLogging $verboseLogging}
     if($newLibrary){#If the new Library has been created, make the subfolders and update the List Item
-        log-result "SUCCESS: $($newLibrary.RootFolder.ServerRelativeUrl) is there [$($duration.Seconds) seconds]!" -logFile $fullLogPathAndName
+        log-result "SUCCESS: $($newLibrary.RootFolder.ServerRelativeUrl) is there [$($duration.TotalSeconds) seconds]!" -logFile $fullLogPathAndName
         #Try to create the subfolders
         log-action "new-clientFolder $($newLibrary.RootFolder.ServerRelativeUrl) [subfolders]: $($arrayOfClientSubfolders -join ", ")" -logFile $fullLogPathAndName
         $formattedArrayOfClientSubfolders = @()
         $arrayOfClientSubfolders | % {$formattedArrayOfClientSubfolders += $($newLibrary.RootFolder.ServerRelativeUrl)+"/"+$_}
         $duration = Measure-Command {$lastNewSubfolder = add-spoLibrarySubfolders -pnpList $newLibrary -arrayOfSubfolderNames $formattedArrayOfClientSubfolders -recreateIfNotEmpty $recreateSubFolderOverride -spoCredentials $adminCreds -verboseLogging $verboseLogging}
         if($lastNewSubfolder){        
-            log-result "SUCCESS: $($lastNewSubfolder) is there [$($duration.Seconds) seconds]!" -logFile $fullLogPathAndName
+            log-result "SUCCESS: $($lastNewSubfolder) is there [$($duration.TotalSeconds) seconds]!" -logFile $fullLogPathAndName
             #If we've got this far, try to update the IsDirty property on the Client in [Kimble Clients]
             $updatedValues = @{"IsDirty"=$false;"LibraryGUID"=$newLibrary.id.Guid}
             log-action "Set-PnPListItem Kimble Clients | $($spoKimbleClientListItem.Name) [$($spoKimbleClientListItem.Id) @{$(stringify-hashTable $updatedValues)}]" -logFile $fullLogPathAndName
             $duration = Measure-Command {$updatedItem = Set-PnPListItem -List $spoKimbleClientList.Id -Identity $spoKimbleClientListItem.SPListItemID -Values $updatedValues}
             if($updatedItem.FieldValues.IsDirty -eq $false){
-                log-result "SUCCESS: Kimble Clients | $($spoKimbleClientListItem.Name) is no longer Dirty [$($duration.Seconds) seconds]" -logFile $fullLogPathAndName
+                log-result "SUCCESS: Kimble Clients | $($spoKimbleClientListItem.Name) is no longer Dirty [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName
                 }
             else{log-result "FAILED: Could not set Client [$($spoKimbleClientListItem.Name)].IsDirty = `$false " -logFile $fullLogPathAndName}
             }
@@ -143,7 +143,7 @@ function new-projectFolder($spoKimbleProjectList, $spoKimbleProjectListItem, $cl
                         log-action "Set-PnPListItem Kimble Projects | $($spoKimbleProjectListItem.Name) [$($spoKimbleProjectListItem.Id)] @{$(stringify-hashTable $updatedValues)}]" -logFile $fullLogPathAndName
                         $duration = Measure-Command {$updatedItem = Set-PnPListItem -List $spoKimbleProjectList.Id -Identity $spoKimbleProjectListItem.SPListItemID -Values $updatedValues}
                         if($updatedItem.FieldValues.IsDirty -eq $false){
-                            log-result "SUCCESS: Kimble Projects | $($spoKimbleProjectListItem.Name) is no longer Dirty [$($duration.Seconds) seconds]" -logFile $fullLogPathAndName
+                            log-result "SUCCESS: Kimble Projects | $($spoKimbleProjectListItem.Name) is no longer Dirty [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName
                             }
                         else{log-result "FAILED: Could not set Project [$($spoKimbleProjectListItem.Name)].IsDirty = `$false " -logFile $fullLogPathAndName}
                         }
@@ -186,7 +186,7 @@ function update-clientFolder($spoKimbleClientList, $spoKimbleClientListItem, $ar
         catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Client Library in update-clientFolder [$($spoKimbleClientListItem.Name)][$($spoKimbleClientListItem.LibraryGUID)] $($Error[0].Exception.InnerException.Response)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
         }
     if($existingLibrary){
-        log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.Seconds + $duration2.Seconds) seconds])" -logFile $fullLogPathAndName
+        log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSeconds + $duration2.Seconds) seconds])" -logFile $fullLogPathAndName
         log-action -myMessage "Updating Client Library [$($existingLibrary.RootFolder.ServerRelativeUrl)]" -logFile $fullLogPathAndName
         try{
             #Update the Library
@@ -199,7 +199,7 @@ function update-clientFolder($spoKimbleClientList, $spoKimbleClientListItem, $ar
                 $updatedLibrary = Get-PnPList -Identity $spoKimbleClientListItem.Name
                 }
             if($updatedLibrary){
-                log-result -myMessage "SUCCESS: Client Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] updated successfully (no error on update) [$($duration.Seconds) secs]" -logFile $fullLogPathAndName
+                log-result -myMessage "SUCCESS: Client Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] updated successfully (no error on update) [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName
                 try{
                     #Update the List Item
                     $duration = Measure-Command {
@@ -207,7 +207,7 @@ function update-clientFolder($spoKimbleClientList, $spoKimbleClientListItem, $ar
                         if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Updating [Kimble Client] List item [$($spoKimbleClientListItem.Name)]: Set-PnPListItem -List $($spoKimbleClientList.Title) -Identity $($spoKimbleClientListItem.SPListItemID) `$updatedValues = @{$(stringify-hashTable $updatedValues)}"}
                         $updatedListItem = Set-PnPListItem -List $spoKimbleClientList -Identity $spoKimbleClientListItem.SPListItemID -Values $updatedValues
                         }
-                    if($updatedListItem.FieldValues.IsDirty -eq $false){log-result -myMessage "SUCCESS: [Kimble Clients].[$($spoKimbleClientListItem.Name)] updated successfully (no error on update) [$($duration.Seconds) secs]" -logFile $fullLogPathAndName}
+                    if($updatedListItem.FieldValues.IsDirty -eq $false){log-result -myMessage "SUCCESS: [Kimble Clients].[$($spoKimbleClientListItem.Name)] updated successfully (no error on update) [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
                     else{log-result -myMessage "FAILED: [Kimble Clients].[$($spoKimbleClientListItem.Name)] was not updated" -logFile $fullLogPathAndName}
                     }
                 catch{
@@ -229,7 +229,7 @@ function update-clientFolder($spoKimbleClientList, $spoKimbleClientListItem, $ar
         if($verboseLogging){Write-Host -ForegroundColor DarkCyan "new-clientFolder -spoKimbleClientList $($spoKimbleClientList.Title) -spoKimbleClientListItem $($spoKimbleClientListItem.Name) -arrayOfClientSubfolders @($($arrayOfClientSubfolders -join ",")) -recreateSubFolderOverride `$false"}
         try{
             $duration = Measure-Command {$newLibrary = new-clientFolder -spoKimbleClientList $spoKimbleClientList -spoKimbleClientListItem $spoKimbleClientListItem -arrayOfClientSubfolders $arrayOfClientSubfolders -recreateSubFolderOverride $false -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName}
-            if($newLibrary){log-result -myMessage "SUCCESS: Weirdly unfindable Client Library [$($newLibrary.RootFolder.ServerRelativeUrl)] was recreated  [$($duration.Seconds) secs]" -logFile $fullLogPathAndName}
+            if($newLibrary){log-result -myMessage "SUCCESS: Weirdly unfindable Client Library [$($newLibrary.RootFolder.ServerRelativeUrl)] was recreated  [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
             else{
                 log-result -myMessage "FAILED: Someone left a sponge in the patient - I couldn't retrieve a Library for [$($spoKimbleClientListItem.Name)] and I couldn't create a new one either..." -logFile $fullLogPathAndName
                 log-error -myError $null -myFriendlyMessage "Borked Client Library update [$($spoKimbleClientListItem.Name)]" -smtpServer $smtpServer -mailTo $mailTo -mailFrom $mailFrom
@@ -297,7 +297,7 @@ function update-projectFolder($spoKimbleProjectList, $spoKimbleProjectListItem, 
                 log-action "Set-PnPListItem Kimble Projects | $($spoKimbleProjectListItem.Name) [$($spoKimbleProjectListItem.Id)] @{$(stringify-hashTable $updatedValues)}]" -logFile $fullLogPathAndName
                 $duration = Measure-Command {$updatedItem = Set-PnPListItem -List $spoKimbleProjectList.Id -Identity $spoKimbleProjectListItem.SPListItemID -Values $updatedValues}
                 if($updatedItem.FieldValues.IsDirty -eq $false){
-                    log-result "SUCCESS: Kimble Projects | $($spoKimbleProjectListItem.Name) is no longer Dirty [$($duration.Seconds) seconds]" -logFile $fullLogPathAndName
+                    log-result "SUCCESS: Kimble Projects | $($spoKimbleProjectListItem.Name) is no longer Dirty [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName
                     }
                 else{log-result "FAILED: Could not set Projects [$($spoKimbleProjectListItem.Name)].IsDirty = `$false " -logFile $fullLogPathAndName}
                 }
@@ -369,7 +369,7 @@ $dirtyClients | % {
             try{
                 log-action "add-termToStore: Kimble | Clients | $($dirtyClient.Name)" -logFile $fullLogPathAndName
                 $duration = Measure-Command {$newTerm = add-spoTermToStore -termGroup "Kimble" -termSet "Clients" -term $($dirtyClient.Name) -kimbleId $dirtyClient.Id -verboseLogging $verboseLogging}
-                if($newTerm){log-result "SUCCESS: Kimble | Clients | $($dirtyClient.Name) added to Managed MetaData Term Store [$($duration.Seconds) secs]" -logFile $fullLogPathAndName}
+                if($newTerm){log-result "SUCCESS: Kimble | Clients | $($dirtyClient.Name) added to Managed MetaData Term Store [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
                 }
             catch{log-error $_ -myFriendlyMessage "Failed to add $($dirtyClient.Title) to Term Store" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailFrom $mailFrom -mailTo $mailTo}
             }
@@ -387,18 +387,18 @@ $dirtyClients | % {
                 log-action -myMessage "Updating Managed Metadata for $($dirtyClient.Name)" -logFile $fullLogPathAndName
                 if($verboseLogging){Write-Host -ForegroundColor DarkCyan "update-spoTerm -termGroup 'Kimble' -termSet 'Clients' -oldTerm $($dirtyClient.PreviousName) -newTerm $($dirtyClient.Name) -kimbleId $($dirtyClient.Id)"}
                 $duration = Measure-Command {$updatedTerm = update-spoTerm -termGroup "Kimble" -termSet "Clients" -oldTerm $($dirtyClient.PreviousName) -newTerm $($dirtyClient.Name) -kimbleId $($dirtyClient.Id) -verboseLogging $verboseLogging}
-                if($updatedTerm){log-result "SUCCESS: Kimble | Clients | [$($dirtyClient.PreviousName)] updated to [$($dirtyClient.Name)] in Managed MetaData Term Store [$($duration.Seconds) secs]" -logFile $fullLogPathAndName}
+                if($updatedTerm){log-result "SUCCESS: Kimble | Clients | [$($dirtyClient.PreviousName)] updated to [$($dirtyClient.Name)] in Managed MetaData Term Store [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
                 }
             catch{
                 #Failed to update Managed Metadata
                 log-error -myError $_ -myFriendlyMessage "Error updating Managed Metadata Term [$($dirtyClient.PreviousName)] to [$($dirtyClient.Name)] [$($Error[0].Exception.InnerException.Response)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
                 }
-            if($(sanitise-forTermStore $updatedTerm.Name) -eq $(sanitise-forTermStore $dirtyClient.Name)){log-result -myMessage "SUCCESS: Managed Metadata Term [$($dirtyClient.PreviousName)] updated to [$($dirtyClient.Name)] [$($duration.Seconds) secs]" -logFile $fullLogPathAndName}
+            if($(sanitise-forTermStore $updatedTerm.Name) -eq $(sanitise-forTermStore $dirtyClient.Name)){log-result -myMessage "SUCCESS: Managed Metadata Term [$($dirtyClient.PreviousName)] updated to [$($dirtyClient.Name)] [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
             else{log-result -myMessage "FAILED: Managed Metadata Term [$($dirtyClient.PreviousName)] did not update to [$($dirtyClient.Name)]" -logFile $fullLogPathAndName}
             }
         $i++
         }
-    log-result "DirtyClient [$($dirtyClient.Name)] proccessed in $($duration.Seconds) seconds" -logFile $fullLogPathAndName
+    log-result "DirtyClient [$($dirtyClient.Name)] proccessed in $($duration.TotalSeconds) seconds" -logFile $fullLogPathAndName
     }
 #endregion
 
@@ -435,7 +435,7 @@ $dirtyProjects | % {
                 log-action "Set-PnPListItem Kimble Projects | $($dirtyProject.Name) [$($dirtyProject.Id)] @{$(stringify-hashTable $updatedValues)}]" -logFile $fullLogPathAndName
                 $duration = Measure-Command {$updatedItem = Set-PnPListItem -List $kp.Id -Identity $dirtyProject.SPListItemID -Values $updatedValues}
                 if($updatedItem.FieldValues.IsDirty -eq $false){
-                    log-result "SUCCESS: Kimble Projects  | $($dirtyProject.Name) is no longer Dirty [$($duration.Seconds) seconds]" -logFile $fullLogPathAndName
+                    log-result "SUCCESS: Kimble Projects  | $($dirtyProject.Name) is no longer Dirty [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName
                     }
                 else{log-result "FAILED: Could not set Project [$($dirtyProject.Name)].IsDirty = `$false " -logFile $fullLogPathAndName}
                 return
@@ -458,7 +458,7 @@ $dirtyProjects | % {
             log-action "Set-PnPListItem Kimble Projects | $($dirtyProject.Name) [$($dirtyProject.Id)] @{$(stringify-hashTable $updatedValues)}]" -logFile $fullLogPathAndName
             $duration = Measure-Command {$updatedItem = Set-PnPListItem -List $kp.Id -Identity $dirtyProject.SPListItemID -Values $updatedValues}
             if($updatedItem.FieldValues.IsDirty -eq $false){
-                log-result "SUCCESS: Kimble Projects | $($dirtyProject.Name) is no longer Dirty [$($duration.Seconds) seconds]" -logFile $fullLogPathAndName
+                log-result "SUCCESS: Kimble Projects | $($dirtyProject.Name) is no longer Dirty [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName
                 }
             else{log-result "FAILED: Could not set Projects [$($dirtyProject.Name)].IsDirty = `$true " -logFile $fullLogPathAndName}
             }
@@ -477,7 +477,7 @@ $dirtyProjects | % {
             if($verboseLogging){Write-Host -ForegroundColor DarkCyan "new-projectFolder -spoKimbleProjectList $($kp.Title) -spoKimbleProjectListItem $($dirtyProject.Name) -clientCacheHashTable `$kimbleClientHashTable -arrayOfProjectSubfolders $($listOfLeadProjSubFolders -join ", ")"}
             $duration = Measure-Command {$newProjectFolder = new-projectFolder -spoKimbleProjectList $kp -spoKimbleProjectListItem $dirtyProject -clientCacheHashTable $kimbleClientHashTable -arrayOfProjectSubfolders $listOfLeadProjSubFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName }
             if($newProjectFolder){
-                log-result -myMessage "SUCCESS: Project Folder [$($newProjectFolder.FieldValues.FileRef)] created successfully [$($duration.Seconds) secs]!" -logFile $fullLogPathAndName}
+                log-result -myMessage "SUCCESS: Project Folder [$($newProjectFolder.FieldValues.FileRef)] created successfully [$($duration.TotalSeconds) secs]!" -logFile $fullLogPathAndName}
             else{log-result "FAILED: Project Folder [$($dirtyProject.Name)] for [$($kimbleClientHashTable[$dirtyProject.KimbleClientId]["Name"])] was not created" -logFile $fullLogPathAndName}
             }
         catch{
@@ -490,7 +490,7 @@ $dirtyProjects | % {
             log-action -myMessage "PROJECT [$($dirtyProject.Name)] for client [$($kimbleClientHashTable[$dirtyProject.KimbleClientId]["Name"])] looks like it needs updating!" -logFile $fullLogPathAndName
             $duration = Measure-Command {$updatedProjectFolder = update-projectFolder -spoKimbleProjectList $kp -spoKimbleProjectListItem $dirtyProject -clientCacheHashTable $kimbleClientHashTable -arrayOfProjectSubfolders $listOfLeadProjSubFolders -recreateSubFolderOverride $recreateAllFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName}
             if($updatedProjectFolder){
-                log-result -myMessage "SUCCESS - Project Folder [$($dirtyProject.Name)] updated successfully [$($duration.Seconds) secs]!" -logFile $fullLogPathAndName
+                log-result -myMessage "SUCCESS - Project Folder [$($dirtyProject.Name)] updated successfully [$($duration.TotalSeconds) secs]!" -logFile $fullLogPathAndName
                 }
             else{log-result "FAILED - Project Folder [$($dirtyProject.Name)] for [$($kimbleClientHashTable[$dirtyProject.KimbleClientId]["Name"])] was not updated" -logFile $fullLogPathAndName}
             }
@@ -539,7 +539,7 @@ $theseProjects | % {
         log-action "Set-PnPListItem Kimble Projects | $($thisProject.Name) [$($thisProject.Id)] @{$(stringify-hashTable $updatedValues)}]" -logFile $fullLogPathAndName
         $duration = Measure-Command {$updatedItem = Set-PnPListItem -List $kp.Id -Identity $thisProject.SPListItemID -Values $updatedValues}
         if($updatedItem.FieldValues.IsDirty -eq $false){
-            log-result "SUCCESS: Kimble Projects | $($thisProject.Name) is no longer Dirty [$($duration.Seconds) seconds]" -logFile $fullLogPathAndName
+            log-result "SUCCESS: Kimble Projects | $($thisProject.Name) is no longer Dirty [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName
             }
         else{log-result "FAILED: Could not set Projects [$($thisProject.Name)].IsDirty = `$true " -logFile $fullLogPathAndName}
         }
