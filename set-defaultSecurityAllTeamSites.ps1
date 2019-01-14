@@ -35,7 +35,14 @@ $excludeThese = @("https://anthesisllc.sharepoint.com/teams/Energy_%26_Carbon_Co
 
 $teamSites | ? {$excludeThese -notcontains $_.Url -and $_.Url -notmatch "Confidential"} | % {
     $thisTeamSite = $_
-    Set-PnPTenantSite -Url $thisTeamSite.Url -Owners (Get-PnPConnection).PSCredential.UserName # This will be automatically removed in the set-standardTeamSitePermissions script
-    set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.Url -adminCredentials $sharePointCreds -verboseLogging $verboseLogging -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName 
+    #Write-Host $thisTeamSite.Url
+    #Set-PnPTenantSite -Url $thisTeamSite.Url -Owners (Get-PnPConnection).PSCredential.UserName # This will be automatically removed in the set-standardTeamSitePermissions script
+    #set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.Url -adminCredentials $sharePointCreds -verboseLogging $verboseLogging -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName 
+    Connect-PnPOnline -Url $thisTeamSite.Url -Credentials $sharePointCreds
+    Remove-PnPSiteCollectionAdmin -Owners (Get-PnPConnection).PSCredential.UserName
     }
 
+$url = "https://anthesisllc.sharepoint.com/teams/Sustainable_Chemistry_Team_All_365"
+Connect-PnPOnline -Url $Url -Credentials $msolCredentials
+Set-PnPTenantSite -Url $Url -Owners (Get-PnPConnection).PSCredential.UserName # This will be automatically removed in the set-standardTeamSitePermissions script
+Remove-PnPSiteCollectionAdmin -Owners (Get-PnPConnection).PSCredential.UserName
