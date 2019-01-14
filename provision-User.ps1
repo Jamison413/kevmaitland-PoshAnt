@@ -404,8 +404,8 @@ function update-msolUserFromAd($userUPN){
 
 $selectedStarters | % {
     provision-365user -userUPN $(remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")) `
-        -userFirstName $_.Title.Split(" ")[0].Trim() `
-        -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]).Trim() `
+        -userFirstName $_.Title.Trim().Split(" ")[0].Trim() `
+        -userSurname $($_.Title.Trim().Split(" ")[$_.Title.Trim().Split(" ").Count-1]).Trim() `
         -userDisplayName $($_.Title).Trim() `
         -userManagerSAM $_.Line_Manager `
         -userPrimaryOffice $_.Primary_Workplace `
@@ -422,7 +422,7 @@ $selectedStarters | % {
         -user365License $_.Office_365_license `
         -userSecondaryOffice $_.Nearest_Office
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis (UK) Ltd (GBR)"} | % {
+$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `

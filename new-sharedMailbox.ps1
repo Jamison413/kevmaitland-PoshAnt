@@ -3,9 +3,9 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Shared Mailbox - Stevenage Borough Council"
-$owner = "chris.jennings@anthesisgroup.com"
-$arrayOfFullAccessMembers = @("gavin.way@anthesisgroup.com","chris.jennings@anthesisgroup.com","duncan.faulkes@anthesisgroup.com")
+$displayName = "Yara - PEC"
+$owner = "michael.malate@anthesisgroup.com"
+$arrayOfFullAccessMembers = @("Wolfgang.Wick@anthesisgroup.com","sharleen.rivera@anthesisgroup.com","irene.oliquino@anthesisgroup.com","gerber.manalo@anthesisgroup.com","Zarel.Adame@anthesisgroup.com","michael.malate@anthesisgroup.com")
 $grantSendAsToo = $true
 $hideFromGal = $true
 
@@ -15,7 +15,7 @@ function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hid
     New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias | Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false
     $arrayOfFullAccessMembers  | %{
         Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
-        if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs}
+        if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs -Confirm:$false}
         }
     }
 
