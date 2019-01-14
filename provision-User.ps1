@@ -422,7 +422,7 @@ $selectedStarters | % {
         -user365License $_.Office_365_license `
         -userSecondaryOffice $_.Nearest_Office
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis (UK) Ltd (GBR)"} | % {
+$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
