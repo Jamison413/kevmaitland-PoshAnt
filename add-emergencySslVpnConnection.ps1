@@ -1,0 +1,6 @@
+﻿$xmlDefinition = [XML]'<EapHostConfig xmlns="http://www.microsoft.com/provisioning/EapHostConfig"><EapMethod><Type xmlns="http://www.microsoft.com/provisioning/EapCommon">26</Type><VendorId xmlns="http://www.microsoft.com/provisioning/EapCommon">0</VendorId><VendorType xmlns="http://www.microsoft.com/provisioning/EapCommon">0</VendorType><AuthorId xmlns="http://www.microsoft.com/provisioning/EapCommon">0</AuthorId></EapMethod><Config xmlns="http://www.microsoft.com/provisioning/EapHostConfig"><Eap xmlns="http://www.microsoft.com/provisioning/BaseEapConnectionPropertiesV1"><Type>26</Type><EapType xmlns="http://www.microsoft.com/provisioning/MsChapV2ConnectionPropertiesV1"><UseWinLogonCredentials>false</UseWinLogonCredentials></EapType></Eap></Config></EapHostConfig>'
+
+Add-VpnConnection -Name "Emergency SSL VPN Connection" -ServerAddress "vpn.sustain.co.uk" -TunnelType Sstp -RememberCredential -Force -IdleDisconnectSeconds 0 -EncryptionLevel Maximum -AuthenticationMethod eap -EapConfigXmlStream $xmlDefinition
+
+Add-VpnConnectionRoute -ConnectionName "Emergency SSL VPN Connection" -DestinationPrefix "192.168.91.0/24"
+Add-VpnConnectionRoute -ConnectionName "Emergency SSL VPN Connection" -DestinationPrefix "192.168.1.0/24"
