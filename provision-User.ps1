@@ -37,7 +37,7 @@ $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"
 $taxonomyListName = "TaxonomyHiddenList"
 $taxonomyData = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $taxonomyListName -suppressProgress $false -restCreds $restCredentials -logFile $logFile -verboseLogging $true
-
+#region get New User List
 $newUserListName = "New User Requests"
 #$oDataUnprocessedUsers = '$select=*,Line_x0020_Manager/Name,Line_x0020_Manager/Title,Prinicpal_x0020_Community_x0020_/Name,Prinicpal_x0020_Community_x0020_/Title,Primary_x0020_Team/Name,Primary_x0020_Team/Title,Additional_x0020_Teams/Id,Additional_x0020_Teams/Title&$filter=Current_x0020_Status eq ''1 - Waiting for IT Team to set up accounts''&$expand=Line_x0020_Manager/Id,Prinicpal_x0020_Community_x0020_/Id,Primary_x0020_Team/Id,Additional_x0020_Teams/Id'
 $oDataUnprocessedUsers = "`$select=*"
@@ -54,7 +54,7 @@ $unprocessedStarters | %{[array]$unprocessedStartersFormatted += $(convert-listI
 #$selectedStarters = $unprocessedStartersFormatted | Out-GridView -PassThru
 $selectedStarters = $unprocessedStartersFormatted | select Title,JobTitle,Primary_Team,Line_Manager,Start_Date,Finance_Cost_Attribu,Guid | Out-GridView -PassThru
 [array]$selectedStarters = $unprocessedStartersFormatted | ?{$selectedStarters.GUID -contains $_.Guid}
-
+#endregion
 
 #region functions
 function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSAM, $pPrimaryTeam, $pSecondaryTeams, $pJobTitle, $plaintextPassword, $pBusinessUnit, $adCredentials, $pPrimaryOffice){
@@ -307,7 +307,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         log-Error "Failed to create MSOL account"
         log-Error $Error
         }
-    Start-Sleep -Seconds 10 #Let MSOL & EXO Syncronise
+    Start-Sleep -Seconds 20 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
         update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle #-pSurname $userSurname -pDisplayName $userDisplayName
@@ -445,7 +445,7 @@ $selectedStarters | % {
     update-msolUserFromAd -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")
     }
 
-$selectedStarters[2] | % {
+$selectedStarters[1] | % {
     $userUPN = remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
     $userFirstName = $_.Title.Split(" ")[0].Trim()
     $userSurname = $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]).Trim()
