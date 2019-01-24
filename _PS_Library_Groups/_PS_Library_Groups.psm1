@@ -245,13 +245,14 @@ function report-groupMembershipEnumeration($allGroupStubs,$filePathAndName){
         }
     $formattedGroupStubs | Sort-Object GroupName | Export-Csv -Path $filePathAndName -Encoding UTF8 -NoTypeInformation -Append
     }
-function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGroupOwners,[boolean]$actionedGroupIs365,$emailAddressForOverviewReport){
+function report-groupMembershipSync([array]$groupChangesArray,[boolean]$changesAreToGroupOwners,[boolean]$actionedGroupIs365,$emailAddressForOverviewReport){
     Write-Host -ForegroundColor Magenta "report-groupMembershipSync($($groupChangesArray.Count) Users changed,[boolean]$changesAreToGroupOwners,[boolean]$actionedGroupIs365,$emailAddressForOverviewReport"
     #$groupChangesArray = $ownersChanged
     if($actionedGroupIs365){$groupChangesArray = $groupChangesArray | Sort-Object ActionedGroupName,Result,Change,DisplayName}
     else{$groupChangesArray = $groupChangesArray | Sort-Object SourceGroupName,Result,Change,DisplayName}
     $groupChangesArray | %{
-        if($current365Group.Mail -ne $_.SourceGroupName -and $current365Group.Mail -ne $_.ActionedGroupName){
+        $thisChange = $_
+        if($current365Group.Mail -ne $thisChange.SourceGroupName -and $current365Group.Mail -ne $thisChange.ActionedGroupName){
             #We need to start another report, so send the current one before we start again
             if($ownerReport){
                 Write-Host $ownerReport
@@ -259,13 +260,12 @@ function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGro
                 }
             #Start new ownerReport
             $ownerReport = New-Object psobject -Property $([ordered]@{"To"=@();"groupName"=$null;"added"=@();"removed"=@();"problems"=@();"fullMemberList"=@()})
-            if($actionedGroupIs365){$current365Group = Get-AzureADMSGroup -Filter "Mail eq '$($_.ActionedGroupName)'"}
-            else{$current365Group = Get-AzureADMSGroup -Filter "Mail eq '$($_.SourceGroupName)'"}
+            if($actionedGroupIs365){$current365Group = Get-AzureADMSGroup -Filter "Mail eq '$($thisChange.ActionedGroupName)'"}
+            else{$current365Group = Get-AzureADMSGroup -Filter "Mail eq '$($thisChange.SourceGroupName)'"}
             $ownerReport.groupName = $current365Group.DisplayName
             #Get the owners' e-mail addresses
-            #[array]$owners = Get-AzureADMSGroup -SearchString $current365GroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName}
-            [array]$owners = $current365Group | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName}
-            [array]$owners = $(Get-AzureADGroupMember -ObjectId $(Get-UnifiedGroup -Identity $current365Group.Id).CustomAttribute2).UserPrincipalName
+            #[array]$owners = $current365Group | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).UserPrincipalName} #This gets the 365 Group Owners
+            [array]$owners = $(Get-AzureADGroupMember -ObjectId $(Get-UnifiedGroup -Identity $current365Group.Id).CustomAttribute2).UserPrincipalName #This gets the Data Managers Subgroup members
             
             if($owners){$ownerReport.To = $owners}
             else{
@@ -274,7 +274,7 @@ function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGro
                 }
             #Get the members' (or owners' if we're reporting on group Ownership) DisplayNames
             if($changesAreToGroupOwners){
-                #[array]$members = Get-AzureADMSGroup -SearchString $current365GroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).DisplayName}
+                #[array]$members = Get-AzureADMSGroup -SearchString $current365GroupName | ? {$_.GroupTypes -contains "Unified"} | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $thisChange.Id).DisplayName}
                 [array]$members = $current365Group | % {$(Get-AzureADGroupOwner -All:$true -ObjectId $_.Id).DisplayName}
                 $members = $($members | Sort-Object)
                 if($members){$ownerReport.fullMemberList = $members}
@@ -286,12 +286,12 @@ function report-groupMembershipSync($groupChangesArray,[boolean]$changesAreToGro
                 }
             }
         #Add any processed changes
-        if($_.Result -eq "Succeeded"){
-            if($_.Change -eq "Added"){$ownerReport.added += $_.DisplayName}
-            else{$ownerReport.Removed += $_.DisplayName}
+        if($thisChange.Result -eq "Succeeded"){
+            if($thisChange.Change -eq "Added"){$ownerReport.added += $thisChange.DisplayName}
+            else{$ownerReport.Removed += $thisChange.DisplayName}
             }
         #Add any failures as problems to be investigated manually
-        else{$ownerReport.problems += $_.DisplayName}
+        else{$ownerReport.problems += $thisChange.DisplayName}
         }
     #Finally, send the last reports too
     Write-Host $ownerReport
@@ -304,10 +304,10 @@ function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwne
     if($changesAreToGroupOwners){$type = "owner"}
     else{$type = "member"}
     $subject = "$($ownerReport.groupName) $($type)ship updated"
-    $body = "<HTML><FONT FACE=`"Calibri`">Hello owners of <B>$($ownerReport.groupName)</B>,`r`n`r`n<BR><BR>"
+    $body = "<HTML><FONT FACE=`"Calibri`">Hello Data managers for <B>$($ownerReport.groupName)</B>,`r`n`r`n<BR><BR>"
     #$body += $ownerReport.To+"`r`n`r`n<BR><BR>"
     $body += "Changes have been made to the <B><U>$($type)</U>ship</B> of $($ownerReport.groupName)`r`n`r`n<BR><BR>"
-    if($ownerReport.added)  {$body += "The following users have been <B>added</B> as Group <B>$($type)s</B>:      `r`n`t<BR><PRE>&#9;$($ownerReport.added -join     "`r`n`t")</PRE>`r`n`r`n<BR>"}
+    if($ownerReport.added)  {$body += "The following users have been <B>added</B> as Team <B>$($type)s</B>:      `r`n`t<BR><PRE>&#9;$($ownerReport.added -join     "`r`n`t")</PRE>`r`n`r`n<BR>"}
     if($ownerReport.removed){$body += "The following users have been <B>removed</B> from the Group <B>$($type)s</B>:  `r`n`t<BR><PRE>&#9;$($ownerReport.removed -join   "`r`n`t")</PRE>`r`n`r`n<BR>"}
     if($ownerReport.problems){
         $body += "The were some problems processing changes to these users (but IT have been notified):`r`n`t<BR><PRE>&#9;$($ownerReport.problems -join "`r`n`t")</PRE>`r`n`r`n<BR>"
@@ -316,7 +316,7 @@ function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwne
     if($ownerReport.fullMemberList){$body += "The full list of group $($type)s looks like this:`r`n`t<BR><PRE>&#9;$($ownerReport.fullMemberList -join "`r`n`t")</PRE>`r`n`r`n<BR>"}
     else{$body += "It looks like the group is now empty...`r`n`r`n<BR><BR>"}
     if($type -eq "owner"){$body += "To help us all remain compliant and secure, group <I>ownership</I> is still managed centrally by your IT Team, and you will need to liaise with them to make changes to group ownership.`r`n`r`n<BR><BR>"}
-    $body += "As an owner, you can manage the membership of this group (and there is a <A HREF=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Group-membership-management-(for-Team-Managers).aspx`">guide available to help you</A>), or you can contact the IT team for your region,`r`n`r`n<BR><BR>"
+    $body += "As an owner, you can manage the membership of this group (and there is a <A HREF=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-6`">guide available to help you</A>), or you can contact the IT team for your region,`r`n`r`n<BR><BR>"
     $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
     #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
     Send-MailMessage -To $ownerReport.To -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc "kevin.maitland@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
@@ -356,10 +356,10 @@ function sync-365GroupMembersToMirroredSecurityGroup($unifiedGroupObject,[boolea
                     log-result -myMessage "Success! (or, at least no error!)" -logFile $fullLogFile
                     }
                 else{log-result -myMessage "We're only pretending to do this anyway..." -logFile $fullLogFile}
-                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
+                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.PrimarySmtpAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Succeeded";"ErrorMessage"=$null}))
                 }
             catch {
-                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.WindowsEmailAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
+                [array]$membersChanged += (New-Object psobject -Property $([ordered]@{"Change"="Added";"ActionedGroupName"=$foundMembersGroup.Mail;"SourceGroupName"=$unifiedGroupObject.PrimarySmtpAddress;"UPN"=$userStub.userPrincipalName;"DisplayName"=$userStub.displayName;"Result"="Failed";"ErrorMessage"=$_}))
                 log-error -myError $_ -myFriendlyMessage "Failed to add new 365 Group Member [$($userStub.displayName) | $($userStub.objectId)] to [$($unifiedGroupObject.DisplayName)]" -fullLogFile $fullLogFile -errorLogFile $errorLogFile
                 }
             }
