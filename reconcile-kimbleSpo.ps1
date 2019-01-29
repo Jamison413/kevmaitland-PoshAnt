@@ -1,11 +1,19 @@
-﻿$logFileLocation = "C:\ScriptLogs\"
+﻿param(
+    # Specifies whether we are updating Clients or Suppliers.
+    [Parameter(Mandatory = $true, Position = 0)]
+    [ValidateNotNullOrEmpty()]
+    [ValidateSet("Clients", "Suppliers","Projects")]
+    [string]$objectType 
+    )
+
+$logFileLocation = "C:\ScriptLogs\"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    $fullLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    $fullLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_$objectType`_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"reconcile-kimbleSpo_$objectType`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
 else{
-    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_$objectType`_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_$objectType`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
 if($PSCommandPath){
     $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
@@ -26,19 +34,19 @@ Import-Module _PNP_Library_SPO
 #
 ########################################
 $webUrl = "https://anthesisllc.sharepoint.com" 
-$sitePath = "/clients"
-$listName = "Kimble Clients"
 $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $mailFrom = "scriptrobot@sustain.co.uk"
 $mailTo = "kevin.maitland@anthesisgroup.com"
+$cacheFilePath = "$env:USERPROFILE\KimbleCache\"
+
 #convertTo-localisedSecureString ""
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #$sharePointAdminPass = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-$restCreds = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($adminCreds.UserName,$adminCreds.Password)
-new-spoCred  -username $adminCreds.UserName -securePassword $adminCreds.Password
-$csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
+#$restCreds = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($adminCreds.UserName,$adminCreds.Password)
+#new-spoCred  -username $adminCreds.UserName -securePassword $adminCreds.Password
+#$csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password
 ########################################
 $kimbleCreds = Import-Csv "$env:USERPROFILE\Desktop\Kimble.txt"
 $standardKimbleHeaders = get-kimbleHeaders -clientId $kimbleCreds.clientId -clientSecret $kimbleCreds.clientSecret -username $kimbleCreds.username -password $kimbleCreds.password -securityToken $kimbleCreds.securityToken -connectToLiveContext $true -verboseLogging $true
@@ -60,6 +68,82 @@ function try-newListItem($webUrl, $sitePath, $newSpoItemData, $spoListToAddTo, $
         }
     catch{log-error -myError $_ -myFriendlyMessage "Failed to create new [Kimble Leads].$($kimbleLeadObject.Name) with @{$($($newSpoLeadData.Keys | % {$_+":"+$newSpoLeadData[$_]+","}) -join "`r")}" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailTo $mailTo -mailFrom $mailFrom}
     
+    }
+function reconcile-objectsBetweenKimbleAndSpo($accountType, $standardKimbleQueryUri, $standardKimbleHeaders, $webUrl, $sitePath, $adminCreds, $verboseLogging){
+    if($accountType -imatch "Client"){
+        $sitePath = "/clients"
+        $listName = "Kimble Clients"
+        $cacheFileName = "kimbleClients.csv"
+        #$soqlWhereStatement = "WHERE ((KimbleOne__IsCustomer__c = TRUE) OR (Type = 'Client') OR (Type = 'Potential Client'))"
+        }
+    elseif($accountType -imatch "Project"){
+        $sitePath = "/clients"
+        $listName = "Kimble Projects"
+        $cacheFileName = "kimbleProjects.csv"
+        }
+    elseif($accountType -imatch "Supplier"){
+        $sitePath = "/subs"
+        $listName = "Kimble Suppliers"
+        $cacheFileName = "kimbleSuppliers.csv"
+        #$soqlWhereStatement = "WHERE ((Is_Partner__c = TRUE) OR (Type = 'Partner') OR (Type = 'Partner/subcontractor') OR (Type = 'Supplier'))"
+        }
+    else{break}
+    #Get the full list of Kimble Clients
+    $allKimbleAccountObjects = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -verboseLogging $verboseLogging
+    #Get the full list of SPO Clients
+    Connect-PnPOnline –Url $($webUrl+$sitePath) –Credentials $adminCreds
+
+    $pnpList = Get-PnPList -Identity $listName -Includes ContentTypes #We need ContentTypes to create New Objects
+    #$pnpAccountListItems = get-spoKimbleAccountListItems -pnpList $pnpList -spoCredentials $adminCreds -verboseLogging $verboseLogging
+
+    #Retrieve (and update if necessary) the full Clients Cache as we'll need it to set up any new Leads/Projects
+    $accountsCache = cache-spoKimbleAccountsList -pnpList $pnpList -kimbleListCachePathAndFileName $($cacheFilePath+$cacheFileName)
+
+    
+    #Check for uncreated spoAccountListItems 
+    $missingAccounts = Compare-Object -ReferenceObject $allKimbleAccountObjects -DifferenceObject $accountsCache -Property "Id" -PassThru -CaseSensitive:$false -IncludeEqual
+    $missingSpoAccounts = $missingAccounts | ?{$_.SideIndicator -eq "<="}
+
+    $missingSpoAccounts | %{
+        $kimbleAccountMissingFromSpo = $_
+        log-action -myMessage "Creating missing $accountType [$($kimbleAccountMissingFromSpo.Name)]" -logFile $fullLogPathAndName
+        $newSpoAccount = new-spoKimbleObjectListItem -kimbleObject $kimbleAccountMissingFromSpo -pnpKimbleObjectList $pnpList -fullLogPathAndName $fullLogPathAndName  -verboseLogging $verboseLogging
+        if($newSpoAccount){log-result "SUCCESS: New $accountType [$($kimbleAccountMissingFromSpo.Name)] created in [$listName]" -logFile $fullLogPathAndName}
+        else{log-result "FAILED: New $accountType [$($kimbleAccountMissingFromSpo.Name)] NOT created in [$listName]" -logFile $fullLogPathAndName}
+        }
+
+    #Check for orphaned spoAccountListItems, flag them as IsOprhaned=$true and isDirty=$false
+    $missingKimbleAccounts = $missingAccounts | ?{$_.SideIndicator -eq "=>"}
+    $missingKimbleAccounts | % {
+        $orphanedSpoAccount = $_
+        log-action -myMessage "Marking orphaned $accountType [$($orphanedSpoAccount. Name)]" -logFile $fullLogPathAndName
+        #$updatedOrphanedAccount = update-spoKimbleObjectListItem -kimbleObject $orphanedSpoAccount -pnpKimbleObjectList $pnpList -overrideIsDirtyFalse $true -overrideIsOrphanedTrue $true -fullLogPathAndName $fullLogPathAndName  -verboseLogging $verboseLogging
+        $updatedOrphanedAccount = update-spoKimbleObjectListItem -kimbleObject $orphanedSpoAccount -pnpKimbleObjectList $pnpList -overrideIsOrphanedTrue $true -fullLogPathAndName $fullLogPathAndName  -verboseLogging $verboseLogging #Removed isDirty Override now (I think) the excessive IsDirty flagging problem is resolved
+        if($updatedOrphanedAccount.FieldValues.IsOrphaned -and !($updatedOrphanedAccount.FieldValues.IsDirty)){log-result "SUCCESS: Updated $accountType [$($updatedOrphanedAccount.FieldValues.Title)] marked as isOrphaned:`$true isDirty:`$false" -logFile $fullLogPathAndName}
+        else{log-result "FAILED: Updated $accountType [$($orphanedSpoAccount.Name)] NOT updated in [$listName]" -logFile $fullLogPathAndName}
+        }
+
+    #Check for misclassified spoAccountListItems, flag them as IsMisclassified=$true and isDirty=$false
+    $validKimbleAccounts = $missingAccounts | ?{$_.SideIndicator -eq "=="}
+    if($accountType -imatch "Client"){
+        $thisTypeOfKimbleAccounts = $validKimbleAccounts | ? {$_.KimbleOne__IsCustomer__c -eq $true -or $_.Type -eq "Client" -or $_.Type -eq "Potential Client"}
+        }
+    elseif($accountType -imatch "Supplier"){
+        $thisTypeOfKimbleAccounts = $validKimbleAccounts | ? {$_.Is_Partner__c -eq $true -or $_.Type -eq "Partner" -or $_.Type -eq "Partner/subcontractor" -or $_.Type -eq "Supplier"}
+        }
+
+    $misclassifiedAccounts = Compare-Object -ReferenceObject $thisTypeOfKimbleAccounts -DifferenceObject $accountsCache -Property "Id" -PassThru -CaseSensitive:$false #This gives us all spoAccounts that are not valid Clients/Supplier
+    $incorrectlyLablledMisclassifiedAccounts = $misclassifiedAccounts | ? {$_.isMisclassified -eq $false -or $_.IsDirty -eq $true} #This gives us all the ones that need processing
+    $i = 1
+    $incorrectlyLablledMisclassifiedAccounts | % {
+        Write-Progress -Id 1000 -Status "Processing Misclassified Accounts" -Activity "$i/$($incorrectlyLablledMisclassifiedAccounts.Count)" -PercentComplete ($i*100/$incorrectlyLablledMisclassifiedAccounts.Count) #Display the overall progress
+        $misclassifiedAccount = $_
+        log-action -myMessage "Marking misclassified $accountType [$($misclassifiedAccount.Name)]" -logFile $fullLogPathAndName
+        $updatedMisclassifiedAccount = update-spoKimbleObjectListItem -kimbleObject $misclassifiedAccount -pnpKimbleObjectList $pnpList -overrideIsDirtyFalse $true -overrideIsMisclassified $true -overrideIsOrphanedFalse $true -fullLogPathAndName $fullLogPathAndName  -verboseLogging $verboseLogging
+        if($updatedMisclassifiedAccount.FieldValues.isMisclassified -and !($updatedMisclassifiedAccount.FieldValues.IsDirty)){log-result "SUCCESS: Updated $accountType [$($updatedMisclassifiedAccount.FieldValues.Title)] marked as isMisclassified:`$true isDirty:`$false" -logFile $fullLogPathAndName}
+        else{log-result "FAILED: Updated $accountType [$($misclassifiedAccount.Name)] NOT updated in [$listName]" -logFile $fullLogPathAndName}
+        $i++
+        }
     }
 function reconcile-clientsBetweenKimbleAndSpo($standardKimbleQueryUri, $standardKimbleHeaders, $webUrl, $sitePath, $adminCreds){
     #Get the full list of Kimble Clients
@@ -222,6 +306,8 @@ function reconcile-projectsBetweenKimbleAndSpo($standardKimbleQueryUri, $standar
 #
 ##################################
 
-reconcile-clientsBetweenKimbleAndSpo -standardKimbleQueryUri $standardKimbleQueryUri -standardKimbleHeaders $standardKimbleHeaders -webUrl $webUrl -sitePath $sitePath -adminCreds $adminCreds
+#reconcile-clientsBetweenKimbleAndSpo -standardKimbleQueryUri $standardKimbleQueryUri -standardKimbleHeaders $standardKimbleHeaders -webUrl $webUrl -sitePath $sitePath -adminCreds $adminCreds
 #reconcile-leads
-reconcile-projectsBetweenKimbleAndSpo -standardKimbleQueryUri $standardKimbleQueryUri -standardKimbleHeaders $standardKimbleHeaders -webUrl $webUrl -sitePath $sitePath -adminCreds $adminCreds
+#reconcile-projectsBetweenKimbleAndSpo -standardKimbleQueryUri $standardKimbleQueryUri -standardKimbleHeaders $standardKimbleHeaders -webUrl $webUrl -sitePath $sitePath -adminCreds $adminCreds
+reconcile-objectsBetweenKimbleAndSpo -accountType $objectType`
+# reconcile-objectsBetweenKimbleAndSpo -accountType "Projects" #Needs more work
