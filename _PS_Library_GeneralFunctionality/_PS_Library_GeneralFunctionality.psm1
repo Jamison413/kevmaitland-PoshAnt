@@ -320,6 +320,9 @@ function log-error($myError, $myFriendlyMessage, $fullLogFile, $errorLogFile, $d
         Write-Host -ForegroundColor Red $myError
         }
     if(!$doNotLogToEmail -or $logErrorsToEmail){
+        if([string]::IsNullOrWhiteSpace($to)){$to = $env:USERNAME+"@anthesisgroup.com"}
+        if([string]::IsNullOrWhiteSpace($mailFrom)){$mailFrom = $env:COMPUTERNAME+"@anthesisgroup.com"}
+        if([string]::IsNullOrWhiteSpace($smtpServer)){$smtpServer= "anthesisgroup-com.mail.protection.outlook.com"}
         Send-MailMessage -To $mailTo -From $mailFrom -Subject "Error in automated script - $($myFriendlyMessage.SubString(0,20))" -Body ("$myError`r`n`r`n$myFriendlyMessage") -SmtpServer $smtpServer
         }
     }
@@ -423,9 +426,11 @@ function sanitise-forTermStore($dirtyString){
     else{$cleanerString}
     }
 function sanitise-stripHtml($dirtyString){
-    $cleanString = $dirtyString -replace '<[^>]+>',''
-    $cleanString = [System.Web.HttpUtility]::HtmlDecode($cleanString)# -replace '&amp;','&'
-    $cleanString
+    if(![string]::IsNullOrWhiteSpace($dirtyString)){
+        $cleanString = $dirtyString -replace '<[^>]+>',''
+        $cleanString = [System.Web.HttpUtility]::HtmlDecode($cleanString)# -replace '&amp;','&'
+        $cleanString
+        }
     }
 function smartReplace($mysteryString,$findThis,$replaceWithThis){
     if([string]::IsNullOrEmpty($mysteryString)){$result = $mysteryString}
@@ -435,7 +440,9 @@ function smartReplace($mysteryString,$findThis,$replaceWithThis){
 function stringify-hashTable($hashtable,$interlimiter,$delimiter){
     if([string]::IsNullOrWhiteSpace($interlimiter)){$interlimiter = ":"}
     if([string]::IsNullOrWhiteSpace($delimiter)){$delimiter = ", "}
-    $dirty = $($($hashtable.Keys | % {$_+"$interlimiter"+$hashtable[$_]+"$delimiter"}) -join "`r")
-    $dirty.Substring(0,$dirty.Length-$delimiter.length)
+    if($hashtable.Count -gt 0){
+        $dirty = $($($hashtable.Keys | % {$_+"$interlimiter"+$hashtable[$_]+"$delimiter"}) -join "`r")
+        $dirty.Substring(0,$dirty.Length-$delimiter.length)
+        }
     }
 #endregion
