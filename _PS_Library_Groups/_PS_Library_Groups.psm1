@@ -796,6 +796,10 @@ $managers = @("kevin.maitland")
 $teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Finance Team (FIN)"
+$description = $null
+$managers = @("emily.pressey")
+$teamMembers = convertTo-arrayOfEmailAddresses "Emily Pressey <emily.pressey@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 #>
-
 

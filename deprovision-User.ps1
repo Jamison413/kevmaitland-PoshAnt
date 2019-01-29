@@ -169,7 +169,7 @@ $selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToR
 $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
 #region deprovision
 
-$binMe = convertTo-arrayOfStrings "amanda.cox@anthesisgroup.com"
+$binMe = convertTo-arrayOfEmailAddresses "Tore Söderqvist <Tore.Soderqvist@anthesisgroup.com>; Åsa Soutukorva Swanberg <Asa.Soutukorva@anthesisgroup.com>; Nemah Agamata <Nemah.Agamata@anthesisgroup.com>; Sonnet Fadera <Sonnet.Fadera@anthesisgroup.com>"
 foreach($user in $binMe){
     if($user){
         $userMsolObject = Get-User -Identity $user
@@ -183,6 +183,8 @@ foreach($user in $binMe){
             Set-Mailbox $userMsolObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
             Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -DisplayName $("Ω_"+$userMsolObject.DisplayName) 
             remove-msolLicenses -userSAM $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
+            #Potential fix for the above line: 
+            <#Set-MsolUserLicense -UserPrincipalName $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com","")) -RemoveLicenses "Anthesis LLC:ENTERPRISEPACK"#>
             }
         }
     }
@@ -191,7 +193,6 @@ foreach($user in $binMe){
 
 
 
-add-mailboxpermission -id lucy.boreham -access fullaccess -user kirsten.doddy
 
 
 
