@@ -3,16 +3,22 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Yara - PEC"
-$owner = "michael.malate@anthesisgroup.com"
-$arrayOfFullAccessMembers = @("Wolfgang.Wick@anthesisgroup.com","sharleen.rivera@anthesisgroup.com","irene.oliquino@anthesisgroup.com","gerber.manalo@anthesisgroup.com","Zarel.Adame@anthesisgroup.com","michael.malate@anthesisgroup.com")
+$displayName = "Dexcom PEC"
+$primaryEmail = "dexcom.pec@anthesisgroup.com"
+$owner = "kevin.maitland@anthesisgroup.com"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Hirene.Lopez@anthesisgroup.com
+Gerber.Manalo@anthesisgroup.com
+Michael.Malate@anthesisgroup.com
+sharleen.rivera@anthesisgroup.com
+acsmailboxaccess@anthesisgroup.com
+"
 $grantSendAsToo = $true
 $hideFromGal = $true
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){
     $exchangeAlias = $(guess-aliasFromDisplayName -displayName $displayName)
-    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias | Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false
+    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias -PrimarySmtpAddress $primaryEmail| Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false
     $arrayOfFullAccessMembers  | %{
         Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
         if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs -Confirm:$false}
