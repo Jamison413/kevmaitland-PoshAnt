@@ -304,7 +304,7 @@ function send-membershipEmailReport($ownerReport,[boolean]$changesAreToGroupOwne
     if($changesAreToGroupOwners){$type = "owner"}
     else{$type = "member"}
     $subject = "$($ownerReport.groupName) $($type)ship updated"
-    $body = "<HTML><FONT FACE=`"Calibri`">Hello Data managers for <B>$($ownerReport.groupName)</B>,`r`n`r`n<BR><BR>"
+    $body = "<HTML><FONT FACE=`"Calibri`">Hello Data Managers for <B>$($ownerReport.groupName)</B>,`r`n`r`n<BR><BR>"
     #$body += $ownerReport.To+"`r`n`r`n<BR><BR>"
     $body += "Changes have been made to the <B><U>$($type)</U>ship</B> of $($ownerReport.groupName)`r`n`r`n<BR><BR>"
     if($ownerReport.added)  {$body += "The following users have been <B>added</B> as Team <B>$($type)s</B>:      `r`n`t<BR><PRE>&#9;$($ownerReport.added -join     "`r`n`t")</PRE>`r`n`r`n<BR>"}
@@ -796,6 +796,10 @@ $managers = @("kevin.maitland")
 $teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
+$displayName = "Finance Team (FIN)"
+$description = $null
+$managers = @("emily.pressey")
+$teamMembers = convertTo-arrayOfEmailAddresses "Emily Pressey <emily.pressey@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 #>
-
 
