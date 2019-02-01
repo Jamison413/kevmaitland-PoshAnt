@@ -10,3 +10,6 @@ connect-ToSpo -credential $sharePointAdmin
 $userToRemove = "Lasse.Kirkelykke@convatec.com"
 
 $extUser = Get-SPOExternalUser -filter $userToRemove
+if($extUser){
+    Remove-SPOExternalUser $extUser
+    }
