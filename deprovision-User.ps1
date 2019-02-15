@@ -169,7 +169,7 @@ $selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToR
 $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
 #region deprovision
 
-$binMe = convertTo-arrayOfEmailAddresses "Tore Söderqvist <Tore.Soderqvist@anthesisgroup.com>; Åsa Soutukorva Swanberg <Asa.Soutukorva@anthesisgroup.com>; Nemah Agamata <Nemah.Agamata@anthesisgroup.com>; Sonnet Fadera <Sonnet.Fadera@anthesisgroup.com>"
+$binMe = convertTo-arrayOfEmailAddresses "richard.emmett@anthesisgroup.com"
 foreach($user in $binMe){
     if($user){
         $userMsolObject = Get-User -Identity $user

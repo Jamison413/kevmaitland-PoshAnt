@@ -8,8 +8,8 @@
 
 $logFileLocation = "C:\ScriptLogs\"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    $fullLogPathAndName = $logFileLocation+"sync-kimbleObjectsToSpoLists_$objectType`_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = $logFileLocation+"sync-kimbleObjectsToSpoLists_$objectType`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    $fullLogPathAndName = $logFileLocation+"sync-kimbleObjectsToSpoLists.ps1_$objectType`_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"sync-kimbleObjectsToSpoLists.ps1_$objectType`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
 else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_$objectType`_FullLog_$(Get-Date -Format "yyMMdd").log"
