@@ -69,5 +69,27 @@ $modifiedKimbleOpps | % {
         }
     }
 
+$lastModifiedPropInDbSql = "SELECT MAX(LastModifiedDate) AS LastModifiedDate FROM SUS_Kimble_Proposals"
+$lastModifiedPropInDb = Execute-SQLQueryOnSQLDB -query $lastModifiedPropInDbSql -queryType Scalar -sqlServerConnection $sqlDbConn
+$cutoffModifiedPropDate = Get-Date $lastModifiedPropInDb -Format s #Does this need to account for Daylight Saving Time?
+$lastCreatedPropInDbSql = "SELECT MAX(CreatedDate) AS LastCreatedDate FROM SUS_Kimble_Proposals"
+$lastCreatedPropInDb = Execute-SQLQueryOnSQLDB -query $lastCreatedPropInDbSql -queryType Scalar -sqlServerConnection $sqlDbConn
+
+$modifiedKimbleProps = get-allKimbleProposals -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE LastModifiedDate > $cutoffModifiedPropDate`Z"
+$modifiedKimbleProps | % {
+    if((Get-Date $_.CreatedDate) -gt $lastCreatedPropInDb){
+        #Create any new Props
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow Creating Prop [$($_.Name)]:[$($_.Id)]}
+        $result = add-kimbleProposalToFocalPointCache -kimbleProp $_ -dbConnection $sqlDbConn -verboseLogging $verboseLogging
+        if ($result -ne 1){[array]$duffCreateProps += @($_,$result)}
+        }
+    else{
+        #If it's not new, it must have been modified, so Update it
+        if($verboseLogging){Write-Host -ForegroundColor DarkYellow Updating Prop [$($_.Name)]:[$($_.Id)]}
+        $result = update-kimbleProposalToFocalPointCache -kimbleProp $_ -dbConnection $sqlDbConn -verboseLogging $verboseLogging
+        if ($result -ne 1){[array]$duffModifyProps += @($_,$result)}
+        }
+    }
+
 $sqlDbConn.Close()
 Stop-Transcript
