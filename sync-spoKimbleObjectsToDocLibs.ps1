@@ -2,14 +2,14 @@
     # Specifies whether we are updating Clients or Suppliers.
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateNotNullOrEmpty()]
-    [ValidateSet("Clients", "Suppliers","Projects","Clients&Projects")]
+    [ValidateSet("Clients", "Suppliers","Projects","ClientsProjects")]
     [string]$whatToSync
     )
 
 $logFileLocation = "C:\ScriptLogs\"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    $fullLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs_$whatToSync`_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs_$whatToSync`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+    $fullLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs.ps1_$whatToSync`_FullLog_$(Get-Date -Format "yyMMdd").log"
+    $errorLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs.ps1_$whatToSync`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
 else{
     $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_$whatToSync`_FullLog_$(Get-Date -Format "yyMMdd").log"
@@ -232,7 +232,7 @@ try{
 catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [$spoListName] to check whether it needs recaching" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
 
 #Retrieve (and update if necessary) the full Clients Cache as we'll need it to set up any new Leads/Projects
-$accountsCache = cache-spoKimbleAccountsList -pnpList $pnpList -kimbleListCachePathAndFileName $($cacheFilePath+$accountsCacheFile)
+$accountsCache = cache-spoKimbleAccountsList -pnpList $pnpList -kimbleListCachePathAndFileName $($cacheFilePath+$accountsCacheFile) 
     
 #Build a hashtable so we can look up Client name by it's KimbleId
 $kimbleAccountHashTable = @{}
@@ -399,3 +399,4 @@ if($whatToSync -match "Projects"){
 
 
 #endregion
+Stop-Transcript
