@@ -134,13 +134,14 @@ $antUsers | select DisplayName,Country,City
 #region Report Variables
 $templatePath = "C:\Reports\"
 $templateFile = "AnthesisGlobalStaffListTemplate - Copy.xlsx"
-$outputPath = "C:\Reports\AntUsers\"
+$outputPath = "C:\Reports\AnthesisStaff\"
 $firstRowOfUsers = 10
 #endregion
 
 #region Write the report
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $true
+$excel.displayalerts = $False
 "`tOpening report template"
 $workbook = $excel.Workbooks.Open("$templatePath$templateFile")
 $sheet = $workbook.Sheets.Item('Anthesians')
@@ -199,7 +200,7 @@ $WorkBook.worksheets.Item("Service Accounts").Delete()
 $WorkBook.worksheets.Item("Unknown").Delete()
 
 
-$workbook.SaveAs($outputPath+"Anthesis Staff List_$((Get-Date).ToString("yyyy-MM-dd")).xlsx")
+$workbook.SaveAs($outputPath+"Anthesis Staff List.xlsx")#_$((Get-Date).ToString("yyyy-MM-dd")).xlsx")
 $workbook.Close($false)
 $excel.Quit()
 #endregion
@@ -211,7 +212,7 @@ $excel.Quit()
 
 #Specify tenant admin and site URL
 $SiteURL = "https://anthesisllc.sharepoint.com/sites/Resources-Administration/"
-$Folder = "C:\Reports\AntUsers"
+$Folder = "C:\Reports\AnthesisStaff"
 $DocLibName = "Global Staff List"
 
 
@@ -224,7 +225,7 @@ $Context.Load($List)
 $Context.ExecuteQuery()
 
 #Upload file to SP
-$File = Get-Item 'C:\Reports\AntUsers\Anthesis Staff List.xlsx'
+$File = Get-Item 'C:\Reports\AnthesisStaff\Anthesis Staff List.xlsx'
 #Foreach ($File in (dir $Folder))
 #{
 $FileStream = New-Object IO.FileStream($File.FullName,[System.IO.FileMode]::Open)
@@ -238,4 +239,4 @@ $Context.ExecuteQuery()
 #}
 
 #Delete the file on local
-Get-ChildItem C:\Reports\AntUsers -Recurse | Remove-Item
+Get-ChildItem C:\Reports\AnthesisStaff\Anthesis Staff List.xlsx -Recurse | Remove-Item
