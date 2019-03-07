@@ -7,14 +7,14 @@ $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredentia
 
 connect-ToSpo -credential $sharePointAdmin
 
-$userToRemove = "emilypressey@hotmail.co.uk"
-$siteToRemoveFrom = "https://anthesisllc.sharepoint.com/sites/external/UKResourcesCouncilWorkingGroupsWasteSectorPlan"
+$userToRemove = "helen@tyrrell.me"
+$siteToRemoveFrom = "https://anthesisllc.sharepoint.com/sites/external/HelensCIPDAdmin"
 
 $extUser = Get-SPOExternalUser -filter $userToRemove
 $extUser2 = Get-SPOExternalUser -filter $userToRemove -SiteUrl $siteToRemoveFrom
 if($extUser){
     Remove-SPOExternalUser -UniqueIDs $extUser.UniqueId
     }
-if($extUser){
+if($extUser2){
     Remove-SPOExternalUser -UniqueIDs $extUser2.UniqueId
     }
