@@ -30,14 +30,10 @@ $accountsDelta = Compare-Object -ReferenceObject $kimbleAccounts -DifferenceObje
 if(!$cachedAccounts){$accountsDelta = $kimbleAccounts}
 
 #Create any new (uncached) Accounts
-$accountsDelta | ? {$_.SideIndicator -eq "<="
+$accountsDelta | ? {$_.SideIndicator -eq "<=" } | % {
+    $me = $_
     add-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn
-    } | % {Write-Host $_.Id $_.Name}
-#These are now missing from Kimble. Not sure what to do with these...
-$accountsDelta | ? {$_.SideIndicator -eq "=>"
-    
-    } | % {Write-Host $_.Id $_.Name}
-
+    } | % {Write-Host $me.Id $me.Name}
 #Update all the Accounts based on the Kimble Data
 if($i -ne $null){rv i}
 $kimbleAccounts | %{
@@ -46,6 +42,13 @@ $kimbleAccounts | %{
     Write-Host $_.Id $_.Name
     $i++
     }
+#These are now missing from Kimble, so mark them as Deleted
+$accountsDelta | ? {$_.SideIndicator -eq "=>" } | % {
+    $me = $_
+    $me.IsDeleted = $true
+    update-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn # | Out-Null 
+    } | % {Write-Host $me.Id $me.Name}
+
 <# This populates the data for the first time
 if($i -ne $null){rv i}
 $kimbleAccounts | %{
@@ -66,11 +69,6 @@ if(!$cachedOpps){$oppsDelta = $kimbleOpps}
 $oppsDelta | ? {$_.SideIndicator -eq "<="
     add-kimbleOppToFocalPointCache -kimbleOpp $_ -dbConnection $sqlDbConn
     } | % {Write-Host $_.Id $_.Name}
-#These are now missing from Kimble. Not sure what to do with these...
-$oppsDelta | ? {$_.SideIndicator -eq "=>"
-    
-    } | % {Write-Host $_.Id $_.Name}
-
 #Update all the Accounts based on the Kimble Data
 if($i -ne $null){rv i}
 $oppsDelta | %{
@@ -79,6 +77,12 @@ $oppsDelta | %{
     Write-Host $_.Id $_.Name
     $i++
     }
+#These are now missing from Kimble. Not sure what to do with these...
+$oppsDelta | ? {$_.SideIndicator -eq "=>" } | % {
+    $me = $_
+    $me.IsDeleted = $true
+    update-kimbleOppToFocalPointCache -kimbleOpp $me -dbConnection $sqlDbConn
+    } | % {Write-Host $me.Id $me.Name}
 <# This populates the data for the first time
 if($i -ne $null){rv i}
 $kimbleOpps | %{
