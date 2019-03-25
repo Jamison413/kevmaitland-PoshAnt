@@ -349,7 +349,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         update-newUserRequest -listItem $newUserListItem -digest $digest -restCredentials $restCredentials -logFile $logFile
         }
     }
-function provision-SustainADUser($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $plaintextPassword, $adCredentials){
+function provision-SustainADUser($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $userPrimaryOffice, $plaintextPassword, $adCredentials){
     try{
         log-Message "Creating AD account for $userUPN" -colour "Yellow"
         create-ADUser -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pManagerSAM $($userManagerSAM.Split("@")[0]) -pDepartment $userPrimaryTeam -pJobTitle $userJobTitle -plaintextPassword $plaintextPassword -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pBusinessUnit $userBusinessUnit -adCredentials $adCredentials -pPrimaryOffice $userPrimaryOffice
@@ -380,7 +380,7 @@ function update-msolUserFromAd($userUPN){
 
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
-        update-MsolUser -pUPN $userUPN -pFirstName $adU.GivenName -pSurname $adU.Surname -pManagerSAM $userManagerSAM -pDDI $DDI -pMobile $mobile  -pJobTitle $adU.Title -pDisplayName $adU.DisplayName -pPhoneExtension $adU.ipPhone
+        update-MsolUser -pUPN $userUPN -pFirstName $adU.GivenName -pSurname $adU.Surname -pManagerSAM $userManagerSAM -pDDI $DDI -pMobile $mobile  -pJobTitle $adU.Title -pDisplayName $adU.DisplayName -pPhoneExtension $adU.ipPhone -pPrimaryOffice $adu.physicalDeliveryOfficeName
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{
@@ -438,7 +438,8 @@ $selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"
         -restCredentials $restCredentials `
         -newUserListItem $_ `
         -userTimeZone $_.TimeZone `
-        -user365License $_.Office_365_license 
+        -user365License $_.Office_365_license `
+        -userPrimaryOffice $_.Primary_Workplace
     }
 
 $selectedStarters | % {

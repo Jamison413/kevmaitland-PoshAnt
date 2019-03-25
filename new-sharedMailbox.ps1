@@ -3,17 +3,17 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Dexcom PEC"
-$primaryEmail = "dexcom.pec@anthesisgroup.com"
+$displayName = "iRobot PEC"
+$primaryEmail = "irobot.pec@anthesisgroup.com"
 $owner = "kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Hirene.Lopez@anthesisgroup.com
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "lynda.benedicto@anthesisgroup.com
 Gerber.Manalo@anthesisgroup.com
 Michael.Malate@anthesisgroup.com
 sharleen.rivera@anthesisgroup.com
 acsmailboxaccess@anthesisgroup.com
 "
 $grantSendAsToo = $true
-$hideFromGal = $true
+$hideFromGal = $false
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){
