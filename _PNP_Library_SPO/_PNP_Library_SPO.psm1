@@ -10,7 +10,11 @@
     $checkForServerSiteOverlap = [regex]::Match($pnpList.RootFolder.ServerRelativeUrl,"^$($pnpList.RootFolder.Context.Web.ServerRelativeUrl)(.+)*")
     if($checkForServerSiteOverlap.Success){$siteRelativeUrlPrefix = $checkForServerSiteOverlap.Groups[$checkForServerSiteOverlap.Groups.Count-1].Value}
     else{$siteRelativeUrlPrefix = $pnpList.RootFolder.Context.Web.ServerRelativeUrl}
-    [array]$formattedArrayOfSiteRelativeSubfolderNames = $arrayOfSubfolderNames | % {$siteRelativeUrlPrefix+$_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")}
+    
+    #[array]$formattedArrayOfSiteRelativeSubfolderNames = $arrayOfSubfolderNames | % {$siteRelativeUrlPrefix+$_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")}
+    #Changed [KM] 2019-03-14 As Client DocLibs weren't beign created properly (missing the trailing / on the site relative path: /JUUL_Kimble automatically creates Project folders)
+    [array]$formattedArrayOfSiteRelativeSubfolderNames = $arrayOfSubfolderNames | % {$($siteRelativeUrlPrefix+"/"+$_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")).Replace("//","/")}
+
     try{
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-spoFolder -pnpList $($pnpList.Title) -folderServerRelativeUrl $($formattedArrayOfSubfolderNames[$formattedArrayOfSubfolderNames.Length-1])"}
         #$hasItems = get-spoFolder -pnpList $pnpList -folderServerRelativeUrl $($formattedArrayOfSubfolderNames[$formattedArrayOfSubfolderNames.Length-1]) -adminCreds $adminCreds -verboseLogging $verboseLogging
@@ -60,8 +64,11 @@ function add-spoTermToStore($termGroup,$termSet,$term,$kimbleId,$verboseLogging)
         $pnpTermGroup = Get-PnPTermGroup $termGroup 
         $pnpTermSet = Get-PnPTermSet -TermGroup $pnpTermGroup -Identity $termSet
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPTerm -TermGroup $($pnpTermGroup.Name) -TermSet $($pnpTermSet.Name) -Identity $cleanTerm -ErrorAction Stop"}
-        $pnpTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanTerm -ErrorAction Stop #Weirdly, Get-PnPTerm throws a non-terminating exception if the Term isn't found. We want an exception, so that catch{} returns $null value
+        #$pnpTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanTerm -ErrorAction Stop #Weirdly, Get-PnPTerm throws a non-terminating exception if the Term isn't found. We want an exception, so that catch{} returns $null value
+        #2019-03-14 [KM] Retrieving all Terms now as it's bizarrely faster than retrieving an individual term and we're hitting a 30 second timeout.
         #$alreadyInStore = Get-PnPTaxonomyItem -TermPath "$termGroup|$termSet|$term"
+        $allTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet
+        $pnpTerm = $allTerms | ? {$_.Name -eq $cleanTerm}
         }
     catch{
         #Meh.
@@ -82,7 +89,7 @@ function add-spoTermToStore($termGroup,$termSet,$term,$kimbleId,$verboseLogging)
         $newPnpTerm
         }
     }
-function cache-spoKimbleAccountsList($pnpList, $kimbleListCachePathAndFileName){
+function cache-spoKimbleAccountsList($pnpList, $kimbleListCachePathAndFileName, $fullLogPathAndName, $errorLogPathAndName, $verboseLogging){
     $listCacheFile = Get-Item $kimbleListCachePathAndFileName
     if((get-date $pnpList.LastItemModifiedDate).AddMinutes(-5) -gt $listCacheFile.LastWriteTimeUtc){#This is bodged so we don't miss any new List added during the time it takes to actually download the full Account list
         try{
@@ -95,7 +102,7 @@ function cache-spoKimbleAccountsList($pnpList, $kimbleListCachePathAndFileName){
                 }
             else{log-result -myMessage "FAILURE: [$($pnpList.Title)] items could not be retrieved" -logFile $fullLogPathAndName}
             }
-        catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [$($pnpList.Title)] items to recache the local copy" -fullLogFile $fullLogPathAndNamel -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+        catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [$($pnpList.Title)] items to recache the local copy" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
         }
     else{log-result -myMessage "SUCCESS: [$($pnpList.Title)] Cache is up-to-date and does not require refreshing" -logFile $fullLogPathAndName}
     $listCache = Import-Csv $kimbleListCachePathAndFileName
@@ -709,7 +716,7 @@ function test-pnpConnectionMatchesResource($resourceUrl, $verboseLogging){
         $false
         }
     }
-function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $pnpListItem, $arrayOfSubfolders, $recreateSubFolderOverride, $adminCreds, $fullLogPathAndName){
+function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $pnpListItem, $arrayOfSubfolders, $recreateSubFolderOverride, $adminCreds, $fullLogPathAndName, $verboseLogging){
     log-action "update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem [$($pnpListItem.Name)] - looking for existing Library" -logFile $fullLogPathAndName
     try{
         $duration = Measure-Command {
@@ -721,7 +728,7 @@ function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $
     catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Document Library in update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem [$($pnpListItem.Name)][$($pnpListItem.LibraryGUID)] $($Error[0].Exception.InnerException.Response)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
 
     if($existingLibrary){
-        log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSecond) seconds])" -logFile $fullLogPathAndName
+        log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSeconds) seconds])" -logFile $fullLogPathAndName
         log-action -myMessage "Updating Document Library [$($existingLibrary.RootFolder.ServerRelativeUrl)]" -logFile $fullLogPathAndName
         #Bodge to capture Descriptions for Clients & Suppliers
         if(![string]::IsNullOrWhiteSpace($pnpListItem.ClientDescription)){$docLibDescription = $pnpListItem.ClientDescription}
@@ -735,6 +742,7 @@ function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $
             $duration = Measure-Command {
                 $existingLibrary.Description = $(sanitise-stripHtml $docLibDescription)
                 $existingLibrary.Update()
+                $existingLibrary.Context.ExecuteQuery()
                 if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Title:[$($pnpListItem.Name)]: Set-PnPList -Identity $($existingLibrary.Id.Guid) -Title $($pnpListItem.Name)"}
                 Set-PnPList -Identity $existingLibrary.Id -Title $pnpListItem.Name
                 $updatedLibrary = Get-PnPList -Identity $existingLibrary.Id #The Id property is constant between $existingLibrary and $updatedLibrary 
@@ -876,10 +884,14 @@ function update-spoTerm($termGroup,$termSet,$oldTerm,$newTerm,$kimbleId,$verbose
     try{
         $pnpTermGroup = Get-PnPTermGroup $termGroup 
         $pnpTermSet = Get-PnPTermSet -TermGroup $pnpTermGroup -Identity $termSet
-        $pnpOldTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanOldTerm
-        if(!$pnpOldTerm){Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $oldTerm} #Try the dirty version if we can't find the clean version
-        $pnpNewTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanNewTerm
-        #$alreadyInStore = Get-PnPTaxonomyItem -TermPath "$termGroup|$termSet|$term"
+        #$pnpOldTerm = Get-PnPTerm -Identity $cleanOldTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet 
+        #if(!$pnpOldTerm){Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $oldTerm} #Try the dirty version if we can't find the clean version
+        #$pnpNewTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanNewTerm
+        #2019-03-14 [KM] Retrieving all Terms now as it's bizarrely faster than retrieving an individual term and we're hitting a 30 second timeout.
+        $allTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet
+        $pnpOldTerm = $allTerms | ? {$_.Name -eq $cleanOldTerm}
+        if(!$pnpOldTerm){$allTerms | ? {$_.Name -eq $oldTerm}} #Try the dirty version if we can't find the clean version
+        $pnpNewTerm = $allTerms | ? {$_.Name -eq $cleanNewTerm}
         }
     catch{
         #Meh.
