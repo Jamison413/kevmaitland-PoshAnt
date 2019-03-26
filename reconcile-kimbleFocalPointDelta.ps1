@@ -75,7 +75,7 @@ $cutoffModifiedPropDate = Get-Date $lastModifiedPropInDb -Format s #Does this ne
 $lastCreatedPropInDbSql = "SELECT MAX(CreatedDate) AS LastCreatedDate FROM SUS_Kimble_Proposals"
 $lastCreatedPropInDb = Execute-SQLQueryOnSQLDB -query $lastCreatedPropInDbSql -queryType Scalar -sqlServerConnection $sqlDbConn
 
-$modifiedKimbleProps = get-allKimbleProposals -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE LastModifiedDate > $cutoffModifiedPropDate`Z"
+$modifiedKimbleProps = get-allKimbleProposals -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement "WHERE LastModifiedDate > $cutoffModifiedPropDate`Z" -verboseLogging $true
 $modifiedKimbleProps | % {
     if((Get-Date $_.CreatedDate) -gt $lastCreatedPropInDb){
         #Create any new Props
