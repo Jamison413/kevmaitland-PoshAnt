@@ -207,44 +207,27 @@ function get-2letterIsoCodeFromCountryName($pCountryName){
     $3letterCode = get-3letterIsoCodeFromCountryName -pCountryName $pCountryName
     get-2letterIsoCodeFrom3LetterIsoCode -p3letterIsoCode $3letterCode
     }
-function Get-AzureADBitLockerKeysForUser {
- 
-    Param 
-    (
-        [parameter(Mandatory = $true)]
-        [string]$SearchString,
-        [pscredential]$Credential
-    )
- 
+function get-azureAdBitlockerHeader{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [pscredential]$aadCreds
+        )
+    Write-Verbose "get-azureAdBitlockerHeader -aadCreds [$($aadCreds.UserName) | $($aadCreds.Password)]"
+    #Test for connection to AzureRM
     Import-Module AzureRM.Profile
-    if (Get-Module -Name "AzureADPreview" -ListAvailable) {
-        Import-Module AzureADPreview
-    } elseif (Get-Module -Name "AzureAD" -ListAvailable) {
-        Import-Module AzureAD
-    }
- 
-    if ($Credential) {
-        Try {
-            Connect-AzureAD -Credential $Credential -ErrorAction Stop | Out-Null
-        } Catch {
-            Write-Warning "Couldn't connect to Azure AD non-interactively, trying interactively."
-            Connect-AzureAD -TenantId $(($Credential.UserName.Split("@"))[1]) -ErrorAction Stop | Out-Null
+    try {    
+        $context = Get-AzureRmContext -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+        if([string]::IsNullOrWhiteSpace($context)){throw [System.AccessViolationException] "Insuffient privileges to connect to Get-AzureRmContext"}
         }
- 
-        Try {
-            Login-AzureRmAccount -Credential $Credential -ErrorAction Stop | Out-Null
-        } Catch {
-            Write-Warning "Couldn't connect to Azure RM non-interactively, trying interactively."
-            Login-AzureRmAccount -TenantId $(($Credential.UserName.Split("@"))[1]) -ErrorAction Stop | Out-Null
+    catch {
+        connect-toAzureRm -aadCreds $aadCreds
         }
-    } else {
-        Connect-AzureAD -ErrorAction Stop | Out-Null
-        Login-AzureRmAccount -ErrorAction Stop | Out-Null
-    }
+    finally {
+        if([string]::IsNullOrWhiteSpace($context)){$context = Get-AzureRmContext}
+        }
 
-
-
- $context = Get-AzureRmContext
+    #Then build header
     $tenantId = $context.Tenant.Id
     $refreshToken = @($context.TokenCache.ReadItems() | Where-Object {$_.tenantId -eq $tenantId -and $_.ExpiresOn -gt (Get-Date)})[0].RefreshToken
     $body = "grant_type=refresh_token&refresh_token=$($refreshToken)&resource=74658136-14ec-4630-ad9b-26e160ff0fc6"
@@ -254,29 +237,94 @@ function Get-AzureADBitLockerKeysForUser {
         'X-Requested-With'       = 'XMLHttpRequest'
         'x-ms-client-request-id' = [guid]::NewGuid()
         'x-ms-correlation-id'    = [guid]::NewGuid()
+        }
+    $header
     }
- 
+function get-azureAdBitLockerKeysForAllDevices{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [hashtable]$header
+        ,[pscredential]$aadCreds
+        )
 
-  $userDevices = Get-AzureADUser -SearchString $SearchString | Get-AzureADUserRegisteredDevice -All:$true
+    #Get Header if necessary
+    if([string]::IsNullOrWhiteSpace($header)){
+        $header = get-azureAdBitlockerHeader -aadCreds $aadCreds 
+        }
 
-  $bitLockerKeys = @()
- 
-    foreach ($device in $userDevices) {
-        $url = "https://main.iam.ad.ext.azure.com/api/Device/$($device.objectId)"
-        $deviceRecord = Invoke-RestMethod -Uri $url -Headers $header -Method Get
-        if ($deviceRecord.bitlockerKey.count -ge 1) {
-            $bitLockerKeys += [PSCustomObject]@{
-                Device      = $deviceRecord.displayName
-                DriveType   = $deviceRecord.bitLockerKey.driveType
-                KeyId       = $deviceRecord.bitlockerKey.keyIdentifier
-                RecoveryKey = $deviceRecord.bitlockerKey.recoveryKey
+    #Check if connected to AzureAD
+    try{$allDevices = Get-AzureADDevice -All:$true -ErrorAction Stop -WarningAction Stop -InformationAction Stop}
+    catch{
+        connect-toAAD -credential $aadCreds
+        }
+    finally{
+        if([string]::IsNullOrWhiteSpace($allDevices)){$allDevices = Get-AzureADDevice -All:$true -ErrorAction Stop -WarningAction Stop -InformationAction Stop}
+        }
+
+    $bitLockerKeys = @()
+
+    foreach ($device in $allDevices) {
+        $bitLockerKeysForThisDevice = get-azureADBitLockerKeysForDevice -adDevice $device -header $header
+        if(![string]::IsNullOrWhiteSpace($bitLockerKeysForThisDevice)){
+            $bitLockerKeys += $bitLockerKeysForThisDevice
             }
         }
+    $bitLockerKeys
     }
+function get-azureAdBitLockerKeysForDevice{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [Microsoft.Open.AzureAD.Model.DirectoryObject]$adDevice
+        ,[hashtable]$header
+        )
+
+    $deviceBitLockerKeys = @()
+    $url = "https://main.iam.ad.ext.azure.com/api/Device/$($adDevice.objectId)"
+    $deviceRecord = Invoke-RestMethod -Uri $url -Headers $header -Method Get
+    if ($deviceRecord.bitlockerKey.count -ge 1) {
+        $bitLockerKeys += [PSCustomObject]@{
+            Device      = $deviceRecord.displayName
+            DriveType   = $deviceRecord.bitLockerKey.driveType
+            KeyId       = $deviceRecord.bitLockerKey.keyIdentifier
+            RecoveryKey = $deviceRecord.bitLockerKey.recoveryKey
+            CreationTime= $deviceRecord.bitLockerKey.creationTime
+            }
+        }
+    $deviceBitLockerKeys
+    }
+function get-azureAdBitLockerKeysForUser {
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [string]$SearchString
+        ,[pscredential]$Credential
+        )
  
+    try{$userDevices = Get-AzureADUser -SearchString $SearchString | Get-AzureADUserRegisteredDevice -All:$true}
+    catch{
+        connect-toAAD -credential $aadCreds
+        }
+    finally{
+        if([string]::IsNullOrWhiteSpace($userDevices)){$userDevices = Get-AzureADUser -SearchString $SearchString | Get-AzureADUserRegisteredDevice -All:$true}
+        }
+ 
+    #Get Header if necessary
+    if([string]::IsNullOrWhiteSpace($header)){
+        $header = get-azureAdBitlockerHeader -aadCreds $aadCreds
+        }
+
+    $bitLockerKeys = @()
+    foreach ($device in $userDevices) {
+        $bitLockerKeysForThisDevice = get-azureADBitLockerKeysForDevice -adDevice $device -header $header
+        if(![string]::IsNullOrWhiteSpace($bitLockerKeysForThisDevice)){
+            $bitLockerKeys += $bitLockerKeysForThisDevice
+            }
+        }
 
      $bitLockerKeys
-}
+    }
 function get-keyFromValue($value, $hashTable){
     foreach ($Key in ($hashTable.GetEnumerator() | Where-Object {$_.Value -eq $value})){
         $Key.name}
