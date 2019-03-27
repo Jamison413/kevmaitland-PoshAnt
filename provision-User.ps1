@@ -203,7 +203,8 @@ function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusiness
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
     Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
     if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN | Set-Mailbox -EmailAddresses @{add="$($pUPN.Split("@")[0])@sustain.co.uk"}}
-    Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
+    if ($pBusinessUnit -match "Energy" -or $pBusinessUnit -match "DEU"){Get-Mailbox $pUPN | Set-Mailbox -LitigationHoldEnabled $true }
+    Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Interim security policy"
     Get-Mailbox $pUPN | Set-Clutter -Enable $true
     Set-User -Identity $pUPN -Company $pBusinessUnit
     Set-MailboxRegionalConfiguration -Identity $pUPN -TimeZone $(convertTo-exTimeZoneValue $pTimeZone)
