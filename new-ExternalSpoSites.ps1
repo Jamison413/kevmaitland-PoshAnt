@@ -168,6 +168,7 @@ foreach ($currentRequest in $selectedRequests){
                 }
             #Get the Id of the current Admin (no error checking required as we won't get this far if the Admin hasn't authenticated successfully)
             $ctx = new-csomContext -fullSitePath $($webUrl+$requestSite) -sharePointCredentials $csomCredentials
+            $ctx.RequestTimeOut = 360000
             $admin = $ctx.Web.EnsureUser($csomCredentials.UserName)
             $ctx.Load($admin)
             $ctx.ExecuteQuery()
