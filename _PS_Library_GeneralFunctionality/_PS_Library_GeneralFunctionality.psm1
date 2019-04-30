@@ -284,7 +284,7 @@ function get-azureAdBitLockerKeysForDevice{
     $url = "https://main.iam.ad.ext.azure.com/api/Device/$($adDevice.objectId)"
     $deviceRecord = Invoke-RestMethod -Uri $url -Headers $header -Method Get
     if ($deviceRecord.bitlockerKey.count -ge 1) {
-        $bitLockerKeys += [PSCustomObject]@{
+        $deviceBitLockerKeys += [PSCustomObject]@{
             Device      = $deviceRecord.displayName
             DriveType   = $deviceRecord.bitLockerKey.driveType
             KeyId       = $deviceRecord.bitLockerKey.keyIdentifier
