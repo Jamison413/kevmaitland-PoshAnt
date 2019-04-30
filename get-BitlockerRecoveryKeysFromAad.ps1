@@ -10,10 +10,12 @@ if($PSCommandPath){
 
 Import-Module _PS_Library_GeneralFunctionality
 
-$aadUser = "groupbot@anthesisgroup.com"
+#$aadUser = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$aadUserPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
-$aadCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $aadUser, $aadUserPass
-
+#$aadUserPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+#$aadCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $aadUser, $aadUserPass
+$aadCreds = set-MsolCredentials
+Connect-AzureRmAccount -Credential $aadCreds
 
 $bitlockerRecoveryKeys = Get-AzureADBitLockerKeysForAllDevices -aadCreds $aadCreds -Verbose
+$bitlockerRecoveryKeys | export-csv $env:USERPROFILE\Desktop\BitlockerKeys_$(Get-Date -Format "yyMMdd").csv -NoTypeInformation
