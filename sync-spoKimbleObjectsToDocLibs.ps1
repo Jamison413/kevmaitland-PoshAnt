@@ -266,7 +266,7 @@ $dirtyAccounts | % {
         #Otherwise try to update it
         else{
             log-action -myMessage "$whatToSync [$($dirtyAccount.Name)] doesn't look new, so I'm going to try updating it" -logFile $fullLogPathAndName
-            try{update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem -pnpList $pnpList -pnpListItem $dirtyAccount -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $recreateAllFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndNamev -verboseLogging $verboseLogging}
+            try{update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem -pnpList $pnpList -pnpListItem $dirtyAccount -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $recreateAllFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging}
             catch{log-error $_ -myFriendlyMessage "Error updating Client [$($dirtyAccount.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailFrom $mailFrom -mailTo $mailTo}
 
             #Then try updating the Managed Metadata

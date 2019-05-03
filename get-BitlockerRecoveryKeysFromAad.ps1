@@ -17,3 +17,4 @@ $aadCreds = New-Object -TypeName System.Management.Automation.PSCredential -Argu
 
 
 $bitlockerRecoveryKeys = Get-AzureADBitLockerKeysForAllDevices -aadCreds $aadCreds -Verbose
+$bitlockerRecoveryKeys | Export-Csv -Path "C:\users\kevinm\Desktop\AuditLogs\BitlockerKeys_$(Get-Date -Format "yyMMdd").csv" -NoTypeInformation

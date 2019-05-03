@@ -265,7 +265,7 @@ function get-azureAdBitLockerKeysForAllDevices{
     $bitLockerKeys = @()
 
     foreach ($device in $allDevices) {
-        $bitLockerKeysForThisDevice = get-azureADBitLockerKeysForDevice -adDevice $device -header $header
+        $bitLockerKeysForThisDevice = get-azureADBitLockerKeysForDevice -adDevice $device -header $header -Verbose
         if(![string]::IsNullOrWhiteSpace($bitLockerKeysForThisDevice)){
             $bitLockerKeys += $bitLockerKeysForThisDevice
             }
@@ -284,7 +284,7 @@ function get-azureAdBitLockerKeysForDevice{
     $url = "https://main.iam.ad.ext.azure.com/api/Device/$($adDevice.objectId)"
     $deviceRecord = Invoke-RestMethod -Uri $url -Headers $header -Method Get
     if ($deviceRecord.bitlockerKey.count -ge 1) {
-        $bitLockerKeys += [PSCustomObject]@{
+        $deviceBitLockerKeys += [PSCustomObject]@{
             Device      = $deviceRecord.displayName
             DriveType   = $deviceRecord.bitLockerKey.driveType
             KeyId       = $deviceRecord.bitLockerKey.keyIdentifier
@@ -531,6 +531,26 @@ function sanitise-forResourcePath($dirtyString){
         #$dirtyString = $dirtyString -creplace "[^a-zA-Z0-9 _/()`'&-@!]+", '' #No need to strip non-standard characters
         #[uri]::EscapeUriString($dirtyString) #No need to encode the URL
         $dirtyString
+        }
+    }
+function sanitise-forSqlValue{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [ValidateSet(“String”,”Int”,”Decimal”,"Boolean","Guid","Date","HTML")] 
+        [string]$dataType
+
+        ,[parameter(Mandatory = $false)]
+        $value
+        )
+    switch($dataType){
+        "String" {"`'$(smartReplace -mysteryString $value -findThis "'" -replaceWithThis "''")`'"}
+        "HTML"   {"`'$(sanitise-forSqlValue -value $(sanitise-stripHtml $value ) -dataType String)`'"}
+        "Int"    {if([string]::IsNullOrWhiteSpace($value)){"0"}else{$value}}
+        "Decimal"{if([string]::IsNullOrWhiteSpace($value)){"0.0"}else{$value}}
+        "Boolean"{if($value -eq $true){"1"}else{"0"}}
+        "Guid"   {if([string]::IsNullOrWhiteSpace($value)){"NULL"}else{"`'$value`'"}} #This could be handled better
+        "Date"   {if([string]::IsNullOrWhiteSpace($value)){"NULL"}else{"`'"+$(Get-Date (smartReplace -mysteryString $value -findThis "+0000" -replaceWithThis "") -Format s)+"`'"}}
         }
     }
 function sanitise-forSql([string]$dirtyString){
