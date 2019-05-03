@@ -24,40 +24,34 @@ $standardKimbleQueryUri = get-kimbleQueryUri
 
 
 #region Accounts
-$cachedAccounts = get-allFocalPointCachedKimbleAccounts -dbConnection $sqlDbConn -pWhereStatement $null -verboseLogging $true
+$cachedAccounts = get-allFocalPointCachedKimbleAccounts -dbConnection $sqlDbConn -pWhereStatement $null #-verboseLogging $true
 $kimbleAccounts = get-allKimbleAccounts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders #-pWhereStatement "WHERE Sync_to_FocalPoint__c = TRUE" 
-$accountsDelta = Compare-Object -ReferenceObject $kimbleAccounts -DifferenceObject $cachedAccounts -Property Id -PassThru -CaseSensitive:$false
+$accountsDelta = Compare-Object -ReferenceObject $kimbleAccounts -DifferenceObject $cachedAccounts -Property Id -PassThru -CaseSensitive:$false -IncludeEqual
 if(!$cachedAccounts){$accountsDelta = $kimbleAccounts}
+
 
 #Create any new (uncached) Accounts
 $accountsDelta | ? {$_.SideIndicator -eq "<=" } | % {
     $me = $_
-    add-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn
+    add-kimbleAccountToFocalPointCache -kimbleAccount $me -dbConnection $sqlDbConn
     } | % {Write-Host $me.Id $me.Name}
 #Update all the Accounts based on the Kimble Data
 if($i -ne $null){rv i}
-$kimbleAccounts | %{
+$accountsDelta | ? {$_.SideIndicator -eq "==" } | % {
     Write-Progress -Activity "Updating cached Kimble Accounts" -status "$($_.Name)" -percentComplete ($i / $kimbleAccounts.count * 100)
-    update-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn | Out-Null 
-    Write-Host $_.Id $_.Name
+    $thisAccount = $_
+    $result = update-kimbleAccountToFocalPointCache -kimbleAccount $thisAccount -dbConnection $sqlDbConn #| Out-Null 
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($thisAccount.Id)] [$($thisAccount.Name)]"}
     $i++
     }
 #These are now missing from Kimble, so mark them as Deleted
 $accountsDelta | ? {$_.SideIndicator -eq "=>" } | % {
     $me = $_
     $me.IsDeleted = $true
-    update-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn # | Out-Null 
-    } | % {Write-Host $me.Id $me.Name}
-
-<# This populates the data for the first time
-if($i -ne $null){rv i}
-$kimbleAccounts | %{
-    Write-Progress -Activity "Adding cached Kimble Accounts" -status "$($_.Name)" -percentComplete ($i / $kimbleAccounts.count * 100)
-    add-kimbleAccountToFocalPointCache -kimbleAccount $_ -dbConnection $sqlDbConn | Out-Null 
-    Write-Host $_.Id $_.Name
-    $i++
+    $me | Add-Member -MemberType NoteProperty -Name "IsMissingFromKimble" -Value $true -Force
+    $result = update-kimbleAccountToFocalPointCache -kimbleAccount $me -dbConnection $sqlDbConn 
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]"}
     }
-#>
 #endregion
 
 #region Opps
@@ -68,14 +62,15 @@ if(!$cachedOpps){$oppsDelta = $kimbleOpps}
 
 $oppsDelta | ? {$_.SideIndicator -eq "<="} | % {
     $me = $_
-    add-kimbleOppToFocalPointCache -kimbleOpp $me -dbConnection $sqlDbConn -verboseLogging $true
+    add-kimbleOppToFocalPointCache -kimbleOpp $me -dbConnection $sqlDbConn
     } | % {Write-Host $me.Id $me.Name}
 #Update all the Accounts based on the Kimble Data
 if($i -ne $null){rv i}
 $oppsDelta | ? {$_.SideIndicator -eq "=="} | % {
     $me = $_
     Write-Progress -Activity "Updating cached Kimble Opps" -status "$($me.Name)" -percentComplete ($i / $kimbleOpps.count * 100)
-    update-kimbleOppToFocalPointCache -kimbleOpp $me -dbConnection $sqlDbConn | Out-Null 
+    $result = update-kimbleOppToFocalPointCache -kimbleOpp $me -dbConnection $sqlDbConn -Verbose
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]"}
     $i++
     } | % {Write-Host $me.Id $me.Name}
 #These are now missing from Kimble. Not sure what to do with these...
@@ -83,7 +78,8 @@ $oppsDelta | ? {$_.SideIndicator -eq "=>" } | % {
     $me = $_
     $me.IsDeleted = $true
     update-kimbleOppToFocalPointCache -kimbleOpp $me -dbConnection $sqlDbConn
-    } | % {Write-Host $me.Id $me.Name}
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]"}
+    }
 <# This populates the data for the first time
 if($i -ne $null){rv i}
 $kimbleOpps | %{
@@ -103,24 +99,30 @@ $kimbleProps = get-allKimbleProposals -pQueryUri $standardKimbleQueryUri -pRestH
 $propsDelta = Compare-Object -ReferenceObject $kimbleProps -DifferenceObject $cachedProps -Property Id -PassThru -CaseSensitive:$false -IncludeEqual
 if(!$cachedProps){$propsDelta = $kimbleProps}
 
-$propsDelta | ? {$_.SideIndicator -eq "<="} | % {
+$propsToAdd = $propsDelta | ? {$_.SideIndicator -eq "<="} 
+$propsToAdd | % {
     $me = $_
     add-kimbleProposalToFocalPointCache -kimbleProp $me -dbConnection $sqlDbConn
     } | % {Write-Host $me.Id $me.Name}
-#Update all the Accounts based on the Kimble Data
+#Update all the matched Accounts based on the Kimble Data
 if($i -ne $null){rv i}
-$propsDelta | ? {$_.SideIndicator -eq "=="} | % {
+$propsToUpdate = $propsDelta | ? {$_.SideIndicator -eq "=="}
+$propsToUpdate | % {
     $me = $_
     Write-Progress -Activity "Updating cached Kimble Proposals" -status "$($me.Name)" -percentComplete ($i / $kimbleProps.count * 100)
-    update-kimbleProposalToFocalPointCache -kimbleProp $me -dbConnection $sqlDbConn | Out-Null 
+    $result = update-kimbleProposalToFocalPointCache -kimbleProp $me -dbConnection $sqlDbConn 
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]"}
     $i++
-    } | % {Write-Host $me.Id $me.Name}
+    }
 #These are now missing from Kimble. Not sure what to do with these...
-$propsDelta | ? {$_.SideIndicator -eq "=>" } | % {
+$propsToDelete = $propsDelta | ? {$_.SideIndicator -eq "=>" }
+$propsToDelete | % {
     $me = $_
     $me.IsDeleted = $true
-    update-kimbleProposalToFocalPointCache -kimbleProp $me -dbConnection $sqlDbConn
-    } | % {Write-Host $me.Id $me.Name}
+    $me | Add-Member -MemberType NoteProperty -Name "IsMissingFromKimble" -Value $true -Force
+    $result = update-kimbleProposalToFocalPointCache -kimbleProp $me -dbConnection $sqlDbConn
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]"}
+    }
 <# This populates the data for the first time
 if($i -ne $null){rv i}
 $kimbleOpps | %{
@@ -132,6 +134,42 @@ $kimbleOpps | %{
 #>
 
 #endregion
+
+
+
+#region Engagements
+$cachedEngagements = get-allFocalPointCachedKimbleEngagements -dbConnection $sqlDbConn -pWhereStatement $null
+$kimbleEngagements = get-allKimbleEngagements -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement $null
+$engagementsDelta = Compare-Object -ReferenceObject $kimbleEngagements -DifferenceObject $cachedEngagements -Property Id -PassThru -CaseSensitive:$false -IncludeEqual
+
+$engagementsToAdd = $engagementsDelta | ? {$_.SideIndicator -eq "<="} 
+$engagementsToAdd | % {
+    $me = $_
+    add-kimbleEngagementToFocalPointCache -kimbleEngagement $me -dbConnection $sqlDbConn 
+    } | % {Write-Host $me.Id $me.Name}
+#Update all the matched Accounts based on the Kimble Data
+$engagementsToUpdate = $engagementsDelta | ? {$_.SideIndicator -eq "=="}
+if($i -ne $null){rv i}
+$failed = @()
+$engagementsToUpdate | % {
+    $me = $_
+    Write-Progress -Activity "Updating cached Kimble Engagments" -status "$($me.Name)" -percentComplete ($i / $engagementsToUpdate.count * 100)
+    $result = update-kimbleEngagementToFocalPointCache -kimbleEngagement $me -dbConnection $sqlDbConn 
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]";$failed += $me}
+    $i++
+    }
+#These are now missing from Kimble. Not sure what to do with these...
+$engagementsToDelete = $engagementsDelta | ? {$_.SideIndicator -eq "=>" }
+$engagementsToDelete | % {
+    $me = $_
+    $me.IsDeleted = $true
+    $me | Add-Member -MemberType NoteProperty -Name "IsMissingFromKimble" -Value $true -Force
+    $result = update-kimbleEngagementToFocalPointCache -kimbleEngagement $me -dbConnection $sqlDbConn
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]"}
+    }
+
+#endregion
+
 
 $sqlDbConn.close()
 Stop-Transcript

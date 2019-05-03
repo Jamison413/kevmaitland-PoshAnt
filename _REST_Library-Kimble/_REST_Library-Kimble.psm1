@@ -13,43 +13,63 @@
 #$securityToken = $kimbleLogin.securityToken
 Import-Module _PS_Library_GeneralFunctionality
 
-function add-kimbleAccountToFocalPointCache($kimbleAccount, $dbConnection, $verboseLogging){
-    if($verboseLogging){Write-Host -ForegroundColor Yellow "add-kimbleAccountToFocalPointCache"}
+function add-kimbleAccountToFocalPointCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$kimbleAccount 
+
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "add-kimbleAccountToFocalPointCache [$($kimbleAccount.Name)]"
     $sql = "SELECT Name,Id FROM SUS_Kimble_Accounts WHERE Id = '$($kimbleAccount.Id)'"
+    Write-Verbose "`t$sql"
     $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
     if ($alreadyPresent){
-        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`Id already present in Cache, not adding duplicate"}
+        Write-Verbose "`tId [$($kimbleAccount.Id)] already present in Cache, not adding duplicate"
         -1 #Return "unsuccessful" as the record is in the DB, but we didn't add it and this might need investigating
         }
     else{
-        $sql = "INSERT INTO SUS_Kimble_Accounts (attributes, Website, Type, SystemModstamp, Phone, ParentId, OwnerId, Name, LastModifiedDate, LastModifiedById, KimbleOne__IsCustomer__c, KimbleOne__BusinessUnit__c, Is_Partner__c, Is_Competitor__c, IsDeleted, Id, CreatedDate, CreatedById, Client_Sector__c, BillingStreet, BillingState, BillingPostalCode, BillingCountry, BillingCity) VALUES ("
-        $sql += "'"+$(sanitise-forSql $kimbleAccount.attributes)+"',"
-        $sql += "'"+$kimbleAccount.Website+"',"
-        $sql += "'"+$kimbleAccount.Type+"',"
-        $sql += "'"+$(Get-Date (smartReplace $kimbleAccount.SystemModstamp "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-        $sql += "'"+$kimbleAccount.Phone+"',"
-        $sql += "'"+$kimbleAccount.ParentId+"',"
-        $sql += "'"+$kimbleAccount.OwnerId+"',"
-        $sql += "'"+$(smartReplace $kimbleAccount.Name "'" "`'`'")+"',"
-        $sql += "'"+$(Get-Date (smartReplace $kimbleAccount.LastModifiedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-        $sql += "'"+$kimbleAccount.LastModifiedById+"',"
-        if($kimbleAccount.KimbleOne__IsCustomer__c -eq $true){$sql += "1,"}else{$sql += "0,"}
-        $sql += "'"+$kimbleAccount.KimbleOne__BusinessUnit__c+"',"
-        if($kimbleAccount.Is_Partner__c -eq $true){$sql += "1,"}else{$sql += "0,"}
-        if($kimbleAccount.Is_Competitor__c -eq $true){$sql += "1,"}else{$sql += "0,"}
-        if($kimbleAccount.IsDeleted -eq $true){$sql += "1,"}else{$sql += "0,"}
-        $sql += "'"+$kimbleAccount.Id+"',"
-        $sql += "'"+$(Get-Date (smartReplace $kimbleAccount.CreatedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-        $sql += "'"+$kimbleAccount.CreatedById+"',"
-        $sql += "'"+$(smartReplace $kimbleAccount.Client_Sector__c "'" "`'`'")+"',"
-        $sql += "'"+$(smartReplace $kimbleAccount.BillingStreet "'" "`'`'")+"',"
-        $sql += "'"+$(smartReplace $kimbleAccount.BillingState "'" "`'`'")+"',"
-        $sql += "'"+$(smartReplace $kimbleAccount.BillingPostalCode "'" "`'`'")+"',"
-        $sql += "'"+$(smartReplace $kimbleAccount.BillingCountry "'" "`'`'")+"',"
-        $sql += "'"+$(smartReplace $kimbleAccount.BillingCity "'" "`'`'")+"')"
-        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t$sql"}
+        Write-Verbose "`tId [$($kimbleAccount.Id)] not present in SQL, adding to [SUS_Kimble_Accounts]"
+        $sql = "INSERT INTO SUS_Kimble_Accounts (attributes, Website, Type, SystemModstamp, Phone, ParentId, OwnerId, Name, LastModifiedDate, LastModifiedById, KimbleOne__IsCustomer__c, KimbleOne__BusinessUnit__c, Is_Partner__c, Is_Competitor__c, IsDeleted, Id, CreatedDate, CreatedById, Client_Sector__c, BillingStreet, BillingState, BillingPostalCode, BillingCountry, BillingCity, Description , DimCode, DimCode_Supplier, IsMissingFromKimble, IsMisclassified, IsDirty, isOrphaned, DocumentLibraryGuid) VALUES ("
+        $sql += $(sanitise-forSqlValue -value $kimbleAccount.attributes.url -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Website -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Type -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.SystemModstamp -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Phone -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.ParentId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.OwnerId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Name -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.LastModifiedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.LastModifiedById -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.KimbleOne__IsCustomer__c -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.KimbleOne__BusinessUnit__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Is_Partner__c -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Is_Competitor__c -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.IsDeleted -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.CreatedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.CreatedById -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Client_Sector__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.BillingStreet -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.BillingState -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.BillingPostalCode -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.BillingCountry -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.BillingCity -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Description -dataType String)
+        $sql += ",NULL" #DimCode
+        $sql += ",NULL" #DimCode_Supplier
+        $sql += ",0" #IsMissingFromKimble
+        $sql += ",0" #IsMisclassified
+        $sql += ",1" #IsDirty
+        $sql += ",0" #isOrphaned
+        $sql += ",NULL" #DocumentLibraryGuid
+        $sql += ")"
+        Write-Verbose "`t$sql"
         $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
-        if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: $result"}}
+        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+        else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
         $result
         }
     }
@@ -67,7 +87,7 @@ function add-kimbleContactToFocalPointCache($kimbleContact, $dbConnection, $verb
         $sql += "'"+$(sanitise-forSql $kimbleContact.Anthesis_Events__c)+"',"
         $sql += "'"+$(sanitise-forSql $kimbleContact.AssistantName)+"',"
         $sql += "'"+$(sanitise-forSql $kimbleContact.AssistantPhone)+"',"
-        $sql += "'"+$(sanitise-forSql $kimbleContact.attributes)+"',"
+        $sql += "'"+$(sanitise-forSql $kimbleContact.attributes.url)+"',"
         $sql += "'"+$(sanitise-forSql $(Get-Date (smartReplace $kimbleContact.Birthdate "+0000" "") -Format s -ErrorAction SilentlyContinue))+"',"
         if($kimbleContact.Cleanup__c -eq $true){$sql += "1,"}else{$sql += "0,"}
         $sql += "'"+$(sanitise-forSql $kimbleContact.Client_Type__c)+"',"
@@ -150,46 +170,144 @@ function add-kimbleContactToFocalPointCache($kimbleContact, $dbConnection, $verb
         $result
         }
     }
-function add-kimbleOppToFocalPointCache($kimbleOpp, $dbConnection, $verboseLogging){
-    $sql = "SELECT Name,Id FROM SUS_Kimble_Opps WHERE Id = '$($kimbleOpp.Id)'"
+function add-kimbleEngagementToFocalPointCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$kimbleEngagement 
+
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "add-kimbleEngagementToFocalPointCache [$($kimbleEngagement.Name)]"
+    $sql = "SELECT Name,Id FROM SUS_Kimble_Engagements WHERE Id = '$($kimbleEngagement.Id)'"
+    Write-Verbose "`t$sql"
     $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
     if ($alreadyPresent){
-        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`Id already present in Cache, not adding duplicate"}
+        Write-Verbose "`tId [$($kimbleEngagement.Id)] already present in Cache, not adding duplicate"
+        -1 #Return "unsuccessful" as the record is in the DB, but we didn't add it and this might need investigating
+        }
+    else{
+        Write-Verbose "`tId [$($kimbleEngagement.Id)] not present in SQL, adding to [SUS_Kimble_Engagements]"
+        $sql = "INSERT INTO SUS_Kimble_Engagements (attributes,Community__c,Competitive__c,CreatedById,CreatedDate,CurrencyIsoCode,Finance_Contact__c,Id,IsDeleted,Is_Engagement_Owner__c,KimbleOne__Account__c,KimbleOne__ActualUsage__c,KimbleOne__BaselineContractCost__c,KimbleOne__BaselineContractMarginAmount__c,KimbleOne__BaselineContractMargin__c,KimbleOne__BaselineContractRevenue__c,KimbleOne__BaselineUsage__c,KimbleOne__BusinessUnitGroup__c,KimbleOne__ContractCost__c,KimbleOne__ContractMarginAmount__c,KimbleOne__ContractMargin__c,KimbleOne__ContractRevenue__c,KimbleOne__DeliveryProgram__c,KimbleOne__DeliveryStage__c,KimbleOne__DeliveryStatus__c,KimbleOne__ExpectedCcyExpectedContractRevenue__c,KimbleOne__ExpectedCurrencyISOCode__c,KimbleOne__ExpectedEndDate__c,KimbleOne__ExpectedStartDate__c,KimbleOne__ForecastAtThisLevel__c,KimbleOne__ForecastStatus__c,KimbleOne__ForecastUsage__c,KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c,KimbleOne__InvoicingCcyServicesInvoiceableAmount__c,KimbleOne__IsExpectedStartDateBeforeCloseDate__c,KimbleOne__LostReasonNarrative__c,KimbleOne__LostReason__c,KimbleOne__ProbabilityCodeEnum__c,KimbleOne__ProductGroup__c,KimbleOne__Proposal__c,KimbleOne__Reference__c,KimbleOne__RiskLevel__c,KimbleOne__SalesOpportunity__c,KimbleOne__ShortName__c,KimbleOne__WeightedContractRevenue__c,LastActivityDate,LastModifiedById,LastModifiedDate,LastReferencedDate,LastViewedDate,Name,OwnerId,Primary_Client_Contact__c,Project_Risk_Assessment_Completed_H_S__c,Project_Type__c,SystemModstamp,IsMissingFromKimble,IsDirty,SuppressFolderCreation) VALUES ("
+        $sql += $(sanitise-forSqlValue -value $kimbleEngagement.attributes.url -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Community__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Competitive__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.CreatedById -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.CreatedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.CurrencyIsoCode -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Finance_Contact__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.IsDeleted -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Is_Engagement_Owner__c -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__Account__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ActualUsage__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractCost__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractMarginAmount__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractMargin__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractRevenue__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineUsage__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BusinessUnitGroup__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractCost__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractMarginAmount__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractMargin__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractRevenue__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__DeliveryProgram__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__DeliveryStage__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__DeliveryStatus__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedCcyExpectedContractRevenue__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedCurrencyISOCode__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedEndDate__c -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedStartDate__c -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ForecastAtThisLevel__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ForecastStatus__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ForecastUsage__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__InvoicingCcyServicesInvoiceableAmount__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__IsExpectedStartDateBeforeCloseDate__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__LostReasonNarrative__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__LostReason__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ProbabilityCodeEnum__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ProductGroup__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__Proposal__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__Reference__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__RiskLevel__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__SalesOpportunity__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ShortName__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__WeightedContractRevenue__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.LastActivityDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.LastModifiedById -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.LastModifiedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.LastReferencedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.LastViewedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Name -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.OwnerId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Primary_Client_Contact__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Project_Risk_Assessment_Completed_H_S__c -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.Project_Type__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleEngagement.SystemModstamp -dataType Date)
+	    $sql += ",0" #IsMissing
+	    $sql += ",1" #IsDirty
+        $sql += ",0" #SuppressFolderCreation 
+        $sql += ")"
+
+        Write-Verbose "`t$sql"
+        $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
+        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+        $result
+        }
+    }
+function add-kimbleOppToFocalPointCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$kimbleOpp 
+
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "add-kimbleOppToFocalPointCache [$($kimbleOpp.Name)]"
+    $sql = "SELECT Name,Id FROM SUS_Kimble_Accounts WHERE Id = '$($kimbleOpp.Id)'"
+    Write-Verbose "`t$sql"
+    $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    if ($alreadyPresent){
+        Write-Verbose "`tId [$($kimbleOpp.Id)] already present in Cache, not adding duplicate"
         -1 #Return "unsuccessful" as the record is in the DB, but we didn't add it and this might need investigating
         }
     else{
         if($verboseLogging){Write-Host -ForegroundColor Yellow "add-kimbleOppToFocalPointCache"}
         $sql = "INSERT INTO SUS_Kimble_Opps (attributes, SystemModstamp, Weighted_Net_Revenue__c, Proposal_Contract_Revenue__c, Project_Type__c, OwnerId, Name, LastModifiedDate, LastModifiedById, LastActivityDate, KimbleOne__WonLostReason__c, KimbleOne__WonLostNarrative__c, KimbleOne__ResponseRequiredDate__c, KimbleOne__Proposal__c, KimbleOne__OpportunityStage__c, KimbleOne__OpportunitySource__c, KimbleOne__ForecastStatus__c, KimbleOne__Description__c, KimbleOne__CloseDate__c, KimbleOne__Account__c, IsDeleted, Id, CreatedDate, CreatedById, Community__c, ANTH_SalesOpportunityStagesCount__c, ANTH_PipelineStage__c) VALUES ("
-	    $sql += "'"+$kimbleOpp.attributes+"',"
-	    $sql += "'"+$(Get-Date (smartReplace $kimbleOpp.SystemModstamp "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-        if($kimbleOpp.Weighted_Net_Revenue__ -eq $null){$sql += "0,"}else{$sql += $kimbleOpp.Weighted_Net_Revenue__+ ","}
-	    $sql += [string]$kimbleOpp.Proposal_Contract_Revenue__c+ ","
-	    $sql += "'"+$(smartReplace $kimbleOpp.Project_Type__c "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.OwnerId "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.Name "'" "`'`'")+"',"
-	    $sql += "'"+$(Get-Date (smartReplace $kimbleOpp.LastModifiedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.LastModifiedById "'" "`'`'")+"',"
-	    $sql += "'"+$(Get-Date (smartReplace $kimbleOpp.LastActivityDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__WonLostReason__c "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__WonLostNarrative__c "'" "`'`'")+"',"
-	    $sql += "'"+$(Get-Date (smartReplace $kimbleOpp.KimbleOne__ResponseRequiredDate__c "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__Proposal__c "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__OpportunityStage__c "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__OpportunitySource__c "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__ForecastStatus__c "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__Description__c "'" "`'`'")+"',"
-	    $sql += "'"+$(Get-Date (smartReplace $kimbleOpp.KimbleOne__CloseDate__c "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.KimbleOne__Account__c "'" "`'`'")+"',"
-        if($kimbleOpp.IsDeleted -eq $true){$sql += "1,"}else{$sql += "0,"}
-	    $sql += "'"+$(smartReplace $kimbleOpp.Id "'" "`'`'")+"',"
-	    $sql += "'"+$(Get-Date (smartReplace $kimbleOpp.CreatedDate "+0000" "" -Format s -ErrorAction SilentlyContinue))+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.CreatedById "'" "`'`'")+"',"
-	    $sql += "'"+$(smartReplace $kimbleOpp.Community__c "'" "`'`'")+"',"
-	    $sql += [string]$kimbleOpp.ANTH_SalesOpportunityStagesCount__c + ","
-	    $sql += "'"+$kimbleOpp.ANTH_PipelineStage__c+"')"
-        if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t$sql"}
+        $sql += $(sanitise-forSqlValue -value $kimbleOpp.attributes.url -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.SystemModstamp -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.Weighted_Net_Revenue__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.Proposal_Contract_Revenue__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.Project_Type__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.OwnerId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.Name -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.LastModifiedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.LastModifiedById -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.LastActivityDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__WonLostReason__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__WonLostNarrative__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__ResponseRequiredDate__c -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__Proposal__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__OpportunityStage__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__OpportunitySource__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__ForecastStatus__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__Description__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__CloseDate__c -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.KimbleOne__Account__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.IsDeleted -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.Id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.CreatedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.CreatedById -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.Community__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.ANTH_SalesOpportunityStagesCount__c -dataType Decimal)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleOpp.ANTH_PipelineStage__c -dataType String)
+        $sql += ")"
+        Write-Verbose "`t$sql"
         $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
-        if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: $result"}}
+        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}else{Write-Verbose "`t`tFAILURE :( - Code: [$result]"}
         $result
         }
     }
@@ -203,7 +321,7 @@ function add-kimbleProposalToFocalPointCache($kimbleProp, $dbConnection, $verbos
     else{
         if($verboseLogging){Write-Host -ForegroundColor Yellow "add-kimbleProposalToFocalPointCache"}
         $sql = "INSERT INTO SUS_Kimble_Proposals (attributes,SystemModstamp,KimbleOne__WeightedContractRevenue__c,Proposal_Contract_Revenue__c,Project_Type__c,OwnerId,Id,Name,LastModifiedDate,LastModifiedById,KimbleOne__HighLevelWeightedContractRevenue__c,KimbleOne__HighLevelContractRevenue__c,KimbleOne__HighLevelContractCost__c,KimbleOne__DetailedLevelWeightedContractRevenue__c,KimbleOne__DetailedLevelContractRevenue__c,KimbleOne__DetailedLevelContractCost__c,KimbleOne__ContractRevenue__c,KimbleOne__ContractMargin__c,KimbleOne__ContractMarginAmount__c,KimbleOne__ContractCost__c,KimbleOne__RiskLevel__c,KimbleOne__Reference__c,KimbleOne__Proposition__c,KimbleOne__ForecastStatus__c,KimbleOne__ForecastAtDetailedLevel__c,KimbleOne__Description__c,KimbleOne__BusinessUnit__c,KimbleOne__AcceptanceType__c,KimbleOne__AcceptanceDate__c,IsDeleted,CreatedDate,CreatedById,CurrencyIsoCode) VALUES ("
-	    $sql += "'"+$kimbleProp.attributes+"',"
+	    $sql += "'"+$kimbleProp.attributes.url+"',"
 	    $sql += "'"+$(Get-Date (smartReplace $kimbleProp.SystemModstamp "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
         if($kimbleProp.KimbleOne__WeightedContractRevenue__c -eq $null){$sql += "0,"}else{$sql += [string]$kimbleProp.KimbleOne__WeightedContractRevenue__c+ ","}
         if($kimbleProp.Proposal_Contract_Revenue__c -eq $null){$sql += "0,"}else{$sql += [string]$kimbleProp.Proposal_Contract_Revenue__c+ ","}
@@ -346,7 +464,7 @@ function Get-KimbleSoqlDataset($queryUri, $soqlQuery, $restHeaders, $myInstance)
     }
 function get-allFocalPointCachedKimbleAccounts($dbConnection, $pWhereStatement, $verboseLogging){
     if($verboseLogging){Write-Host -ForegroundColor Yellow "get-allFocalPointCachedKimbleAccounts"}
-    $sql = "SELECT attributes, Website, Type, SystemModstamp, Phone, ParentId, OwnerId, Name, LastModifiedDate, LastModifiedById, KimbleOne__IsCustomer__c, KimbleOne__BusinessUnit__c, Is_Partner__c, Is_Competitor__c, IsDeleted, Id, CreatedDate, CreatedById, Client_Sector__c, BillingStreet, BillingState, BillingPostalCode, BillingCountry, BillingCity FROM SUS_Kimble_Accounts $pWhereStatement"
+    $sql = "SELECT attributes, Website, Type, SystemModstamp, Phone, ParentId, OwnerId, Name, LastModifiedDate, LastModifiedById, KimbleOne__IsCustomer__c, KimbleOne__BusinessUnit__c, Is_Partner__c, Is_Competitor__c, IsDeleted, Id, CreatedDate, CreatedById, Client_Sector__c, BillingStreet, BillingState, BillingPostalCode, BillingCountry, BillingCity, DimCode, DimCode_Supplier, IsMissingFromKimble, IsMisclassified, IsDirty, isOrphaned, DocumentLibraryGuid, Description, PreviousDescription, PreviousName FROM SUS_Kimble_Accounts $pWhereStatement"
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t`$query = $sql"}
     $results = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
     $results
@@ -355,6 +473,21 @@ function get-allFocalPointCachedKimbleContacts($dbConnection, $pWhereStatement, 
     if($verboseLogging){Write-Host -ForegroundColor Yellow "get-allFocalPointCachedKimbleContacts"}
     $sql = "SELECT AccountId, Anthesis_Events__c, AssistantName, AssistantPhone, attributes, Birthdate, Cleanup__c, Client_Type__c, CreatedById, CreatedDate, CurrencyIsoCode, Department, Description, Email, EmailBouncedDate, EmailBouncedReason, Fax, FirstName, Gender__c, Have_you_completed_this_section__c, HomePhone, Id, IsDeleted, IsEmailBounced, Jigsaw, JigsawContactId, Key_areas_of_interest__c, LastActivityDate, LastCURequestDate, LastCUUpdateDate, LastModifiedById, LastModifiedDate, LastName, LastReferencedDate, LastViewedDate, Lead_Source_Detail__c, LeadSource, Linked_In__c, MailingAddress, MailingCity, MailingCountry, MailingGeocodeAccuracy, MailingLatitude, MailingLongitude, MailingPostalCode, MailingState, MailingStreet, MasterRecordId, Met_At__c, MobilePhone, Name, Nee__c, Newsletters_Campaigns__c, Nickname__c, No_Show_Event_Attendees__c, Other_Email__c, OtherAddress, OtherCity, OtherCountry, OtherGeocodeAccuracy, OtherLatitude, OtherLongitude, OtherPhone, OtherPostalCode, OtherState, OtherStreet, OwnerId, Phone, PhotoUrl, Previous_Company__c, Region__c, ReportsToId, Role_Responsibilities__c, Salutation, Secondary_contact_owner__c, Skype__c, SystemModstamp, Title, Twitter__c, Unsubscribe_Newsletter_Campaigns__c FROM SUS_Kimble_Contacts $pWhereStatement"
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t`$query = $sql"}
+    $results = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    $results
+    }
+function get-allFocalPointCachedKimbleEngagements{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+
+        ,[parameter(Mandatory = $false)]
+        [string]$pWhereStatement
+        )
+    Write-Verbose "get-allFocalPointCachedKimbleEngagements"
+    $sql = "SELECT attributes, Community__c, Competitive__c, CreatedById, CreatedDate, CurrencyIsoCode, Finance_Contact__c, Id, IsDeleted, Is_Engagement_Owner__c, KimbleOne__Account__c, KimbleOne__ActualUsage__c, KimbleOne__BaselineContractCost__c, KimbleOne__BaselineContractMarginAmount__c, KimbleOne__BaselineContractMargin__c, KimbleOne__BaselineContractRevenue__c, KimbleOne__BaselineUsage__c, KimbleOne__BusinessUnitGroup__c, KimbleOne__ContractCost__c, KimbleOne__ContractMarginAmount__c, KimbleOne__ContractMargin__c, KimbleOne__ContractRevenue__c, KimbleOne__DeliveryProgram__c, KimbleOne__DeliveryStage__c, KimbleOne__DeliveryStatus__c, KimbleOne__ExpectedCcyExpectedContractRevenue__c, KimbleOne__ExpectedCurrencyISOCode__c, KimbleOne__ExpectedEndDate__c, KimbleOne__ExpectedStartDate__c, KimbleOne__ForecastAtThisLevel__c, KimbleOne__ForecastStatus__c, KimbleOne__ForecastUsage__c, KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c, KimbleOne__InvoicingCcyServicesInvoiceableAmount__c, KimbleOne__IsExpectedStartDateBeforeCloseDate__c, KimbleOne__LostReasonNarrative__c, KimbleOne__LostReason__c, KimbleOne__ProbabilityCodeEnum__c, KimbleOne__ProductGroup__c, KimbleOne__Proposal__c, KimbleOne__Reference__c, KimbleOne__RiskLevel__c, KimbleOne__SalesOpportunity__c, KimbleOne__ShortName__c, KimbleOne__WeightedContractRevenue__c, LastActivityDate, LastModifiedById, LastModifiedDate, LastReferencedDate, LastViewedDate, Name, OwnerId, Primary_Client_Contact__c, Project_Risk_Assessment_Completed_H_S__c, Project_Type__c, SystemModstamp, IsMissingFromKimble, IsDirty, FolderGuid, SuppressFolderCreation, PreviousKimbleClientId, PreviousName FROM SUS_Kimble_Engagements $pWhereStatement"
+    Write-Verbose "`t`$query = $sql"
     $results = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
     $results
     }
@@ -388,8 +521,8 @@ function get-allKimbleLeads($pQueryUri, $pRestHeaders, $pWhereStatement, $verbos
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t`$query = $query"}
     Get-KimbleSoqlDataset -queryUri $pQueryUri -soqlQuery $query -restHeaders $pRestHeaders
     }
-function get-allKimbleProjects($pQueryUri, $pRestHeaders, $pWhereStatement, $verboseLogging){
-    if($verboseLogging){Write-Host -ForegroundColor Yellow "get-allKimbleProjects"}
+function get-allKimbleEngagements($pQueryUri, $pRestHeaders, $pWhereStatement, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Yellow "get-allKimbleEngagements"}
     $query = "Select k.SystemModstamp, k.Project_Type__c, k.Primary_Client_Contact__c, k.OwnerId, k.Name, k.LastViewedDate, k.LastReferencedDate, k.LastModifiedDate, k.LastModifiedById, k.LastActivityDate, k.KimbleOne__WeightedContractRevenue__c, k.KimbleOne__ShortName__c, k.KimbleOne__SalesOpportunity__c, k.KimbleOne__RiskLevel__c, k.KimbleOne__Reference__c, k.KimbleOne__Proposal__c, k.KimbleOne__ProductGroup__c, k.KimbleOne__ProbabilityCodeEnum__c, k.KimbleOne__LostReason__c, k.KimbleOne__LostReasonNarrative__c, k.KimbleOne__IsExpectedStartDateBeforeCloseDate__c, k.KimbleOne__InvoicingCcyServicesInvoiceableAmount__c, k.KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c, k.KimbleOne__ForecastUsage__c, k.KimbleOne__ForecastStatus__c, k.KimbleOne__ForecastAtThisLevel__c, k.KimbleOne__ExpectedStartDate__c, k.KimbleOne__ExpectedEndDate__c, k.KimbleOne__ExpectedCurrencyISOCode__c, k.KimbleOne__ExpectedCcyExpectedContractRevenue__c, k.KimbleOne__DeliveryStatus__c, k.KimbleOne__DeliveryStage__c, k.KimbleOne__DeliveryProgram__c, k.KimbleOne__ContractRevenue__c, k.KimbleOne__ContractMargin__c, k.KimbleOne__ContractMarginAmount__c, k.KimbleOne__ContractCost__c, k.KimbleOne__BusinessUnitGroup__c, k.KimbleOne__BaselineUsage__c, k.KimbleOne__BaselineContractRevenue__c, k.KimbleOne__BaselineContractMargin__c, k.KimbleOne__BaselineContractMarginAmount__c, k.KimbleOne__BaselineContractCost__c, k.KimbleOne__ActualUsage__c, k.KimbleOne__Account__c, k.Is_Engagement_Owner__c, k.IsDeleted, k.Id, k.Finance_Contact__c, k.CurrencyIsoCode, k.CreatedDate, k.CreatedById, k.Competitive__c, k.Community__c From KimbleOne__DeliveryGroup__c k $pWhereStatement"
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t`$query = $query"}
     Get-KimbleSoqlDataset -queryUri $pQueryUri -soqlQuery $query -restHeaders $pRestHeaders
@@ -406,39 +539,93 @@ function get-allKimbleContacts($pQueryUri, $pRestHeaders, $pWhereStatement, $ver
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t`$query = $query"}
     Get-KimbleSoqlDataset -queryUri $pQueryUri -soqlQuery $query -restHeaders $pRestHeaders
     }
-function update-kimbleAccountToFocalPointCache($kimbleAccount, $dbConnection, $verboseLogging){
-    if($verboseLogging){Write-Host -ForegroundColor Yellow "update-kimbleAccountToFocalPointCache"}
+function update-kimbleAccountToFocalPointCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$kimbleAccount 
+
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "update-kimbleAccountToFocalPointCache [$($kimbleAccount.Name)]"
+
+    #We need to check whether Name and/or Description have changed
+    $sql = "SELECT Id, Name, Description FROM SUS_Kimble_Accounts WHERE Id = '$($kimbleAccount.Id)'"
+    Write-Verbose "`t$sql"
+    $existingRecord = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    switch ($($i = 0; $existingRecord | % {$i++})){ #This doesn't support .Count >:(
+        0 {
+            #Id not in SUS_Kimble_Accounts. Might as well send it for creation as fail it
+            Write-Verbose "`t[$($kimbleAccount.Id)][$($kimbleAccount.Name)] is missing (cannot update). Sending for recreation instead"
+            add-kimbleAccountToFocalPointCache -kimbleAccount $kimbleAccount -dbConnection $dbConnection -verboseLogging $verboseLogging
+            return
+            }
+        1 {
+            #Expected result. Allows us to compare Name & Description fields later
+            Write-Verbose "`t[$($kimbleAccount.Id)][$($kimbleAccount.Name)] found. Will update."
+            }
+        default {
+            #Id matches >1. Shouldn't happen as there is a constraint on the SQL table to prevent this
+            Write-Verbose "`t[$($kimbleAccount.Id)][$($kimbleAccount.Name)] has [$i] matches in [SUS_Kimble_Accounts] - check the constraints on the table as this shouldn't be possible"
+            return
+            }
+        }
+
+    Write-Verbose "`tGenerating SQL UPDATE statement"
     $sql = "UPDATE SUS_Kimble_Accounts "
-    #(attributes, Website, Type, SystemModstamp, Phone, ParentId, OwnerId, Name, LastModifiedDate, LastModifiedById, KimbleOne__IsCustomer__c, KimbleOne__BusinessUnit__c, Is_Partner__c, Is_Competitor__c, IsDeleted, Id, CreatedDate, CreatedById, Client_Sector__c, BillingStreet, BillingState, BillingPostalCode, BillingCountry, BillingCity) VALUES ("
-    $sql += "SET attributes = '"+$kimbleAccount.attributes+"',"
-    $sql += "Website = '"+$kimbleAccount.Website+"',"
-    $sql += "Type = '"+$kimbleAccount.Type+"',"
-    $sql += "SystemModstamp = '"+$(Get-Date (smartReplace $kimbleAccount.SystemModstamp "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-    $sql += "Phone = '"+$kimbleAccount.Phone+"',"
-    $sql += "ParentId = '"+$kimbleAccount.ParentId+"',"
-    $sql += "OwnerId = '"+$kimbleAccount.OwnerId+"',"
-    #$sql += "OwnerId = 'Kev',"
-    $sql += "Name = '"+$(smartReplace $kimbleAccount.Name "'" "`'`'")+"',"
-    $sql += "LastModifiedDate = '"+$(Get-Date (smartReplace $kimbleAccount.LastModifiedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-    $sql += "LastModifiedById = '"+$kimbleAccount.LastModifiedById+"',"
-    if($kimbleAccount.KimbleOne__IsCustomer__c -eq $true){$sql += "KimbleOne__IsCustomer__c = 1,"}else{$sql += "KimbleOne__IsCustomer__c = 0,"}
-    $sql += "KimbleOne__BusinessUnit__c = '"+$kimbleAccount.KimbleOne__BusinessUnit__c+"',"
-    if($kimbleAccount.Is_Partner__c -eq $true){$sql += "Is_Partner__c = 1,"}else{$sql += "Is_Partner__c = 0,"}
-    if($kimbleAccount.Is_Competitor__c -eq $true){$sql += "Is_Competitor__c = 1,"}else{$sql += "Is_Competitor__c = 0,"}
-    if($kimbleAccount.IsDeleted -eq $true){$sql += "IsDeleted = 1,"}else{$sql += "IsDeleted = 0,"}
-    #$sql += "'"+$kimbleAccount.Id+"',"
-    $sql += "CreatedDate = '"+$(Get-Date (smartReplace $kimbleAccount.CreatedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-    $sql += "CreatedById = '"+$kimbleAccount.CreatedById+"',"
-    $sql += "Client_Sector__c = '"+$(smartReplace $kimbleAccount.Client_Sector__c "'" "`'`'")+"',"
-    $sql += "BillingStreet = '"+$(smartReplace $kimbleAccount.BillingStreet "'" "`'`'")+"',"
-    $sql += "BillingState = '"+$(smartReplace $kimbleAccount.BillingState "'" "`'`'")+"',"
-    $sql += "BillingPostalCode = '"+$(smartReplace $kimbleAccount.BillingPostalCode "'" "`'`'")+"',"
-    $sql += "BillingCountry = '"+$(smartReplace $kimbleAccount.BillingCountry "'" "`'`'")+"',"
-    $sql += "BillingCity = '"+$(smartReplace $kimbleAccount.BillingCity "'" "`'`'")+"'"
-    $sql += "WHERE id = '$($kimbleAccount.Id)'"
-    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t$sql"}
+    #(attributes, Website, Type, SystemModstamp, Phone, ParentId, OwnerId, Name, LastModifiedDate, LastModifiedById, KimbleOne__IsCustomer__c, KimbleOne__BusinessUnit__c, Is_Partner__c, Is_Competitor__c, IsDeleted, Id, CreatedDate, CreatedById, Client_Sector__c, BillingStreet, BillingState, BillingPostalCode, BillingCountry, BillingCity, DimCode, DimCode_Supplier, IsMissingFromKimble, IsMisclassified, IsDirty, isOrphaned, DocumentLibraryGuid) VALUES ("
+    $sql += "SET attributes = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.attributes.url)
+    $sql += ",Website = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.Website)
+    $sql += ",Type = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.Type)
+    $sql += ",Name = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.Name)
+    $sql += ",Description = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.Description)
+    $sql += ",SystemModstamp = "+$(sanitise-forSqlValue -dataType Date -value $kimbleAccount.SystemModstamp)
+    $sql += ",Phone = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.Phone)
+    $sql += ",ParentId = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.ParentId)
+    $sql += ",OwnerId = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.OwnerId)
+    $sql += ",LastModifiedDate = "+$(sanitise-forSqlValue -dataType Date -value $kimbleAccount.LastModifiedDate)
+    $sql += ",LastModifiedById = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.LastModifiedById)
+    $sql += ",KimbleOne__IsCustomer__c = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.KimbleOne__IsCustomer__c)
+    $sql += ",KimbleOne__BusinessUnit__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.KimbleOne__BusinessUnit__c)
+    $sql += ",Is_Partner__c = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.Is_Partner__c)
+    $sql += ",Is_Competitor__c = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.Is_Competitor__c)
+    $sql += ",IsDeleted = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.IsDeleted)
+    #$sql += "'"+$kimbleAccount.Id
+    $sql += ",CreatedDate = "+$(sanitise-forSqlValue -dataType Date -value $kimbleAccount.CreatedDate)
+    $sql += ",CreatedById = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.CreatedById)
+    $sql += ",Client_Sector__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.Client_Sector__c)
+    $sql += ",BillingStreet = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.BillingStreet)
+    $sql += ",BillingState = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.BillingState)
+    $sql += ",BillingPostalCode = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.BillingPostalCode)
+    $sql += ",BillingCountry = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.BillingCountry)
+    $sql += ",BillingCity = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.BillingCity)
+    #These Properties need extra processing
+    if((sanitise-forSql $existingRecord.Name) -ne (sanitise-forSql $kimbleAccount.Name)){
+        $sql += ",PreviousName = "+$(sanitise-forSqlValue -dataType String -value $existingRecord.Name) #There is also a Trigger on SUS_Kimble_Accounts to record these changes over time
+        $isDefinitelyDirtyNow = $true
+        Write-Verbose "`tName has changed. Definitely Dirty now."
+        }
+    if((sanitise-forSql $existingRecord.Description) -ne (sanitise-forSql $kimbleAccount.Description)){
+        $sql += ",PreviousDescription = "+$(sanitise-forSqlValue -dataType String -value $existingRecord.Description) #There is also a Trigger on SUS_Kimble_Accounts to record these changes over time
+        $isDefinitelyDirtyNow = $true
+        Write-Verbose "`tDescription has changed. Definitely Dirty now."
+        }
+    #These Properties are not native to Kimble, so may not be present:
+    if($kimbleAccount.DimCode){$sql += ",DimCode = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.DimCode)}
+    if($kimbleAccount.DimCode_Supplier){$sql += ",DimCode_Supplier = "+$(sanitise-forSqlValue -dataType String -value $kimbleAccount.DimCode_Supplier)}
+    if($kimbleAccount.IsMissingFromKimble){$sql += ",IsMissingFromKimble = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.IsMissingFromKimble)}
+    if($kimbleAccount.IsMisclassified){$sql += ",IsMisclassified = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.IsMisclassified)}
+    if($kimbleAccount.isOrphaned){$sql += ",isOrphaned = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.isOrphaned)}
+    if($isDefinitelyDirtyNow){$sql += ",IsDirty = 1"}
+    elseif($kimbleAccount.IsDirty){$sql += ",IsDirty = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleAccount.IsDirty)} #Don't include comma on final add
+        #else{$sql += "IsDirty = 1"} #If this isn't supplied, assume IsDirty=$true (_Don't assume this as it marks everything as IsDirty=$true when we reconcile)
+
+    $sql += " WHERE id = '$(sanitise-forSql $kimbleAccount.Id)'"
+    Write-Verbose "`t$sql"
     $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
-    if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: $result"}}
+    if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+    else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
     $result
     }
 function update-kimbleContactToFocalPointCache($kimbleContact, $dbConnection, $verboseLogging){
@@ -450,7 +637,7 @@ function update-kimbleContactToFocalPointCache($kimbleContact, $dbConnection, $v
     $sql += "Anthesis_Events__c = '"+$kimbleContact.Anthesis_Events__c+"',"
     $sql += "AssistantName = '"+$kimbleContact.AssistantName+"',"
     $sql += "AssistantPhone = '"+$kimbleContact.AssistantPhone+"',"
-    $sql += "attributes = '"+$kimbleContact.attributes+"',"
+    $sql += "attributes = '"+$kimbleContact.attributes.url+"',"
     $sql += "Birthdate = '"+$(Get-Date (smartReplace $kimbleContact.Birthdate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
     if($kimbleContact.Cleanup__c -eq $true){$sql += "Cleanup__c = 1,"}else{$sql += "Cleanup__c = 0,"}
     $sql += "Client_Type__c = '"+$kimbleContact.Client_Type__c+"',"
@@ -526,54 +713,190 @@ function update-kimbleContactToFocalPointCache($kimbleContact, $dbConnection, $v
     $sql += "Title = '"+$kimbleContact.Title+"',"
     $sql += "Twitter__c = '"+$kimbleContact.Twitter__c+"',"
     $sql += "Unsubscribe_Newsletter_Campaigns__c = '"+$kimbleContact.Unsubscribe_Newsletter_Campaigns__c+"' "
-    $sql += "WHERE id = '$($kimbleContact.Id)'"
+    $sql += "WHERE id = '$(sanitise-forSql $kimbleContact.Id)'"
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t$sql"}
     $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
-    if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: $result"}}
+    if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: [$result]"}}
     $result
     }
-function update-kimbleOppToFocalPointCache($kimbleOpp, $dbConnection, $verboseLogging){
-    if($verboseLogging){Write-Host -ForegroundColor Yellow "update-kimbleOppToFocalPointCache"}
+function update-kimbleEngagementToFocalPointCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$kimbleEngagement 
+
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "update-kimbleEngagementToFocalPointCache"
+    #We need to check whether Name and/or KimbleOne__Account__c have changed
+    $sql = "SELECT Id, Name, KimbleOne__Account__c FROM SUS_Kimble_Engagements WHERE Id = '$($kimbleEngagement.Id)'"
+    Write-Verbose "`t$sql"
+    $existingRecord = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    switch ($($i = 0; $existingRecord | % {$i++})){ #This doesn't support .Count >:(
+        0 {
+            #Id not in SUS_Kimble_Engagements. Might as well send it for creation as fail it
+            add-kimbleEngagementToFocalPointCache -kimbleEngagement $kimbleEngagement -dbConnection $dbConnection
+            Write-Verbose "`t[$($kimbleEngagement.Id)][$($kimbleEngagement.Name)] is missing (cannot update). Sending for recreation instead"
+            return
+            }
+        1 {
+            #Expected result. Allows us to compare Name & KimbleOne__Account__c fields later
+            Write-Verbose "`t[$($kimbleEngagement.Id)][$($kimbleEngagement.Name)] found. Will update."
+            }
+        default {
+            #Id matches >1. Shouldn't happen as there is a constraint on the SQL table to prevent this
+            Write-Verbose "`t[$($kimbleEngagement.Id)][$($kimbleEngagement.Name)] has [$i] matches in [SUS_Kimble_Accounts] - check the constraints on the table as this shouldn't be possible"
+            return
+            }
+        }
+    
+    $sql = "UPDATE SUS_Kimble_Engagements "
+    #attributes,Community__c,Competitive__c,CreatedById,CreatedDate,CurrencyIsoCode,Finance_Contact__c,Id,IsDeleted,Is_Engagement_Owner__c,KimbleOne__Account__c,KimbleOne__ActualUsage__c,KimbleOne__BaselineContractCost__c,KimbleOne__BaselineContractMarginAmount__c,KimbleOne__BaselineContractMargin__c,KimbleOne__BaselineContractRevenue__c,KimbleOne__BaselineUsage__c,KimbleOne__BusinessUnitGroup__c,KimbleOne__ContractCost__c,KimbleOne__ContractMarginAmount__c,KimbleOne__ContractMargin__c,KimbleOne__ContractRevenue__c,KimbleOne__DeliveryProgram__c,KimbleOne__DeliveryStage__c,KimbleOne__DeliveryStatus__c,KimbleOne__ExpectedCcyExpectedContractRevenue__c,KimbleOne__ExpectedCurrencyISOCode__c,KimbleOne__ExpectedEndDate__c,KimbleOne__ExpectedStartDate__c,KimbleOne__ForecastAtThisLevel__c,KimbleOne__ForecastStatus__c,KimbleOne__ForecastUsage__c,KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c,KimbleOne__InvoicingCcyServicesInvoiceableAmount__c,KimbleOne__IsExpectedStartDateBeforeCloseDate__c,KimbleOne__LostReasonNarrative__c,KimbleOne__LostReason__c,KimbleOne__ProbabilityCodeEnum__c,KimbleOne__ProductGroup__c,KimbleOne__Proposal__c,KimbleOne__Reference__c,KimbleOne__RiskLevel__c,KimbleOne__SalesOpportunity__c,KimbleOne__ShortName__c,KimbleOne__WeightedContractRevenue__c,LastActivityDate,LastModifiedById,LastModifiedDate,LastReferencedDate,LastViewedDate,Name,OwnerId,Primary_Client_Contact__c,Project_Risk_Assessment_Completed_H_S__c,Project_Type__c,SystemModstamp,IsMissingFromKimble,IsDirty
+	$sql += "SET attributes = "+(sanitise-forSqlValue -value $kimbleEngagement.attributes.url -dataType String)
+	$sql += ",Community__c = "+(sanitise-forSqlValue -value $kimbleEngagement.Community__c -dataType String)
+	$sql += ",Competitive__c = "+(sanitise-forSqlValue -value $kimbleEngagement.Competitive__c -dataType String)
+	$sql += ",CreatedById = "+(sanitise-forSqlValue -value $kimbleEngagement.CreatedById -dataType String)
+	$sql += ",CreatedDate = "+(sanitise-forSqlValue -value $kimbleEngagement.CreatedDate -dataType Date)
+	$sql += ",CurrencyIsoCode = "+(sanitise-forSqlValue -value $kimbleEngagement.CurrencyIsoCode -dataType String)
+	$sql += ",Finance_Contact__c = "+(sanitise-forSqlValue -value $kimbleEngagement.Finance_Contact__c -dataType String)
+	#$sql += ",Id = "+(sanitise-forSqlValue -value $kimbleEngagement.Id -dataType String)
+	$sql += ",IsDeleted = "+(sanitise-forSqlValue -value $kimbleEngagement.IsDeleted -dataType Boolean)
+	$sql += ",Is_Engagement_Owner__c = "+(sanitise-forSqlValue -value $kimbleEngagement.Is_Engagement_Owner__c -dataType Boolean)
+	$sql += ",KimbleOne__Account__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__Account__c -dataType String)
+	$sql += ",KimbleOne__ActualUsage__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ActualUsage__c -dataType Decimal)
+	$sql += ",KimbleOne__BaselineContractCost__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractCost__c -dataType Decimal)
+	$sql += ",KimbleOne__BaselineContractMarginAmount__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractMarginAmount__c -dataType Decimal)
+	$sql += ",KimbleOne__BaselineContractMargin__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractMargin__c -dataType Decimal)
+	$sql += ",KimbleOne__BaselineContractRevenue__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineContractRevenue__c -dataType Decimal)
+	$sql += ",KimbleOne__BaselineUsage__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BaselineUsage__c -dataType Decimal)
+	$sql += ",KimbleOne__BusinessUnitGroup__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__BusinessUnitGroup__c -dataType String)
+	$sql += ",KimbleOne__ContractCost__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractCost__c -dataType Decimal)
+	$sql += ",KimbleOne__ContractMarginAmount__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractMarginAmount__c -dataType Decimal)
+	$sql += ",KimbleOne__ContractMargin__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractMargin__c -dataType Decimal)
+	$sql += ",KimbleOne__ContractRevenue__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ContractRevenue__c -dataType Decimal)
+	$sql += ",KimbleOne__DeliveryProgram__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__DeliveryProgram__c -dataType String)
+	$sql += ",KimbleOne__DeliveryStage__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__DeliveryStage__c -dataType String)
+	$sql += ",KimbleOne__DeliveryStatus__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__DeliveryStatus__c -dataType String)
+	$sql += ",KimbleOne__ExpectedCcyExpectedContractRevenue__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedCcyExpectedContractRevenue__c -dataType String)
+	$sql += ",KimbleOne__ExpectedCurrencyISOCode__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedCurrencyISOCode__c -dataType String)
+	$sql += ",KimbleOne__ExpectedEndDate__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedEndDate__c -dataType Date)
+	$sql += ",KimbleOne__ExpectedStartDate__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ExpectedStartDate__c -dataType Date)
+	$sql += ",KimbleOne__ForecastAtThisLevel__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ForecastAtThisLevel__c -dataType String)
+	$sql += ",KimbleOne__ForecastStatus__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ForecastStatus__c -dataType String)
+	$sql += ",KimbleOne__ForecastUsage__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ForecastUsage__c -dataType Decimal)
+	$sql += ",KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__InvoicingCcyExpensesInvoiceableAmount__c -dataType Decimal)
+	$sql += ",KimbleOne__InvoicingCcyServicesInvoiceableAmount__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__InvoicingCcyServicesInvoiceableAmount__c -dataType Decimal)
+	$sql += ",KimbleOne__IsExpectedStartDateBeforeCloseDate__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__IsExpectedStartDateBeforeCloseDate__c -dataType String)
+	$sql += ",KimbleOne__LostReasonNarrative__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__LostReasonNarrative__c -dataType String)
+	$sql += ",KimbleOne__LostReason__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__LostReason__c -dataType String)
+	$sql += ",KimbleOne__ProbabilityCodeEnum__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ProbabilityCodeEnum__c -dataType String)
+	$sql += ",KimbleOne__ProductGroup__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ProductGroup__c -dataType String)
+	$sql += ",KimbleOne__Proposal__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__Proposal__c -dataType String)
+	$sql += ",KimbleOne__Reference__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__Reference__c -dataType String)
+	$sql += ",KimbleOne__RiskLevel__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__RiskLevel__c -dataType String)
+	$sql += ",KimbleOne__SalesOpportunity__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__SalesOpportunity__c -dataType String)
+	$sql += ",KimbleOne__ShortName__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__ShortName__c -dataType String)
+	$sql += ",KimbleOne__WeightedContractRevenue__c = "+(sanitise-forSqlValue -value $kimbleEngagement.KimbleOne__WeightedContractRevenue__c -dataType Decimal)
+	$sql += ",LastActivityDate = "+(sanitise-forSqlValue -value $kimbleEngagement.LastActivityDate -dataType Date)
+	$sql += ",LastModifiedById = "+(sanitise-forSqlValue -value $kimbleEngagement.LastModifiedById -dataType String)
+	$sql += ",LastModifiedDate = "+(sanitise-forSqlValue -value $kimbleEngagement.LastModifiedDate -dataType Date)
+	$sql += ",LastReferencedDate = "+(sanitise-forSqlValue -value $kimbleEngagement.LastReferencedDate -dataType Date)
+	$sql += ",LastViewedDate = "+(sanitise-forSqlValue -value $kimbleEngagement.LastViewedDate -dataType Date)
+	$sql += ",Name = "+(sanitise-forSqlValue -value $kimbleEngagement.Name -dataType String)
+	$sql += ",OwnerId = "+(sanitise-forSqlValue -value $kimbleEngagement.OwnerId -dataType String)
+	$sql += ",Primary_Client_Contact__c = "+(sanitise-forSqlValue -value $kimbleEngagement.Primary_Client_Contact__c -dataType String)
+	$sql += ",Project_Risk_Assessment_Completed_H_S__c = "+(sanitise-forSqlValue -value $kimbleEngagement.Project_Risk_Assessment_Completed_H_S__c -dataType Boolean)
+	$sql += ",Project_Type__c = "+(sanitise-forSqlValue -value $kimbleEngagement.Project_Type__c -dataType String)
+	$sql += ",SystemModstamp = "+(sanitise-forSqlValue -value $kimbleEngagement.SystemModstamp -dataType Date)
+    #These Properties need extra processing
+    if((sanitise-forSqlValue -value $existingRecord.Name -dataType String) -ne (sanitise-forSqlValue -value  $kimbleEngagement.Name -dataType String)){
+        $sql += ",PreviousName = "+$(sanitise-forSqlValue -dataType String -value $existingRecord.Name) #There is also a Trigger on SUS_Kimble_Engagements to record these changes over time
+        $isDefinitelyDirtyNow = $true
+        $dirtyReason += " [Name Change]"
+        #Write-Debug "Name Change - Old:[$(sanitise-forSql $existingRecord.Name)] New:[$(sanitise-forSql $kimbleEngagement.Name)]"
+        }
+    if((sanitise-forSqlValue -value $existingRecord.KimbleOne__Account__c -dataType String) -ne (sanitise-forSqlValue -value  $kimbleEngagement.KimbleOne__Account__c -dataType String)){
+        $sql += ",PreviousKimbleClientId = "+$(sanitise-forSqlValue -dataType String -value $existingRecord.KimbleOne__Account__c) #There is also a Trigger on SUS_Kimble_Engagements to record these changes over time
+        $isDefinitelyDirtyNow = $true
+        $dirtyReason += " [Client change]"
+        #Write-Debug "Client Change - Old:[$(sanitise-forSql $existingRecord.KimbleOne__Account__c)] New:[$(sanitise-forSql $kimbleEngagement.KimbleOne__Account__c)]"
+        }
+    #These Properties are not native to Kimble, so may not be present:
+    if($kimbleEngagement.SuppressFolderCreation){$sql += ",SuppressFolderCreation = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleEngagement.SuppressFolderCreation)}
+    if($kimbleEngagement.IsMissingFromKimble){$sql += ",IsMissingFromKimble = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleEngagement.IsMissingFromKimble)}
+    if($kimbleEngagement.FolderGuid){$sql += ",FolderGuid = "+$(sanitise-forSqlValue -dataType Guid -value $kimbleEngagement.FolderGuid)}
+    if($kimbleEngagement.SuppressFolderCreation){$sql += ",SuppressFolderCreation = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleEngagement.SuppressFolderCreation)}
+    if($kimbleEngagement.PreviousName){$sql += ",PreviousName = "+$(sanitise-forSqlValue -dataType String -value $kimbleEngagement.PreviousName)}
+    if($kimbleEngagement.PreviousKimbleClientId){$sql += ",PreviousKimbleClientId = "+$(sanitise-forSqlValue -dataType String -value $PreviousKimbleClientId.isOrphaned)}
+    if($kimbleEngagement.IsOrphaned){$sql += ",IsOrphaned = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleEngagement.IsOrphaned)}
+    if($isDefinitelyDirtyNow){$sql += ",IsDirty = 1"} 
+    elseif($kimbleEngagement.IsDirty){$sql += ",IsDirty = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleEngagement.IsDirty)}
+    if($kimbleEngagement.IsDirty -eq $true){$dirtyReason += " [Already flagged as IsDirty]"}
+        #else{$sql += "IsDirty = 1"} #If this isn't supplied, _don't_ assume IsDirty=$true as it marks everything as IsDirty=$true when we reconcile)
+
+    $sql += " WHERE id = '$(sanitise-forSql $kimbleEngagement.Id)'"
+
+    if(![string]::IsNullOrWhiteSpace($dirtyReason)){Write-Debug "update-kimbleEngagementToFocalPointCache flagged [$($kimbleEngagement.Name)] as `$IsDirty=`$true because $dirtyReason"}
+    Write-Verbose "`t$sql"
+    if($dirtyReason){Write-Debug "Engagement isDirty because: [$($dirtyReason)]"}
+    $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
+    if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+#    Write-Debug "`$result = [$result]"
+    $result
+    }
+function update-kimbleOppToFocalPointCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$kimbleOpp 
+
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "update-kimbleOppToFocalPointCache [$($kimbleOpp.Name)]"
+    #We don't need to check this for changes as we don't monitor them for anything. The data just needs to be up to date.
+
     $sql = "UPDATE SUS_Kimble_Opps "
     #(attributes, SystemModstamp, Weighted_Net_Revenue__c, Proposal_Contract_Revenue__c, Project_Type__c, OwnerId, Name, LastModifiedDate, LastModifiedById, LastActivityDate, KimbleOne__WonLostReason__c, KimbleOne__WonLostNarrative__c, KimbleOne__ResponseRequiredDate__c, KimbleOne__Proposal__c, KimbleOne__OpportunityStage__c, KimbleOne__OpportunitySource__c, KimbleOne__ForecastStatus__c, KimbleOne__Description__c, KimbleOne__CloseDate__c, KimbleOne__Account__c, IsDeleted, CreatedDate, CreatedById, Community__c, ANTH_SalesOpportunityStagesCount__c, ANTH_PipelineStage__c) VALUES ("
-	$sql += "SET attributes = '"+$kimbleOpp.attributes+"',"
-	$sql += "SystemModstamp ='"+$(Get-Date (smartReplace $kimbleOpp.SystemModstamp "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-    if($kimbleOpp.Weighted_Net_Revenue__ -eq $null){$sql += "Weighted_Net_Revenue__c = 0,"}else{$sql += "Weighted_Net_Revenue__c = " + $kimbleOpp.Weighted_Net_Revenue__+ ","}
-	$sql += "Proposal_Contract_Revenue__c = " + [string]$kimbleOpp.Proposal_Contract_Revenue__c+ ","
-	$sql += "Project_Type__c = '"+$(smartReplace $kimbleOpp.Project_Type__c "'" "`'`'")+"',"
-	$sql += "OwnerId = '"+$(smartReplace $kimbleOpp.OwnerId "'" "`'`'")+"',"
-	$sql += "Name = '"+$(smartReplace $kimbleOpp.Name "'" "`'`'")+"',"
-	$sql += "LastModifiedDate = '"+$(Get-Date (smartReplace $kimbleOpp.LastModifiedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	$sql += "LastModifiedById = '"+$(smartReplace $kimbleOpp.LastModifiedById "'" "`'`'")+"',"
-	$sql += "LastActivityDate = '"+$(Get-Date (smartReplace $kimbleOpp.LastActivityDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	$sql += "KimbleOne__WonLostReason__c = '"+$(smartReplace $kimbleOpp.KimbleOne__WonLostReason__c "'" "`'`'")+"',"
-	$sql += "KimbleOne__WonLostNarrative__c = '"+$(smartReplace $kimbleOpp.KimbleOne__WonLostNarrative__c "'" "`'`'")+"',"
-	$sql += "KimbleOne__ResponseRequiredDate__c = '"+$(Get-Date (smartReplace $kimbleOpp.KimbleOne__ResponseRequiredDate__c "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	$sql += "KimbleOne__Proposal__c = '"+$(smartReplace $kimbleOpp.KimbleOne__Proposal__c "'" "`'`'")+"',"
-	$sql += "KimbleOne__OpportunityStage__c = '"+$(smartReplace $kimbleOpp.KimbleOne__OpportunityStage__c "'" "`'`'")+"',"
-	$sql += "KimbleOne__OpportunitySource__c = '"+$(smartReplace $kimbleOpp.KimbleOne__OpportunitySource__c "'" "`'`'")+"',"
-	$sql += "KimbleOne__ForecastStatus__c = '"+$(smartReplace $kimbleOpp.KimbleOne__ForecastStatus__c "'" "`'`'")+"',"
-	$sql += "KimbleOne__Description__c = '"+$(smartReplace $kimbleOpp.KimbleOne__Description__c "'" "`'`'")+"',"
-	$sql += "KimbleOne__CloseDate__c = '"+$(Get-Date (smartReplace $kimbleOpp.KimbleOne__CloseDate__c "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	$sql += "KimbleOne__Account__c = '"+$(smartReplace $kimbleOpp.KimbleOne__Account__c "'" "`'`'")+"',"
-    if($kimbleOpp.IsDeleted -eq $true){$sql += "IsDeleted = 1,"}else{$sql += "IsDeleted = 0,"}
+    $sql += "SET attributes = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.attributes.url)
+    $sql += ",SystemModstamp = "+$(sanitise-forSqlValue -dataType Date -value $kimbleOpp.SystemModstamp)
+    $sql += ",Weighted_Net_Revenue__c = "+$(sanitise-forSqlValue -dataType Decimal -value $kimbleOpp.Weighted_Net_Revenue__c)
+    $sql += ",Proposal_Contract_Revenue__c = "+$(sanitise-forSqlValue -dataType Decimal -value $kimbleOpp.Proposal_Contract_Revenue__c)
+    $sql += ",Project_Type__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.Project_Type__c)
+    $sql += ",OwnerId = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.OwnerId)
+    $sql += ",Name = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.Name)
+    $sql += ",LastModifiedDate = "+$(sanitise-forSqlValue -dataType Date -value $kimbleOpp.LastModifiedDate)
+    $sql += ",LastModifiedById = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.LastModifiedById)
+    $sql += ",LastActivityDate = "+$(sanitise-forSqlValue -dataType Date -value $kimbleOpp.LastActivityDate)
+    $sql += ",KimbleOne__WonLostReason__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__WonLostReason__c)
+    $sql += ",KimbleOne__WonLostNarrative__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__WonLostNarrative__c)
+    $sql += ",KimbleOne__ResponseRequiredDate__c = "+$(sanitise-forSqlValue -dataType Date -value $kimbleOpp.KimbleOne__ResponseRequiredDate__c)
+    $sql += ",KimbleOne__Proposal__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__Proposal__c)
+    $sql += ",KimbleOne__OpportunityStage__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__OpportunityStage__c)
+    $sql += ",KimbleOne__OpportunitySource__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__OpportunitySource__c)
+    $sql += ",KimbleOne__ForecastStatus__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__ForecastStatus__c)
+    $sql += ",KimbleOne__Description__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__Description__c)
+    $sql += ",KimbleOne__CloseDate__c = "+$(sanitise-forSqlValue -dataType Date -value $kimbleOpp.KimbleOne__CloseDate__c)
+    $sql += ",KimbleOne__Account__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.KimbleOne__Account__c)
+    $sql += ",IsDeleted = "+$(sanitise-forSqlValue -dataType Boolean -value $kimbleOpp.IsDeleted)
 	#$sql += "'"+$(smartReplace $kimbleOpp.Id "'" "`'`'")+"',"
-	$sql += "CreatedDate = '"+$(Get-Date (smartReplace $kimbleOpp.CreatedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
-	$sql += "CreatedById = '"+$(smartReplace $kimbleOpp.CreatedById "'" "`'`'")+"',"
-	$sql += "Community__c = '"+$(smartReplace $kimbleOpp.Community__c "'" "`'`'")+"',"
-	$sql += "ANTH_SalesOpportunityStagesCount__c = " + [string]$kimbleOpp.ANTH_SalesOpportunityStagesCount__c + ","
-	$sql += "ANTH_PipelineStage__c = '"+$kimbleOpp.ANTH_PipelineStage__c+"' "
-    $sql += "WHERE id = '$($kimbleOpp.Id)'"
-    if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t$sql"}
+    $sql += ",CreatedDate = "+$(sanitise-forSqlValue -dataType Date -value $kimbleOpp.CreatedDate)
+    $sql += ",CreatedById = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.CreatedById)
+    $sql += ",Community__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.Community__c)
+    $sql += ",ANTH_SalesOpportunityStagesCount__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.ANTH_SalesOpportunityStagesCount__c)
+    $sql += ",ANTH_PipelineStage__c = "+$(sanitise-forSqlValue -dataType String -value $kimbleOpp.ANTH_PipelineStage__c)
+    $sql += " WHERE id = '$(sanitise-forSql $kimbleOpp.Id)'"
+    Write-Verbose "`t$sql"
     $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
-    if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: $result"}}
+    if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}else{Write-Verbose "`t`tFAILURE :( - Code: [$result]"}
     $result
     }
 function update-kimbleProposalToFocalPointCache($kimbleProp, $dbConnection, $verboseLogging){
     if($verboseLogging){Write-Host -ForegroundColor Yellow "update-kimbleOppToFocalPointCache"}
     $sql = "UPDATE SUS_Kimble_Proposals "
     #(attributes, SystemModstamp, Weighted_Net_Revenue__c, Proposal_Contract_Revenue__c, Project_Type__c, OwnerId, Name, LastModifiedDate, LastModifiedById, LastActivityDate, KimbleOne__WonLostReason__c, KimbleOne__WonLostNarrative__c, KimbleOne__ResponseRequiredDate__c, KimbleOne__Proposal__c, KimbleOne__OpportunityStage__c, KimbleOne__OpportunitySource__c, KimbleOne__ForecastStatus__c, KimbleOne__Description__c, KimbleOne__CloseDate__c, KimbleOne__Account__c, IsDeleted, CreatedDate, CreatedById, Community__c, ANTH_SalesOpportunityStagesCount__c, ANTH_PipelineStage__c) VALUES ("
-	$sql += "SET attributes = '"+$kimbleProp.attributes+"',"
+	$sql += "SET attributes = '"+$kimbleProp.attributes.url+"',"
 	$sql += "SystemModstamp ='"+$(Get-Date (smartReplace $kimbleProp.SystemModstamp "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
     if($kimbleProp.KimbleOne__WeightedContractRevenue__c -eq $null){$sql += "KimbleOne__WeightedContractRevenue__c = 0,"}else{$sql += "KimbleOne__WeightedContractRevenue__c = " + [string]$kimbleProp.KimbleOne__WeightedContractRevenue__c+ ","}
     if($kimbleProp.Proposal_Contract_Revenue__c -eq $null){$sql += "Proposal_Contract_Revenue__c = 0,"}else{$sql += "Proposal_Contract_Revenue__c = " + [string]$kimbleProp.Proposal_Contract_Revenue__c+ ","}
@@ -606,7 +929,7 @@ function update-kimbleProposalToFocalPointCache($kimbleProp, $dbConnection, $ver
 	$sql += "CreatedDate = '"+$(Get-Date (smartReplace $kimbleProp.CreatedDate "+0000" "") -Format s -ErrorAction SilentlyContinue)+"',"
 	$sql += "CreatedById = '"+$(smartReplace $kimbleProp.CreatedById "'" "`'`'")+"',"
 	$sql += "CurrencyIsoCode = '"+$(smartReplace $kimbleProp.CurrencyIsoCode "'" "`'`'")+"'"
-    $sql += " WHERE id = '$($kimbleProp.Id)'"
+    $sql += " WHERE id = '$(sanitise-forSql $kimbleProp.Id)'"
     if($verboseLogging){Write-Host -ForegroundColor DarkYellow "`t$sql"}
     $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
     if($verboseLogging){if($result -eq 1){Write-Host -ForegroundColor DarkYellow "`t`tSUCCESS!"}else{Write-Host -ForegroundColor DarkYellow "`t`tFAILURE :( - Code: $result"}}
