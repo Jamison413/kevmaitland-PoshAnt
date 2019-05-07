@@ -1,4 +1,17 @@
 ﻿#Generate Anthesis Staff Lists
+
+$logFileLocation = "C:\ScriptLogs\"
+$scriptName = "RevampedAnthesisStaffList"
+$fullLogPathAndName = $logFileLocation+$scriptName+"_FullLog_$(Get-Date -Format "yyMMdd").log"
+$errorLogPathAndName = $logFileLocation+$scriptName+"_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
+
+$verboseLogging = $true
+
+
 Import-Module _PS_Library_MSOL.psm1
 Import-Module _CSOM_Library-SPO.psm1
 
@@ -239,4 +252,4 @@ $Context.ExecuteQuery()
 #}
 
 #Delete the file on local
-Get-ChildItem C:\Reports\AnthesisStaff\Anthesis Staff List.xlsx -Recurse | Remove-Item
+#Get-ChildItem C:\Reports\AnthesisStaff\Anthesis Staff List.xlsx -Recurse | Remove-Item

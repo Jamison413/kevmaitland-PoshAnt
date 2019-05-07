@@ -279,7 +279,6 @@ foreach ($csvDataBlob in $csvDatas) {
     }
     }
 
-$myThings | Export-Csv -Path c:\users\kevinm\desktop\deemed4.csv -NoTypeInformation
+$myThings | Export-Csv -Path c:\users\kevinm\desktop\deemed5.csv -NoTypeInformation
 
-$sql = "INSERT INTO t_deemedScores_new ()
-
+$sql = "INSERT INTO t_deemedScores()"
