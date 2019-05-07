@@ -31,60 +31,12 @@ $auth.RememberDevicesNotIssuedBefore = (Get-Date)
 #$users = convertTo-arrayOfEmailAddresses "Alan Spray <Alan.Spray@anthesisgroup.com>; Alec Burslem <Alec.Burslem@anthesisgroup.com>; Chloe McCloskey <Chloe.McCloskey@anthesisgroup.com>; Claire Stentiford <Claire.Stentiford@anthesisgroup.com>; Eleanor Penney <Eleanor.Penney@anthesisgroup.com>; Matt Fishwick <Matt.Fishwick@anthesisgroup.com>; Michael Kirk-Smith <Michael.Kirk-Smith@anthesisgroup.com>; Sophie Sapienza <Sophie.Sapienza@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Mark Hawker <Mark.Hawker@anthesisgroup.com>; Heather Ball <Heather.Ball@anthesisgroup.com>; Jaime Dingle <Jaime.Dingle@anthesisgroup.com>; Tharaka Naga <Tharaka.Naga@anthesisgroup.com>; Ashwini Arul <Ashwini.Arul@anthesisgroup.com>; Alan Dow <Alan.Dow@anthesisgroup.com>; Matt Rooney <Matt.Rooney@anthesisgroup.com>; Sarah Gilby <Sarah.Gilby@anthesisgroup.com>; Tim Clare <Tim.Clare@anthesisgroup.com>"
 #$users = convertTo-arrayOfEmailAddresses "Bethany Munyard <Bethany.Munyard@anthesisgroup.com>; Ellen Upton <Ellen.Upton@anthesisgroup.com>; Jono Adams <Jono.Adams@anthesisgroup.com>; Polly Stebbings <Polly.Stebbings@anthesisgroup.com>; Alan Matthews <Alan.Matthews@anthesisgroup.com>; Dee Moloney <Dee.Moloney@anthesisgroup.com>; Enda Colfer <Enda.Colfer@anthesisgroup.com>; Ian Bailey <Ian.Bailey@anthesisgroup.com>; Paul Crewe <Paul.Crewe@anthesisgroup.com>; Anne O’Brien <Anne.OBrien@anthesisgroup.com>; Beth Simpson <Beth.Simpson@anthesisgroup.com>; Julian Parfitt <Julian.Parfitt@anthesisgroup.com>; Nick Cuomo <Nick.Cuomo@anthesisgroup.com>; Peter Scholes <Peter.Scholes@anthesisgroup.com>; Simone Aplin <Simone.Aplin@anthesisgroup.com>; Stephanie Egee <Stephanie.Egee@anthesisgroup.com>"
-$users = convertTo-arrayOfEmailAddresses "Allan.Carasco@anthesisgroup.com
-Allison.Lapidez@anthesisgroup.com
-Anna.Tirona@anthesisgroup.com
-Anna.Rebebes@anthesisgroup.com
-AvayaConflictMinerals@anthesisgroup.com
-Burkert.pec@anthesisgroup.com
-Carl.Gatchalian@anthesisgroup.com
-Crystel.Quijano@anthesisgroup.com
-Dana.Rosende@anthesisgroup.com
-Darryl.Nicol@anthesisgroup.com
-Diana.Namoco@anthesisgroup.com
-Druanne.Pepito@anthesisgroup.com
-Elgie.Cabarubias@anthesisgroup.com
-Erlyn.Ricafrente@anthesisgroup.com
-gerber.manalo@anthesisgroup.com
-Hannah.Ballesteros@anthesisgroup.com
-Hans.Angelo@anthesisgroup.com
-Harold.Javier@anthesisgroup.com
-Hirene.Lopez@anthesisgroup.com
-irene.oliquino@anthesisgroup.com
-Ivy.Tan@anthesisgroup.com
-Janella.Lontoc@anthesisgroup.com
-Jenice.Oliver@anthesisgroup.com
-Jeremiah.Oracion@anthesisgroup.com
-Jill.Villanueva@anthesisgroup.com
-John.Caraan@anthesisgroup.com
-Kaye.Nicolas@anthesisgroup.com
-Kim.Sangalang@anthesisgroup.com
-kcc.pec@anthesisgroup.com
-Krysmarie.Abellana@anthesisgroup.com
-Lea.Dones@anthesisgroup.com
-lynda.benedicto@anthesisgroup.com
-Marco.Cagaoan@anthesisgroup.com
-Criselda.Quisumbing@anthesisgroup.com
-Maria.Santillan@anthesisgroup.com
-Marjury.Maat@anthesisgroup.com
-meetingroom-manilaconferenceroom@anthesisgroup.com
-meetingroommanilaphimanilameetingroom@anthesisgroup.com
-Michael.Hong@anthesisgroup.com
-Michael.Dagarag@anthesisgroup.com
-michael.malate@anthesisgroup.com
-Micron.pec@anthesisgroup.com
-Mikhaella.Casanova@anthesisgroup.com
-Nickeen.Mayol@anthesisgroup.com
-ProductCompliance@anthesisgroup.com
-Reina.Barimbao@anthesisgroup.com
-Rene.Lopez@anthesisgroup.com
-Rose.Coronado@anthesisgroup.com
-Roselle.Diep@anthesisgroup.com
-Shaira.Montero@anthesisgroup.com
-sharleen.rivera@anthesisgroup.com
-Soren.Mateo@anthesisgroup.com
-yara.pec@anthesisgroup.com
-Zarel.Adame@anthesisgroup.com
+$users = convertTo-arrayOfEmailAddresses "Josephine.Brown@anthesisgroup.com
+Alex.Waterfield@anthesisgroup.com
+Curtis.MacGeever@anthesisgroup.com 
+Gemma.Tong@anthesisgroup.com 
+Michele.Arlett@anthesisgroup.com 
+Myles.Tatlock@anthesisgroup.com
 "
 $ssprGroup = Get-MsolGroup -SearchString "SSPR Testers"
 

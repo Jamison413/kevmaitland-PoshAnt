@@ -4,6 +4,11 @@
     [ValidateNotNullOrEmpty()]
     [ValidateSet("Android", "Apple","Windows")]
     [string]$deviceType
+
+    # Specifies whether we add the user to the Corporate group or not.
+    ,[Parameter(Mandatory = $false, Position = 1)]
+    [ValidateSet($true,$false)]
+    [bool]$addToCorporateGroup
     )
     <#
     .Synopsis
@@ -11,7 +16,7 @@
     .DESCRIPTION
         Moves users from the corporate enrollment group for their device type to "MDM Coprporate Device Users" and disables deprecated connection methods (e.g. ActiveSync, IMAP, etc.)
     .EXAMPLE
-       configure-basicMdm -deviceType "Android"
+       configure-basicMdm -deviceType "Android" -addToCorporateGroup $true
     #>
 
 $logFileLocation = "C:\ScriptLogs\"
@@ -52,17 +57,19 @@ switch ($deviceType){
             $thisUser = $_
             log-action "Processing [$($thisUser.DisplayName)]" -logFile $fullLogPathAndName
             try{
-                try{
-                    log-action "Adding to [$($mdmCorporateGroup.DisplayName)]" -logFile $fullLogPathAndName
-                    Add-DistributionGroupMember -Identity $mdmCorporateGroup.ExternalDirectoryObjectId -Member $thisUser.ObjectId -ErrorAction Stop
-                    log-result "[$($thisUser.DisplayName)] successfully added to [$($mdmCorporateGroup.DisplayName)]" -logFile $fullLogPathAndName
-                    } #Add to "MDM - Corporate Mobile Device Users"
-                catch{
-                    if($_.Exception.HResult -eq -2146233087){log-result "[$($thisUser.DisplayName)] already a member of [$($mdmCorporateGroup.DisplayName)]" -logFile $fullLogPathAndName}
-                    else{log-error -myError $_ -myFriendlyMessage "Error adding [$($thisUser.DisplayName)] to [$($mdmCorporateGroup.DisplayName)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
+                if($addToCorporateGroup){
+                    try{ #Add to "MDM - Corporate Mobile Device Users"
+                        log-action "Adding to [$($mdmCorporateGroup.DisplayName)]" -logFile $fullLogPathAndName
+                        Add-DistributionGroupMember -Identity $mdmCorporateGroup.ExternalDirectoryObjectId -Member $thisUser.ObjectId -ErrorAction Stop
+                        log-result "[$($thisUser.DisplayName)] successfully added to [$($mdmCorporateGroup.DisplayName)]" -logFile $fullLogPathAndName
+                        } 
+                    catch{
+                        if($_.Exception.HResult -eq -2146233087){log-result "[$($thisUser.DisplayName)] already a member of [$($mdmCorporateGroup.DisplayName)]" -logFile $fullLogPathAndName}
+                        else{log-error -myError $_ -myFriendlyMessage "Error adding [$($thisUser.DisplayName)] to [$($mdmCorporateGroup.DisplayName)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
+                        }
                     }
-
-                try{
+                else{log-action "`$addToCorporateGroup = `$false - not adding to [$($mdmCorporateGroup.DisplayName)]" -logFile $fullLogPathAndName}
+                try{#Add to "MDM - BYOD Mobile Device Users"
                     log-action "Adding to [$($mdmByodGroup.DisplayName)]" -logFile $fullLogPathAndName
                     Add-DistributionGroupMember -Identity $mdmByodGroup.ExternalDirectoryObjectId -Member $thisUser.ObjectId -ErrorAction Stop #Add to "MDM - BYOD Mobile Device Users"
                     log-result "[$($thisUser.DisplayName)] successfully added to [$($mdmByodGroup.DisplayName)]" -logFile $fullLogPathAndName
@@ -72,7 +79,7 @@ switch ($deviceType){
                     else{log-error -myError $_ -myFriendlyMessage "Error adding [$($thisUser.DisplayName)] to [$($mdmByodGroup.DisplayName)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
                     }
 
-                try{
+                try{# Disable legacy mailbox protocols
                     log-action "Disabling legacy mailbox protocols for [$($thisUser.DisplayName)]" -logFile $fullLogPathAndName
                     $thisMailbox = Get-Mailbox -Identity $thisUser.UserPrincipalName
                     $thisMailbox | Set-CASMailbox -ImapEnabled $false -ActiveSyncEnabled $false -PopEnabled $false -OWAforDevicesEnabled $false -ErrorAction Stop #Disable legacy mailbox protocols to avoid MFA bypass -MAPIEnabled $false
