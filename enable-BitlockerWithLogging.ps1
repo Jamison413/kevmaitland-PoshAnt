@@ -4,7 +4,9 @@ Script to enable Bitlocker on all non-removable drives for Windows 10 / PS5 PCs
 Kev Maitland
 
 v1.0
-04/01/17
+2017-01-04
+v2.0 - Rewrite to work with/without PIN, write to Eventlogs, use company branding in Windows Forms, improve code-reuse and include cmdletbinding. Should now work via Intune, Scheduled Task or (bodged) login script
+2019-05-24
 #>
 [cmdletbinding()]
 param(
