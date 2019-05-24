@@ -7,9 +7,9 @@ $members = convertTo-arrayOfEmailAddresses -blockOfText ""
 $members = @("Jessica.onyshko@anthesisgroup.com","Paul.Ashford@anthesisgroup.com","Drew.ONeil@Target.com","Don.Asleson@Target.com")
 $members = @("kevin.maitland")
 
-$memberOf = @()
+$memberOf = @("All Europe")
 $owners = @("kevin.maitland")
-$name = "IT Team (All)"
+$name = "All (COL)"
 $hideFromGal = $false
 $blockExternalMail = $true
 $public365Site = $true

@@ -1,10 +1,10 @@
 ﻿Import-Module _PS_Library_MSOL
 connect-ToExo
 
-$daysToLookBack = 3
+$daysToLookBack = 30
 if(!$toDate){$toDate = $(Get-Date).AddDays(1)}
 $fromDate = $toDate.AddDays(-($daysToLookBack+1))
-[array]$arrayOfUsers = @("richard.emmett@anthesisgroup.com")
+[array]$arrayOfUsers = @("qwest_ga@anthesisgroup.com")
 #[array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
 $title = "$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd)"
 
@@ -137,5 +137,5 @@ $splitColumns = [regex]::Split($log[12].AuditData.Replace("{","").Replace("[",""
 $log[12].AuditData.Replace("{","").Replace("[","").Replace("}","").Replace("]","").Replace("\/","/") -split ',(?=(?:[^"]|"[^"]*")*$)'
  #>
 
-$re3 = parse-unifiedAuditLogCsvToPsObjects -pathToAuditLogCsvFile C:\Users\kevinm\Desktop\AuditLogs\AuditLog_2018-10-31_2019-01-30.csv
-export-psobjectsToCSV -arrayOfPsobjectAuditEntries $re
+$re3 = parse-unifiedAuditLogCsvToPsObjects -pathToAuditLogCsvFile C:\Users\kevin.maitland\Downloads\AuditLog_2019-04-26_2019-04-29.csv
+export-psobjectsToCSV -arrayOfPsobjectAuditEntries $re3

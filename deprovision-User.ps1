@@ -136,6 +136,7 @@ Set-SPORestCredentials -Credential $creds
 $plaintextPassword = "Ttfn123!"
 $usersToReassign = @{}
 
+<#
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
 $hrSite = "/teams/hr"
 $leavingUserListName = "Leaving User Requests"
@@ -167,9 +168,11 @@ $usersToDeprovision = $selectedLeavers | ?{$_.UpnAction -ne "Reassign to another
 $selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToReassign.Add($_.LeavingUserId.Split("@")[0],$_.RedirectToId.Split("@")[0])}
 
 $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
+
+#>
 #region deprovision
 
-$binMe = convertTo-arrayOfEmailAddresses "oliver.marshall@anthesisgroup.com"
+$binMe = convertTo-arrayOfEmailAddresses "dean.cooney@anthesisgroup.com"
 foreach($user in $binMe){
     if($user){
         $userMsolObject = Get-User -Identity $user
@@ -200,6 +203,7 @@ foreach($user in $binMe){
 
 
 
+<#
 
 
 
@@ -253,3 +257,5 @@ foreach($userSAM in $usersToReassign.Keys){
 $sqlConnection.Close()
 
 #Remove-MailboxPermission -Identity $userSAM -AccessRights FullAccess -user $exportAdmin 
+
+#>

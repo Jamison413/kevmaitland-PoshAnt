@@ -82,7 +82,7 @@ switch ($deviceType){
                 try{# Disable legacy mailbox protocols
                     log-action "Disabling legacy mailbox protocols for [$($thisUser.DisplayName)]" -logFile $fullLogPathAndName
                     $thisMailbox = Get-Mailbox -Identity $thisUser.UserPrincipalName
-                    $thisMailbox | Set-CASMailbox -ImapEnabled $false -ActiveSyncEnabled $false -PopEnabled $false -OWAforDevicesEnabled $false -ErrorAction Stop #Disable legacy mailbox protocols to avoid MFA bypass -MAPIEnabled $false
+                    $thisMailbox | Set-CASMailbox -ImapEnabled $false -ActiveSyncEnabled $false -PopEnabled $false -OWAforDevicesEnabled $false -ActiveSyncMailboxPolicy "Default" -ErrorAction Stop #Disable legacy mailbox protocols to avoid MFA bypass -MAPIEnabled $false
                     log-result "[$($thisUser.DisplayName)] successfully added to [$($mdmByodGroup.DisplayName)]" -logFile $fullLogPathAndName
                     }
                 catch{log-error -myError $_ -myFriendlyMessage "Error disabling legacy mailbox protocols for [$($thisUser.DisplayName)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}

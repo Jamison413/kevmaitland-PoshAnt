@@ -35,7 +35,7 @@ function convertTo-arrayOfEmailAddresses($blockOfText){
     $addresses = @()
     $blockOfText | %{
         foreach($blob in $_.Split(" ").Split("`r`n").Split(";").Split(",")){
-            if($blob -match "@" -and $blob -match "."){$addresses += $blob.Replace("<","").Replace(">","").Replace(";","")}
+            if($blob -match "@" -and $blob -match "."){$addresses += $blob.Replace("<","").Replace(">","").Replace(";","").Trim()}
             }
         }
     $addresses
@@ -43,7 +43,7 @@ function convertTo-arrayOfEmailAddresses($blockOfText){
 function convertTo-arrayOfStrings($blockOfText){
     $strings = @()
     $blockOfText | %{
-        foreach($blob in $_.Split(",").Split("`r`n")){
+        foreach($blob in $_.Split(",").Split("`r`n").Trim()){
             if(![string]::IsNullOrEmpty($blob)){$strings += $blob}
             }
         }
@@ -163,9 +163,9 @@ function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[
 function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verboseLogging){
     if($stringMaybeContaining3LettersInBrackets -match '\([a-zA-Z]{3}\)'){
         $Matches[0].Replace('(',"").Replace(')',"")
-        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContainingEngagementCode"}
+        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContaining3LettersInBrackets"}
         }
-    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "3 letters in brackets not found in $stringMaybeContainingEngagementCode"}}
+    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "3 letters in brackets not found in $stringMaybeContaining3LettersInBrackets"}}
     }
 function get-3letterIsoCodeFromCountryName($pCountryName){
     switch ($pCountryName) {
