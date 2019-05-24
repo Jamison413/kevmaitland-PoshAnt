@@ -1,6 +1,6 @@
 ﻿
 
-[array]$newChumps = convertTo-arrayOfEmailAddresses "secureadmin82@earthlink.net"
+[array]$newChumps = convertTo-arrayOfEmailAddresses "jynxy2000@aol.com"
 
 $blackListTheseChumpsRuleName = "Blacklist these chumps"
 $blackListRepliesToTheseChumpsRuleName = "Blacklist replies to these chumps"

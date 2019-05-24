@@ -1,5 +1,5 @@
 ﻿
-$arrayOfUserstoIgnore = @("kevin.maitland","kirsten.doddy","elle.smith","sophie.taylor","emily.pressey")
+$arrayOfUserstoIgnore = @("kevin.maitland","kirsten.doddy","elle.smith","sophie.taylor","emily.pressey","Albert.Masnou" )
 $arrayOfUnusedServices = @("TEAMS1","YAMMER_ENTERPRISE") 
 
 #Get All Licensed Users
