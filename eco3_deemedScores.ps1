@@ -1,4 +1,4 @@
-﻿$csvFiles = @("C:\Users\kevinm\Desktop\eco3_deemed_scores_v1.2.1.csv","C:\Users\kevinm\Desktop\eco3_deemed_scores_2018_2.csv","C:\Users\kevinm\Desktop\eco3_deemed_scores_2018_3.csv")
+﻿$csvFiles = @("C:\Users\kevinm\Desktop\eco3_deemed_scores_2018_1.csv","C:\Users\kevinm\Desktop\eco3_deemed_scores_2018_2.csv","C:\Users\kevinm\Desktop\eco3_deemed_scores_2018_3.csv")
 
 $csvData1 = import-csv $csvFiles[0]
 $csvData2 = import-csv $csvFiles[1]
@@ -9,14 +9,14 @@ $j = 1
 $i = 0
 foreach ($csvDataBlob in $csvDatas) {
     Write-Progress -Activity "Processing file #$j"
-    $csvDataBlob | %{
-    Write-Progress -Activity "Processing $($csvDataBlob.Count) Records" -Status "Processing Row [$($i+1)] ($($i / $csvDataBlob.Count*100))" -PercentComplete $($i / $csvDataBlob.Count*100)
+    $csvData | %{
+    Write-Progress -Activity "Processing $($csvData.Count) Records" -Status "Processing Row [$($i+1)] ($($i / $csvData.Count*100))" -PercentComplete $($i / $csvData.Count*100)
 #Get-Content $csvFile | %{
     $thisRow = $_
     #$thisObject = New-Object -TypeName psobject -ArgumentList $([ordered]@{[string]"id"=$null;[string]"version"="ECO3";[string]"measure"=$null;[string]"measureVariant"=$null;[string]"propertyType"=$null;[string]"bedrooms"=$null;[string]"preHeatingSystem"=$null;[string]"postHeatingSystem"=$null;[string]"annualSaving"=$null;[string]"costSaving"=$null;[string]"uValueDelta"=$null;[string]"wallType"=$null;[string]"lifetime"=$null;[string]"meanPopt"=$null;[string]"ageBand"=$null;[string]"issMeasure"=$null;[string]"issMeasureName"=$null;[string]"issWallType"=$null;[string]"issThermalConductivity"=$null;[string]"issDoorType"=$null;[string]"issGlazing"=$null;[string]"issRiri"=$null;[string]"issLoftInsulation"=$null;[string]"issPreExistingHeatingControls"=$null;[string]"issPropertyType"=$null;[string]"issBedrooms"=$null;[string]"issExtWalls"=$null;[string]"issDetatchment"=$null})
     $thisObject = [pscustomobject]@{[string]"id"="";[string]"version"="ECO3";[string]"measure"="";[string]"measureVariant"="";[string]"propertyType"="";[string]"bedrooms"="";[string]"preHeatingSystem"="";[string]"postHeatingSystem"="";[string]"annualSaving"="";[string]"costSaving"="";[string]"uValueDelta"="";[string]"wallType"="";[string]"lifetime"="";[string]"meanPopt"="";[string]"ageBand"="";[string]"issMeasure"="";[string]"issMeasureName"="";[string]"issWallType"="";[string]"issThermalConductivity"="";[string]"issDoorType"="";[string]"issGlazing"="";[string]"issRiri"="";[string]"issLoftInsulation"="";[string]"issPreExistingHeatingControls"="";[string]"issPropertyType"="";[string]"issBedrooms"="";[string]"issExtWalls"="";[string]"issDetatchment"="";[string]"upliftName"="";[string]"upliftValue"=""}
     
-    $thisObject.measure = $thisRow.'Measure Category'
+    $thisObject.measure = $thisRow.Measure_Category
     $thisObject.upliftName = $thisRow.Name_of_Uplift
     $thisObject.upliftValue = $thisRow.Uplift
     $thisObject.costSaving = $thisRow.'Cost_Score_(�)'
@@ -25,7 +25,7 @@ foreach ($csvDataBlob in $csvDatas) {
     $thisObject.lifetime = $thisRow.L
     $thisObject.preHeatingSystem = $thisRow.Pre_Main_Heating_Source_for_the_Property
     
-    switch($thisRow.'Measure Category'){
+    switch($thisRow.Measure_Category){
         ("Solid Wall Insulation") {
             $thisObject.measureVariant = $thisRow.Measure_Type.Split("_")[0]
             $thisObject.wallType = $thisRow.Measure_Type.Split("_")[1]
@@ -279,6 +279,4 @@ foreach ($csvDataBlob in $csvDatas) {
     }
     }
 
-$myThings | Export-Csv -Path c:\users\kevinm\desktop\deemed5.csv -NoTypeInformation
-
-$sql = "INSERT INTO t_deemedScores()"
+$myThings | Export-Csv -Path c:\users\kevinm\desktop\deemed3.csv -NoTypeInformation

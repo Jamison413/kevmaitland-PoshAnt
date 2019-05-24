@@ -1,6 +1,6 @@
 ﻿
 
-[array]$newChumps = convertTo-arrayOfEmailAddresses "jynxy2000@aol.com"
+[array]$newChumps = convertTo-arrayOfEmailAddresses "contact@ceooffice.info"
 
 $blackListTheseChumpsRuleName = "Blacklist these chumps"
 $blackListRepliesToTheseChumpsRuleName = "Blacklist replies to these chumps"
@@ -13,4 +13,4 @@ $newChumps | % {
     $blackListRepliesToTheseChumpsRule.SentTo.Add($_)
     }
 $blackListTheseChumpsRule | Set-TransportRule -From $blackListTheseChumpsRule.From
-$blackListRepliesToTheseChumpsRule | Set-TransportRule -SentTo $blackListRepliesToTheseChumpsRule.SentTo
+$blackListTheseChumpsRuleName | Set-TransportRule -SentTo $blackListRepliesToTheseChumpsRule.SentTo

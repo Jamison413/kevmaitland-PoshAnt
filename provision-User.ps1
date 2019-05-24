@@ -208,8 +208,7 @@ function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusiness
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
     Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
     if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN | Set-Mailbox -EmailAddresses @{add="$($pUPN.Split("@")[0])@sustain.co.uk"}}
-    if ($pBusinessUnit -match "Energy" -or $pBusinessUnit -match "DEU"){Get-Mailbox $pUPN | Set-Mailbox -LitigationHoldEnabled $true }
-    Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Interim security policy"
+    Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
     Get-Mailbox $pUPN | Set-Clutter -Enable $true
     Set-User -Identity $pUPN -Company $pBusinessUnit -Manager $pLineManager
     Set-MailboxRegionalConfiguration -Identity $pUPN -TimeZone $(convertTo-exTimeZoneValue $pTimeZone)
@@ -355,7 +354,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         update-newUserRequest -listItem $newUserListItem -digest $digest -restCredentials $restCredentials -logFile $logFile
         }
     }
-function provision-SustainADUser($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $userPrimaryOffice, $plaintextPassword, $adCredentials){
+function provision-SustainADUser($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $plaintextPassword, $adCredentials){
     try{
         log-Message "Creating AD account for $userUPN" -colour "Yellow"
         create-ADUser -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pManagerSAM $($userManagerSAM.Split("@")[0]) -pDepartment $userPrimaryTeam -pJobTitle $userJobTitle -plaintextPassword $plaintextPassword -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pBusinessUnit $userBusinessUnit -adCredentials $adCredentials -pPrimaryOffice $userPrimaryOffice
@@ -386,7 +385,7 @@ function update-msolUserFromAd($userUPN){
 
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
-        update-MsolUser -pUPN $userUPN -pFirstName $adU.GivenName -pSurname $adU.Surname -pManagerSAM $userManagerSAM -pDDI $DDI -pMobile $mobile  -pJobTitle $adU.Title -pDisplayName $adU.DisplayName -pPhoneExtension $adU.ipPhone -pPrimaryOffice $adu.physicalDeliveryOfficeName
+        update-MsolUser -pUPN $userUPN -pFirstName $adU.GivenName -pSurname $adU.Surname -pManagerSAM $userManagerSAM -pDDI $DDI -pMobile $mobile  -pJobTitle $adU.Title -pDisplayName $adU.DisplayName -pPhoneExtension $adU.ipPhone
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{
@@ -444,8 +443,7 @@ $selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"
         -restCredentials $restCredentials `
         -newUserListItem $_ `
         -userTimeZone $_.TimeZone `
-        -user365License $_.Office_365_license `
-        -userPrimaryOffice $_.Primary_Workplace
+        -user365License $_.Office_365_license 
     }
 
 $selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
