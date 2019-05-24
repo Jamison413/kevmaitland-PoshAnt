@@ -802,10 +802,30 @@ $managers = @("emily.pressey")
 $teamMembers = convertTo-arrayOfEmailAddresses "Emily Pressey <emily.pressey@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 
-$displayName = "Lavola Integration Team (All)"
+$displayName = "Advisory, Communications and Analytics (North America)"
 $description = $null
-$managers = @("kevin.maitland")
-$teamMembers = convertTo-arrayOfEmailAddresses "Kev Maitland <kevin.maitland@anthesisgroup.com>"
+$managers = @("emily.pressey")
+$teamMembers = convertTo-arrayOfEmailAddresses "Emily Pressey <emily.pressey@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Management Team (North America)"
+$description = $null
+$managers = @("emily.pressey")
+$teamMembers = convertTo-arrayOfEmailAddresses "Emily Pressey <emily.pressey@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+
+$displayName = "Client Management Programme (All)"
+$description = $null
+$managers = @("emily.pressey")
+$teamMembers = convertTo-arrayOfEmailAddresses "Emily Pressey <emily.pressey@anthesisgroup.com>"
+new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
+
+$displayName = "Working Group - Mitel"
+$description = $null
+$managers = @("emily.pressey")
+$teamMembers = convertTo-arrayOfEmailAddresses "Emily Pressey <emily.pressey@anthesisgroup.com>"
 new-teamGroup -displayName $displayName -managers $managers -teamMembers $teamMembers
 #>
+
 

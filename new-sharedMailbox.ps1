@@ -10,7 +10,7 @@ $arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "harold.javier@anthe
 Michael.Malate@anthesisgroup.com
 Addison Weinstein <Addison.Weinstein@anthesisgroup.com>"
 $grantSendAsToo = $true
-$hideFromGal = $false
+$hideFromGal = $true
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){

@@ -37,21 +37,6 @@ function connect-ToMsol($credential){
     Write-Host -f DarkYellow "Executing Connect-MsolService"
     Connect-MsolService -Credential $credential
     }
-function connect-toAzureRm{
-    Param (
-        [parameter(Mandatory = $false)]
-        [pscredential]$aadCreds
-        )
-    Write-Host -f Yellow Connecting to AzureRM services
-    Import-Module AzureRM.Profile
-    Try {
-        Login-AzureRmAccount -Credential $aadCreds -ErrorAction Stop | Out-Null
-        } 
-    Catch {
-        Write-Warning "Couldn't connect to Azure RM non-interactively, trying interactively."
-        Login-AzureRmAccount -TenantId $(($aadCreds.UserName.Split("@"))[1]) -ErrorAction Stop | Out-Null
-        }
-    }
 function connect-toAAD($credential){
     Write-Host -f Yellow Connecting to AAD services
     if ($(Get-Module -ListAvailable AzureAD) -ne $null){

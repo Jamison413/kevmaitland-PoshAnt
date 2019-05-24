@@ -10,11 +10,7 @@
     $checkForServerSiteOverlap = [regex]::Match($pnpList.RootFolder.ServerRelativeUrl,"^$($pnpList.RootFolder.Context.Web.ServerRelativeUrl)(.+)*")
     if($checkForServerSiteOverlap.Success){$siteRelativeUrlPrefix = $checkForServerSiteOverlap.Groups[$checkForServerSiteOverlap.Groups.Count-1].Value}
     else{$siteRelativeUrlPrefix = $pnpList.RootFolder.Context.Web.ServerRelativeUrl}
-    
-    #[array]$formattedArrayOfSiteRelativeSubfolderNames = $arrayOfSubfolderNames | % {$siteRelativeUrlPrefix+$_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")}
-    #Changed [KM] 2019-03-14 As Client DocLibs weren't beign created properly (missing the trailing / on the site relative path: /JUUL_Kimble automatically creates Project folders)
-    [array]$formattedArrayOfSiteRelativeSubfolderNames = $arrayOfSubfolderNames | % {$($siteRelativeUrlPrefix+"/"+$_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")).Replace("//","/")}
-
+    [array]$formattedArrayOfSiteRelativeSubfolderNames = $arrayOfSubfolderNames | % {$siteRelativeUrlPrefix+$_.Replace($pnpList.RootFolder.ServerRelativeUrl,"")}
     try{
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-spoFolder -pnpList $($pnpList.Title) -folderServerRelativeUrl $($formattedArrayOfSubfolderNames[$formattedArrayOfSubfolderNames.Length-1])"}
         #$hasItems = get-spoFolder -pnpList $pnpList -folderServerRelativeUrl $($formattedArrayOfSubfolderNames[$formattedArrayOfSubfolderNames.Length-1]) -adminCreds $adminCreds -verboseLogging $verboseLogging
@@ -24,7 +20,7 @@
         #$hasItems = Get-PnPListItem -List $pnpList -Query "<View><Query><Where><Eq><FieldRef Name='FileRef'/><Value Type='Text'>/clients/DummyCo Ltd/DummyOp5 (E003941)/Analysis</Value></Eq></Where></Query></View>" 
         #$hasItems = Get-PnPListItem -List $pnpList #-Query "<View><Query><Where><Eq><FieldRef Name='FileLeafRef'/><Value Type='Text'>$($arrayOfSubfolderNames[0])</Value></Eq></Where></Query></View>" 
         #$hasItems = $hasItems | ? {$_.FieldValues.FileRef -eq "$($arrayOfSubfolderNames[$arrayOfSubfolderNames.Length-1])"}
-        $hasItems = Get-PnPFolder -Url $formattedArrayOfSiteRelativeSubfolderNames[$formattedArrayOfSiteRelativeSubfolderNames.Count-1] -ErrorAction Stop -Includes ListItemAllFields
+        $hasItems = Get-PnPFolder -Url $formattedArrayOfSiteRelativeSubfolderNames[$formattedArrayOfSiteRelativeSubfolderNames.Count-1] -ErrorAction Stop
         }
     catch{
         #Meh.
@@ -45,11 +41,11 @@
         $formattedArrayOfSiteRelativeSubfolderNames | % {
             $folderName = Split-Path $_ -Leaf
             $folderPath = $_.Substring(0,$_.Length-$folderName.Length)
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Add-PnPFolder -Folder [$($folderPath)] -Name [$($folderName)]"}
+            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Add-PnPFolder -Folder $($folderPath) -Name $($folderName)"}
             Add-PnPFolder -Folder $folderPath -Name $folderName            
             }
 
-        $newFolder = Get-PnPFolder $formattedArrayOfSiteRelativeSubfolderNames[$formattedArrayOfSiteRelativeSubfolderNames.Count-1] -Includes ListItemAllFields
+        $newFolder = Get-PnPFolder $formattedArrayOfSiteRelativeSubfolderNames[$formattedArrayOfSiteRelativeSubfolderNames.Count-1]
         $newFolder #Return last folder created (we have to do this separately as Add-PnPDocumentSet only returns the Absolute URL)
         }
     else{
@@ -64,11 +60,8 @@ function add-spoTermToStore($termGroup,$termSet,$term,$kimbleId,$verboseLogging)
         $pnpTermGroup = Get-PnPTermGroup $termGroup 
         $pnpTermSet = Get-PnPTermSet -TermGroup $pnpTermGroup -Identity $termSet
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPTerm -TermGroup $($pnpTermGroup.Name) -TermSet $($pnpTermSet.Name) -Identity $cleanTerm -ErrorAction Stop"}
-        #$pnpTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanTerm -ErrorAction Stop #Weirdly, Get-PnPTerm throws a non-terminating exception if the Term isn't found. We want an exception, so that catch{} returns $null value
-        #2019-03-14 [KM] Retrieving all Terms now as it's bizarrely faster than retrieving an individual term and we're hitting a 30 second timeout.
+        $pnpTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanTerm -ErrorAction Stop #Weirdly, Get-PnPTerm throws a non-terminating exception if the Term isn't found. We want an exception, so that catch{} returns $null value
         #$alreadyInStore = Get-PnPTaxonomyItem -TermPath "$termGroup|$termSet|$term"
-        $allTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet
-        $pnpTerm = $allTerms | ? {$_.Name -eq $cleanTerm}
         }
     catch{
         #Meh.
@@ -89,7 +82,7 @@ function add-spoTermToStore($termGroup,$termSet,$term,$kimbleId,$verboseLogging)
         $newPnpTerm
         }
     }
-function cache-spoKimbleAccountsList($pnpList, $kimbleListCachePathAndFileName, $fullLogPathAndName, $errorLogPathAndName, $verboseLogging){
+function cache-spoKimbleAccountsList($pnpList, $kimbleListCachePathAndFileName){
     $listCacheFile = Get-Item $kimbleListCachePathAndFileName
     if((get-date $pnpList.LastItemModifiedDate).AddMinutes(-5) -gt $listCacheFile.LastWriteTimeUtc){#This is bodged so we don't miss any new List added during the time it takes to actually download the full Account list
         try{
@@ -102,7 +95,7 @@ function cache-spoKimbleAccountsList($pnpList, $kimbleListCachePathAndFileName, 
                 }
             else{log-result -myMessage "FAILURE: [$($pnpList.Title)] items could not be retrieved" -logFile $fullLogPathAndName}
             }
-        catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [$($pnpList.Title)] items to recache the local copy" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
+        catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [$($pnpList.Title)] items to recache the local copy" -fullLogFile $fullLogPathAndNamel -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
         }
     else{log-result -myMessage "SUCCESS: [$($pnpList.Title)] Cache is up-to-date and does not require refreshing" -logFile $fullLogPathAndName}
     $listCache = Import-Csv $kimbleListCachePathAndFileName
@@ -112,9 +105,17 @@ function copy-spoFile($fromList,$from,$to,$spoCredentials){
     if($verboseLogging){Write-Host -ForegroundColor Magenta "copy-spoFile($fromList,$from,$to"}
     if($fromList.Substring(0,1) -ne "/"){$fromList = "/"+$fromList}
     if($(Split-Path $from -Leaf) -eq $(Split-Path $to -Leaf)){$to = $to.SubString(0,$($to.Length - $(split-path $to -leaf).Length) -1)} #Specififying a file name is broken for (presumably) Sites with large numbers of Libraries/Files
-    if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Copy-PnPFile -SourceUrl $from -TargetUrl $to -Force (but not -OverwriteIfAlreadyExists)"}
-    Copy-PnPFile -SourceUrl $from -TargetUrl $to -Force
-    Get-PnPFile -Url "$to$(Split-Path $from -Leaf)"
+<#    $oldConnection = Get-PnPConnection
+    if($oldConnection.Url -ne "https://anthesisllc.sharepoint.com$fromList"){
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Connected to wrong site - connecting to https://anthesisllc.sharepoint.com$fromList"}
+        Connect-PnPOnline –Url $("https://anthesisllc.sharepoint.com$fromList") –Credentials $spoCredentials
+        }#>
+    if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Copy-PnPFile -SourceUrl $from -TargetUrl $to -Force"}
+    Copy-PnPFile -SourceUrl $from -TargetUrl $to -force
+    if($oldConnection){
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Reconnecting to $($oldConnection.Url)"}
+        Connect-PnPOnline -Url $oldConnection.Url -Credentials $spoCredentials
+        }
     }
 function format-asServerRelativeUrl($serverRelativeUrl,$stringToFormat){
     $formattedString = $stringToFormat
@@ -178,7 +179,7 @@ function get-spoDocumentLibrary($docLibName, $docLibGuid, $verboseLogging){
                 }
             catch{<#Meh.#>}
             }
-        if(!$thisDocumentLibrary -and ![string]::IsNullOrWhiteSpace($docLibName)){
+        if(!$thisDocumentLibrary){
             $sanitisedDocLibName = $(sanitise-forPnpSharePoint $docLibName)
             if($docLibName.SubString($docLibName.Length-1,1) -eq "."){$sanitisedDocLibName+="."} #Trailing fullstops /are/ allowed in this context
             if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Trying to retrieve Document Library by Name: Get-PnPList -Identity [$sanitisedDocLibName]"}
@@ -221,14 +222,9 @@ function get-spoFolder($pnpList, $folderServerRelativeUrl, $folderGuid, $adminCr
         }
     $pnpListItem
     }
-function get-spoProjectFolder($pnpList, $kimbleEngagementCodeToLookFor, $folderGuid, $adminCreds, $verboseLogging){
+function get-spoProjectFolder($pnpList, $kimbleEngagementCodeToLookFor,$adminCreds, $verboseLogging){
     if($verboseLogging){Write-Host -ForegroundColor Magenta "get-spoProjectFolder($($pnpList.Title), $kimbleEngagementCodeToLookFor)"}
-    if($folderGuid){
-        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-PnPListItem -list [$($pnpList.Title)] -UniqueId [$folderGuid]"}
-        $pnpListItem = Get-PnPListItem -List $pnpList -UniqueId $folderGuid
-        }
-    else{
-        if(!$pnpListItem -and ![string]::IsNullOrWhiteSpace($kimbleEngagementCodeToLookFor)){}
+    if($kimbleEngagementCodeToLookFor){
         #$pnpQuery = "<View><Query><Where><Contains><FieldRef Name='Title'/><Value Type='Text'>$kimbleEngagementCodeToLookFor</Value></Eq></Where></Query></View>"
         $pnpQuery = "<View><Query><Where><Contains><FieldRef Name='FileLeafRef'/><Value Type='Text'>$kimbleEngagementCodeToLookFor</Value></Eq></Where></Query></View>" #Changed to FileLeafRef because Title property is not always populated
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-PnPListItem -list [$($pnpList.Title)] -Query [$pnpQuery]"}
@@ -383,55 +379,26 @@ function new-spoClientLibrary($clientName, $clientDescription, $spoCredentials, 
         }
     $clientLibrary
     }
-function new-spoDocumentLibrary{
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true)]
-        [string]$docLibName
-
-        ,[parameter(Mandatory = $true)]
-        [PSCredential]$spoCredentials
-
-        ,[parameter(Mandatory = $false)]
-        [string]$docLibDescription
-        )
-    Write-Verbose "new-spoDocumentLibrary($docLibName, $docLibDescription)"
+function new-spoDocumentLibrary($docLibName, $docLibDescription, $spoCredentials, $verboseLogging){
+    if($verboseLogging){Write-Host -ForegroundColor Magenta "new-spoDocumentLibrary($docLibName, $docLibDescription)"}
     try{
-        Write-Verbose "`tget-spoDocumentLibrary -docLibName [$(sanitise-forSql $docLibName)]"
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Get-PnPList -Identity $(sanitise-forSql $docLibName)"}
         $documentLibrary = get-spoDocumentLibrary -docLibName $docLibName
         }
-    catch{
-        Write-Verbose "`tError trying to retrieve DocLib [$docLibName]"
-        $_
-        }
-    if($documentLibrary){Write-Verbose "Existing Library for $docLibName FOUND - not creating duplicate!"}
+    catch{<#Meh.#>}
+    if($documentLibrary){if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Existing Library for $docLibName FOUND - not creating duplicate!"}}
     else{
-        Write-Verbose "`tExisting Library for $docLibName not found - creating a new one"
-        Write-Verbose "`tNew-PnPList -Title [$(sanitise-forSql $docLibName)] -Template DocumentLibrary"
-        try{$documentLibrary = New-PnPList -Title $(sanitise-forSql $docLibName) -Template DocumentLibrary}
-        catch{
-            Write-Verbose "`t`tError trying to create DocLib [$docLibName]"
-            $_
-            }
-         try{
-            #Weirdly, New-PnPList doesn't seem to return the new object, so we have to go looking for it again...
-            Write-Verbose "`tget-spoDocumentLibrary -docLibName [$(sanitise-forSql $docLibName)] (after creation)"
-            $documentLibrary = get-spoDocumentLibrary -docLibName $docLibName
-            }
-        catch{
-            Write-Verbose "`tError trying to retrieve DocLib [$docLibName]"
-            $_
-            }
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Existing Library for $docLibName not found - creating a new one"}
+        if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "New-PnPList -Title $(sanitise-forSql $docLibName) -Template DocumentLibrary"}
+        $documentLibrary = New-PnPList -Title $(sanitise-forSql $docLibName) -Template DocumentLibrary
         if($documentLibrary){
-            Write-Verbose "`t`tSuccess! DocLib [$($documentLibrary.RootFolder.ServerRelativeUrl)] created!"
             if(![string]::IsNullOrWhiteSpace($docLibDescription)){
-                Write-Verbose "`t$($documentLibrary.Name).Description = [$(sanitise-stripHtml $docLibDescription)]"
+                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "$documentLibrary.Description = $(sanitise-stripHtml $docLibDescription)"}
                 $documentLibrary.Description = sanitise-stripHtml $docLibDescription
                 $documentLibrary.Update()
-                $documentLibrary.Context.ExecuteQuery()
                 }
             }
-        else{Write-Verbose "Summat went wrong creating the Document Library: New-PnpList didn't return an object"}
+        else{if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Summat went wrong creating the Document Library"}}
         }
     $documentLibrary
     }
@@ -465,52 +432,6 @@ function new-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $pnp
         else{log-result "FAILED: $($newLibrary.RootFolder.ServerRelativeUrl) [subfolders]: $($arrayOfSubfolders -join ", ") were not created properly" -logFile $fullLogPathAndName}
         }
     else{log-result "FAILED: Library [$($pnpList.Title)] for $($pnpListItem.Name) was not created/retrievable!" -logFile $fullLogPathAndName}    
-    }
-function new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem{
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true)]
-        [PSCustomObject]$sqlKimbleAccount,
-
-        [parameter(Mandatory = $true)]
-        [array]$arrayOfSubfolders,
-
-        [parameter(Mandatory = $true)]
-        [PSCredential]$adminCreds,
-
-        [parameter(Mandatory = $true)]
-        [string]$fullLogPathAndName,
-
-        [parameter(Mandatory = $true)]
-        [string]$errorLogPathAndName,
-
-        [parameter(Mandatory = $true)]
-        [System.Data.Common.DbConnection]$sqlDbConn,
-
-        [parameter(Mandatory = $false)]
-        [bool]$recreateSubFolderOverride
-        )
-    Write-Verbose "new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [SUS_Kimble_Accounts] | [$($sqlKimbleAccount.Name)] "
-    log-action "new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [SUS_Kimble_Accounts] | [$($sqlKimbleAccount.Name)] " -logFile $fullLogPathAndName
-
-    try{$duration = Measure-Command {$newLibrary = new-spoDocumentLibrary -docLibName $sqlKimbleAccount.Name -docLibDescription $sqlKimbleAccount.Description -spoCredentials $adminCreds}}
-    catch{log-error -myError $_ -myFriendlyMessage "Error creating Document Library for Account [$($sqlKimbleAccount.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
-    if($newLibrary){#If the new Library has been created, make the subfolders and update the List Item
-        log-result "SUCCESS: $($newLibrary.RootFolder.ServerRelativeUrl) is there [$($duration.TotalSeconds) seconds]!" -logFile $fullLogPathAndName
-        #Try to create the subfolders
-        log-action "new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem $($newLibrary.RootFolder.ServerRelativeUrl) [subfolders]: $($arrayOfSubfolders -join ", ")" -logFile $fullLogPathAndName
-        $formattedArrayOfSubfolders = @()
-        $arrayOfSubfolders | % {$formattedArrayOfSubfolders += $($newLibrary.RootFolder.ServerRelativeUrl)+"/"+$_}
-        Write-Verbose "`$formattedArrayOfSubfolders: [$formattedArrayOfSubfolders]"
-        try{$duration = Measure-Command {$lastNewSubfolder = add-spoLibrarySubfolders -pnpList $newLibrary -arrayOfSubfolderNames $formattedArrayOfSubfolders -recreateIfNotEmpty $recreateSubFolderOverride -spoCredentials $adminCreds -verboseLogging $verboseLogging}}
-        catch{log-error -myError $_ -myFriendlyMessage "Error creating subfolders [$($arrayOfSubfolders -join ", ")] for Account [$($sqlKimbleAccount.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
-        if($lastNewSubfolder){        
-            log-result "SUCCESS: $($lastNewSubfolder.ServerRelativeUrl) is there [$($duration.TotalSeconds) seconds]!" -logFile $fullLogPathAndName
-            $newLibrary
-            }
-        else{log-result "FAILED: $($newLibrary.RootFolder.ServerRelativeUrl) [subfolders]: $($arrayOfSubfolders -join ", ") were not created properly [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName}
-        }
-    else{log-result "FAILED: Document Library for [$($sqlKimbleAccount.Name)] was not created/retrievable [$($duration.TotalSeconds) seconds]!" -logFile $fullLogPathAndName}    
     }
 function new-spoKimbleObjectListItem($kimbleObject, $pnpKimbleObjectList, $fullLogPathAndName,$verboseLogging){
     #Create the new List item
@@ -788,7 +709,7 @@ function test-pnpConnectionMatchesResource($resourceUrl, $verboseLogging){
         $false
         }
     }
-function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $pnpListItem, $arrayOfSubfolders, $recreateSubFolderOverride, $adminCreds, $fullLogPathAndName, $verboseLogging){
+function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $pnpListItem, $arrayOfSubfolders, $recreateSubFolderOverride, $adminCreds, $fullLogPathAndName){
     log-action "update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem [$($pnpListItem.Name)] - looking for existing Library" -logFile $fullLogPathAndName
     try{
         $duration = Measure-Command {
@@ -800,7 +721,7 @@ function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $
     catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Document Library in update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem [$($pnpListItem.Name)][$($pnpListItem.LibraryGUID)] $($Error[0].Exception.InnerException.Response)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
 
     if($existingLibrary){
-        log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSeconds) seconds])" -logFile $fullLogPathAndName
+        log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSecond) seconds])" -logFile $fullLogPathAndName
         log-action -myMessage "Updating Document Library [$($existingLibrary.RootFolder.ServerRelativeUrl)]" -logFile $fullLogPathAndName
         #Bodge to capture Descriptions for Clients & Suppliers
         if(![string]::IsNullOrWhiteSpace($pnpListItem.ClientDescription)){$docLibDescription = $pnpListItem.ClientDescription}
@@ -814,7 +735,6 @@ function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $
             $duration = Measure-Command {
                 $existingLibrary.Description = $(sanitise-stripHtml $docLibDescription)
                 $existingLibrary.Update()
-                $existingLibrary.Context.ExecuteQuery()
                 if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Title:[$($pnpListItem.Name)]: Set-PnPList -Identity $($existingLibrary.Id.Guid) -Title $($pnpListItem.Name)"}
                 Set-PnPList -Identity $existingLibrary.Id -Title $pnpListItem.Name
                 $updatedLibrary = Get-PnPList -Identity $existingLibrary.Id #The Id property is constant between $existingLibrary and $updatedLibrary 
@@ -858,83 +778,6 @@ function update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem($pnpList, $
                 }
             }
         catch{log-error -myError $_ -myFriendlyMessage "Error: Borked update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem [$($pnpList.Title)] | [$($pnpListItem.Name)]" -smtpServer "anthesisgroup-com.mail.protection.outlook.com" -mailTo "kevin.maitland@anthesisgroup.com" -mailFrom "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"}
-        }
-    }
-function update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem{
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true)]
-        [PSCustomObject]$sqlKimbleAccount
-
-        ,[parameter(Mandatory = $true)]
-        [array]$arrayOfSubfolders
-
-        ,[parameter(Mandatory = $true)]
-        [PSCredential]$adminCreds
-
-        ,[parameter(Mandatory = $true)]
-        [string]$fullLogPathAndName
-
-        ,[parameter(Mandatory = $true)]
-        [string]$errorLogPathAndName
-
-        ,[parameter(Mandatory = $true)]
-        [System.Data.Common.DbConnection]$sqlDbConn
-
-        ,[parameter(Mandatory = $false)]
-        [bool]$recreateSubFolderOverride
-        )
-    log-action "update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)] - looking for existing Library" -logFile $fullLogPathAndName
-    try{
-        $duration = Measure-Command {
-            #Try to get the Document Library by GUID (most accurate), then by PreviousName (next most likely), then by Name (least likely)
-            $existingLibrary = get-spoDocumentLibrary -docLibName $sqlKimbleAccount.PreviousName -docLibGuid $sqlKimbleAccount.DocumentLibraryGuid
-            if(!$existingLibrary){$existingLibrary = get-spoDocumentLibrary -docLibName $sqlKimbleAccount.Name}
-            }
-        }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Document Library in update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($pnpListItem.Name)][$($pnpListItem.DocumentLibraryGuid)] $($Error[0].Exception.InnerException.Response)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
-
-    if($existingLibrary){
-        log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSeconds) seconds])" -logFile $fullLogPathAndName
-        log-action -myMessage "Updating Document Library [$($existingLibrary.RootFolder.ServerRelativeUrl)]" -logFile $fullLogPathAndName
-
-        try{
-            #Update the Library
-            if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Description:[$(sanitise-forSqlValue -value $sqlKimbleAccount.Description -dataType HTML) ]"}
-            $duration = Measure-Command {
-                $existingLibrary.Description = $(sanitise-stripHtml $sqlKimbleAccount.Description)
-                $existingLibrary.Update()
-                $existingLibrary.Context.ExecuteQuery()
-                if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Title:[$($sqlKimbleAccount.Name)]: Set-PnPList -Identity [$($existingLibrary.Id.Guid)] -Title [$($sqlKimbleAccount.Name)]"}
-                Set-PnPList -Identity $existingLibrary.Id -Title $sqlKimbleAccount.Name
-                $updatedLibrary = Get-PnPList -Identity $existingLibrary.Id #The Id property is constant between $existingLibrary and $updatedLibrary 
-                }
-            #Check the update worked
-            if($updatedLibrary.Title -eq $sqlKimbleAccount.Name -and $(sanitise-stripHtml $updatedLibrary.Description) -eq $(sanitise-stripHtml $sqlKimbleAccount.Description)){
-                log-result -myMessage "SUCCESS: Client Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] updated successfully [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName
-                $updatedLibrary
-                }
-            }
-        catch{
-            #Failed to update Client Library
-            log-result -myMessage "FAILED: Document Library [$($existingLibrary.Title)] was found, but not updated" -logFile $fullLogPathAndName
-            log-error -myError $_ -myFriendlyMessage "Error updating Document Library [$($existingLibrary.Title)] - this is still marked as IsDirty=`$true :( [$($Error[0].Exception.InnerException.Response)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
-            }
-        }
-    else{
-        #Couldn't find the Library, so try creating a new one to paper over the cracks. #WCGW
-        log-result -myMessage "FAILED: Could not retrieve a Document Library for [$($sqlKimbleAccount.Name)] - sending it back for re-creation :/" -logFile $fullLogPathAndName
-        log-action -myMessage "Sending [$($sqlKimbleAccount.Name)] back for re-creation as it has mysteriously disappeared" -logFile $fullLogPathAndName
-        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem -sqlKimbleAccount $($sqlKimbleAccount.Name) -sqlDbConn $($sqlDbConn.DataSource) -arrayOfClientSubfolders @($($arrayOfSubfolders -join ",")) -recreateSubFolderOverride `$false"}
-        try{
-            $duration = Measure-Command {$newLibrary = new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem -sqlKimbleAccount $sqlKimbleAccount -sqlDbConn $sqlDbConn -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $false -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName}
-            if($newLibrary){log-result -myMessage "SUCCESS: Weirdly unfindable Client Library [$($newLibrary.RootFolder.ServerRelativeUrl)] was recreated [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
-            else{
-                log-result -myMessage "FAILED: Someone left a sponge in the patient - I couldn't retrieve a Document Library for [$($sqlKimbleAccount.Name)] and I couldn't create a new one either..." -logFile $fullLogPathAndName
-                log-error -myError $null -myFriendlyMessage "Borked update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)]" -smtpServer "anthesisgroup-com.mail.protection.outlook.com" -mailTo "kevin.maitland@anthesisgroup.com" -mailFrom "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"
-                }
-            }
-        catch{log-error -myError $_ -myFriendlyMessage "Error: Borked update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)]" -smtpServer "anthesisgroup-com.mail.protection.outlook.com" -mailTo "kevin.maitland@anthesisgroup.com" -mailFrom "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"}
         }
     }
 function update-spoKimbleObjectListItem($kimbleObject, $pnpKimbleObjectList, $overrideIsDirtyTrue, $overrideIsDirtyFalse, $overrideIsOrphanedTrue, $overrideIsOrphanedFalse, $overrideIsMisclassified, $fullLogPathAndName,$verboseLogging){
@@ -1033,14 +876,10 @@ function update-spoTerm($termGroup,$termSet,$oldTerm,$newTerm,$kimbleId,$verbose
     try{
         $pnpTermGroup = Get-PnPTermGroup $termGroup 
         $pnpTermSet = Get-PnPTermSet -TermGroup $pnpTermGroup -Identity $termSet
-        #$pnpOldTerm = Get-PnPTerm -Identity $cleanOldTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet 
-        #if(!$pnpOldTerm){Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $oldTerm} #Try the dirty version if we can't find the clean version
-        #$pnpNewTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanNewTerm
-        #2019-03-14 [KM] Retrieving all Terms now as it's bizarrely faster than retrieving an individual term and we're hitting a 30 second timeout.
-        $allTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet
-        $pnpOldTerm = $allTerms | ? {$_.Name -eq $cleanOldTerm}
-        if(!$pnpOldTerm){$allTerms | ? {$_.Name -eq $oldTerm}} #Try the dirty version if we can't find the clean version
-        $pnpNewTerm = $allTerms | ? {$_.Name -eq $cleanNewTerm}
+        $pnpOldTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanOldTerm
+        if(!$pnpOldTerm){Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $oldTerm} #Try the dirty version if we can't find the clean version
+        $pnpNewTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $cleanNewTerm
+        #$alreadyInStore = Get-PnPTaxonomyItem -TermPath "$termGroup|$termSet|$term"
         }
     catch{
         #Meh.
