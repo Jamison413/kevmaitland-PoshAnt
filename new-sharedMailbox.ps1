@@ -20,6 +20,8 @@ function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hid
         Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
         if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs -Confirm:$false}
         }
+    Set-MsolUser -UserPrincipalName "$exchangeAlias@anthesisgroup.com" -ImmutableId
+    Set-MsolUserPrincipalName -UserPrincipalName "$exchangeAlias@anthesisgroup.com" -NewUserPrincipalName $primaryEmail
     }
 
 new-sharedMailbox -displayName $displayName -arrayOfFullAccessMembers $arrayOfFullAccessMembers -hideFromGal $hideFromGal -owner $owner -grantSendAsToo $grantSendAsToo
