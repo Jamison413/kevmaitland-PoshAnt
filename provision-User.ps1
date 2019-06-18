@@ -157,7 +157,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)"}
         "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
         "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
-        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
+        "Manchester, GBR" {$streetAddress = "Dalton Place, 29 John Dalton Street";$postalCode="M2 6LN";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
         "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)"}
         "Manila, PHL" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)"}
         "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
@@ -190,7 +190,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         -DisplayName $displayName `
         -Title $jobTitle `
         -Department $primaryTeam `
-        -Office $primaryOffice `
+        -Office $pPrimaryOffice `
         -PhoneNumber $ddi `
         -StreetAddress $streetAddress `
         -City $secondaryOffice `
@@ -312,7 +312,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         log-Error "Failed to create MSOL account"
         log-Error $Error
         }
-    Start-Sleep -Seconds 20 #Let MSOL & EXO Syncronise
+    Start-Sleep -Seconds 30 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
         update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle #-pSurname $userSurname -pDisplayName $userDisplayName
@@ -451,7 +451,7 @@ $selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"
     }
 
 $selectedStarters |% {
-    license-msolUser -pUPN $(remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")) -licenseType "EMS"
+    license-msolUser -pUPN $(remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")) -licenseType "E3"
     }
 
 $selectedStarters[0] | % {
