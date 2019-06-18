@@ -172,7 +172,7 @@ $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "
 #>
 #region deprovision
 
-$binMe = convertTo-arrayOfEmailAddresses "dean.cooney@anthesisgroup.com"
+$binMe = convertTo-arrayOfEmailAddresses "thomas.milne@anthesisgroup.com"
 foreach($user in $binMe){
     if($user){
         $userMsolObject = Get-User -Identity $user
