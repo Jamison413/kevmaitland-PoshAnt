@@ -37,21 +37,6 @@ function connect-ToMsol($credential){
     Write-Host -f DarkYellow "Executing Connect-MsolService"
     Connect-MsolService -Credential $credential
     }
-function connect-toAzureRm{
-    Param (
-        [parameter(Mandatory = $false)]
-        [pscredential]$aadCreds
-        )
-    Write-Host -f Yellow Connecting to AzureRM services
-    Import-Module AzureRM.Profile
-    Try {
-        Login-AzureRmAccount -Credential $aadCreds -ErrorAction Stop | Out-Null
-        } 
-    Catch {
-        Write-Warning "Couldn't connect to Azure RM non-interactively, trying interactively."
-        Login-AzureRmAccount -TenantId $(($aadCreds.UserName.Split("@"))[1]) -ErrorAction Stop | Out-Null
-        }
-    }
 function connect-toAAD($credential){
     Write-Host -f Yellow Connecting to AAD services
     if ($(Get-Module -ListAvailable AzureAD) -ne $null){
@@ -96,6 +81,33 @@ function connect-ToExo($credential){
     Write-Host -f DarkYellow "Importing New-PSSession"
     Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global
     }
+function connect-ToSecCom($credential){
+    Write-Host -f Yellow Connecting to Security `& Compliance services
+    <#
+    .Synopsis
+        Provides a standardised (and simplifed) way to connect to MSOL services
+    .DESCRIPTION
+        Provides a standardised (and simplifed) way to connect to MSOL services.
+        If no credentials are supplied, set-MsolCredentials is called.
+    .EXAMPLE
+       connect-ToExo
+    .EXAMPLE
+       connect-ToExo -credential $creds
+    #>
+    if ($credential -eq $null){$credential = set-MsolCredentials}
+    Import-Module Microsoft.Exchange.Management.ExoPowershellModule
+    Write-Host -f DarkYellow "Initiating New-PSSession"
+    try {
+        $SecComSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://ps.compliance.protection.outlook.com/powershell-liveid/' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+        }
+    catch{
+        Write-Host -ForegroundColor DarkRed "MFA might be required"
+        $SecComSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://ps.compliance.protection.outlook.com/powershell-liveid/' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+        }
+    Write-Host -f DarkYellow "Importing New-PSSession"
+    Import-Module (Import-PSSession $SecComSession -AllowClobber) -Global
+    }
+
 function connect-ToSpo($credential){
     Write-Host -f Yellow Connecting to SPO services
     <#
