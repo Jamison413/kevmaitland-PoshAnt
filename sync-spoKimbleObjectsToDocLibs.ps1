@@ -5,16 +5,11 @@
     [ValidateSet("Clients", "Suppliers","Projects","ClientsProjects")]
     [string]$whatToSync
     )
+    $verboseLogging = $true
 
 $logFileLocation = "C:\ScriptLogs\"
-if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    $fullLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs.ps1_$whatToSync`_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs.ps1_$whatToSync`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
-    }
-else{
-    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_$whatToSync`_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_$whatToSync`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
-    }
+$fullLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs.ps1_$whatToSync`_FullLog_$(Get-Date -Format "yyMMdd").log"
+$errorLogPathAndName = $logFileLocation+"sync-spoKimbleObjectsToDocLibs.ps1_$whatToSync`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
 if($PSCommandPath){
     $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_$whatToSync`_Transcript_$(Get-Date -Format "yyMMdd").log"
     Start-Transcript $transcriptLogName -Append
@@ -67,7 +62,7 @@ elseif($whatToSync -match "Suppliers"){
     }
 else{}
 
-Connect-PnPOnline –Url $($webUrl+$spoSite) –Credentials $adminCreds
+Connect-PnPOnline –Url $($webUrl+$spoSite) –Credentials $adminCreds #-RequestTimeout 7200000
 
 #region functions
 function new-projectFolder($spoKimbleProjectList, $spoKimbleProjectListItem, $accountsCacheHashTable, $arrayOfProjectSubfolders, $recreateSubFolderOverride, $adminCreds, $fullLogPathAndName){
@@ -218,8 +213,8 @@ function update-projectFolder($spoKimbleProjectList, $spoKimbleProjectListItem, 
 
 #If we need it, get the list of Projects to update *before* we get the list of Clients, so we don't create a race condition where any Projects created while we're processing the Clients queue incorrectly appear to be orphaned
 if($whatToSync -match "Projects"){
+    Write-Host "If we need it, get the list of Projects to update *before* we get the list of Clients, so we don't create a race condition where any Projects created while we're processing the Clients queue incorrectly appear to be orphaned"
     $dirtyProjects = get-spoKimbleProjectListItems -camlQuery "<View><Query><Where><Eq><FieldRef Name='IsDirty'/><Value Type='Boolean'>1</Value></Eq></Where></Query></View>" -spoCredentials $adminCreds -verboseLogging $verboseLogging
-    #And get a Client Cache (as we need to look up the Clients based on their KimbleClientId value - the Foreign Key in the Kimble Projects table)
     }
 
 #Get the appropriate [Kimble XXX] List from SPO to see whether our existing cache is out-of-date
@@ -232,22 +227,26 @@ try{
 catch{log-error -myError $_ -myFriendlyMessage "Could not retrieve [$spoListName] to check whether it needs recaching" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -doNotLogToEmail $true}
 
 #Retrieve (and update if necessary) the full Clients Cache as we'll need it to set up any new Leads/Projects
-$accountsCache = cache-spoKimbleAccountsList -pnpList $pnpList -kimbleListCachePathAndFileName $($cacheFilePath+$accountsCacheFile) 
+Write-Host "Retrieve (and update if necessary) the full Clients Cache as we'll need it to set up any new Leads/Projects"
+$accountsCache = cache-spoKimbleAccountsList -pnpList $pnpList -kimbleListCachePathAndFileName $($cacheFilePath+$accountsCacheFile) -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName -verboseLogging $verboseLogging
     
 #Build a hashtable so we can look up Client name by it's KimbleId
+Write-Host "Build a hashtable so we can look up Client name by it's KimbleId"
 $kimbleAccountHashTable = @{}
 $accountsCache | % {$kimbleAccountHashTable.Add($_.Id, @{"Name"=$_.Name;"LibraryId"=$_.LibraryGUID})}
 
 
 #Process any [Kimble Clients] flagged as IsDirty
+Write-Host "Process any [Kimble Clients] flagged as IsDirty"
 $dirtyAccounts = $accountsCache | ?{$_.IsDirty -eq $true -and -not ($_.IsDeleted -eq $true -or $_.isMisclassifed -eq $true -or $_.IsOrphaned -eq $true)}
 $i = 1
+Write-Host "Process [$($dirtyAccounts.Count)] [Kimble Clients] flagged as IsDirty"
 $dirtyAccounts | % {
     Write-Progress -Id 1000 -Status "Processing DirtyClients" -Activity "$i/$($dirtyAccounts.Count)" -PercentComplete ($i*100/$dirtyAccounts.Count) #Display the overall progress
     $dirtyAccount = $_
     $duration = Measure-Command {
         log-action -myMessage "************************************************************************" -logFile $fullLogPathAndName
-        log-action -myMessage "$whatToSync [$($dirtyAccount.Name)][$i/$($dirtyAccounts.Count)] isDirty!" -logFile $fullLogPathAndName
+        log-action -myMessage "$whatToSync [$($dirtyAccount.Name)][$i/$($dirtyAccounts.Count)] isDirty!" -logFile $fullLogPathAndName 
         #Check if the Client needs creating
         if(([string]::IsNullOrEmpty($dirtyAccount.PreviousName) -and [string]::IsNullOrEmpty($dirtyAccount.PreviousDescription)) -OR $recreateAllFolders -eq $true){
             log-action -myMessage "$whatToSync [$($dirtyAccount.Name)] looks new - creating new Library" -logFile $fullLogPathAndName
@@ -267,13 +266,13 @@ $dirtyAccounts | % {
         #Otherwise try to update it
         else{
             log-action -myMessage "$whatToSync [$($dirtyAccount.Name)] doesn't look new, so I'm going to try updating it" -logFile $fullLogPathAndName
-            try{update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem -pnpList $pnpList -pnpListItem $dirtyAccount -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $recreateAllFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName}
-            catch{log-error $_ -myFriendlyMessage "Error updating Client [$($dirtyAccount.Name)]"}
+            try{update-spoDocumentLibraryAndSubfoldersFromPnpKimbleListItem -pnpList $pnpList -pnpListItem $dirtyAccount -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $recreateAllFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName -verboseLogging $verboseLogging}
+            catch{log-error $_ -myFriendlyMessage "Error updating Client [$($dirtyAccount.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailFrom $mailFrom -mailTo $mailTo}
 
             #Then try updating the Managed Metadata
             try{
                 log-action -myMessage "Updating Managed Metadata for $($dirtyAccount.Name)" -logFile $fullLogPathAndName
-                if($verboseLogging){Write-Host -ForegroundColor DarkCyan "update-spoTerm -termGroup 'Kimble' -termSet [$termSetName] -oldTerm $($dirtyAccount.PreviousName) -newTerm $($dirtyAccount.Name) -kimbleId $($dirtyAccount.Id)"}
+                if($verboseLogging){Write-Host -ForegroundColor DarkCyan "update-spoTerm -termGroup [Kimble] -termSet [$termSetName] -oldTerm [$($dirtyAccount.PreviousName)] -newTerm [$($dirtyAccount.Name)] -kimbleId [$($dirtyAccount.Id)]"}
                 $duration2 = Measure-Command {$updatedTerm = update-spoTerm -termGroup "Kimble" -termSet $termSetName -oldTerm $($dirtyAccount.PreviousName) -newTerm $($dirtyAccount.Name) -kimbleId $($dirtyAccount.Id) -verboseLogging $verboseLogging}
                 if($updatedTerm){log-result "SUCCESS: Kimble | $termSetName | [$($dirtyAccount.PreviousName)] updated to [$($dirtyAccount.Name)] in Managed MetaData Term Store [$($duration2.TotalSeconds) secs]" -logFile $fullLogPathAndName}
                 }
