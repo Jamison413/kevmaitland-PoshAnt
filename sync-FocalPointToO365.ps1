@@ -17,8 +17,7 @@ else{
     $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
     }
 $debugLog = "$env:USERPROFILE\Desktop\debugdump.log"
-Start-Transcript $transcriptLogName -Append
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Start-Transcript $transcriptLogName -AppendStart-Transcript "$($MyInvocation.MyCommand.Definition).log" #-Append
 
 
 $EWSServicePath = 'C:\Program Files\Microsoft\Exchange\Web Services\2.2\Microsoft.Exchange.WebServices.dll'
