@@ -71,8 +71,8 @@ function Invoke-SPORestMethod {
     }
     Process {
         $request = [System.Net.WebRequest]::Create($Url)
-        #$global:emptyRequest = $request
-        $request.Credentials = $credentials
+        $global:emptyRequest = $request
+        $request.Credentials = $restCreds
         #$request.PreAuthenticate = $true
         $odata = ";odata=$($JSONVerbosity.ToLower())"
         $request.Accept = "application/json$odata"
@@ -104,8 +104,7 @@ function Invoke-SPORestMethod {
 
         if ($manualTimeOut -ne 0){$request.Timeout = $manualTimeOut}
 
-        #$global:dummy= $request
-        Write-Verbose $request
+        $global:dummy= $request
         $response = $request.GetResponse()
         try {
             $streamReader = New-Object System.IO.StreamReader $response.GetResponseStream()
@@ -140,13 +139,11 @@ function Invoke-SPORestMethod {
                 }
 
                 $results = ConvertFrom-Json -InputObject $data
-                #$global:results2 = $results
+                $global:results2 = $results
                 # The JSON verbosity setting changes the structure of the object returned.
                 if ($JSONVerbosity -ne "verbose" -or $results.d -eq $null) {
-                    Write-Verbose $results
                     Write-Output $results
                 } else {
-                    Write-Verbose $results.d
                     Write-Output $results.d 
                 }
             } finally {
