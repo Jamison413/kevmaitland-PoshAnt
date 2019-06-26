@@ -3,7 +3,7 @@
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateNotNullOrEmpty()]
     [ValidateSet("Clients", "Suppliers","Projects","ClientsProjects")]
-    [string]$whatToSync
+    [string]$whatToSync = "ClientsProjects"
     )
     $verboseLogging = $true
 
@@ -125,15 +125,15 @@ $dirtyAccounts | % {
         #Otherwise try to update it
         else{
             log-action -myMessage "$whatToSync [$($dirtyAccount.Name)] doesn't look new, so I'm going to try updating it" -logFile $fullLogPathAndName
-            try{$updatedLibrary = update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem -sqlKimbleAccount $dirtyAccount -sqlDbConn $sqlDbConn -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $recreateAllFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName}
+            try{$updatedLibrary = update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem -sqlKimbleAccount $dirtyAccount -sqlDbConn $sqlDbConn -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $recreateAllFolders -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName -Verbose}
             catch{log-error $_ -myFriendlyMessage "Error updating Client [$($dirtyAccount.Name)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName -smtpServer $smtpServer -mailFrom $mailFrom -mailTo $mailTo}
 
             if($updatedLibrary){
                 try{
                     #Update the List Item
                     $sql = "UPDATE SUS_Kimble_Accounts SET IsDirty = 0, DocumentLibraryGuid = '$($updatedLibrary.id.Guid)'"
-                    if(![string]::IsNullOrWhiteSpace($dirtyAccount.PreviousName) -and ($(sanitise-forSqlValue -value $dirtyAccount.Name -dataType String) -ne $(sanitise-forSqlValue -value $dirtyAccount.PreviousName -dataType String))){$sql += ", PreviousName = '$(sanitise-forSqlValue -value $dirtyAccount.Name -dataType String)'"} #If the Name has changed, overwrite the old one with the new one to indicate that this has been processed (a trigger on [SUS_Kimble_Accounts] preserves this data)
-                    if(![string]::IsNullOrWhiteSpace($dirtyAccount.PreviousDescription) -and ((sanitise-forSqlValue -value $dirtyAccount.Description -dataType HTML) -ne (sanitise-forSqlValue -value $dirtyAccount.Description -dataType HTML))){$sql += ", PreviousName = '$(sanitise-forSqlValue -value $dirtyAccount.Description -dataType HTML)'"} #If the Description has changed, overwrite the old one with the new one to indicate that this has been processed (a trigger on [SUS_Kimble_Accounts] preserves this data)
+                    if(![string]::IsNullOrWhiteSpace($dirtyAccount.PreviousName) -and ($(sanitise-forSqlValue -value $dirtyAccount.Name -dataType String) -ne $(sanitise-forSqlValue -value $dirtyAccount.PreviousName -dataType String))){$sql += ", PreviousName = $(sanitise-forSqlValue -value $dirtyAccount.Name -dataType String)"} #If the Name has changed, overwrite the old one with the new one to indicate that this has been processed (a trigger on [SUS_Kimble_Accounts] preserves this data)
+                    if(![string]::IsNullOrWhiteSpace($dirtyAccount.PreviousDescription) -and ((sanitise-forSqlValue -value $dirtyAccount.Description -dataType HTML) -ne (sanitise-forSqlValue -value $dirtyAccount.Description -dataType HTML))){$sql += ", PreviousName = $(sanitise-forSqlValue -value $dirtyAccount.Description -dataType HTML)"} #If the Description has changed, overwrite the old one with the new one to indicate that this has been processed (a trigger on [SUS_Kimble_Accounts] preserves this data)
                     $sql +=" WHERE ID = '$($dirtyAccount.Id)'"
                     $result = Execute-SQLQueryOnSQLDB -query $sql -queryType NonQuery -sqlServerConnection $sqlDbConn
                     if($result -eq 1){log-result "SUCCESS: [SUS_Kimble_Accounts] | [$($dirtyAccount.Name)] is no longer Dirty [$($duration.TotalSeconds) seconds]" -logFile $fullLogPathAndName}
@@ -283,7 +283,7 @@ if($whatToSync -match "Projects"){
                 log-action -myMessage "Retrieving Previous Client Library [$($previousClientForThisProject.Name)]" -logFile $fullLogPathAndName
                 $sql = "SELECT Id, Name, DocumentLibraryGuid FROM SUS_Kimble_Accounts WHERE Id = '$($dirtyProject.PreviousKimbleClientId)'"
                 $previousClientForThisProject = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $sqlDbConn
-                $previousClientLibrary = get-spoClientLibrary -clientName $previousClientForThisProject.Name
+                $previousClientLibrary = get-spoClientLibrary -clientName $previousClientForThisProject.Name -clientLibraryGuid $previousClientForThisProject.DocumentLibraryGuid
                 if($previousClientLibrary){
                     #Look for the Project folder on the old DocLib first
                     log-result -myMessage "SUCCESS: Previous Client Library [$($previousClientForThisProject.Name)] retrieved" -logFile $fullLogPathAndName
@@ -308,7 +308,7 @@ if($whatToSync -match "Projects"){
                 }
             #Now we've moved any Project folders that have been assigned to a new client, process any name changes
             log-action -myMessage "Retrieving Project Folder [$($dirtyProject.Name)] in Client Library [$($clientForThisProject.Name)]" -logFile $fullLogPathAndName
-            try{$currentProjectFolder = get-spoProjectFolder -pnpList $clientLibrary -folderGuid $dirtyProject.FolderGuid -kimbleEngagementCodeToLookFor $(get-kimbleEngagementCodeFromString $dirtyProject.Name)}
+            try{$currentProjectFolder = get-spoProjectFolder -pnpList $clientLibrary -folderGuid $dirtyProject.FolderGuid -kimbleEngagementCodeToLookFor $(get-kimbleEngagementCodeFromString $dirtyProject.Name) -verboseLogging $verboseLogging}
             catch{log-error -myError $_ -myFriendlyMessage "Error retrieving original main Project Folder [$($dirtyProject.Name)] from [$($clientLibrary.RootFolder.ServerRelativeUrl)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
             if($currentProjectFolder){
                 log-result -myMessage "SUCCESS: [$($currentProjectFolder.FieldValues.FileRef)] retrieved" -logFile $fullLogPathAndName
@@ -349,8 +349,23 @@ if($whatToSync -match "Projects"){
                 "Folder" {
                     if([string]::IsNullOrWhiteSpace($finalProjectFolder.ListItemAllFields.FieldValues.GUID)){$finalProjectFolder = Get-PnPFolder -Url $finalProjectFolder.ServerRelativeUrl -Includes ListItemAllFields}
                     $finalProjectFolderGuid = $finalProjectFolder.ListItemAllFields.FieldValues.GUID
+                    $finalProjectUrl = $finalProjectFolder.ServerRelativeUrl
                     }
-                "ListItemCollection" {$finalProjectFolderGuid = $finalProjectFolder.FieldValues.GUID}
+                "ListItemCollection" {
+                    if($finalProjectFolder.Count -eq 1){
+                        $finalProjectFolderGuid = $finalProjectFolder.FieldValues.GUID
+                        $finalProjectUrl = $finalProjectFolder.FieldValues.FileRef
+                        }
+                    else{
+                        Write-Verbose "Somehow we've got too many folders returned from get-spoProjectFolder: [$($finalProjectFolder.FieldValues.GUID -join ", ")] from Client DocLib [$($clientForThisProject.Name)][$($clientForThisProject.DocumentLibraryGuid)]"
+                        Write-Error "Somehow we've got too many folders returned from get-spoProjectFolder: [$($finalProjectFolder.FieldValues.GUID -join ", ")] from Client DocLib [$($clientForThisProject.Name)][$($clientForThisProject.DocumentLibraryGuid)]"
+                        log-error -myError $null -myFriendlyMessage "Somehow we've got too many folders returned from get-spoProjectFolder: [$($finalProjectFolder.FieldValues.GUID -join ", ")] from Client DocLib [$($clientForThisProject.Name)][$($clientForThisProject.DocumentLibraryGuid)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+                        }
+                    } 
+                "ListItem" {
+                    $finalProjectFolderGuid = $finalProjectFolder.FieldValues.GUID
+                    $finalProjectUrl = $finalProjectFolder.FieldValues.FileRef
+                    }
                 }
 
             try{
@@ -366,7 +381,7 @@ if($whatToSync -match "Projects"){
                 log-error -myError $_ -myFriendlyMessage "Error updating [SUS_Kimble_Engagements] | [$($dirtyProject.Name)] to .isDirty = `$false after failing to find DocLib for Client $($clientForThisProject.Name)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
                 return
                 }
-            log-result "SUCCESS: Project Folder [$($finalProjectFolder.ServerRelativeUrl)] was created" -logFile $fullLogPathAndName
+            log-result "SUCCESS: Project Folder [$finalProjectUrl] was created" -logFile $fullLogPathAndName
             }
         else{
             #We've got a non-specific problem here, so it's _probably_ better to leave the SQL object marked as IsDirty = $true and investigate the underlying cause rather than just mark it as IsDirty = $false and ignore the problem

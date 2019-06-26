@@ -128,12 +128,44 @@ function delete-userAccounts($userSAM){
     }
 #endregion
 
-$msolCredentials = set-MsolCredentials
-connect-ToMsol -credential $msolCredentials
-connect-ToExo -credential $msolCredentials
-Set-SPORestCredentials -Credential $creds
+$Admin = "kevin.maitland@anthesisgroup.com"
+$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Kev.txt) 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+
+connect-ToMsol -credential $adminCreds
+
 
 $plaintextPassword = "Ttfn123!"
+#region deprovision
+
+$binMe = convertTo-arrayOfEmailAddresses "charlie.walter@anthesisgroup.com"
+foreach($user in $binMe){
+    if($user){
+        $userMsolObject = Get-User -Identity $user
+        if($userMsolObject.DistinguishedName -ne $null){
+            write-host "Disabling $($userMsolObject.DisplayName)"
+            Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -BlockCredential $true
+            Set-MsolUserPassword -UserPrincipalName $userMsolObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
+            Get-DistributionGroup -Filter "Members -eq '$($userMsolObject.DistinguishedName)'" | % {
+                Remove-DistributionGroupMember -Identity $_.Id -Member $userMsolObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+                }
+            Set-Mailbox $userMsolObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
+            Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -DisplayName $("Ω_"+$userMsolObject.DisplayName) 
+            remove-msolLicenses -userSAM $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
+            #Potential fix for the above line: 
+            <#Set-MsolUserLicense -UserPrincipalName $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com","")) -RemoveLicenses "Anthesis LLC:ENTERPRISEPACK"#>
+            }
+        }
+    }
+#-InactiveMailbox 
+
+
+
+
+
+
+<#
+
 $usersToReassign = @{}
 
 $sharePointServerUrl = "https://anthesisllc.sharepoint.com"
@@ -167,36 +199,6 @@ $usersToDeprovision = $selectedLeavers | ?{$_.UpnAction -ne "Reassign to another
 $selectedLeavers | ?{$_.UpnAction -eq "Reassign to another user"} | % {$usersToReassign.Add($_.LeavingUserId.Split("@")[0],$_.RedirectToId.Split("@")[0])}
 
 $sqlConnection = connect-toSqlServer -SQLServer "sql.sustain.co.uk" -SQLDBName "SUSTAIN_LIVE" #This is required to disable ARENA accounts
-#region deprovision
-
-$binMe = convertTo-arrayOfEmailAddresses "oliver.marshall@anthesisgroup.com"
-foreach($user in $binMe){
-    if($user){
-        $userMsolObject = Get-User -Identity $user
-        if($userMsolObject.DistinguishedName -ne $null){
-            write-host "Disabling $($userMsolObject.DisplayName)"
-            Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -BlockCredential $true
-            Set-MsolUserPassword -UserPrincipalName $userMsolObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
-            Get-DistributionGroup -Filter "Members -eq '$($userMsolObject.DistinguishedName)'" | % {
-                Remove-DistributionGroupMember -Identity $_.Id -Member $userMsolObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
-                }
-            Set-Mailbox $userMsolObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
-            Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -DisplayName $("Ω_"+$userMsolObject.DisplayName) 
-            remove-msolLicenses -userSAM $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
-            #Potential fix for the above line: 
-            <#Set-MsolUserLicense -UserPrincipalName $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com","")) -RemoveLicenses "Anthesis LLC:ENTERPRISEPACK"#>
-            }
-        }
-    }
-#-InactiveMailbox 
-
-
-
-
-
-
-
-
 
 
 
@@ -253,3 +255,4 @@ foreach($userSAM in $usersToReassign.Keys){
 $sqlConnection.Close()
 
 #Remove-MailboxPermission -Identity $userSAM -AccessRights FullAccess -user $exportAdmin 
+#>

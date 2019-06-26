@@ -173,7 +173,7 @@ function get-spoDocumentLibrary($docLibName, $docLibGuid, $verboseLogging){
         if(![string]::IsNullOrWhiteSpace($docLibGuid)){
             if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Found LibraryGUID for DocLib - trying that!"}
             try{
-                $thisDocumentLibrary = Get-PnPList -Identity $($docLibGuid) 
+                $thisDocumentLibrary = Get-PnPList -Identity $($docLibGuid) -Includes Description
                 if($verboseLogging){if(!$thisDocumentLibrary){Write-Host -ForegroundColor DarkMagenta "`tDidn't work :("}}
                 }
             catch{<#Meh.#>}
@@ -225,10 +225,9 @@ function get-spoProjectFolder($pnpList, $kimbleEngagementCodeToLookFor, $folderG
     if($verboseLogging){Write-Host -ForegroundColor Magenta "get-spoProjectFolder($($pnpList.Title), $kimbleEngagementCodeToLookFor)"}
     if($folderGuid){
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-PnPListItem -list [$($pnpList.Title)] -UniqueId [$folderGuid]"}
-        $pnpListItem = Get-PnPListItem -List $pnpList -UniqueId $folderGuid
+        $pnpListItem = Get-PnPListItem -List $pnpList -UniqueId $folderGuid 
         }
-    else{
-        if(!$pnpListItem -and ![string]::IsNullOrWhiteSpace($kimbleEngagementCodeToLookFor)){}
+    if([string]::IsNullOrWhiteSpace($pnpListItem) -and ![string]::IsNullOrWhiteSpace($kimbleEngagementCodeToLookFor)){
         #$pnpQuery = "<View><Query><Where><Contains><FieldRef Name='Title'/><Value Type='Text'>$kimbleEngagementCodeToLookFor</Value></Eq></Where></Query></View>"
         $pnpQuery = "<View><Query><Where><Contains><FieldRef Name='FileLeafRef'/><Value Type='Text'>$kimbleEngagementCodeToLookFor</Value></Eq></Where></Query></View>" #Changed to FileLeafRef because Title property is not always populated
         if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "get-PnPListItem -list [$($pnpList.Title)] -Query [$pnpQuery]"}
@@ -884,57 +883,96 @@ function update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem{
         ,[parameter(Mandatory = $false)]
         [bool]$recreateSubFolderOverride
         )
+    Write-Verbose "update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)] - looking for existing Library"
     log-action "update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)] - looking for existing Library" -logFile $fullLogPathAndName
     try{
         $duration = Measure-Command {
             #Try to get the Document Library by GUID (most accurate), then by PreviousName (next most likely), then by Name (least likely)
+            Write-Verbose "`t`$existingLibrary = get-spoDocumentLibrary -docLibName [$($sqlKimbleAccount.PreviousName)] -docLibGuid [$($sqlKimbleAccount.DocumentLibraryGuid)]"
             $existingLibrary = get-spoDocumentLibrary -docLibName $sqlKimbleAccount.PreviousName -docLibGuid $sqlKimbleAccount.DocumentLibraryGuid
-            if(!$existingLibrary){$existingLibrary = get-spoDocumentLibrary -docLibName $sqlKimbleAccount.Name}
+            if(!$existingLibrary){
+                Write-Verbose "`t`$existingLibrary = get-spoDocumentLibrary -docLibName [$($sqlKimbleAccount.Name)]"
+                $existingLibrary = get-spoDocumentLibrary -docLibName $sqlKimbleAccount.Name
+                }
             }
         }
-    catch{log-error -myError $_ -myFriendlyMessage "Error retrieving Document Library in update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($pnpListItem.Name)][$($pnpListItem.DocumentLibraryGuid)] $($Error[0].Exception.InnerException.Response)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
+    catch{
+        Write-Verbose "Error retrieving Document Library in update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($pnpListItem.Name)][$($pnpListItem.DocumentLibraryGuid)] `r`n$($Error[0].Exception.Response)`r`n$($Error[0].Exception.InnerException.Response)"
+        Write-Error "Error retrieving Document Library in update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($pnpListItem.Name)][$($pnpListItem.DocumentLibraryGuid)] `r`n$($Error[0].Exception.Response)`r`n$($Error[0].Exception.InnerException.Response)"
+        log-error -myError $_ -myFriendlyMessage "Error retrieving Document Library in update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($pnpListItem.Name)][$($pnpListItem.DocumentLibraryGuid)] $($Error[0].Exception.InnerException.Response)" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+        }
 
     if($existingLibrary){
+        Write-Verbose "`tSUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSeconds) seconds])"
         log-result -myMessage "SUCCESS: [$($existingLibrary.RootFolder.ServerRelativeUrl)] found (GUID:[$($existingLibrary.Id.Guid)] [$($duration.TotalSeconds) seconds])" -logFile $fullLogPathAndName
+        Write-Verbose "Updating Document Library [$($existingLibrary.RootFolder.ServerRelativeUrl)]"
         log-action -myMessage "Updating Document Library [$($existingLibrary.RootFolder.ServerRelativeUrl)]" -logFile $fullLogPathAndName
 
         try{
             #Update the Library
-            if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Description:[$(sanitise-forSqlValue -value $sqlKimbleAccount.Description -dataType HTML) ]"}
+            Write-Verbose "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Description:[$(sanitise-stripHtml -dirtyString $sqlKimbleAccount.Description)]"
             $duration = Measure-Command {
                 $existingLibrary.Description = $(sanitise-stripHtml $sqlKimbleAccount.Description)
                 $existingLibrary.Update()
                 $existingLibrary.Context.ExecuteQuery()
-                if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Title:[$($sqlKimbleAccount.Name)]: Set-PnPList -Identity [$($existingLibrary.Id.Guid)] -Title [$($sqlKimbleAccount.Name)]"}
+                Write-Verbose "Updating Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] Title:[$($sqlKimbleAccount.Name)]: `r`nSet-PnPList -Identity [$($existingLibrary.Id.Guid)] -Title [$($sqlKimbleAccount.Name)]"
                 Set-PnPList -Identity $existingLibrary.Id -Title $sqlKimbleAccount.Name
-                $updatedLibrary = Get-PnPList -Identity $existingLibrary.Id #The Id property is constant between $existingLibrary and $updatedLibrary 
+                Write-Verbose "`$updatedLibrary = Get-PnPList -Identity [$($existingLibrary.Id)]"
+                $updatedLibrary = get-spoDocumentLibrary -docLibGuid $existingLibrary.Id #The Id property is constant between $existingLibrary and $updatedLibrary 
                 }
             #Check the update worked
             if($updatedLibrary.Title -eq $sqlKimbleAccount.Name -and $(sanitise-stripHtml $updatedLibrary.Description) -eq $(sanitise-stripHtml $sqlKimbleAccount.Description)){
+                Write-Verbose "`tSUCCESS: Client Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] updated successfully [$($duration.TotalSeconds) secs]"
                 log-result -myMessage "SUCCESS: Client Library [$($existingLibrary.RootFolder.ServerRelativeUrl)] updated successfully [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName
                 $updatedLibrary
+                }
+            else{
+                Write-Verbose "`tFAILED: Client Library not updated as expected!"
+                if($updatedLibrary.Title -eq $sqlKimbleAccount.Name){
+                    Write-Verbose "Client Name [$($updatedLibrary.Title)] matches correctly"
+                    }
+                else{
+                    Write-Verbose "Original Client Name [$($sqlKimbleAccount.Name)] does not match [$($updatedLibrary.Title)]"
+                    }
+                if($(sanitise-stripHtml $updatedLibrary.Description) -eq $(sanitise-stripHtml $sqlKimbleAccount.Description)){
+                    Write-Verbose "Client Description [$($updatedLibrary.Description)] matches correctly"
+                    }
+                else{
+                    Write-Verbose "Original Client Description [$(sanitise-stripHtml $sqlKimbleAccount.Description)] does not match [$(sanitise-stripHtml $updatedLibrary.Description)]"
+                    }
                 }
             }
         catch{
             #Failed to update Client Library
+            Write-Verbose "`tFAILED: Document Library [$($existingLibrary.Title)] was found, but not updated"
             log-result -myMessage "FAILED: Document Library [$($existingLibrary.Title)] was found, but not updated" -logFile $fullLogPathAndName
+            Write-Verbose "Error updating Document Library [$($existingLibrary.Title)] - this is still marked as IsDirty=`$true :( [$($Error[0].Exception.Response)][$($Error[0].Exception.InnerException.Response)]"
+            Write-Error "Error updating Document Library [$($existingLibrary.Title)] - this is still marked as IsDirty=`$true :( [$($Error[0].Exception.Response)][$($Error[0].Exception.InnerException.Response)]"
             log-error -myError $_ -myFriendlyMessage "Error updating Document Library [$($existingLibrary.Title)] - this is still marked as IsDirty=`$true :( [$($Error[0].Exception.InnerException.Response)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
             }
         }
     else{
         #Couldn't find the Library, so try creating a new one to paper over the cracks. #WCGW
+        Write-Verbose "`tFAILED: Could not retrieve a Document Library for [$($sqlKimbleAccount.Name)] - sending it back for re-creation :/"
         log-result -myMessage "FAILED: Could not retrieve a Document Library for [$($sqlKimbleAccount.Name)] - sending it back for re-creation :/" -logFile $fullLogPathAndName
+        Write-Verbose "Sending [$($sqlKimbleAccount.Name)] back for re-creation as it has mysteriously disappeared"
         log-action -myMessage "Sending [$($sqlKimbleAccount.Name)] back for re-creation as it has mysteriously disappeared" -logFile $fullLogPathAndName
-        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem -sqlKimbleAccount $($sqlKimbleAccount.Name) -sqlDbConn $($sqlDbConn.DataSource) -arrayOfClientSubfolders @($($arrayOfSubfolders -join ",")) -recreateSubFolderOverride `$false"}
+        Write-Verbose "new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem -sqlKimbleAccount $($sqlKimbleAccount.Name) -sqlDbConn $($sqlDbConn.DataSource) -arrayOfClientSubfolders @($($arrayOfSubfolders -join ",")) -recreateSubFolderOverride `$false"
         try{
             $duration = Measure-Command {$newLibrary = new-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem -sqlKimbleAccount $sqlKimbleAccount -sqlDbConn $sqlDbConn -arrayOfSubfolders $arrayOfSubfolders -recreateSubFolderOverride $false -adminCreds $adminCreds -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName}
-            if($newLibrary){log-result -myMessage "SUCCESS: Weirdly unfindable Client Library [$($newLibrary.RootFolder.ServerRelativeUrl)] was recreated [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
+            if($newLibrary){Write-Verbose "`tSUCCESS: Weirdly unfindable Client Library [$($newLibrary.RootFolder.ServerRelativeUrl)] was recreated [$($duration.TotalSeconds) secs]" -logFile $fullLogPathAndName}
             else{
+                Write-Verbose "`tFAILED: Someone left a sponge in the patient - I couldn't retrieve a Document Library for [$($sqlKimbleAccount.Name)] and I couldn't create a new one either..."
                 log-result -myMessage "FAILED: Someone left a sponge in the patient - I couldn't retrieve a Document Library for [$($sqlKimbleAccount.Name)] and I couldn't create a new one either..." -logFile $fullLogPathAndName
-                log-error -myError $null -myFriendlyMessage "Borked update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)]" -smtpServer "anthesisgroup-com.mail.protection.outlook.com" -mailTo "kevin.maitland@anthesisgroup.com" -mailFrom "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"
+                write-error "Someone left a sponge in the patient - I couldn't retrieve a Document Library for [$($sqlKimbleAccount.Name)] and I couldn't create a new one either..."
+                log-error -myError $null -myFriendlyMessage "Someone left a sponge in the patient - I couldn't retrieve a Document Library for [$($sqlKimbleAccount.Name)] and I couldn't create a new one either..." -smtpServer "anthesisgroup-com.mail.protection.outlook.com" -mailTo "kevin.maitland@anthesisgroup.com" -mailFrom "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"
                 }
             }
-        catch{log-error -myError $_ -myFriendlyMessage "Error: Borked update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)]" -smtpServer "anthesisgroup-com.mail.protection.outlook.com" -mailTo "kevin.maitland@anthesisgroup.com" -mailFrom "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"}
+        catch{
+            Write-Verbose "Error: Borked update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)] [$($Error[0].Exception.Response)][$($Error[0].Exception.InnerException.Response)]"
+            Write-Error "Error: Borked update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)] [$($Error[0].Exception.Response)][$($Error[0].Exception.InnerException.Response)]"
+            log-error -myError $_ -myFriendlyMessage "Error: Borked update-spoDocumentLibraryAndSubfoldersFromSqlKimbleListItem [$($sqlKimbleAccount.Name)]" -smtpServer "anthesisgroup-com.mail.protection.outlook.com" -mailTo "kevin.maitland@anthesisgroup.com" -mailFrom "$(split-path $PSCommandPath -Leaf)_netmon@sustain.co.uk"
+            }
         }
     }
 function update-spoKimbleObjectListItem($kimbleObject, $pnpKimbleObjectList, $overrideIsDirtyTrue, $overrideIsDirtyFalse, $overrideIsOrphanedTrue, $overrideIsOrphanedFalse, $overrideIsMisclassified, $fullLogPathAndName,$verboseLogging){
