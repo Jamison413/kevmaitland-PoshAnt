@@ -63,7 +63,7 @@
         'x-ms-correlation-id'    = [guid]::NewGuid()
     }
 
-    $userDevices = Get-AzureADUser -SearchString $SearchString | Get-AzureADUserRegisteredDevice -All:$true
+    #$userDevices = Get-AzureADUser -SearchString $SearchString | Get-AzureADUserRegisteredDevice -All:$true
     $allDevices = Get-AzureADDevice -All:$true
 
     $bitLockerKeys = @()

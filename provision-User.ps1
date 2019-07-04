@@ -203,13 +203,15 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN -BypassSecurityGroupManagerCheck}
     if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN -BypassSecurityGroupManagerCheck}}
     if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
+    Add-DistributionGroupMember -Identity "MDM - BYOD Mobile Device Users" -Member $pUPN -BypassSecurityGroupManagerCheck
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone,$pLineManager){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
     Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
-    if ($pBusinessUnit -match "Sustain"){Get-Mailbox $pUPN | Set-Mailbox -EmailAddresses @{add="$($pUPN.Split("@")[0])@sustain.co.uk"}}
-    Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
-    Get-Mailbox $pUPN | Set-Clutter -Enable $true
+    if ($pBusinessUnit -match "Germany"){Get-Mailbox $pUPN | Set-Mailbox -LitigationHoldEnabled $true -RetentionComment "Ligation Hold (DEU)" -RetentionUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/ALessSinisterExplaination.aspx"}
+    if ($pBusinessUnit -match "UK"){Get-Mailbox $pUPN | Set-Mailbox -LitigationHoldEnabled $true -RetentionComment "Ligation Hold (GBR - Energy)" -RetentionUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/ALessSinisterExplaination.aspx"}
+    #Get-Mailbox $pUPN | Set-CASMailbox -ActiveSyncMailboxPolicy "Sustain"
+    #Get-Mailbox $pUPN | Set-Clutter -Enable $true
     Set-User -Identity $pUPN -Company $pBusinessUnit -Manager $pLineManager
     Set-MailboxRegionalConfiguration -Identity $pUPN -TimeZone $(convertTo-exTimeZoneValue $pTimeZone)
     }
@@ -427,7 +429,7 @@ $selectedStarters | % {
         -user365License $_.Office_365_license `
         -userSecondaryOffice $_.Nearest_Office
     }
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
+$selectedStarters  | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
         -userFirstName $_.Title.Split(" ")[0] `
         -userSurname $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `

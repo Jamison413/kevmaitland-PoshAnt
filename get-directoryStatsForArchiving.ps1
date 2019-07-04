@@ -37,8 +37,10 @@ Function scrape-subitems(){
     param([string]$rootPath)
     $params = New-Object System.Collections.Arraylist
     $params.AddRange(@("/L","/S","/XJ","/XJD","/NJH","/NJS","/BYTES","/FP","/NC","/NDL","/TS","/R:0","/W:0"))
-    $countPattern = "^\s{3}Files\s:\s+(?<Count>\d+).*"
-    $sizePattern = "^\s{3}Bytes\s:\s+(?<Size>\d+(?:\.?\d+)\s[a-z]?).*"
+    #$countPattern = "^\s{3}Files\s:\s+(?<Count>\d+).*"
+    #$sizePattern = "^\s{3}Bytes\s:\s+(?<Size>\d+(?:\.?\d+)\s[a-z]?).*"
+    $rootPath = $rootPath.TrimEnd("\")
+    write-host $rootPath
     (robocopy $rootPath NULL $params) | ForEach {
         If ($_ -match "(?<Size>\d+)\s(?<Date>\S+\s\S+)\s+(?<FullName>.*)") {
             New-Object PSObject -Property @{
@@ -63,12 +65,13 @@ function update-dirStats(){
 
     }
 
-$startPoint = "C:\Users\kevin.maitland\Desktop\"
+
+$startPoint = "G:\Shares and data\Documents & Data\"
 $fsBlob = new-dirStatObject
 
 scrape-subitems $startPoint | % {
     $temp = $_
-    $remainingPath = ((Split-Path $temp.FullName)+"\").Replace($startPoint,"")
+    $remainingPath = ((Split-Path $temp.FullName)+"\").Replace($startPoint,"").Replace("\\","\")
     switch($remainingPath.Split("\").Count){
         {$_ -eq 1} {
             $fsBlob.Size += $temp.Size
@@ -83,7 +86,7 @@ scrape-subitems $startPoint | % {
             if($fsBlob.LastModified -lt $temp.Date){$fsBlob.LastModified = $temp.Date}
             if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].LastModified -lt $temp.Date){$fsBlob.Subfolders[$remainingPath.Split("\")[0]].LastModified = $temp.Date}
             }
-        {$_ -gt 2} {
+        {$_ -eq 3} {
             if($fsBlob.Subfolders.Keys -notcontains $remainingPath.Split("\")[0]){
                 $fsBlob.Subfolders.Add($remainingPath.Split("\")[0],$(new-dirStatObject))
                 }
@@ -96,19 +99,31 @@ scrape-subitems $startPoint | % {
             if($fsBlob.LastModified -lt $temp.Date){$fsBlob.LastModified = $temp.Date}
             if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].LastModified -lt $temp.Date){$fsBlob.Subfolders[$remainingPath.Split("\")[0]].LastModified = $temp.Date}
             if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].LastModified -lt $temp.Date){$fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].LastModified = $temp.Date}
+            }        
+        {$_ -gt 3} {
+            if($fsBlob.Subfolders.Keys -notcontains $remainingPath.Split("\")[0]){
+                $fsBlob.Subfolders.Add($remainingPath.Split("\")[0],$(new-dirStatObject))
+                }
+            if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders.Keys -notcontains $remainingPath.Split("\")[1]){
+                $fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders.Add($remainingPath.Split("\")[1],$(new-dirStatObject))
+                }
+            if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].Subfolders.Keys -notcontains $remainingPath.Split("\")[2]){
+                $fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].Subfolders.Add($remainingPath.Split("\")[2],$(new-dirStatObject))
+                }
+            $fsBlob.Size += $temp.Size
+            $fsBlob.Subfolders[$remainingPath.Split("\")[0]].Size  += $temp.Size
+            $fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].Size  += $temp.Size
+            $fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].Subfolders[$remainingPath.Split("\")[2]].Size  += $temp.Size
+            if($fsBlob.LastModified -lt $temp.Date){$fsBlob.LastModified = $temp.Date}
+            if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].LastModified -lt $temp.Date){$fsBlob.Subfolders[$remainingPath.Split("\")[0]].LastModified = $temp.Date}
+            if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].LastModified -lt $temp.Date){$fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].LastModified = $temp.Date}
+            if($fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].Subfolders[$remainingPath.Split("\")[2]].LastModified -lt $temp.Date){$fsBlob.Subfolders[$remainingPath.Split("\")[0]].Subfolders[$remainingPath.Split("\")[1]].Subfolders[$remainingPath.Split("\")[2]].LastModified = $temp.Date}
             }
-        default {}
+default {write-host "Uh-oh"}
         }
-        
-        #$temp.FullName
-
-    #while (($temp.FullName.Split("\").Count -eq $lastLength) -and ($temp.FullName.Split("\")[$temp.FullName.Split("\").Counth-2] -eq $lastFolder)){
-    #Check path hasn't changed 
-    #Check path first X hasn't changed
-
     }
 
 
 $outblobs = @()
 $outblobs += enumerate-fsDirStats -fsDirStatBlob $fsBlob
-$outblobs | Export-Csv -Path C:\Users\kevin.maitland\Desktop\folderdata.csv -NoTypeInformation
+$outblobs | Export-Csv -Path C:\Users\kev.maitland\folderdata3.csv -NoTypeInformation 
