@@ -15,6 +15,7 @@ if($PSCommandPath){
 Import-Module _PS_Library_MSOL
 Import-Module _CSOM_Library-SPO.psm1
 Import-Module _REST_Library-SPO.psm1
+Import-Module _PNP_Library_SPO
 
 $msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
 $restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password

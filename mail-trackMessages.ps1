@@ -22,10 +22,10 @@ function format-MailTracePrettily($traceBlob){
     $trace | Out-GridView 
     }
 
-$emailAddressForTrace = "Alan.Matthews@anthesisgroup.com"
+$emailAddressForTrace = "sharleen.rivera-ceid@hp.com"
     
 $trace = get-allToAddressXHours -recipientAddress $emailAddressForTrace -hoursAgo 720
-$trace = get-allToAddressXHours -recipientAddress $emailAddressForTrace -hoursAgo 5
+$trace = get-allToAddressXHours -recipientAddress $emailAddressForTrace -hoursAgo 48
 $trace = get-allFromAddressXHours -senderAddress $emailAddressForTrace -hoursAgo 30
 
 
