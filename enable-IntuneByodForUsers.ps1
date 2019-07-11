@@ -1,4 +1,4 @@
-﻿$logFileLocation = "C:\ScriptLogs\"
+﻿$logFileLocation = "C:\ScriptLogs\" 
 $logFileName = "enable-IntuneByodForUsers"
 $fullLogPathAndName = $logFileLocation+$logFileName+"_$deviceType`_FullLog_$(Get-Date -Format "yyMMdd").log"
 $errorLogPathAndName = $logFileLocation+$logFileName+"_$deviceType`_ErrorLog_$(Get-Date -Format "yyMMdd").log"
