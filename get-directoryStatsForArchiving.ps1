@@ -123,7 +123,7 @@ default {write-host "Uh-oh"}
         }
     }
 
-
+     
 $outblobs = @()
 $outblobs += enumerate-fsDirStats -fsDirStatBlob $fsBlob
 $outblobs | Export-Csv -Path C:\Users\kev.maitland\folderdata3.csv -NoTypeInformation 
