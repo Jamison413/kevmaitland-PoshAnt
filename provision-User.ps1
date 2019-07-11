@@ -152,24 +152,19 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     
     Write-Host -ForegroundColor DarkYellow "`tPrimaryOffice: $pPrimaryOffice"
     switch($pPrimaryOffice){
-        "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers ($(get-3letterIsoCodeFromCountryName $pCountry))")}
+        "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers")}
         "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)"}
         "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)"}
         "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
         "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
-        "Manchester, GBR" {$streetAddress = "Dalton Place, 29 John Dalton Street";$postalCode="M2 6LN";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
+        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
         "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)"}
-        "Manila, PHL" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)"}
+        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)"}
         "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
         "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
         "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)"}
         "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)"}
         "Stockholm, SWE" {$streetAddress = "Barnhusgatan 4";$postalCode="SE-111 23";$country="Sweden";$usageLocation="SE";$group = "All (SWE)"}
-        "Barcelona, ESP" {$streetAddress = "Rbla. Catalunya, 6, 2a planta";$postalCode="08007";$country="Spain";$usageLocation="ES";$group = "All (ESP)"}
-        "Manlleu, ESP" {$streetAddress = "Av. de Roma, 254";$postalCode="08560";$country="Spain";$usageLocation="ES";$group = "All (ESP)"}
-        "Madrid, ESP" {$streetAddress = "Gran Vía, 63 3 dcha,";$postalCode="28013";$country="Spain";$usageLocation="ES";$group = "All (ESP)"}
-        "Andorra, AND" {$streetAddress = "C. de la Unió, 2 2n B,";$postalCode="";$country="Andorra";$usageLocation="AD";$group = "All (AND)"}
-        "Bogota, COL" {$streetAddress = "Calle 73 # 7-31 Of. 303,";$postalCode="";$country="Columbia";$usageLocation="ES";$group = "All (COL)"}
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
         }
     Write-Host -ForegroundColor DarkYellow "`tUsername:`t`t`t$($pUPN.Split("@")[0])@anthesisgroup.com"
@@ -190,7 +185,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
         -DisplayName $displayName `
         -Title $jobTitle `
         -Department $primaryTeam `
-        -Office $pPrimaryOffice `
+        -Office $primaryOffice `
         -PhoneNumber $ddi `
         -StreetAddress $streetAddress `
         -City $secondaryOffice `
@@ -205,7 +200,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
     Add-DistributionGroupMember -Identity "MDM - BYOD Mobile Device Users" -Member $pUPN -BypassSecurityGroupManagerCheck
     }
-function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone,$pLineManager){
+function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
     Get-Mailbox $pUPN | Set-Mailbox  -CustomAttribute1 $pBusinessUnit -Alias $($pUPN.Split("@")[0]) -DisplayName $pDisplayName -Name "$pFirstName $pSurname" -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
     if ($pBusinessUnit -match "Germany"){Get-Mailbox $pUPN | Set-Mailbox -LitigationHoldEnabled $true -RetentionComment "Ligation Hold (DEU)" -RetentionUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/ALessSinisterExplaination.aspx"}
@@ -314,7 +309,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         log-Error "Failed to create MSOL account"
         log-Error $Error
         }
-    Start-Sleep -Seconds 30 #Let MSOL & EXO Syncronise
+    Start-Sleep -Seconds 20 #Let MSOL & EXO Syncronise
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
         update-MsolUser -pUPN $userUPN -pPrimaryOffice $userPrimaryOffice -pSecondaryOffice $userSecondaryOffice -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pJobTitle $userJobTitle #-pSurname $userSurname -pDisplayName $userDisplayName
@@ -335,7 +330,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         }
     try{
         log-Message "Updating mailbox for $userUPN" -colour "Yellow"
-        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone -pLineManager $userManagerSAM
+        update-msolMailbox -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pBusinessUnit $userBusinessUnit -pTimeZone $userTimeZone
         log-Message "Mailbox updated" -colour "DarkYellow"
         }
     catch{
@@ -356,7 +351,7 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         update-newUserRequest -listItem $newUserListItem -digest $digest -restCredentials $restCredentials -logFile $logFile
         }
     }
-function provision-SustainADUser($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $plaintextPassword, $adCredentials){
+function provision-SustainADUser($userUPN, $userFirstName, $userSurname, $userDisplayName, $userManagerSAM, $userCommunity, $userPrimaryTeam, $userSecondaryTeams, $userBusinessUnit, $userJobTitle, $userPrimaryOffice, $plaintextPassword, $adCredentials){
     try{
         log-Message "Creating AD account for $userUPN" -colour "Yellow"
         create-ADUser -pUPN $userUPN -pFirstName $userFirstName -pSurname $userSurname -pDisplayName $userDisplayName -pManagerSAM $($userManagerSAM.Split("@")[0]) -pDepartment $userPrimaryTeam -pJobTitle $userJobTitle -plaintextPassword $plaintextPassword -pPrimaryTeam $userPrimaryTeam -pSecondaryTeams $userSecondaryTeams -pBusinessUnit $userBusinessUnit -adCredentials $adCredentials -pPrimaryOffice $userPrimaryOffice
@@ -387,7 +382,7 @@ function update-msolUserFromAd($userUPN){
 
     try{
         log-Message "Updating MSOL account for $userUPN" -colour "Yellow"
-        update-MsolUser -pUPN $userUPN -pFirstName $adU.GivenName -pSurname $adU.Surname -pManagerSAM $userManagerSAM -pDDI $DDI -pMobile $mobile  -pJobTitle $adU.Title -pDisplayName $adU.DisplayName -pPhoneExtension $adU.ipPhone
+        update-MsolUser -pUPN $userUPN -pFirstName $adU.GivenName -pSurname $adU.Surname -pManagerSAM $userManagerSAM -pDDI $DDI -pMobile $mobile  -pJobTitle $adU.Title -pDisplayName $adU.DisplayName -pPhoneExtension $adU.ipPhone -pPrimaryOffice $adu.physicalDeliveryOfficeName
         log-Message "Account updated" -colour "DarkYellow"
         }
     catch{
@@ -440,23 +435,20 @@ $selectedStarters  | % {
         -userSecondaryTeams $_.Additional_Teams `
         -userBusinessUnit $_.Finance_Cost_Attribu `
         -userJobTitle $_.Job_title `
-        -plaintextPassword "Welcome123" `
+        -plaintextPassword "Anthesis123" `
         -adCredentials $adCredentials `
         -restCredentials $restCredentials `
         -newUserListItem $_ `
         -userTimeZone $_.TimeZone `
-        -user365License $_.Office_365_license 
+        -user365License $_.Office_365_license `
+        -userPrimaryOffice $_.Primary_Workplace
     }
 
-$selectedStarters |? {$_.Finance_Cost_Attribu -eq "Anthesis Energy UK Ltd (GBR)"} | % {
+$selectedStarters | % {
     update-msolUserFromAd -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")
     }
 
-$selectedStarters |% {
-    license-msolUser -pUPN $(remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")) -licenseType "E3"
-    }
-
-$selectedStarters[0] | % {
+$selectedStarters[1] | % {
     $userUPN = remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
     $userFirstName = $_.Title.Split(" ")[0].Trim()
     $userSurname = $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]).Trim()
@@ -469,7 +461,7 @@ $selectedStarters[0] | % {
     $userSecondaryOffice = $_.Nearest_Office
     $userBusinessUnit = $_.Finance_Cost_Attribu 
     $userJobTitle = $_.Job_title 
-    $plaintextPassword = "Anthesis123" 
+    $plaintextPassword = "Welcome123" 
     $adCredentials = $adCredentials 
     $restCredentials = $restCredentials 
     $newUserListItem = $_ 

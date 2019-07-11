@@ -6,13 +6,13 @@
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") 
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles")
-Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.dll"
+#Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.dll"
 #Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.ClientContext.dll"
-Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.Runtime.dll"
+#Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.Runtime.dll"
 #Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.SharePointOnlineCredentials.dll"
 #Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.Sharing.dll"
-Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.Taxonomy.dll"
-Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.UserProfiles.dll"
+#Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.Taxonomy.dll"
+#Import-Module  "$env:USERPROFILE\SPO_CSOM\Microsoft.SharePointOnline.CSOM.16.1.8210.1200\lib\net45\Microsoft.SharePoint.Client.UserProfiles.dll"
 
 #Import-Module _PS_Library_GeneralFunctionality
 $webUrl = "https://anthesisllc.sharepoint.com" 
