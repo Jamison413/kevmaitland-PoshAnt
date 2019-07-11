@@ -1,4 +1,5 @@
-﻿[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client")
+﻿$latestPnp = $(gci "C:\Program Files\WindowsPowerShell\Modules\SharePointPnPPowerShellOnline\" -Directory | Measure-Object -Property Name -Maximum).Maximum
+Add-Type -Path "C:\Program Files\WindowsPowerShell\Modules\SharePointPnPPowerShellOnline\$latestPnp\Microsoft.SharePoint.Client.dll"
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.Online.SharePoint.PowerShell")
 #Import-Module  "C:\Program Files\SharePoint Online Management Shell\Microsoft.Online.SharePoint.PowerShell"
 #region SPO functions
