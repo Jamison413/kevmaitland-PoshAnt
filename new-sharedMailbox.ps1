@@ -3,25 +3,26 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Ahold Delhaize NPE"
-$primaryEmail = "AholdDelhaize.NPE@anthesisgroup.com"
+$displayName = "iRobot PEC"
+$primaryEmail = "irobot.pec@anthesisgroup.com"
 $owner = "kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "harold.javier@anthesisgroup.com
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "lynda.benedicto@anthesisgroup.com
+Gerber.Manalo@anthesisgroup.com
 Michael.Malate@anthesisgroup.com
-Addison Weinstein <Addison.Weinstein@anthesisgroup.com>"
+sharleen.rivera@anthesisgroup.com
+acsmailboxaccess@anthesisgroup.com
+"
 $grantSendAsToo = $true
-$hideFromGal = $true
+$hideFromGal = $false
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){
     $exchangeAlias = $(guess-aliasFromDisplayName -displayName $displayName)
-    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias -PrimarySmtpAddress $primaryEmail| Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false -MessageCopyForSentAsEnabled $true -MessageCopyForSendOnBehalfEnabled $true
+    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias -PrimarySmtpAddress $primaryEmail| Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false
     $arrayOfFullAccessMembers  | %{
         Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
         if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs -Confirm:$false}
         }
-    Set-MsolUser -UserPrincipalName "$exchangeAlias@anthesisgroup.com" -ImmutableId
-    Set-MsolUserPrincipalName -UserPrincipalName "$exchangeAlias@anthesisgroup.com" -NewUserPrincipalName $primaryEmail
     }
 
 new-sharedMailbox -displayName $displayName -arrayOfFullAccessMembers $arrayOfFullAccessMembers -hideFromGal $hideFromGal -owner $owner -grantSendAsToo $grantSendAsToo
