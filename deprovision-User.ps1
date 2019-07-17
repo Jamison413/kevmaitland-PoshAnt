@@ -1,4 +1,12 @@
-﻿Import-Module _PS_Library_GeneralFunctionality
+﻿param(
+    [CmdletBinding()]
+    [parameter(Mandatory = $true)]
+    [ValidateNotNull()]
+    [ValidatePattern(".[@].")]
+    [string]$upnsString
+    )
+
+Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Databases.psm1
 Import-Module _PS_Library_MSOL.psm1
 Import-Module _REST_Library-SPO.psm1
@@ -128,32 +136,38 @@ function delete-userAccounts($userSAM){
     }
 #endregion
 
-$Admin = "kevin.maitland@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Kev.txt) 
-$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+$userAdmin = "groupbot@anthesisgroup.com"
+#convertTo-localisedSecureString "IntuneAdminPasswordHere"
+$userAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Groupbot.txt) 
+#$adminCreds = set-MsolCredentials -username $intuneAdmin
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $userAdmin, $userAdminPass
+Connect-AzureAD -Credential $adminCreds
+connect-ToExo -credential $adminCreds
 
-connect-ToMsol -credential $adminCreds
-
-
-$plaintextPassword = "Ttfn123!"
+$upnsToDeactivate = convertTo-arrayOfEmailAddresses $upnsString
 #region deprovision
 
-$binMe = convertTo-arrayOfEmailAddresses "charlie.walter@anthesisgroup.com"
-foreach($user in $binMe){
+foreach($user in $upnsToDeactivate){
     if($user){
-        $userMsolObject = Get-User -Identity $user
-        if($userMsolObject.DistinguishedName -ne $null){
-            write-host "Disabling $($userMsolObject.DisplayName)"
-            Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -BlockCredential $true
-            Set-MsolUserPassword -UserPrincipalName $userMsolObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
-            Get-DistributionGroup -Filter "Members -eq '$($userMsolObject.DistinguishedName)'" | % {
-                Remove-DistributionGroupMember -Identity $_.Id -Member $userMsolObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        $userExoObject = Get-User -Identity $user
+        $userAadObject = Get-AzureADUser -SearchString $user.Replace("@anthesisgroup.com","")
+        if($userExoObject.DistinguishedName -ne $null){
+            write-host "Disabling $($userExoObject.DisplayName)"
+            Set-MsolUser -UserPrincipalName $userExoObject.UserPrincipalName -BlockCredential $true
+            Set-MsolUserPassword -UserPrincipalName $userExoObject.UserPrincipalName -NewPassword "TTFN123!" -ForceChangePassword $true
+            Get-DistributionGroup -Filter "Members -eq '$($userExoObject.DistinguishedName)'" | % {
+                Remove-DistributionGroupMember -Identity $_.Id -Member $userExoObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
                 }
-            Set-Mailbox $userMsolObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
-            Set-MsolUser -UserPrincipalName $userMsolObject.UserPrincipalName -DisplayName $("Ω_"+$userMsolObject.DisplayName) 
-            remove-msolLicenses -userSAM $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
+            Set-Mailbox $userExoObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
+            Set-MsolUser -UserPrincipalName $userExoObject.UserPrincipalName -DisplayName $("Ω_"+$userExoObject.DisplayName) 
+            remove-msolLicenses -userSAM $($userExoObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
             #Potential fix for the above line: 
-            <#Set-MsolUserLicense -UserPrincipalName $($userMsolObject.UserPrincipalName.Replace("@anthesisgroup.com","")) -RemoveLicenses "Anthesis LLC:ENTERPRISEPACK"#>
+            <#Set-MsolUserLicense -UserPrincipalName $($userExoObject.UserPrincipalName.Replace("@anthesisgroup.com","")) -RemoveLicenses "Anthesis LLC:ENTERPRISEPACK"#>
+            Revoke-AzureADUserAllRefreshToken -ObjectId $userAadObject.ObjectId
+            #Initiate Retire on Intune devices
+            #
+            # ?
+
             }
         }
     }
