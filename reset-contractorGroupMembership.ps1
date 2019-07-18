@@ -35,7 +35,9 @@ connect-ToExo -credential $adminCreds
 $groupMembershipExceptions = @()
 $subbieExceptions = @()
 $subcontractorMesg = Get-DistributionGroup cff78155-8974-44f3-b0b3-f9d2b3b53a23 #"All Subcontractors"
+$mdmByodUsers = Get-DistributionGroup b264f337-ef04-432e-a139-3574331a4d18 #"MDM - BYOD Mobile Device Users"
 $groupMembershipExceptions += $subcontractorMesg.ExternalDirectoryObjectId
+$groupMembershipExceptions += $mdmByodUsers.ExternalDirectoryObjectId
 #$subbieExceptions += "36bc6f20-feed-422d-b2f2-7758e9708604" # $(Get-User "kevin.maitland").ExternalDirectoryObjectId
 
 $subbies = Get-DistributionGroupMember $subcontractorMesg.ExternalDirectoryObjectId | ? {$subbieExceptions -notcontains $_.ExternalDirectoryObjectId}

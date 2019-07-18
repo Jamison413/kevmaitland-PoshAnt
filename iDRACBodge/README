@@ -1,0 +1,21 @@
+Use this as an example on how to start the virtual console without the need of Java Web Start or accessing it from the web interface.
+You can use the user and password that you use for the web interface.
+
+You need an old JRE... I used 1.7.0_80 from the Server JRE package, also I have tested successfully 1.7.0_79 with MacOS.
+You don't need to install it, just extract it or copy the files in "jre" folder.
+
+Open the viewer.jnlp file that you get by launching the virtual console from the web interface with a text editor.
+Note the urls to the jar files. Download the main jar file avctKVM.jar and the libs for your operating system and architecture.
+Extract the dlls (.so Linux, .jnilib MacOS) from the jar libs.
+
+If you don't see the MacOS libs in the file make sure you download it from MacOS.
+
+Edit the bat/sh file according to your needs.
+
+The file structure should look like this:
+
+start-virtual-console.bat (.sh if Linux/MacOS)
+avctKVM.jar
+jre/<jre home here>
+lib/avctKVMIO.dll (.so if Linux, .jnilib if MacOS)
+lib/avmWinLib.dll (.so if Linux, .jnilib if MacOS)
