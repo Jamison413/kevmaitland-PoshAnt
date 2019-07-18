@@ -141,7 +141,8 @@ $userAdmin = "groupbot@anthesisgroup.com"
 $userAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Groupbot.txt) 
 #$adminCreds = set-MsolCredentials -username $intuneAdmin
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $userAdmin, $userAdminPass
-Connect-AzureAD -Credential $adminCreds
+connect-ToMsol -Credential $adminCreds
+connect-toAAD -Credential $adminCreds
 connect-ToExo -credential $adminCreds
 
 $upnsToDeactivate = convertTo-arrayOfEmailAddresses $upnsString
@@ -159,7 +160,7 @@ foreach($user in $upnsToDeactivate){
                 Remove-DistributionGroupMember -Identity $_.Id -Member $userExoObject.UserPrincipalName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
                 }
             Set-Mailbox $userExoObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
-            Set-MsolUser -UserPrincipalName $userExoObject.UserPrincipalName -DisplayName $("Ω_"+$userExoObject.DisplayName) 
+            if($userExoObject.DisplayName.Substring(0,1) -ne "Ω"){Set-MsolUser -UserPrincipalName $userExoObject.UserPrincipalName -DisplayName $("Ω_"+$userExoObject.DisplayName)}
             remove-msolLicenses -userSAM $($userExoObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
             #Potential fix for the above line: 
             <#Set-MsolUserLicense -UserPrincipalName $($userExoObject.UserPrincipalName.Replace("@anthesisgroup.com","")) -RemoveLicenses "Anthesis LLC:ENTERPRISEPACK"#>
