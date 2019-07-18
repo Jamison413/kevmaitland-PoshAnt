@@ -222,23 +222,26 @@ function update-msolSharePointProfileFromAnotherProfile($sourceSpProfile,$destSp
     if($sourceSpProfile.UserProfileProperties["Qualifications"] -ne $null){$destPeopleManager.SetMultiValuedProfileProperty($destSpProfile.AccountName, "Qualifications", $sourceSpProfile.UserProfileProperties["Qualifications"].Split("|"))} 
     $destContext.ExecuteQuery()
     }
-function update-sharePointInitialConfig($pUPN, $anthesisAdminSite, $csomCreds, $timeZone, $p3LetterCountryIsoCode){
+function update-sharePointInitialConfig($pUPN, $csomCreds, $pTimeZone, $p3LetterCountryIsoCode){
+    $spoLoginPrefix = "i:0#.f|membership|"
     $countryLocale = get-spoLocaleFromCountry -p3LetterCountryIsoCode $p3LetterCountryIsoCode
     $languageCode = guess-languageCodeFromCountry -p3LetterCountryIsoCode $p3LetterCountryIsoCode
-    $adminContext = new-csomContext -fullSitePath $anthesisAdminSite -sharePointCredentials $csomCreds
-    $spoUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($adminContext)
-    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-RegionalSettings-Initialized", $true)
-    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-RegionalSettings-FollowWeb", $false)
+
     #Getting the TimeZoneID is a massive PITA:
-    if($timeZones -eq $null){$timeZones = get-timeZones}
-    $tz = $timeZones | ?{$_.PSChildName -eq $timeZone} #Look that up in the registry list
+    $timeZones = get-timeZones
+    $tz = $timeZones | ?{$_.PSChildName -eq $pTimeZone} #Look that up in the registry list
     if($spoTimeZones -eq $null){$spoTimeZones = get-spoTimeZoneHashTable -credentials $csomCredentials}
     $tzID = $spoTimeZones[$tz.Display.replace("+00:00","")] #Then match a different property of the registry object to the SPO object
-    if($tzID.Length -gt 0){$spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-TimeZone", $tzID)}
-    if($countryLocale.length -gt 0){$spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-Locale", $countryLocale)}
-    if($languageCode.length -gt 0){$spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-MUILanguages", $languageCode)}
-    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-CalendarType", 1)
-    $spoUsers.SetSingleValueProfileProperty($pUPN, "SPS-AltCalendarType", 1)
+
+    $adminContext = new-csomContext -fullSitePath "https://anthesisllc-admin.sharepoint.com/" -sharePointCredentials $csomCreds
+    $spoUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($adminContext)
+    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-RegionalSettings-Initialized", $true)
+    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-RegionalSettings-FollowWeb", $false)
+    if($tzID.Length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-TimeZone", $tzID)}
+    if($countryLocale.length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-Locale", $countryLocale)}
+    if($languageCode.length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-MUILanguages", $languageCode)}
+    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-CalendarType", 1)
+    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-AltCalendarType", 1)
     $adminContext.ExecuteQuery()
     }
 function create-personalFolder($pUPN){
@@ -344,6 +347,15 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         }
     catch{
         log-Error "Failed to update mailbox"
+        log-Error $Error
+        }
+    try{
+        log-Message "Setting SharePoint Timezone" -colour "Yellow"
+        update-sharePointInitialConfig -pUPN $userUPN -csomCreds $csomCredentials -pTimeZone $userTimeZone -p3LetterCountryIsoCode $(get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $userPrimaryOffice)
+        log-Message "SharePoint Timezone updated" -colour "DarkYellow"
+        }
+    catch{
+        log-Error "Failed to update SharePoint Timezone"
         log-Error $Error
         }
 
