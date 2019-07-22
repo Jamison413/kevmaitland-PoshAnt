@@ -136,6 +136,16 @@ function delete-userAccounts($userSAM){
     }
 #endregion
 
+$logFileLocation = "C:\ScriptLogs\"
+$scriptName = "get-bitlockerRecoveryKeysFromAad"
+$fullLogPathAndName = $logFileLocation+$scriptName+".ps1_FullLog_$(Get-Date -Format "yyMMdd").log"
+$errorLogPathAndName = $logFileLocation+$scriptName+".ps1_ErrorLog_$(Get-Date -Format "yyMMdd").log"
+if($PSCommandPath){
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_$whatToSync`_Transcript_$(Get-Date -Format "yyMMdd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
+
+
 $userAdmin = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString "IntuneAdminPasswordHere"
 $userAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Groupbot.txt) 
