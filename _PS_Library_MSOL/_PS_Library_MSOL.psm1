@@ -20,7 +20,6 @@ function set-MsolCredentials($username, $password){
     $credential
     }
 function connect-ToMsol($credential){
-    Write-Host -f Yellow Connecting to MSOL services
     <#
     .Synopsis
         Provides a standardised (and simplifed) way to connect to MSOL services
@@ -32,10 +31,19 @@ function connect-ToMsol($credential){
     .EXAMPLE
        connect-ToMsol -credential $creds
     #>
-    if ($credential -eq $null){$credential = set-MsolCredentials}
-    Import-Module MSOnline
-    Write-Host -f DarkYellow "Executing Connect-MsolService"
-    Connect-MsolService -Credential $credential
+    try{
+        Get-AzureADTenantDetail -ErrorAction Stop | Out-Null
+        Write-Host -ForegroundColor Yellow "Already connected to MSOL services"
+        }
+    catch{
+        Write-Host -ForegroundColor Yellow "Connecting to MSOL services"
+        Import-Module MSOnline
+        try{Connect-MsolService -Credential $credential}
+        catch{
+            Write-Warning "Couldn't connect to MSOL non-interactively, trying interactively."
+            Connect-MsolService
+            }
+        }
     }
 function connect-toAzureRm{
     Param (
@@ -53,25 +61,30 @@ function connect-toAzureRm{
         }
     }
 function connect-toAAD($credential){
-    Write-Host -f Yellow Connecting to AAD services
-    if ($(Get-Module -ListAvailable AzureAD) -ne $null){
-        Write-Host -f DarkYellow "Importing AzureAD (_not_ Preview)"
-        Import-Module AzureAD
-        Write-Host -f DarkYellow "Executing Connect-AzureAD"
+    try{
+        Get-AzureADTenantDetail -ErrorAction Stop | Out-Null
+        Write-Host -f Yellow "Already connected to AAD services"
         }
-    if ($(Get-Module -ListAvailable AzureADPreview) -ne $null){
-        Write-Host -f DarkYellow "Importing AzureADPreview"
-        Import-Module AzureADPreview
-        Write-Host -f DarkYellow "Executing Connect-AzureAD"
-        }
-    try{Connect-AzureAD -Credential $credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop}
     catch{
-        Write-Host -ForegroundColor DarkRed "MFA might be required"
-        Connect-AzureAD
+        Write-Host -f Yellow "Connecting to AAD services"
+        if ($(Get-Module -ListAvailable AzureAD) -ne $null){
+            Write-Host -f DarkYellow "Importing AzureAD (_not_ Preview)"
+            Import-Module AzureAD
+            Write-Host -f DarkYellow "Executing Connect-AzureAD"
+            }
+        if ($(Get-Module -ListAvailable AzureADPreview) -ne $null){
+            Write-Host -f DarkYellow "Importing AzureADPreview"
+            Import-Module AzureADPreview
+            Write-Host -f DarkYellow "Executing Connect-AzureAD"
+            }
+        try{Connect-AzureAD -Credential $credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop}
+        catch{
+            Write-Host -ForegroundColor DarkRed "MFA might be required"
+            Connect-AzureAD
+            }
         }
     }
 function connect-ToExo($credential){
-    Write-Host -f Yellow Connecting to EXO services
     <#
     .Synopsis
         Provides a standardised (and simplifed) way to connect to MSOL services
@@ -79,22 +92,28 @@ function connect-ToExo($credential){
         Provides a standardised (and simplifed) way to connect to MSOL services.
         If no credentials are supplied, set-MsolCredentials is called.
     .EXAMPLE
-       connect-ToExo
+        connect-ToExo
     .EXAMPLE
-       connect-ToExo -credential $creds
+        connect-ToExo -credential $creds
     #>
-    if ($credential -eq $null){$credential = set-MsolCredentials}
-    Import-Module Microsoft.Exchange.Management.ExoPowershellModule
-    Write-Host -f DarkYellow "Initiating New-PSSession"
-    try {
-        $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+    if(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}){
+        Write-Host -f Yellow "Already connected to EXO services"
         }
-    catch{
-        Write-Host -ForegroundColor DarkRed "MFA might be required"
-        $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+    else{
+        Write-Host -f Yellow Connecting to EXO services
+        if ($credential -eq $null){$credential = set-MsolCredentials}
+        Import-Module Microsoft.Exchange.Management.ExoPowershellModule
+        Write-Host -f DarkYellow "Initiating New-PSSession"
+        try {
+            $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+            }
+        catch{
+            Write-Host -ForegroundColor DarkRed "MFA might be required"
+            $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+            }
+        Write-Host -f DarkYellow "Importing New-PSSession"
+        Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global
         }
-    Write-Host -f DarkYellow "Importing New-PSSession"
-    Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global
     }
 function connect-ToSpo($credential){
     Write-Host -f Yellow Connecting to SPO services
