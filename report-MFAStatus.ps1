@@ -77,11 +77,12 @@ $body += "      `r`n`t<BR><PRE>&#9;"
 $body += "Total MFA Optimal Score: $TotalOptimalMFAScore%"
 
 
-$body += "Love,`r`n`r`n<BR><BR>The Helpful MFA Robot</FONT></HTML>"
+$body += "<BR><BR>Love,`r`n`r`n<BR>The Helpful MFA Robot</FONT></HTML>"
 #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
 Write-Information $body
 Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
-Send-MailMessage -To "kev.maitland@anthesisgroup.com" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
+Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
+Send-MailMessage -To "andrew.ost@anthesisgroup.com" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
 Write-Information "Message Sent (maybe)"
 #$body
 Stop-Transcript
