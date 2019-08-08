@@ -35,7 +35,7 @@ function convertTo-arrayOfEmailAddresses($blockOfText){
     $addresses = @()
     $blockOfText | %{
         foreach($blob in $_.Split(" ").Split("`r`n").Split(";").Split(",")){
-            if($blob -match "@" -and $blob -match "."){$addresses += $blob.Replace("<","").Replace(">","").Replace(";","")}
+            if($blob -match "@" -and $blob -match "."){$addresses += $blob.Replace("<","").Replace(">","").Replace(";","").Trim()}
             }
         }
     $addresses

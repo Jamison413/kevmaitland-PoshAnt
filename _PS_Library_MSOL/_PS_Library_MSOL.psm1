@@ -32,7 +32,7 @@ function connect-ToMsol($credential){
        connect-ToMsol -credential $creds
     #>
     try{
-        Get-AzureADTenantDetail -ErrorAction Stop | Out-Null
+        Get-MsolDomain -ErrorAction Stop | Out-Null
         Write-Host -ForegroundColor Yellow "Already connected to MSOL services"
         }
     catch{
@@ -96,7 +96,7 @@ function connect-ToExo($credential){
     .EXAMPLE
         connect-ToExo -credential $creds
     #>
-    if(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}){
+    if($(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}).Count -ne 0){
         Write-Host -f Yellow "Already connected to EXO services"
         }
     else{
