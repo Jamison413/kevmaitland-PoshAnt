@@ -112,8 +112,14 @@ function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSA
         -OtherAttributes @{'ipPhone'="XXX";'pager'=$receptionDDI} `
         -Credential $adCredentials
     $newAdUserAccount = Get-ADUser -filter {UserPrincipalName -like $pUPN} -Credential $adCredentials 
-    Get-ADGroup -Filter {name -like $pPrimaryTeam} | %{Add-ADGroupMember -Identity $_ -Members $newAdUserAccount -Credential $adCredentials}
-    $pSecondaryTeams | %{Get-ADGroup -Filter {name -like $_}} | %{Add-ADGroupMember -Identity $_ -Members $newAdUserAccount -Credential $adCredentials}
+    $primaryTeam = Get-ADGroup -Filter {name -like $pPrimaryTeam} 
+    if($primaryTeam){
+        Write-Host "Adding [$($newAdUserAccount.Name)] to [$($primaryTeam.Name)]"
+        Add-ADGroupMember -Identity $primaryTeam.ObjectGUID -Members $newAdUserAccount -Credential $adCredentials
+        }
+    if($pSecondaryTeams){
+        $pSecondaryTeams | %{Get-ADGroup -Filter {name -like $_}} | %{Add-ADGroupMember -Identity $_ -Members $newAdUserAccount -Credential $adCredentials}
+        }
     }
 function create-msolUser($pUPN,$pPlaintextPassword){
     #create the Mailbox rather than the MSOLUser, which will effectively create an unlicensed E1 user
