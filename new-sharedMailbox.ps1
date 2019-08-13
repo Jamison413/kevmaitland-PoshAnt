@@ -18,7 +18,7 @@ $hideFromGal = $false
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){
     $exchangeAlias = $(guess-aliasFromDisplayName -displayName $displayName)
-    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias -PrimarySmtpAddress $primaryEmail| Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false
+    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias -PrimarySmtpAddress $primaryEmail | Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false -MessageCopyForSendOnBehalfEnabled $true -MessageCopyForSentAsEnabled $true
     $arrayOfFullAccessMembers  | %{
         Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
         if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs -Confirm:$false}

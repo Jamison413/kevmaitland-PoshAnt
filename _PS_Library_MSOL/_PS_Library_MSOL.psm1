@@ -19,6 +19,11 @@ function set-MsolCredentials($username, $password){
     $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $username, $password
     $credential
     }
+function bodge-exo(){
+    [cmdletbinding()]
+    param()
+    add-registryValue -registryPath "Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WinRM\Client" -registryKey "AllowBasic" -registryValue "1" -registryType DWord -Verbose
+    }
 function connect-ToMsol($credential){
     <#
     .Synopsis
@@ -96,23 +101,35 @@ function connect-ToExo($credential){
     .EXAMPLE
         connect-ToExo -credential $creds
     #>
-    if($(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}).Count -ne 0){
-        Write-Host -f Yellow "Already connected to EXO services"
-        }
-    else{
-        Write-Host -f Yellow Connecting to EXO services
-        if ($credential -eq $null){$credential = set-MsolCredentials}
-        Import-Module Microsoft.Exchange.Management.ExoPowershellModule
-        Write-Host -f DarkYellow "Initiating New-PSSession"
-        try {
-            $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+    switch ($(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}).Count){
+        0 {
+            Write-Host -f Yellow Connecting to EXO services
+            if ($credential -eq $null){$credential = set-MsolCredentials}
+            Import-Module Microsoft.Exchange.Management.ExoPowershellModule
+            Write-Host -f DarkYellow "Initiating New-PSSession"
+            try {
+                bodge-exo 
+                $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+                }
+            catch{
+                Write-Host -ForegroundColor DarkRed "MFA might be required"
+                $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+                }
+            Write-Host -f DarkYellow "Importing New-PSSession"
+            Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global            
             }
-        catch{
-            Write-Host -ForegroundColor DarkRed "MFA might be required"
-            $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+        1 {
+            if((Get-Module | ? {$_.ExportedCommands.Keys -contains "Get-Mailbox"}).Count -gt 0)
+                {
+                Write-Host -f Yellow "Already connected to EXO services"
+                }
+            else{
+                Import-Module (Import-PSSession $(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}) -AllowClobber) -Global
+                }
             }
-        Write-Host -f DarkYellow "Importing New-PSSession"
-        Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global
+        default {
+            Write-Host -f DarkRed "Something went wrong connecting to EXO :/"
+            }
         }
     }
 function connect-ToSpo($credential){

@@ -13,3 +13,67 @@ function remove-regBranchKeyMatchingString([Microsoft.Win32.RegistryKey]$branchK
         else{$branchKey | Remove-Item -Recurse -Force -WhatIf}
         }
     }
+
+function add-registryValue(){
+    [cmdletbinding()]
+        <#
+    .SYNOPSIS
+    
+
+    .DESCRIPTION
+    
+
+    .PARAMETER infile1
+    
+
+    .PARAMETER infile2
+    
+
+    .EXAMPLE
+    Merge-PolicyRules.ps1 .\wksta-basic.PolicyRules .\wksta-kiosk.PolicyRules > .\wksta-merged.PolicyRules
+    #>
+
+    param(
+        [parameter(Mandatory=$true)]
+        [String]
+        $registryPath,
+
+        [parameter(Mandatory=$true)]
+        [String]
+        $registryKey
+        
+        ,[parameter(Mandatory=$true)]
+        [String]
+        $registryValue
+
+        ,[parameter(Mandatory=$true)]
+        [ValidateSet("String", "ExpandString", "Binary", "DWord", "MultiString", "QWord")] 
+        [String]
+        $registryType
+
+    #TODO: Merge arbitrary number of files
+    )
+    $registryPath = $registryPath.Replace("Computer\","")
+    $registryPath = $registryPath.Replace("HKEY_LOCAL_MACHINE","HKLM:")
+    $registryPath = $registryPath.Replace("HKEY_CURRENT_USER","HKCU:")
+
+    try {$existingItem = Get-ItemProperty -Path $registryPath -name $registryKey -ErrorAction SilentlyContinue}
+    catch{}
+    
+    Write-Verbose "`$registryPath = $registryPath"
+    Write-Verbose "`$registryKey = $registryKey"
+    Write-Verbose "`$registryValue = $registryValue"
+    Write-Verbose "`$registryType = $registryType"
+    Write-Verbose "`$existingItem = $existingItem"
+
+    if([string]::IsNullOrWhiteSpace($existingItem.$registryKey)){
+        Write-Verbose "Creating new Registry Value"
+        New-ItemProperty -Path $registryPath -Name $registryKey -Value $registryValue -PropertyType $registryType
+        }
+    else{
+        Write-Verbose "Updating existing Registry Value"
+        Set-ItemProperty -Path $registryPath -Name $registryKey -Value $registryValue
+        }
+    
+    
+    }
