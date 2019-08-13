@@ -49,5 +49,3 @@ $upnsToEnable | % {
     }
 
 Stop-Transcript
-
-
