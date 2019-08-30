@@ -49,3 +49,8 @@ $upnsToEnable | % {
     }
 
 Stop-Transcript
+
+<#Disable MFA for specific user#>
+
+$mfa = @()
+Set-MsolUser -UserPrincipalName <#UPN#> -StrongAuthenticationRequirements $mfa
