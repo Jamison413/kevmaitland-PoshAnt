@@ -116,6 +116,82 @@ function copy-spoFile($fromList,$from,$to,$spoCredentials){
     Copy-PnPFile -SourceUrl $from -TargetUrl $to -Force
     Get-PnPFile -Url "$to$(Split-Path $from -Leaf)"
     }
+function copy-spoPage(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [ValidatePattern(".[SitePages].")]
+        [System.Uri]$sourceUrl = "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Candidate-Template-for-Global-Sites.aspx"
+
+        ,[parameter(Mandatory = $true)]
+        [System.Uri]$destinationSite =  "https://anthesisllc.sharepoint.com/sites/Resources-HumanResourcesHRTeamESP"
+
+        ,[parameter(Mandatory = $true)]
+        [pscredential]$pnpCreds
+
+        ,[parameter(Mandatory = $false)]
+        [bool]$overwriteDestinationFile = $false
+        )
+    
+    $dirtyBodgeToGetSourceSite = $sourceUrl.Scheme+"://"+$sourceUrl.DnsSafeHost
+    $sourceUrl.Segments | %{
+        if($_ -match "SitePages"){break}
+        $dirtyBodgeToGetSourceSite += $_
+        }
+    
+    $dirtyBodgeToGetDestinationSite = $destinationSite.Scheme+"://"+$destinationSite.DnsSafeHost
+    $destinationSite.Segments | %{
+        if($_ -match "SitePages"){break}
+        $dirtyBodgeToGetDestinationSite += $_
+        }
+    Write-Verbose "`$dirtyBodgeToGetSourceSite = $dirtyBodgeToGetSourceSite"
+    Write-Verbose "`$dirtyBodgeToGetDestinationSite = $dirtyBodgeToGetDestinationSite"
+
+    try{
+        Write-Verbose "Connecting to Source Site via PNP [$dirtyBodgeToGetSourceSite]"
+        Connect-PnPOnline –Url $dirtyBodgeToGetSourceSite -Credentials $pnpCreds -ErrorAction Stop
+        try{
+            Write-Verbose "Downloading source Page file [$($sourceUrl.LocalPath)]"
+            Get-PnPFile -Url $sourceUrl.LocalPath -Path "$env:TEMP" -Filename $(Split-Path $sourceUrl.AbsoluteUri -Leaf) -AsFile -Force
+            try{
+                Write-Verbose "Connecting to SPO Admin [https://anthesisllc-admin.sharepoint.com/] (same creds [$($pnpCreds.UserName)], but different permissions required)"
+                Connect-SPOService -Url https://anthesisllc-admin.sharepoint.com/ -Credential $pnpCreds
+                try{
+                    Write-Verbose "Allowing upload of .aspx files to destination [$($destinationSite.AbsoluteUri)]"
+                    Set-SPOSite -Identity $destinationSite.AbsoluteUri -DenyAddAndCustomizePages $false -ErrorAction Stop
+                    try{
+                        Write-Verbose "Uploading file to [$($destinationSite.AbsoluteUri+"/SitePages/"+$(Split-Path $sourceUrl.AbsoluteUri -Leaf))]"
+                        Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Credentials $pnpCreds
+                        Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop
+                        try{
+                            Write-Verbose "Disabling upload of .aspx files to destination [$($destinationSite.AbsoluteUri)]"
+                            Set-SPOSite -Identity $destinationSite.AbsoluteUri -DenyAddAndCustomizePages $true -ErrorAction Stop
+                            }
+                        catch{
+                            Write-Error "Failed to re-allow upload of .aspx files to Destination SitePages Lib [$($destinationSite.AbsoluteUri)]"
+                            }
+                        }
+                    catch{
+                        Write-Error "Failed to upload file to destination [$($destinationSite.AbsoluteUri+"/SitePages/"+$(Split-Path $sourceUrl.AbsoluteUri -Leaf))]"
+                        }
+                    }
+                catch{
+                    Write-Error "Could not enable upload fo .aspx files to destination site [[$($destinationSite.AbsoluteUri)]]"
+                    }
+                }
+            catch{
+                Write-Error "Failed to connect to [https://anthesisllc-admin.sharepoint.com/]"
+                }
+            }
+        catch{
+             Write-Error "Failed to download source file [$($sourceUrl.LocalPath)]"
+            }
+        }
+    catch{
+        Write-Error "Could not connect to Source Site via PNP [$dirtyBodgeToGetSourceSite]"
+        }
+    
+    }
 function format-asServerRelativeUrl($serverRelativeUrl,$stringToFormat){
     $formattedString = $stringToFormat
     if([string]::IsNullOrWhiteSpace($formattedString)){$formattedString = "/"}
