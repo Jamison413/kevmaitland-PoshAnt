@@ -71,13 +71,6 @@ function decrypt-SecureString($secureString){
     $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
     [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
     }
-function get-kimbleEngagementCodeFromString($stringMaybeContainingEngagementCode,$verboseLogging){
-    if($stringMaybeContainingEngagementCode -match 'E(\d){6}'){
-        $Matches[0]
-        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContainingEngagementCode"}
-        }
-    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Kimble Project Code not found in $stringMaybeContainingEngagementCode"}}
-    }
 function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[boolean]$localise){
     if($pDirtyNumber.Length -gt 0){
         $dirtynumber = $pDirtyNumber.Split("ext")[0]
@@ -325,6 +318,14 @@ function get-azureAdBitLockerKeysForUser {
 
      $bitLockerKeys
     }
+function get-groupAdminRoleEmailAddresses(){
+    [CmdletBinding()]
+    param()
+    $admins = @()
+    Get-MsolRoleMember -RoleObjectId fe930be7-5e62-47db-91af-98c3a49a38b1 | % {$admins += $_.EmailAddress} #User Account Administrator
+    Get-MsolRoleMember -RoleObjectId 29232cdf-9323-42fd-ade2-1d097af3e4de | % {$admins += $_.EmailAddress} #Exchange Service Administrator
+    $admins | Sort-Object -Unique
+    }
 function get-keyFromValue($value, $hashTable){
     foreach ($Key in ($hashTable.GetEnumerator() | Where-Object {$_.Value -eq $value})){
         $Key.name}
@@ -332,6 +333,13 @@ function get-keyFromValue($value, $hashTable){
 function get-keyFromValueViaAnotherKey($value, $interimKey, $hashTable){
     foreach ($Key in ($hashTable.GetEnumerator() | Where-Object {$_.Value[$interimKey] -eq $value})){
         $Key.name}
+    }
+function get-kimbleEngagementCodeFromString($stringMaybeContainingEngagementCode,$verboseLogging){
+    if($stringMaybeContainingEngagementCode -match 'E(\d){6}'){
+        $Matches[0]
+        if($verboseLogging){Write-Host -ForegroundColor DarkCyan "[$($Matches[0])] found in $stringMaybeContainingEngagementCode"}
+        }
+    else{if($verboseLogging){Write-Host -ForegroundColor DarkCyan "Kimble Project Code not found in $stringMaybeContainingEngagementCode"}}
     }
 function get-managersGroupNameFromTeamUrl($teamSiteUrl){
     if(![string]::IsNullOrWhiteSpace($teamSiteUrl)){
