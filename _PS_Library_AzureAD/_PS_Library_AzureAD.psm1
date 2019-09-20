@@ -1,30 +1,4 @@
-﻿function enumerate-nestedDistributionGroupsToAadUsers(){
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true)]
-        [PSObject]$distributionGroupObject
-        )
-    $immediateMembers = Get-DistributionGroupMember -Identity $distributionGroupObject.ExternalDirectoryObjectId
-    $immediateMembers | % {
-        $thisMember = $_
-        switch($thisMember.RecipientTypeDetails){
-            ("UserMailbox") {
-                $aadUser = Get-AzureADUser -ObjectId $thisMember.WindowsLiveID
-                Write-Verbose "AADUser [$($aadUser.DisplayName)] is a member of [$($distributionGroupObject.DisplayName)]"
-                [array]$aadUserObjects += $aadUser
-                }
-            ("MailUniversalSecurityGroup"){
-                $subDistributionGroup = Get-DistributionGroup -Identity $thisMember.ExternalDirectoryObjectId
-                [array]$subAadUserObjects = enumerate-nestedDistributionGroupsToAadUsers -distributionGroupObject $subDistributionGroup
-                Write-Host "`$aadUserObjects.Count = $($aadUserObjects.Count) `t`$subAadUserObjects.Count = $($subAadUserObjects.Count)"
-                $aadUserObjects = $subAadUserObjects
-                }
-            default {}
-            }
-        }
-    $aadUserObjects
-    }
-function get-aadUsersWithLicense(){
+﻿function get-aadUsersWithLicense(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true)]

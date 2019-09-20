@@ -22,29 +22,20 @@ $groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\G
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 
 connect-toAAD -credential $adminCreds
-
-$groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
-$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $adminCreds
 
 $all365Groups = Get-UnifiedGroup
 $toExclude = @("Sym - Supply Chain","Apparel Team (All)","All North America","Business Development Team (GBR)","Pre Sales Team (All)","Teams Testing Team", "Finance Team (North America)","Finance Team (North America)")
 $365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential"}
 
+$adminEmailAddresses = get-groupAdminRoleEmailAddresses
 
 $365GroupsToProcess | % {
     $365Group = $_
-    sync-365GroupMembersToMirroredSecurityGroup -unifiedGroupObject $365Group -reallyDoIt $true -dontSendEmailReport $false -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
-    sync-managersTo365GroupOwners -unifiedGroupObject $365Group -reallyDoIt $true -dontSendEmailReport $false -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
+    sync-groupMemberships -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose 
+    sync-groupMemberships -UnifiedGroup $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose
     }
 
 
 
 Stop-Transcript
-
-<#
-$365Group = Get-UnifiedGroup "Software Team (PHI)"
-Remove-Module _PS_Library_Groups
-Import-Module _PS_Library_Groups
-#>
