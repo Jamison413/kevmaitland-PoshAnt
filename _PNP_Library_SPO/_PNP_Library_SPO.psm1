@@ -687,7 +687,126 @@ function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOf
 
 
     }
-function set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging,$fullLogPathAndName,$errorLogPathAndName){
+function set-standardTeamSitePermissions(){
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName="URL")]
+        [System.Uri]$teamSiteAbsoluteUrl
+        ,[parameter(Mandatory = $false,ParameterSetName="URL")]
+        [Object[]]$fullArrayOfUnifiedGroups #To optionally save on repeated get-UnifiedGroup calls
+        #,[parameter(Mandatory = $true,ParameterSetName="URL")]
+        #[pscredential]$pnpCreds
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
+        [PSObject]$UnifiedGroupObject
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [string]$UnifiedGroupId
+
+        ,[parameter(Mandatory = $false,ParameterSetName="URL")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [string]$fullLogPathAndName
+        ,[parameter(Mandatory = $false,ParameterSetName="URL")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [string]$errorLogPathAndName
+        )
+    Write-Verbose "set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $($adminCredentials.Username))"
+
+    #region Get $teamSiteAbsoluteUrl & $UnifiedGroupObject, regardless of which parameters we've been given
+    switch ($PsCmdlet.ParameterSetName){
+        “UnifiedGroupId”  {
+            Write-Verbose "We've been given a 365 Id, so we need the Group object"
+            $UnifiedGroupObject = Get-UnifiedGroup $UnifiedGroupId
+            if(!$UnifiedGroupObject){
+                Write-Error "Could not retrieve Unified Group from ID [$UnifiedGroupId]"
+                break
+                }
+            }
+        {$_ -match "Unified"}  {
+            Write-Verbose "We have a Unified Group object, so we need the URL"
+            $teamSiteAbsoluteUrl = $UnifiedGroupObject.SharePointSiteUrl
+            if(![string]::IsNullOrWhiteSpace($teamSiteAbsoluteUrl)){
+                Write-Error "Could not retrieve 365 Group URL from Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)]. Exiting without attempting to permissions"
+                break
+                }
+            }
+        "URL" {
+            if(!$fullArrayOfUnifiedGroups){$fullArrayOfUnifiedGroups = Get-UnifiedGroup}
+            }
+        }
+
+    if(!$UnifiedGroupObject){$unifiedGroupObject = $fullArrayOfUnifiedGroups | ? {$_.SharePointSiteUrl -eq $teamSiteAbsoluteUrl}}#-Filter "SharePointSiteUrl -eq '$teamSiteAbsoluteUrl'" Cannot bind parameter 'Filter' to the target. Exception setting "Filter": ""SharePointSiteUrl" is not a recognized filterable property.
+    #endregion
+
+    if(test-pnpConnectionMatchesResource -resourceUrl $teamSiteAbsoluteUrl){
+        $spoSiteCollectionAdmins = Get-PnPSiteCollectionAdmin
+        $spoOwnersGroup = Get-PnPGroup -AssociatedOwnerGroup
+
+        #Block all external sharing
+        $pnpTenantSite = Get-PnPTenantSite -Url $teamSiteAbsoluteUrl
+        Write-Verbose "SharingCapability is [$($pnpTenantSite.SharingCapability)] for [$($teamSiteAbsoluteUrl)]"
+        if($pnpTenantSite.SharingCapability -ne "Disabled"){
+            Write-Warning "SharingCapability was [$($pnpTenantSite.SharingCapability)] for [$($teamSiteAbsoluteUrl)] - Disabling now"
+            Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled
+            }
+
+        #Enable the DocID service
+        $pnpSite = Get-PnPSite -Includes Features
+        if($pnpSite.Features.DefinitionId -notcontains "b50e3104-6812-424f-a011-cc90e6327318"){
+            Write-Verbose "Enabling DocID Service for [$teamSiteAbsoluteUrl]"
+            $pnpSite.Features.Add([guid]"b50e3104-6812-424f-a011-cc90e6327318",$false,[Microsoft.SharePoint.Client.FeatureDefinitionScope]::None)
+            $pnpSite.Context.ExecuteQuery()
+            }
+        else{Write-Verbose "DocID Service was already enabled for [$teamSiteAbsoluteUrl]"}
+        
+        #Untick Members can share boxes 
+            $pnpWeb = Get-PnPWeb -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
+            if($pnpWeb.MembersCanShare){
+                Write-Warning "MembersCanShare was set to $true for $[($teamSiteAbsoluteUrl)]"
+                $pnpWeb.MembersCanShare = $false
+                }
+            if($pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
+                Write-Warning "AssociatedMemberGroup.AllowMembersEditMembership was set to $true for $[($teamSiteAbsoluteUrl)]"
+                $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
+                $pnpWeb.AssociatedMemberGroup.Update()
+                }
+            if($pnpWeb.MembersCanShare -or $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
+                $pnpWeb.Update()
+                $pnpWeb.Context.ExecuteQuery()
+                }
+
+
+        #Remove all non-Datamanager entries from Site Owners
+        [array]$unexpectedSiteOwners = $spoOwnersGroup.Users | ? {($_.LoginName -notmatch $UnifiedGroupObject.ExternalDirectoryObjectId) -and ($_.LoginName -ne "SHAREPOINT\system")}
+        if($unexpectedSiteOwners.Count -gt 0){
+            #Report Unexpected Site Owners
+##########################################
+            #Remove Unexpected Site Owners
+            $unexpectedSiteOwners | % {
+                Write-Verbose "`tRemove-PnPUserFromGroup -LoginName $($_.LoginName) -Identity $($spoOwnersGroup.Id)"
+                Remove-PnPUserFromGroup -LoginName $_.LoginName -Identity $spoOwnersGroup.Id -Verbose:$VerbosePreference
+                }
+            }
+
+        #Remove all non-DataManager entries from Site Collection Admins (except executing user otherwise we might saw off the branch we're sitting on) :)
+        [array]$unexpectedSiteCollectionAdmins = $spoSiteCollectionAdmins | ? {($_.LoginName -notmatch $UnifiedGroupObject.CustomAttribute2 -and $_.LoginName -notmatch (Get-PnPConnection).PSCredential.UserName)}
+        if($unexpectedSiteCollectionAdmins.Count -gt 0){
+            #Report Unexpected Site Admins
+##########################################
+            #Remove Unexpected Site Admins
+            $unexpectedSiteCollectionAdmins | % {
+                Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
+                }
+            }
+        #Finally, remove the executing User from Site Collection Admins, if present
+        $spoSiteCollectionAdmins | ? {$_.LoginName -match (Get-PnPConnection).PSCredential.UserName} | % {
+            Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
+            }
+
+        }
+    }
+
+function set-standardTeamSitePermissions_deprecated($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging,$fullLogPathAndName,$errorLogPathAndName){
     #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_Engineering_Team_All_365/"
     #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Waste_&_Resource_Sustainability_WRS_Team_All_365"
    if($verboseLogging){Write-Host -ForegroundColor Magenta "set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $($adminCredentials.Username))"}

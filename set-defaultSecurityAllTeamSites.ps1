@@ -29,20 +29,26 @@ $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredentia
 connect-ToExo -credential $exoCreds
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $sharePointCreds
 
-$teamSites = Get-PnPTenantSite -Template GROUP#0
+$allUnifiedGroups = Get-UnifiedGroup
 
 $excludeThese = @("https://anthesisllc.sharepoint.com/teams/Energy_%26_Carbon_Consulting_Analysts_%26_Software_ECCAST_Community_","https://anthesisllc.sharepoint.com/sites/AccountsPayable","https://anthesisllc.sharepoint.com/sites/anthesisnorthamerica","https://anthesisllc.sharepoint.com/sites/apparel","https://anthesisllc.sharepoint.com/sites/bdcontacts42","https://anthesisllc.sharepoint.com/teams/BusinessDevelopmentTeam-GBR-","https://anthesisllc.sharepoint.com/teams/PreSalesTeam","https://anthesisllc.sharepoint.com/teams/teamstestingteam","https://anthesisllc.sharepoint.com/sites/sparke","https://anthesisllc.sharepoint.com/sites/supplychainsym")
 
-$teamSites | ? {$excludeThese -notcontains $_.Url -and $_.Url -notmatch "Confidential"} | % {
+$groupsToProcess = $allUnifiedGroups | ? {$excludeThese -notcontains $_.SharePointSiteUrl -and $_.Displayname -notmatch "Confidential"}
+$groupsToProcess | % {
     $thisTeamSite = $_
     #Write-Host $thisTeamSite.Url
-    #Set-PnPTenantSite -Url $thisTeamSite.Url -Owners (Get-PnPConnection).PSCredential.UserName # This will be automatically removed in the set-standardTeamSitePermissions script
-    #set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.Url -adminCredentials $sharePointCreds -verboseLogging $verboseLogging -fullLogPathAndName $fullLogPathAndName -errorLogPathAndName $errorLogPathAndName 
-    Connect-PnPOnline -Url $thisTeamSite.Url -Credentials $sharePointCreds
-    Remove-PnPSiteCollectionAdmin -Owners (Get-PnPConnection).PSCredential.UserName
+    if([string]::IsNullOrWhiteSpace($thisTeamSite.SharePointSiteUrl)){
+        Write-Verbose "Site [$($thisTeamSite.DisplayName)] is not provisioned yet. having a pop at it, but don't hold your breath."
+        #$web = Invoke-WebRequest -Uri "https://outlook.office365.com/owa/$($thisTeamSite.PrimarySmtpAddress)/groupsubscription.ashx?realm=anthesisgroup.com&source=WelcomeEmail&action=files" -Credential $sharePointCreds -SessionVariable thisSession
+        #$web2 = Invoke-WebRequest -Uri "https://anthesisllc.sharepoint.com/_layouts/15/groupstatus.aspx?id=$($thisTeamSite.ExternalDirectoryObjectId)&target=documents" -Credential $sharePointCreds -SessionVariable thisSession -Method Get
+        #$web3 = Invoke-WebRequest -Uri "https://anthesisllc.sharepoint.com/_layouts/15/groupstatus.aspx?id=$($thisTeamSite.ExternalDirectoryObjectId)&target=documents" -Credential $sharePointCreds -SessionVariable $thisSession
+        }
+    else{
+        Write-Verbose "Setting security defaults for [$($thisTeamSite.DisplayName)]"
+        Set-PnPTenantSite -Url $thisTeamSite.SharePointSiteUrl -Owners $((Get-PnPConnection).PSCredential.UserName)
+        Connect-PnPOnline -Url $thisTeamSite.SharePointSiteUrl -Credentials $sharePointCreds
+        set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.SharePointSiteUrl -fullArrayOfUnifiedGroups $allUnifiedGroups -Verbose
+        }
     }
 
-$url = "https://anthesisllc.sharepoint.com/teams/Sustainable_Chemistry_Team_All_365"
-Connect-PnPOnline -Url $Url -Credentials $msolCredentials
-Set-PnPTenantSite -Url $Url -Owners (Get-PnPConnection).PSCredential.UserName # This will be automatically removed in the set-standardTeamSitePermissions script
-Remove-PnPSiteCollectionAdmin -Owners (Get-PnPConnection).PSCredential.UserName
+

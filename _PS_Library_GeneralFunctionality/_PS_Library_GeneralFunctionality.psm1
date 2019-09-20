@@ -32,7 +32,7 @@ function compare-objectProperties {
     if ($diffs) {return ($diffs | Select PropertyName,RefValue,DiffValue)}     
     }
 function convertTo-arrayOfEmailAddresses($blockOfText){
-    $addresses = @()
+    [string[]]$addresses = @()
     $blockOfText | %{
         foreach($blob in $_.Split(" ").Split("`r`n").Split(";").Split(",")){
             if($blob -match "@" -and $blob -match "."){$addresses += $blob.Replace("<","").Replace(">","").Replace(";","").Trim()}

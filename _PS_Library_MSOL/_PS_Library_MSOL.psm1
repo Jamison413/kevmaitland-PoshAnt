@@ -159,18 +159,6 @@ function connect-ToSpo($credential){
     Connect-PnPOnline –Url https://anthesisllc.sharepoint.com -Credentials  $credential
     }
 function connect-to365(){
-    Write-Host -f Yellow "Importing Modules"
-    Write-Host -f DarkYellow "_PS_Library_GeneralFunctionality"
-    Import-Module _PS_Library_GeneralFunctionality
-    Write-Host -f DarkYellow "_PS_Library_Groups"
-    Import-Module _PS_Library_Groups
-    Write-Host -f DarkYellow "_CSOM_Library-SPO"
-    Import-Module _CSOM_Library-SPO
-    Write-Host -f DarkYellow "_REST_Library-SPO"
-    Import-Module _REST_Library-SPO
-    Write-Host -f DarkYellow "_REST_Library-Kimble"
-    Import-Module _REST_Library-Kimble
-
     Write-Host -f Yellow Connecting to 365 services
     Write-Host -f DarkYellow "Executing set-MsolCredentials"
     $msolCredentials = set-MsolCredentials 
