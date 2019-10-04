@@ -2,7 +2,17 @@
 
 Import-Module _PS_Library_MSOL.psm1
 Import-Module _PS_Library_GeneralFunctionality
+Import-Module _PNP_Library_SPO
 #Import-Module *pnp*
+
+$msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
+$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
+$csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
+connect-ToMsol -credential $msolCredentials
+connect-toAAD -credential $msolCredentials
+connect-ToExo -credential $msolCredentials
+connect-PnPonline -url "https://anthesisllc.sharepoint.com" -credential $msolCredentials #for adding team to Term Store
+
 
 function guess-aliasFromDisplayName($displayName){
     #Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
@@ -1259,9 +1269,19 @@ function sync-managersTo365GroupOwners($unifiedGroupObject,[boolean]$reallyDoIt,
     if($dontSendEmailReport){log-result -myMessage "Report specifically not requested" -logFile $fullLogFile}
 
     }
+function addto-SharepointTeamsTermStore{
+[CmdletBinding()]
+Param ($displayName)
+
+    If( ($displayName -notmatch "Sym") -and ($displayName -notmatch "Working Group") ){
+        Write-Host "This isn't a Sym or Working Group, adding to the Team Term Store" -ForegroundColor Magenta 
+        New-PnPTerm -TermSet "Live Sharepoint Teams" -TermGroup "Anthesis" -Name $displayName -Lcid 1033
+        }
+}
 
 
 new-teamGroup -displayName "IT Team (ESP)" -managerUpns "kevin.maitland@anthesisgroup.com" -teamMemberUpns $(convertTo-arrayOfEmailAddresses "kevin.maitland@anthesisgroup.com") -memberOf ITTeamAll-365Mirror@anthesisgroup.com -membershipManagedBy 365 -Verbose
+addto-SharepointTeamsTermStore -displayName $displayName
 
 $displayName = "IT Team (GBR)"
 [string[]]$managerUpns = $(convertTo-arrayOfEmailAddresses "kevin.maitland@anthesisgroup.com")
