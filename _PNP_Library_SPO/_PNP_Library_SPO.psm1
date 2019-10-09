@@ -124,32 +124,35 @@ function copy-spoPage(){
         [System.Uri]$sourceUrl = "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Candidate-Template-for-Global-Sites.aspx"
 
         ,[parameter(Mandatory = $true)]
-        [System.Uri]$destinationSite =  "https://anthesisllc.sharepoint.com/sites/Resources-HumanResourcesHRTeamESP"
+        [System.Uri]$destinationSite
 
         ,[parameter(Mandatory = $true)]
         [pscredential]$pnpCreds
 
         ,[parameter(Mandatory = $false)]
         [bool]$overwriteDestinationFile = $false
+        
+        ,[parameter(Mandatory = $false)]
+        [string]$renameFileAs
         )
-    
+    Write-Verbose "copy-spoPage($($sourceUrl),$($destinationSite))"
     $dirtyBodgeToGetSourceSite = $sourceUrl.Scheme+"://"+$sourceUrl.DnsSafeHost
-    $sourceUrl.Segments | %{
-        if($_ -match "SitePages"){break}
-        $dirtyBodgeToGetSourceSite += $_
-        }
-    
-    $dirtyBodgeToGetDestinationSite = $destinationSite.Scheme+"://"+$destinationSite.DnsSafeHost
-    $destinationSite.Segments | %{
-        if($_ -match "SitePages"){break}
-        $dirtyBodgeToGetDestinationSite += $_
+    #$sourceUrl.Segments | %{ #break not supported in pipeline
+    foreach ($segment in $sourceUrl.Segments ){
+        if($segment -match "SitePages"){break}
+        $dirtyBodgeToGetSourceSite += $segment
         }
     Write-Verbose "`$dirtyBodgeToGetSourceSite = $dirtyBodgeToGetSourceSite"
+    
+    $dirtyBodgeToGetDestinationSite = $destinationSite.Scheme+"://"+$destinationSite.DnsSafeHost
+    foreach ($segment in $destinationSite.Segments){
+        if($segment -match "SitePages"){break}
+        $dirtyBodgeToGetDestinationSite += $segment
+        }
     Write-Verbose "`$dirtyBodgeToGetDestinationSite = $dirtyBodgeToGetDestinationSite"
 
     try{
-        Write-Verbose "Connecting to Source Site via PNP [$dirtyBodgeToGetSourceSite]"
-        Connect-PnPOnline –Url $dirtyBodgeToGetSourceSite -Credentials $pnpCreds -ErrorAction Stop
+        if (test-pnpConnectionMatchesResource -resourceUrl $dirtyBodgeToGetSourceSite -connectIfDifferent $true -pnpCreds $pnpCreds){Write-Verbose "Already connected to source Site [$($dirtyBodgeToGetSourceSite)]"}
         try{
             Write-Verbose "Downloading source Page file [$($sourceUrl.LocalPath)]"
             Get-PnPFile -Url $sourceUrl.LocalPath -Path "$env:TEMP" -Filename $(Split-Path $sourceUrl.AbsoluteUri -Leaf) -AsFile -Force
@@ -157,15 +160,19 @@ function copy-spoPage(){
                 Write-Verbose "Connecting to SPO Admin [https://anthesisllc-admin.sharepoint.com/] (same creds [$($pnpCreds.UserName)], but different permissions required)"
                 Connect-SPOService -Url https://anthesisllc-admin.sharepoint.com/ -Credential $pnpCreds
                 try{
-                    Write-Verbose "Allowing upload of .aspx files to destination [$($destinationSite.AbsoluteUri)]"
-                    Set-SPOSite -Identity $destinationSite.AbsoluteUri -DenyAddAndCustomizePages $false -ErrorAction Stop
+                    Write-Verbose "Allowing upload of .aspx files to destination [$($destinationSite.AbsoluteUri.TrimEnd("/"))]"
+                    Set-SPOSite -Identity $destinationSite.AbsoluteUri.TrimEnd("/") -DenyAddAndCustomizePages $false -ErrorAction Stop
                     try{
                         Write-Verbose "Uploading file to [$($destinationSite.AbsoluteUri+"/SitePages/"+$(Split-Path $sourceUrl.AbsoluteUri -Leaf))]"
                         Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Credentials $pnpCreds
-                        Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop
+                        if([string]::IsNullOrWhiteSpace($renameFileAs)){
+                            Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop
+                            }
+                        else{Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop -NewFileName $renameFileAs}
+                        
                         try{
-                            Write-Verbose "Disabling upload of .aspx files to destination [$($destinationSite.AbsoluteUri)]"
-                            Set-SPOSite -Identity $destinationSite.AbsoluteUri -DenyAddAndCustomizePages $true -ErrorAction Stop
+                            Write-Verbose "Disabling upload of .aspx files to destination [$($destinationSite.AbsoluteUri.TrimEnd("/"))]"
+                            Set-SPOSite -Identity $destinationSite.AbsoluteUri.TrimEnd("/") -DenyAddAndCustomizePages $true -ErrorAction Stop
                             }
                         catch{
                             Write-Error "Failed to re-allow upload of .aspx files to Destination SitePages Lib [$($destinationSite.AbsoluteUri)]"
@@ -176,7 +183,7 @@ function copy-spoPage(){
                         }
                     }
                 catch{
-                    Write-Error "Could not enable upload fo .aspx files to destination site [[$($destinationSite.AbsoluteUri)]]"
+                    Write-Error "Could not enable upload of .aspx files to destination site [[$($destinationSite.AbsoluteUri)]]"
                     }
                 }
             catch{
@@ -687,6 +694,145 @@ function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOf
 
 
     }
+function set-standardTeamPermissions(){
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
+        [PSObject]$UnifiedGroupObject
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [string]$UnifiedGroupId
+
+        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [string]$fullLogPathAndName
+        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [string]$errorLogPathAndName
+        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [string[]]$adminEmailAddresses
+        )
+    
+    #region Get $UnifiedGroupObject, regardless of which parameters we've been given
+    switch ($PsCmdlet.ParameterSetName){
+        “UnifiedGroupId”  {
+            Write-Verbose "We've been given a 365 Id, so we need the Group object"
+            $UnifiedGroupObject = Get-UnifiedGroup $UnifiedGroupId
+            if(!$UnifiedGroupObject){
+                Write-Error "Could not retrieve Unified Group from ID [$UnifiedGroupId]"
+                break
+                }
+            }
+        }
+    #endregion
+
+    Write-Verbose "set-standardTeamPermissions([$($UnifiedGroupObject.ExternalDirectoryObjectId)])"
+    
+    #Check the classification is correct, try to fix it, and alert the Owners and Admins
+    if($UnifiedGroupObject.Classification -ne $UnifiedGroupObject.CustomAttribute7){
+        $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misclassified as [$($UnifiedGroupObject.Classification)] instead of [$($UnifiedGroupObject.CustomAttribute7)]"
+        Write-Verbose $warningMessage
+        try{
+            Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -Classification $UnifiedGroupObject.CustomAttribute7 -ErrorAction Stop
+            $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute7)]"
+            $priorty = "Normal"
+            }
+        catch{
+            $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
+            $priorty = "High"
+            }
+
+        if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
+        $groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID
+        Write-Verbose `t$result
+        Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
+        }
+
+    #Check the privacy setting is correct, try to fix it, and alert the Owners and Admins
+    if($UnifiedGroupObject.AccessType -ne $UnifiedGroupObject.CustomAttribute8){
+        $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was mis-privacy-ed as [$($UnifiedGroupObject.AccessType)] instead of [$($UnifiedGroupObject.CustomAttribute8)]"
+        Write-Verbose $warningMessage
+        try{
+            Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -AccessType $UnifiedGroupObject.CustomAttribute8 -ErrorAction Stop
+            $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute8)]"
+            $priorty = "Normal"
+            }
+        catch{
+            $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
+            $priorty = "High"
+            }
+        if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
+        if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
+        Write-Verbose `t$result
+        Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
+        }
+    
+    #Check the _intended_ Guest Access setting (based on [CustomAttribute6]) is correct, try to fix it, and alert the Owners and Admins
+    switch($UnifiedGroupObject.CustomAttribute7){
+        "External" {
+            if($UnifiedGroupObject.AllowAddGuests -eq $false){
+                $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misconfigured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)], which is wrong for an $($UnifiedGroupObject.Classification) group"
+                Write-Verbose $warningMessage
+                try{
+                    $currentSettings = Get-AzureADObjectSetting -TargetType Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId 
+                    if($currentSettings){
+                        Write-Verbose "Removing pre-existing settings [$($currentSettings.Id)]"
+                        Remove-AzureADObjectSetting -id $currentSettings.Id -targettype Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId
+                        }
+                    $template = Get-AzureADDirectorySettingTemplate | ? {$_.displayname -eq "group.unified.guest"}
+                    $settingsCopy = $template.CreateDirectorySetting()
+                    $settingsCopy["AllowToAddGuests"]=$true
+                    New-AzureADObjectSetting -TargetType Groups -TargetObjectId $UnifiedGroupObject.ExternalDirectoryObjectId -DirectorySetting $settingsCopy 
+                    $result = "Don't worry - I've fixed it now and set it back to [$true]"
+                    $priorty = "Normal"
+                    }
+                catch{
+                    $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
+                    $priorty = "High"
+                    }
+                if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
+                if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
+                Write-Verbose `t$result
+                #Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
+                Send-MailMessage -to kevin.maitland@anthesisgroup.com -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
+                }
+            else{Write-Verbose "Unified Group [$($UnifiedGroupObject.DisplayName)] was correctly configured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)]"}
+            }
+        {@("Internal","Confidential") -contains $_} {
+            if($UnifiedGroupObject.AllowAddGuests -eq $true){
+                $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misconfigured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)], which is wrong for an $($UnifiedGroupObject.Classification) group"
+                Write-Verbose $warningMessage
+                try{
+                    $currentSettings = Get-AzureADObjectSetting -TargetType Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId 
+                    if($currentSettings){
+                        Write-Verbose "Removing pre-existing settings [$($currentSettings.Id)]"
+                        Remove-AzureADObjectSetting -id $currentSettings.Id -targettype Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId
+                        }
+                    $template = Get-AzureADDirectorySettingTemplate | ? {$_.displayname -eq "group.unified.guest"}
+                    $settingsCopy = $template.CreateDirectorySetting()
+                    $settingsCopy["AllowToAddGuests"]=$False
+                    New-AzureADObjectSetting -TargetType Groups -TargetObjectId $UnifiedGroupObject.ExternalDirectoryObjectId -DirectorySetting $settingsCopy 
+                    $result = "Don't worry - I've fixed it now and set it back to [$false]"
+                    $priorty = "Normal"
+                    }
+                catch{
+                    $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
+                    $priorty = "High"
+                    }
+                if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
+                if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
+                Write-Verbose `t$result
+                Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
+                }
+            else{Write-Verbose "Unified Group [$($UnifiedGroupObject.DisplayName)] was correctly configured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)]"}
+            }
+        "Confidential" {
+            #Do Owner Stuff too
+            }
+        }
+    
+
+    }
 function set-standardTeamSitePermissions(){
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
@@ -805,7 +951,6 @@ function set-standardTeamSitePermissions(){
 
         }
     }
-
 function set-standardTeamSitePermissions_deprecated($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging,$fullLogPathAndName,$errorLogPathAndName){
     #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_Engineering_Team_All_365/"
     #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Waste_&_Resource_Sustainability_WRS_Team_All_365"
@@ -965,7 +1110,48 @@ function set-standardTeamSitePermissions_deprecated($teamSiteAbsoluteUrl, $admin
         else{Write-Error "Could not connect to Site"}
         }
     }
-function test-pnpConnectionMatchesResource($resourceUrl, $verboseLogging){
+function test-pnpConnectionMatchesResource(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [System.Uri]$resourceUrl = "https://anthesisllc.sharepoint.com"
+
+        ,[parameter(Mandatory = $false)]
+        [bool]$connectIfDifferent = $false
+
+        ,[parameter(Mandatory = $false)]
+        [pscredential]$pnpCreds
+        )
+    Write-Verbose "test-pnpConnectionMatchesResource($resourceUrl, $($pnpCreds.UserName)"
+    try{
+        Get-PnPConnection | Out-Null
+        if((split-path ([System.Uri](Get-PnPConnection).Url).LocalPath -Leaf) -eq (Split-Path $resourceUrl -Leaf)){
+            Write-Verbose "Connect-PnPOnline connection matches [$resourceUrl]"
+            return $true
+            break #To avoid reconnecting and changing context later
+            }
+        else{
+            Write-Verbose "Connect-PnPOnline connection [$([System.Uri](Get-PnPConnection).Url).LocalPath)] does not match [$resourceUrl]"
+            $false
+            }
+        }
+    catch{
+        Write-Verbose "No Connect-PnPOnline connection available."
+        }
+
+    if($connectIfDifferent){
+        Write-Verbose "Creating new Connect-PnpOnline to [$resourceUrl]"
+        if($pnpCreds){
+            try{Connect-PnPOnline -Url $resourceUrl -Credentials $pnpCreds}
+            catch{Write-Error $_}
+            }
+        else{
+            try{Connect-PnPOnline -Url $resourceUrl -CurrentCredentials}
+            catch{Write-Error $_}
+            }
+        }
+    }
+function test-pnpConnectionMatchesResource_deprecated($resourceUrl, $verboseLogging){
     if($verboseLogging){Write-Host -ForegroundColor Magenta "test-pnpConnectionMatchesResource($resourceUrl, $($adminCredentials.UserName)"}
     try{Get-PnPConnection | Out-Null}
     catch{

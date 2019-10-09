@@ -6,12 +6,7 @@ connect-ToExo
 $displayName = "iRobot PEC"
 $primaryEmail = "irobot.pec@anthesisgroup.com"
 $owner = "kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "lynda.benedicto@anthesisgroup.com
-Gerber.Manalo@anthesisgroup.com
-Michael.Malate@anthesisgroup.com
-sharleen.rivera@anthesisgroup.com
-acsmailboxaccess@anthesisgroup.com
-"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses (enumerate-nestedDistributionGroups -distributionGroupObject $dg).WindowsLiveID
 $grantSendAsToo = $true
 $hideFromGal = $false
 

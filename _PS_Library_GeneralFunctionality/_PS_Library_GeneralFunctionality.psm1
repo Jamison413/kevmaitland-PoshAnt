@@ -31,11 +31,27 @@ function compare-objectProperties {
         }
     if ($diffs) {return ($diffs | Select PropertyName,RefValue,DiffValue)}     
     }
+function convert-csvToSecureStrings(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$rawCsvData        
+        )
+
+    foreach ($record in $rawCsvData){
+        foreach ($property in ($record | Get-Member -MemberType NoteProperty)){
+            $record.($property.Name) = convertTo-localisedSecureString $($record.($property.Name))
+            }
+        }
+    $rawCsvData
+    }
 function convertTo-arrayOfEmailAddresses($blockOfText){
     [string[]]$addresses = @()
     $blockOfText | %{
-        foreach($blob in $_.Split(" ").Split("`r`n").Split(";").Split(",")){
-            if($blob -match "@" -and $blob -match "."){$addresses += $blob.Replace("<","").Replace(">","").Replace(";","").Trim()}
+        if(![string]::IsNullOrWhiteSpace($_)){
+            foreach($blob in $_.Split(" ").Split("`r`n").Split(";").Split(",")){
+                if($blob -match "@" -and $blob -match "."){$addresses += $blob.Replace("<","").Replace(">","").Replace(";","").Trim()}
+                }
             }
         }
     $addresses
