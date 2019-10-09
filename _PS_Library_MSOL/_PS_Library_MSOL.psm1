@@ -108,7 +108,7 @@ function connect-ToExo($credential){
             Import-Module Microsoft.Exchange.Management.ExoPowershellModule
             Write-Host -f DarkYellow "Initiating New-PSSession"
             try {
-                bodge-exo 
+                #bodge-exo 
                 $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
                 }
             catch{
@@ -133,7 +133,6 @@ function connect-ToExo($credential){
         }
     }
 function connect-ToSpo($credential){
-    Write-Host -f Yellow Connecting to SPO services
     <#
     .Synopsis
         Provides a standardised (and simplifed) way to connect to MSOL services
@@ -150,26 +149,82 @@ function connect-ToSpo($credential){
         $credential = set-MsolCredentials
         }
     
-    Write-Host -f DarkYellow "Importing Microsoft.Online.Sharepoint.PowerShell"
-    Import-Module Microsoft.Online.Sharepoint.PowerShell
-    Write-Host -f DarkYellow "Executing Connect-SPOService"
-    Write-Host -f DarkYellow "Credential: $($credential.UserName) $($credential.Password)"
-    Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential
-    Write-Host -f DarkYellow "Executing Connect-PnPOnline"
-    Connect-PnPOnline –Url https://anthesisllc.sharepoint.com -Credentials  $credential
+    #Write-Host -f DarkYellow "Importing Microsoft.Online.Sharepoint.PowerShell"
+    #Import-Module Microsoft.Online.Sharepoint.PowerShell
+    Write-Verbose "Executing Connect-SPOService"
+    
+    try{
+        Get-SPOTenant -ErrorAction Stop | Out-Null
+        Write-Host -f Yellow "Already connected to SPO services"
+        }
+    catch{
+        Write-Host -f Yellow "Connecting to SPO [https://anthesisllc-admin.sharepoint.com]"
+        try{Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com' -Credential $credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop}
+        catch{
+            Write-Host -ForegroundColor DarkRed "MFA might be required"
+            Connect-SPOService -url 'https://anthesisllc-admin.sharepoint.com'
+            }
+        }
+
+    try{
+        Get-PnPConnection -ErrorAction Stop | Out-Null
+        Write-Host -f Yellow "Already connected to PNP services"
+        }
+    catch{
+        Write-Host -f Yellow "Connecting to PNP [https://anthesisllc.sharepoint.com]"
+        try{Connect-PnPOnline –Url https://anthesisllc.sharepoint.com -Credentials  $credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop}
+        catch{
+            Write-Host -ForegroundColor DarkRed "MFA might be required"
+            Connect-PnPOnline –Url https://anthesisllc.sharepoint.com
+            }
+        }
+
+    }
+function connect-toTeams(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory=$false)]
+            [pscredential]$credential
+        )
+    if([string]::IsNullOrEmpty($credential)){
+        Write-Verbose "[$credential] is $null"
+        $credential = set-MsolCredentials
+        }
+    try{
+        Get-Team -ErrorAction Stop | Out-Null
+        Write-Host -f Yellow "Already connected to Teams services"
+        }
+    catch{
+        Write-Host -f Yellow "Connecting to Teams services"
+        try{Connect-MicrosoftTeams -Credential $credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop | out-null}
+        catch{
+            Write-Host -ForegroundColor DarkRed "MFA might be required"
+            Connect-MicrosoftTeams
+            }
+        }
     }
 function connect-to365(){
-    Write-Host -f Yellow Connecting to 365 services
-    Write-Host -f DarkYellow "Executing set-MsolCredentials"
-    $msolCredentials = set-MsolCredentials 
-    Write-Host -f DarkYellow "Executing connect-ToMsol"
-    connect-ToMsol $msolCredentials
-    Write-Host -f DarkYellow "Executing connect-toAAD"
-    connect-toAAD $msolCredentials
-    Write-Host -f DarkYellow "Executing connect-ToExo"
-    connect-ToExo $msolCredentials
-    #Write-Host -f DarkYellow "connect-ToSpo"
-    #connect-ToSpo $msolCredentials
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory=$false)]
+            [pscredential]$credential
+        )
+    Write-Verbose "Connecting to 365 services"
+    if(!$credential){
+        Write-Verbose "Executing set-MsolCredentials"
+        $credential = set-MsolCredentials
+        }
+    Write-Verbose "Executing connect-ToMsol"
+    connect-ToMsol $credential
+    Write-Verbose "Executing connect-toAAD"
+    connect-toAAD $credential
+    Write-Verbose "Executing connect-ToExo"
+    connect-ToExo $credential
+    Write-Verbose "Executing connect-ToTeams"
+    connect-toTeams -credential $credential
+    Write-Verbose "Executing connect-ToSpo"
+    connect-ToSpo -credential $credential
     #$csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
     #$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
+    $credential
     }
