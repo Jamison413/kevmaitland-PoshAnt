@@ -40,7 +40,7 @@ $LiveCandidateTrackers = @()
 ForEach($List in $FullListQuery){
 If($List.Description -match "Live Candidate Tracker"){
 
-        $RoleId = $($List.Description) -split ':'
+        $RoleId = $($List.Description) -split ':' #IM CAUSING ISSUES AT LINE 162
 
         $LiveCandidateTrackers += New-Object psobject -Property @{
         'Title' = $List.Title;
@@ -57,30 +57,38 @@ If($List.Description -match "Live Candidate Tracker"){
 
 #Iterate through each list and check for any actions against candidates need processing - is the date modified more recent than the Last Modified Date?
 $Folderstocreate = @()
-ForEach($LiveTracker in $LiveCandidateTrackers){
+ForEach($LiveTracker in $LiveCandidateTrackers[6]){
 
     $Itemstoprocess = Get-PnPListItem -List $LiveTracker.Guid  
     
-    foreach($Item in $Items){
+    foreach($Item in $Itemstoprocess){
 
         #I don't work, don't believe me - just compare the Decision Columns below instead...keeping this here in case I get fixed
         #$LastModifiedDate = $Item.FieldValues.Last_x0020_Modified_x0020_Date
         #$ModifiedDate = $Item.FieldValues.Modified
         #write-host "The last modified date of this item is older the the current Modified date, something has changed! Comparing the old entries to the new entries"
 
-    #First, compare the key columns for changes, if there is a change, we can process it below
+    #First, check for Declined Candidates so we can skip the iteration and then compare the key columns for changes for non-declined candidates, if there is a change, we can process it below.
+
+
+        #Check for Declined candidates - if Decision 1 is set to Decline, set the Last Entry fields and Final Decision  fields also as Decline and continue onto the next iteration. Same concept for Final Decision, but this won't change Interview 1 decision fields, just the Last entry field.
+        If(("Decline" -eq $Item.FieldValues.Decision_x0020_1) -and ("Decline" -ne $Item.FieldValues.D1LE)){
+           Write-Host "Looks like this Candidate has been declined after Interview 1 since we last ran through - setting other fields to decline and moving on"
+           Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'D1LE' = "$($Item.FieldValues.Decision_x0020_1)"}
+           Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Decision_x0020_1)"}
+           Continue
+        }
+
+        If(("Decline" -eq $Item.FieldValues.Final_x0020_Decision) -and ("Decline" -ne $Item.FieldValues.FDLE)){
+           Write-Host "Looks like this Candidate has been declined after final interview since we last ran through - setting other fields to decline and moving on"
+           Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Final_x0020_Decision)"}
+           Continue
+        }
 
         #Compare the Decision Columns - only process them if they are different as it indicates a change.
         $InterView1Decision = (Compare-Object -ReferenceObject $Item.FieldValues.Decision_x0020_1 -DifferenceObject $Item.FieldValues.D1LE)
         $FinalDecision = (Compare-Object -ReferenceObject $Item.FieldValues.Final_x0020_Decision -DifferenceObject $Item.FieldValues.FDLE)
 
-        #Check for Declined candidates - if Decision 1 is set to Decline, set the Last Entry fields and Final Decision  fields also as Decline and continue onto the next iteration.
-        If("Decline" -eq $Item.FieldValues.Decision_x0020_1){
-           Write-Host "Looks like this Candidate has been declined - setting other fields to decline"
-           Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'D1LE' = "$($Item.FieldValues.Decision_x0020_1)"}
-           Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Decision_x0020_1)"}
-           Continue
-        }
 
 
         If($InterView1Decision){
@@ -103,7 +111,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             $subject = "Recruitment Update: A Candidate is Ready to Move to Second Interview"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
             $body += "The Candidate $($Item.FieldValues.Candidate_x0020_Name) for role $($LiveTracker.Title) has been moved to the next stage.`r`n`r`n<BR><BR>"
-            $body += "Please schedue an interview with the candidate and fill in the details of the date and type of interview in the candidate tracker.`r`n`r`n<BR><BR>"
+            $body += "Please schedule an interview with the candidate and fill in the details of the date and type of interview in the candidate tracker.`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
 
