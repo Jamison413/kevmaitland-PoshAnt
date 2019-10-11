@@ -10,7 +10,7 @@ else{
     }
 Start-Transcript $transcriptLogName -Append
 
-<#Connect to everything and load modules#>
+<#------------------- Connect to everything and load modules -------------------#>
 
 Import-Module _PNP_Library_SPO
 
@@ -19,17 +19,16 @@ $SiteURL = "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_36
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 
-
-#Connect to Sharepoint - Groupbot? Couldn't work this bit out
+#Connect to Sharepoint
 Connect-PnPOnline -Url $SiteURL -Credentials $adminCreds
 $context = Get-PnPContext
 
+<#------------------- Find what needs processing -------------------#>
 
-
-#Get the Processing List
+#Get the Processing List and build an array
 $RequestItems = Get-PnPListItem -List "Recruitment Area" -Query "<View Scope='Processing'><Query><Where><Eq><FieldRef Name='IsDirty'/><Value Type='Text'>1</Value></Eq></Where></Query></View>"
  
 
@@ -49,11 +48,15 @@ ForEach ($Item in $RequestItems){
 }
 
 
+
+<#------------------- Process It -------------------#>
+
 #Pass details for each object above and create new list for each role to track candidates
 
 ForEach ($Role in $ItemstoProcess){
 
 $ListTitle = "$($Role.'ID')" + "  " + "$($Role.'Role Name')"
+$datetime = (Get-date)
 
 write-host "Creating new Candidate Tracker List for Role: ID$($Role.'ID') $($Role.'Role Name')" -ForegroundColor Yellow
     New-PnPList -Title "ID$($ListTitle)"  -Template GenericList
@@ -63,10 +66,10 @@ write-host "Adding Content Types and Views to list (also removing default views)
     Add-PnPContentTypeToList -List "ID$($ListTitle)" -ContentType "Candidate Tracker V2" -DefaultContentType
     
     Remove-PnPContentTypeFromList -List "ID$($ListTitle)" -ContentType "Item"
-    Add-PnPView -List "ID$($ListTitle)" -Title "Candidates" -Fields "ID","Candidate Name","Interview 1: Date","Interview 1: Type","Interview 1: Feedback", "Decision 1","D1LE","Interview 2: Type","Interview 2: Feedback","Final Decision","FDLE","Offer Outcome","Proposed Start Date"
-    #Add-PnPView -List "ID$($ListTitle)" -Title "People Services" -Fields "ID","Candidate Name","Recruiter","Candidate Source","Interview 1: Date","Interview 1: Type","Interview 1: Feedback", "Interview 1: Next Steps","Interview 2: Date","Interview 2: Type","Interview 2: Feedback","Final Decision","Offer Outcome","Proposed Start Date" #need to figure out how to restrict this view
+    Add-PnPView -List "ID$($ListTitle)" -Title "Candidates" -Fields "ID","Candidate Name","Interview 1: Date","Interview 1: Type","Interview 1: Feedback", "Decision 1","Interview 2: Type","Interview 2: Feedback","Final Decision","Offer Outcome","Proposed Start Date"
+    Add-PnPView -List "ID$($ListTitle)" -Title "People Services" -Fields "ID","Candidate Name","Interview 1: Date","Interview 1: Type","Interview 1: Feedback", "Decision 1","D1LE","Interview 2: Type","Interview 2: Feedback","Final Decision","FDLE","Offer Outcome","Proposed Start Date","Recruiter","Candidate Source"
+    Add-PnPView -List "ID$($ListTitle)" -Title "IT" -Fields "ID","Candidate Name","Interview 1: Date","Interview 1: Type","Interview 1: Feedback", "Decision 1","D1LE","Interview 2: Type","Interview 2: Feedback","Final Decision","FDLE","Offer Outcome","Proposed Start Date","Recruiter","Candidate Source","IsDirty"
     
-    #Add-PnPView -List "ID$($ListTitle)" -Title "Processing" -Fields "ID","Candidate Name","Recruiter","Candidate Source","Interview 1: Date","Interview 1: Type","Interview 1: Feedback", "Interview 1: Next Steps","Interview 1: Next Steps_LastEntry", "Interview 1: Email  Processed","Interview 2: Date","Interview 2: Type","Interview 2: Feedback","Final Decision","Final Decision_LastEntry","Offer Outcome","Proposed Start Date", "Last Modified Date", "Modified" #need to figure out how to restrict this view
     Remove-PnPView -List "ID$($ListTitle)" -Identity "All Items" -Force
     Set-PnPView -List "ID$($ListTitle)" -Identity "Candidates" -Values @{DefaultView=$True}
 
@@ -86,11 +89,48 @@ write-host "Setting item as processed in Recruitment Area: $($Role.'Role Name').
     Set-PnPListItem -List "Recruitment Area" -Identity $Role.ID -Values @{"IsDirty" = "0"}
     Set-PnPListItem -List "Recruitment Area" -Identity $Role.ID -Values @{"Candidate_x0020_Tracker" = "$($fullurl), ID$($ListTitle) Candidate Tracker"}
     Set-PnPListItem -List "Recruitment Area" -Identity $Role.ID -Values @{"Role_x0020_Hire_x0020_Status" = "Live"}
+    $link = "<a href=$($fullurl)>ID$($ListTitle)</a>"
+
+
+    #Check for success
+    $currentlist = Get-PnPList -Identity "ID$($ListTitle)"
+
+    If($currentlist){
+    write-host "It looks like the correct list was made:" "ID$($ListTitle)" -ForegroundColor Yellow
+    
+    #Send a success email
+            $subject = "Recruitment Update: A Candidate Tracker has been made for role " + "ID$($ListTitle)"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services and IT Team,`r`n`r`n<BR><BR>"
+            $body += "This email is just to let you know that it looks like a Candidate Tracker has been successfully created: $link`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot<BR><BR><BR><BR>"
+            $body += "*Please note, this is an automated email. If you notice any issues, please get in touch with the IT Team"
+            
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+
+    }
+
+    Else{
+    Write-Host "Woops, looks like something has gone wrong" -ForegroundColor Yellow
+    #Send a failure email
+            $subject = "Failure: Recruitment Processing - a Candidate Tracker has *not* been made for role " + "ID$($ListTitle)"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
+            $body += "This email is just to let you know that it looks like a Candidate Tracker <b>has not been successfully created:</b> " + "ID$($ListTitle)`r`n`r`n<BR><BR>"
+            $body += "Timestamp: " + "<b>$datetime</b>`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot<BR><BR><BR><BR>"
+            $body += "*Please note, this is an automated email. If you notice any issues, please get in touch with the IT Team"
+            
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+
+
+    }
     
 }
 
 
-write-host "I currently have no error handling, so I don't know if I haven't worked! It would be worth checking the Recruitment Area and resulting List in the Site Contents" -ForegroundColor Red
+
+
 
    
 
