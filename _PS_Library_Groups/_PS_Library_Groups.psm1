@@ -606,6 +606,53 @@ function new-365Group_deprecated($displayName, $description, $managers, $teamMem
         }
     $365Group
     }
+function new-externalGroup(){
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    param(
+        [Parameter(Mandatory=$true)]
+            [string]$displayName
+        ,[Parameter(Mandatory=$false)]
+            [string]$description
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$managerUpns
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$teamMemberUpns
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$memberOf
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$additionalEmailAddresses
+        ,[Parameter(Mandatory=$true)]
+            [string]$membershipManagedBy
+        ,[Parameter(Mandatory=$true)]
+            [PSCustomObject]$tokenResponse
+        ,[Parameter(Mandatory=$true)]
+            [bool]$alsoCreateTeam = $false
+        ,[Parameter(Mandatory=$true)]
+            [PSCredential]$pnpCreds
+        )
+    Write-Verbose "new-externalGroup($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $additionalEmailAddress, $membershipManagedBy)"
+    $hideFromGal = $false
+    $blockExternalMail = $false
+    $accessType = "Private"
+    $autoSubscribe = $true
+    $groupClassification = "External"
+    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam
+    Connect-PnPOnline -AccessToken $tokenResponse.access_token
+    $newTeam = Get-PnPUnifiedGroup -Identity $displayName
+    
+    #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
+    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose
+    test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true
+    if((test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl) -eq $true){
+        Write-Verbose "Setting Homepage"
+        Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
+        }
+    Add-PnPHubSiteAssociation -Site $newTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub" | Out-Null
+    start-Process $newTeam.SiteUrl
+    Remove-UnifiedGroupLinks -Identity $newTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+    Remove-UnifiedGroupLinks -Identity $newTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+    $newTeam
+    }
 function new-mailEnabledSecurityGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
@@ -696,53 +743,6 @@ function new-mailEnabledSecurityGroup_deprecated($dgDisplayName, $description, $
             }
         }
     $mesg
-    }
-function new-externalGroup(){
-    [CmdletBinding(SupportsShouldProcess=$true)]
-    param(
-        [Parameter(Mandatory=$true)]
-            [string]$displayName
-        ,[Parameter(Mandatory=$false)]
-            [string]$description
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$managerUpns
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$teamMemberUpns
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$memberOf
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$additionalEmailAddresses
-        ,[Parameter(Mandatory=$true)]
-            [string]$membershipManagedBy
-        ,[Parameter(Mandatory=$true)]
-            [PSCustomObject]$tokenResponse
-        ,[Parameter(Mandatory=$true)]
-            [bool]$alsoCreateTeam = $false
-        ,[Parameter(Mandatory=$true)]
-            [PSCredential]$pnpCreds
-        )
-    Write-Verbose "new-externalGroup($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $additionalEmailAddress, $membershipManagedBy)"
-    $hideFromGal = $false
-    $blockExternalMail = $false
-    $accessType = "Private"
-    $autoSubscribe = $true
-    $groupClassification = "External"
-    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam
-    Connect-PnPOnline -AccessToken $tokenResponse.access_token
-    $newTeam = Get-PnPUnifiedGroup -Identity $displayName
-    
-    #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
-    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose
-    test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true
-    if((test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl) -eq $true){
-        Write-Verbose "Setting Homepage"
-        Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx"
-        }
-    Add-PnPHubSiteAssociation -Site $newTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub"
-    start-Process $newTeam.SiteUrl
-    Remove-UnifiedGroupLinks -Identity $newTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-    Remove-UnifiedGroupLinks -Identity $newTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-    $newTeam
     }
 function new-symGroup($displayName, $description, $managers, $teamMembers, $memberOf, $additionalEmailAddress){
     Write-Host -ForegroundColor Magenta "new-symGroup($displayName, $description, $managers, $teamMembers, $memberOf, $additionalEmailAddress)"
