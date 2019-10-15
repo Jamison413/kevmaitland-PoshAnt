@@ -166,10 +166,10 @@ ForEach($LiveTracker in $LiveCandidateTrackers[6]){
             "Employee_x0020_Preferred_x0020_N" = $Item.FieldValues.Candidate_x0020_Name; 
             "StartDate" = $Item.FieldValues.Proposed_x0020_Start_x0020_Date;  
             "JobTitle" = $RecruitmentAreaItem.FieldValues.Role_x0020_Name;
-            "Line_x0020_Manager" = $RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager;
-            "Primary_x0020_Team" = $RecruitmentAreaItem.FieldValues.Primary_x0020_Team;
-            "Community0" = $RecruitmentAreaItem.FieldValues.Community0 ;
-            "Business_x0020_Unit0" = $RecruitmentAreaItem.FieldValues.Business_x0020_Unit;
+            "Line_x0020_Manager" = $RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager.LookupValue;
+            "Primary_x0020_Team" = $RecruitmentAreaItem.FieldValues.Primary_x0020_Team0.Label;
+            "Community0" = $RecruitmentAreaItem.FieldValues.Community0.Label;
+            "Business_x0020_Unit0" = $RecruitmentAreaItem.FieldValues.Business_x0020_Unit0.Label;
             }
         
         #Send a confirmation email to People Services
