@@ -40,7 +40,7 @@ $LiveCandidateTrackers = @()
 ForEach($List in $FullListQuery){
 If($List.Description -match "Live Candidate Tracker"){
 
-        $RoleId = $($List.Description) -split ':' #IM CAUSING ISSUES AT LINE 162
+        $RoleId = ($($List.Description) -split ':')[1]
 
         $LiveCandidateTrackers += New-Object psobject -Property @{
         'Title' = $List.Title;
