@@ -488,6 +488,29 @@ function remove-diacritics{
     PARAM ([string]$String)
     [Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($String))
     }
+function sanitise-forJson(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$dirtyString
+        )
+    $cleanString = $dirtyString.Replace('"','\"')
+    $cleanString
+    }
+function sanitise-forMicrosoftEmailAddress(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$dirtyString
+        )
+    $cleanString = $dirtyString -creplace '[^a-zA-Z0-9_@\-\.]+', ''
+    do{$cleanString = $cleanString.Replace("..",".")}
+    While($cleanString -match "\.\.")
+    $cleanString = $cleanString.Trim(".")
+    $cleanString = $cleanString.Replace(".@","@")
+    $cleanString = $cleanString.Replace("@.","@")
+    $cleanString
+    }
 function sanitise-forPnpSharePoint($dirtyString){ 
     if([string]::IsNullOrWhiteSpace($dirtyString)){return}
     $cleanerString = sanitise-forSharePointStandard -dirtyString $dirtyString
@@ -593,6 +616,22 @@ function sanitise-stripHtml($dirtyString){
         $cleanString = [System.Web.HttpUtility]::HtmlDecode($cleanString)# -replace '&amp;','&'
         $cleanString
         }
+    }
+function set-suffixAndMaxLength(){
+    [cmdletbinding()]
+    Param(
+        [Parameter(Mandatory =$true)]
+        [string]$string
+        ,[Parameter(Mandatory =$true)]
+        [string]$suffix
+        ,[Parameter(Mandatory =$true)]
+        [int]$maxLength
+        )
+    if($string.Length -gt ($maxLength-$suffix.length)){
+        $outString = $string.Substring(0,$maxLength-$suffix.length)+$suffix
+        }
+    else{$outString = $string+$suffix}
+    $outString
     }
 function smartReplace($mysteryString,$findThis,$replaceWithThis){
     if([string]::IsNullOrEmpty($mysteryString)){$result = $mysteryString}

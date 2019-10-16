@@ -833,7 +833,175 @@ function set-standardTeamPermissions(){
     
 
     }
-function set-standardTeamSitePermissions(){
+function set-standardSitePermissions(){
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
+        [PSObject]$unifiedGroupObject
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [string]$unifiedGroupId
+
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+            [PSCustomObject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [pscredential]$pnpCreds
+
+        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [string]$fullLogPathAndName
+        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
+        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [string]$errorLogPathAndName
+        )
+    Write-Verbose "set-standardSitePermissions([$($unifiedGroupObject.Id)$unifiedGroupId])"
+
+    #Get $unifiedGroupObject, regardless of which parameters we've been given
+    switch ($PsCmdlet.ParameterSetName){
+        “UnifiedGroupId”  {
+            Write-Verbose "We've been given a 365 Id, so we need the Group object"
+            $unifiedGroupObject = Get-UnifiedGroup -Identity $unifiedGroupId
+            if(!$unifiedGroupObject){
+                Write-Error "Could not retrieve Unified Group from ID [$unifiedGroupId]"
+                break
+                }
+            }
+        }
+    
+    try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupObject.ExternalDirectoryObjectId -ErrorAction Stop -WarningAction Stop}
+    catch{#Connect to the root site if we're not connected to anything
+        Write-Verbose "Connecting to Graph"
+        Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/" -AccessToken $tokenResponse.access_token
+        $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupObject.ExternalDirectoryObjectId
+        }
+
+    if([string]::IsNullOrWhiteSpace($pnpUnifiedGroupObject.SiteUrl)){ #This is a more reliable test than the UnifiedGroup.SharePointSiteUrl property as it populates /much/ faster
+        Write-Error "Could not retrieve 365 Group URL from Group [$($unifiedGroupObject.DisplayName)][$($unifiedGroupObject.ExternalDirectoryObjectId)]. Exiting without attempting to check/set permissions"
+        break
+        }
+
+    #region Get connected to the Site
+    try{
+        Write-Verbose "Checking to see if the executing user already has admin permissions for the Site"
+        test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl -connectIfDifferent $true -pnpCreds $pnpCreds -ErrorAction Stop
+        Write-Verbose "Connected successfully to [$($pnpUnifiedGroupObject.SiteUrl)]"
+        }
+    catch{
+        if($_.Exception.HResult -eq "-2146233079"){ #Unauthorised
+            Write-Verbose "No they didn't. Temporarily adding them and waiting for the permissions to propagate..."
+            $requiresTemporaryAdminRights = $true
+            try{
+                Write-Verbose "Temporarily adding [$((Get-PnPConnection).PSCredential.UserName)] to [$($unifiedGroupObject.DisplayName)][$($unifiedGroupObject.ExternalDirectoryObjectId)] Owners"
+                get-help Add-PnPSiteCollectionAdmin -full
+                Add-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -ErrorAction Stop
+                }
+            catch{
+                if($_.Exception.HResult -eq "-2146233087"){
+                    $requiresTemporaryMembership = $true
+                    Write-Verbose "Temporarily adding [$((Get-PnPConnection).PSCredential.UserName)] to [$($unifiedGroupObject.DisplayName)][$($unifiedGroupObject.ExternalDirectoryObjectId)] Members"
+                    Add-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Members -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+                    Add-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+                    }
+                }
+            do{
+                Write-Verbose "Waiting for temporary SharePoint permissions to propagate..."
+                start-sleep -Seconds 5
+                try{test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl -connectIfDifferent $true -pnpCreds $pnpCreds -ErrorAction Stop}
+                catch{
+                    if($_.Exception.HResult -ne "-2146233079"){ #Unauthorised
+                        Write-Error "Additional (unexpected) error connecting to [$($pnpUnifiedGroupObject.SiteUrl)]. Sorry - this isn't going to work :("
+                        break
+                        }
+                    }
+                }
+            while((test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl -connectIfDifferent $true -pnpCreds $pnpCreds) -eq $false)
+            }
+        }
+    #endregion
+
+    if(test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl){
+        #Do all the generic stuff first that applies to all Sites
+        if($requiresTemporaryAdminRights){Add-PnPSiteCollectionAdmin -Owners $((Get-PnPConnection).PSCredential.UserName)}
+        $spoSiteCollectionAdmins = Get-PnPSiteCollectionAdmin
+        $spoOwnersGroup = Get-PnPGroup -AssociatedOwnerGroup
+
+        Write-Verbose "Enable the DocID service"
+        $pnpSite = Get-PnPSite -Includes Features
+        if($pnpSite.Features.DefinitionId -notcontains "b50e3104-6812-424f-a011-cc90e6327318"){
+            Write-Verbose "Enabling DocID Service for [$($pnpUnifiedGroupObject.SiteUrl)]"
+            $pnpSite.Features.Add([guid]"b50e3104-6812-424f-a011-cc90e6327318",$false,[Microsoft.SharePoint.Client.FeatureDefinitionScope]::None)
+            try{$pnpSite.Context.ExecuteQuery()}
+            catch{Write-Warning $_}
+            }
+        else{Write-Verbose "DocID Service was already enabled for [$pnpUnifiedGroupObject.SiteUrl]"}
+
+        Write-Verbose "Untick Members can share boxes"
+        $pnpWeb = Get-PnPWeb -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
+        if($pnpWeb.MembersCanShare){
+            Write-Warning "MembersCanShare was set to $true for $[($pnpUnifiedGroupObject.SiteUrl)]"
+            $pnpWeb.MembersCanShare = $false
+            }
+        if($pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
+            Write-Warning "AssociatedMemberGroup.AllowMembersEditMembership was set to $true for $[($pnpUnifiedGroupObject.SiteUrl)]"
+            $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
+            $pnpWeb.AssociatedMemberGroup.Update()
+            }
+        if($pnpWeb.MembersCanShare -or $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
+            $pnpWeb.Update()
+            $pnpWeb.Context.ExecuteQuery()
+            }
+            
+        Write-Verbose "Now do the Classification-specific settings"
+        switch($unifiedGroupObject.CustomAttribute7){
+            "External" {
+                #Allow external sharing
+                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing ExternalUserAndGuestSharing
+                }
+            "Internal" {
+                #Block all external sharing
+                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled
+                }
+            "Confidential" {
+                #Block all external sharing
+                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled
+                }
+            }
+
+        #Now tidy up
+        Write-Verbose "Remove everything that isn't the 365 Group Owners object from Site Owners (it looks like adding the Data Managers AAD group has been deprecated to match the user-only membership behaviour of 365 Groups)"
+        [array]$unexpectedSiteOwners = $spoOwnersGroup.Users | ? {($_.LoginName -notmatch $unifiedGroupObject.ExternalDirectoryObjectId) -and ($_.LoginName -ne "SHAREPOINT\system")}
+        if($unexpectedSiteOwners.Count -gt 0){
+            #Report Unexpected Site Owners
+##########################################
+            #Remove Unexpected Site Owners
+            $unexpectedSiteOwners | % {
+                Write-Verbose "`tRemove-PnPUserFromGroup -LoginName $($_.LoginName) -Identity $($spoOwnersGroup.Id)"
+                Remove-PnPUserFromGroup -LoginName $_.LoginName -Identity $spoOwnersGroup.Id -Verbose:$VerbosePreference
+                }
+            }
+
+        Write-Verbose "Remove everything that isn't the 365 Group Owners object from Site Collection Admins (except executing user otherwise we might saw off the branch we're sitting on) :)"
+        [array]$unexpectedSiteCollectionAdmins = $spoSiteCollectionAdmins | ? {($_.LoginName -notmatch $unifiedGroupObject.ExternalDirectoryObjectId -and $_.LoginName -notmatch (Get-PnPConnection).PSCredential.UserName)}
+        if($unexpectedSiteCollectionAdmins.Count -gt 0){
+            #Report Unexpected Site Admins
+##########################################
+            #Remove Unexpected Site Admins
+            $unexpectedSiteCollectionAdmins | % {
+                Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
+                }
+            }
+
+        Write-Verbose "Finally, remove any owner/memberships we've temporarily granted ourselves"
+        if($requiresTemporaryMembership){Remove-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Members -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false}
+        if($requiresTemporaryAdminRights){
+            Remove-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+            Remove-PnPSiteCollectionAdmin -Owners $((Get-PnPConnection).PSCredential.UserName)
+            }
+
+        }
+    }
+function set-standardTeamSitePermissions_deprecated2(){
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory = $true,ParameterSetName="URL")]
@@ -872,7 +1040,7 @@ function set-standardTeamSitePermissions(){
             Write-Verbose "We have a Unified Group object, so we need the URL"
             $teamSiteAbsoluteUrl = $UnifiedGroupObject.SharePointSiteUrl
             if(![string]::IsNullOrWhiteSpace($teamSiteAbsoluteUrl)){
-                Write-Error "Could not retrieve 365 Group URL from Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)]. Exiting without attempting to permissions"
+                Write-Error "Could not retrieve 365 Group URL from Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)]. Exiting without attempting to check/set permissions"
                 break
                 }
             }
@@ -1131,7 +1299,7 @@ function test-pnpConnectionMatchesResource(){
             break #To avoid reconnecting and changing context later
             }
         else{
-            Write-Verbose "Connect-PnPOnline connection [$([System.Uri](Get-PnPConnection).Url).LocalPath)] does not match [$resourceUrl]"
+            Write-Verbose "Connect-PnPOnline connection [$([System.Uri](Get-PnPConnection).Url))] does not match [$resourceUrl]"
             $false
             }
         }
