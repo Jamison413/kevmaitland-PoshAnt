@@ -256,19 +256,19 @@ function guess-shorterAliasFromDisplayName($displayName){
     }
 function new-365Group(){
     #Groups created look like this:
-    # [Dummy Team (All)] - Mail-enabled Security Group (DisplayName)
-    # [Dummy Team (All)] - Unified Group (DisplayName)
-    # [Dummy_Team_All] - Mail-enabled Security Group (Alias)
-    # [Dummy_Team_All_365] - Unified Group (Alias)
-    # [Shared Mailbox - Dummy Team (All)] - Shared Mailbox (for bodging DG membership)
+    # [Dummy Team (All)] - Combined Mail-enabled Security Group (DisplayName)
     # [Dummy Team (All) - Data Managers Subgroup] - Mail-enabled Security Group for Managers
     # [Dummy Team (All) - Members Subgroup] - Mail-enabled Security Group Mirroring Unified Group Members
+    # [Dummy Team (All)] - Unified Group (DisplayName)
+    # [Shared Mailbox - Dummy Team (All)] - Shared Mailbox (for bodging DG membership)
     #$UnifiedGroupObject.CustomAttribute1 = Own ExternalDirectoryObjectId
     #$UnifiedGroupObject.CustomAttribute2 = Data Managers Subgroup ExternalDirectoryObjectId
     #$UnifiedGroupObject.CustomAttribute3 = Members Subgroup ExternalDirectoryObjectId
-    #$UnifiedGroupObject.CustomAttribute4 = Mail-Enabled Security Group ExternalDirectoryObjectId
+    #$UnifiedGroupObject.CustomAttribute4 = Combined Mail-Enabled Security Group ExternalDirectoryObjectId
     #$UnifiedGroupObject.CustomAttribute5 = Shared Mailbox ExternalDirectoryObjectId
     #$UnifiedGroupObject.CustomAttribute6 = [string] "365"|"AAD" Is membership driven by the 365 Group or the associated AAD group?
+    #$UnifiedGroupObject.CustomAttribute7 = [string] "Internal"|"External"|"Confidential" Intended Site Classification (used to reset in the event of unauthorised change)
+    #$UnifiedGroupObject.CustomAttribute8 = [string] "Public"|"Private" Intended Site Privacy (used to reset in the event of unauthorised change)
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
         [Parameter(Mandatory=$true)]
@@ -683,23 +683,32 @@ function new-externalGroup(){
     $accessType = "Private"
     $autoSubscribe = $true
     $groupClassification = "External"
+
+    if($managerUpns -notcontains ((Get-PnPConnection).PSCredential.UserName)){
+        $addExecutingUserAsTemporaryAdmin = $true
+        [array]$managerUpns += ((Get-PnPConnection).PSCredential.UserName)
+        }
+
     $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $pnpCreds
     Connect-PnPOnline -AccessToken $tokenResponse.access_token
     Write-Verbose "`$newTeam = Get-PnPUnifiedGroup -Identity [$displayName]"
-    $newTeam = Get-PnPUnifiedGroup -Identity $displayName
+    $newPnpTeam = Get-PnPUnifiedGroup -Identity $displayName
     
     #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
-    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
-    test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
-    if((test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl) -eq $true){
+    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
+    test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
+    if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
         Write-Verbose "Setting Homepage"
         Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
         }
-    Add-PnPHubSiteAssociation -Site $newTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub" | Out-Null
-    start-Process $newTeam.SiteUrl
-    Remove-UnifiedGroupLinks -Identity $newTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-    Remove-UnifiedGroupLinks -Identity $newTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-    $newTeam
+    Add-PnPHubSiteAssociation -Site $newPnpTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub" | Out-Null
+    start-Process $newPnpTeam.SiteUrl
+    if($addExecutingUserAsTemporaryAdmin){
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-DistributionGroupMember -Identity $newTeam.CustomAttribute2 -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        }
+    $newPnpTeam
     }
 function new-mailEnabledSecurityGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]

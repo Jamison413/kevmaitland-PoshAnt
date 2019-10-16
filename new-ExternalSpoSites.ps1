@@ -24,7 +24,7 @@ if($requests){$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.
 
 foreach ($currentRequest in $selectedRequests){
     $fullRequest = $requests | ? {$_.FieldValues.GUID.Guid -eq $currentRequest.'$_.FieldValues.GUID.Guid'}
-    $managers = convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Admin.Email+","+ $((Get-PnPConnection).PSCredential.UserName)) | sort | select -Unique
+    $managers = convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Admin.Email) | sort | select -Unique
     $members = convertTo-arrayOfEmailAddresses ($managers + $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique
     $members | % {
         $thisEmail = $_
@@ -39,12 +39,12 @@ foreach ($currentRequest in $selectedRequests){
         }
     $members = $members | Sort-Object | select -Unique
     try{
-        $result = new-externalGroup -displayName $("External - $($fullRequest.FieldValues.Title)").Trim(" ") -managerUpns $managers -teamMemberUpns $members -membershipManagedBy 365 -tokenResponse $tokenResponse -alsoCreateTeam $false -pnpCreds $365creds -Verbose -ErrorAction Stop
+        $newPnpTeam = new-externalGroup -displayName $("External - $($fullRequest.FieldValues.Title)").Trim(" ") -managerUpns $managers -teamMemberUpns $members -membershipManagedBy 365 -tokenResponse $tokenResponse -alsoCreateTeam $false -pnpCreds $365creds -Verbose -ErrorAction Stop
         Write-Host -ForegroundColor Yellow "Site Admin is : [$($fullRequest.FieldValues.Site_x0020_Admin.LookupValue)]"
         #If there we no errors returned, assume it worked and notify finish the setup
         #Add a link to the new Site on the External Hub
         Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/external" -Credentials $365creds
-        Add-PnPNavigationNode -Location QuickLaunch -Title $($fullRequest.FieldValues.Title) -Url $result.SiteUrl -First -External -Parent 2252 #2252 is the "Modern External Sites" NavNode
+        Add-PnPNavigationNode -Location QuickLaunch -Title $($fullRequest.FieldValues.Title) -Url $newPnpTeam.SiteUrl -First -External -Parent 2252 #2252 is the "Modern External Sites" NavNode
 
         switch($fullRequest.FieldValues.FileDirRef.Split("/")[1]){
             "clients" {
@@ -63,7 +63,7 @@ foreach ($currentRequest in $selectedRequests){
             }
 
         $body = "<HTML><BODY><p>Hi $($fullRequest.FieldValues.Site_x0020_Admin.LookupValue.Split(" ")[0]),</p>
-            <p>Your new <a href=`"$siteUrl`">External
+            <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">External
             Sharing Site</a> is available for you now. This is a new Modern-style External
             Sharing Site, which should be more familiar to work with than the
             older Classic-style Sites. We have also made some improvements to the way
@@ -92,7 +92,10 @@ foreach ($currentRequest in $selectedRequests){
 
             <p>The External Sharing Site Robot</p>
             </BODY></HTML>"
-        Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $(convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique) -bcc $((Get-PnPConnection).PSCredential.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com"
+        $cc = $(convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique)
+        if($cc){Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $cc -bcc $((Get-PnPConnection).PSCredential.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com"}
+        else{Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $((Get-PnPConnection).PSCredential.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com"} #Send-MailMessage doesn't support Empty CC option
+
 
         }
     catch{Write-Error $_}
