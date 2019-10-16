@@ -622,7 +622,7 @@ function set-suffixAndMaxLength(){
     Param(
         [Parameter(Mandatory =$true)]
         [string]$string
-        ,[Parameter(Mandatory =$true)]
+        ,[Parameter(Mandatory =$false)]
         [string]$suffix
         ,[Parameter(Mandatory =$true)]
         [int]$maxLength
