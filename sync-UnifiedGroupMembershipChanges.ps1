@@ -21,6 +21,7 @@ $groupAdmin = "groupbot@anthesisgroup.com"
 $groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 
+connect-ToMsol -credential $adminCreds
 connect-toAAD -credential $adminCreds
 connect-ToExo -credential $adminCreds
 

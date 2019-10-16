@@ -14,6 +14,7 @@ $verboseLogging = $true
 
 Import-Module _PS_Library_MSOL.psm1
 Import-Module _CSOM_Library-SPO.psm1
+Import-Module _PNP_Library_SPO
 
 $anthesisMySite = 'https://anthesisllc-my.sharepoint.com/' # This needs to be the mySite where the userdata lives.
 $anthesisAdminSite = 'https://anthesisllc-admin.sharepoint.com/' # This needs to be the "admin" site.
@@ -74,6 +75,8 @@ $spoSetUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager
 $spoUserList = $userContext.Web.SiteUsers
 $userContext.Load($spoUserList)
 $userContext.ExecuteQuery()
+
+<#temp commenting out to test - EP
 
 #Get the Client Context and Bind the Site Collection for the MySites first to get teh full list of users
 #$context = New-Object Microsoft.SharePoint.Client.ClientContext($mySiteUrl)
@@ -144,6 +147,8 @@ $antUsers | select DisplayName,Country,City
 
 #endregion
 
+
+<#
 #region Report Variables
 $templatePath = "C:\Reports\"
 $templateFile = "AnthesisGlobalStaffListTemplate - Copy.xlsx"
@@ -221,35 +226,20 @@ $excel.Quit()
 #Add Password change data if you want it
 #$msolUsers | sort LastPasswordChangeTimestamp | select Displayname, LastPasswordChangeTimestamp | export-csv -Path .\Desktop\AnthesisPasswordChanges.log
 
+
+#>
+
+
 #Updload File to SP
 
+
+
 #Specify tenant admin and site URL
-$SiteURL = "https://anthesisllc.sharepoint.com/sites/Resources-Administration/"
-$Folder = "C:\Reports\AnthesisStaff"
-$DocLibName = "Global Staff List"
+#$SiteURL = "https://anthesisllc.sharepoint.com/sites/Resources-Administration/"
 
 
-#Bind to site collection
-$Context = new-csomContext -fullSitePath $SiteURL -sharePointCredentials $csomCreds
+#Connect-PnPOnline -Url $SiteURL -CurrentCredentials
+#$context = Get-PnPContext
 
-#Retrieve list
-$List = $Context.Web.Lists.GetByTitle($DocLibName)
-$Context.Load($List)
-$Context.ExecuteQuery()
+#Add-PnPFile -Path "C:\Reports\AnthesisStaff\Anthesis Staff List.xlsx" -Folder "Global Staff List"
 
-#Upload file to SP
-$File = Get-Item 'C:\Reports\AnthesisStaff\Anthesis Staff List.xlsx'
-#Foreach ($File in (dir $Folder))
-#{
-$FileStream = New-Object IO.FileStream($File.FullName,[System.IO.FileMode]::Open)
-$FileCreationInfo = New-Object Microsoft.SharePoint.Client.FileCreationInformation
-$FileCreationInfo.Overwrite = $true
-$FileCreationInfo.ContentStream = $FileStream
-$FileCreationInfo.URL = $File
-$Upload = $List.RootFolder.Files.Add($FileCreationInfo)
-$Context.Load($Upload)
-$Context.ExecuteQuery()
-#}
-
-#Delete the file on local
-#Get-ChildItem C:\Reports\AnthesisStaff\Anthesis Staff List.xlsx -Recurse | Remove-Item
