@@ -144,38 +144,6 @@ function get-dataManagerGroupNameFrom365GroupName(){
     $dataManagerGroupName = set-suffixAndMaxLength -string $unifiedGroupDisplayName -suffix $suffix -maxLength 70
     $dataManagerGroupName
     }
-function get-membersGroupNameFrom365GroupName(){
-    [cmdletbinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$unifiedGroupDisplayName
-        )
-    #70 character limit is imposed by Exchange in Group Naming
-    $suffix = " - Members Subgroup"
-    $membersGroupName = set-suffixAndMaxLength -string $unifiedGroupDisplayName -suffix $suffix -maxLength 70
-    $membersGroupName
-    }
-function guess-aliasFromDisplayName(){
-    [CmdletBinding()]
-    Param (
-        [parameter(Mandatory = $true)]
-        [string]$displayName
-        )
-    #Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
-    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","")}
-    $guessedAlias = sanitise-forMicrosoftEmailAddress -dirtyString $guessedAlias
-    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
-    $guessedAlias = remove-diacritics -String $guessedAlias
-    Write-Verbose -Message "guess-aliasFromDisplayName($displayName) = [$guessedAlias]"
-    $guessedAlias
-    }
-function guess-shorterAliasFromDisplayName($displayName){
-    Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
-    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","").Replace("(","").Replace(")","").Replace(",","").Replace("&","")}
-    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
-    Write-Debug -Message "guess-shorterAliasFromDisplayName($displayName) = [$(guess-aliasFromDisplayName($displayName))]"
-    $guessedAlias
-    }
 function get-membersGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
@@ -251,6 +219,40 @@ function get-membersGroup(){
             $result[0]
             }
         }
+    }
+function get-membersGroupNameFrom365GroupName(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$unifiedGroupDisplayName
+        )
+    #70 character limit is imposed by Exchange in Group Naming
+    $suffix = " - Members Subgroup"
+    $membersGroupName = set-suffixAndMaxLength -string $unifiedGroupDisplayName -suffix $suffix -maxLength 70
+    $membersGroupName
+    }
+function guess-aliasFromDisplayName(){
+    [CmdletBinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [string]$displayName
+        ,[parameter(Mandatory = $false)]
+        [string]$fixedSuffix
+        )
+    #Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
+    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","")}
+    $guessedAlias = set-suffixAndMaxLength -string $guessedAlias -suffix $fixedSuffix -maxLength 64
+    $guessedAlias = sanitise-forMicrosoftEmailAddress -dirtyString $guessedAlias
+    $guessedAlias = remove-diacritics -String $guessedAlias
+    Write-Verbose -Message "guess-aliasFromDisplayName($displayName) = [$guessedAlias]"
+    $guessedAlias
+    }
+function guess-shorterAliasFromDisplayName($displayName){
+    Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
+    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","").Replace("(","").Replace(")","").Replace(",","").Replace("&","")}
+    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
+    Write-Debug -Message "guess-shorterAliasFromDisplayName($displayName) = [$(guess-aliasFromDisplayName($displayName))]"
+    $guessedAlias
     }
 function new-365Group(){
     #Groups created look like this:
@@ -340,14 +342,16 @@ function new-365Group(){
     else{
         Write-Verbose "No pre-existing 365 group found - checking for AAD Groups."
         $combinedSgDisplayName = $displayName
-        $managersSgDisplayName = get-dataManagerGroupNameFrom365GroupName -unifiedGroupDisplayName $displayName
-        $membersSgDisplayName = get-membersGroupNameFrom365GroupName -unifiedGroupDisplayName $displayName
+        $managersSgDisplayNameSuffix = " - Data Managers Subgroup"
+        $managersSgDisplayName = "$displayName$managersSgDisplayNameSuffix"
+        $membersSgDisplayNameSuffix = " - Members Subgroup"
+        $membersSgDisplayName = "$displayName$membersSgDisplayNameSuffix"
         $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
 
         #Check whether any of these MESG exist based on names (just in case we're re-creating a 365 group and want to retain the AAD Groups)
         $combinedSg = rummage-forDistributionGroup -displayName $combinedSgDisplayName
         if($combinedSg){Write-Verbose "Combined Group [$($combinedSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
-        $managersSg = rummage-forDistributionGroup -displayName $managersSgDisplayName
+        $managersSg = rummage-forDistributionGroup -displayName $managersSgDisplayName 
         if($managersSg){Write-Verbose "Managers Group [$($managersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
         $membersSg  = rummage-forDistributionGroup -displayName $membersSgDisplayName 
         if($membersSg){Write-Verbose "Members Group [$($membersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
@@ -367,14 +371,14 @@ function new-365Group(){
                 Write-Verbose "Creating Data Managers Security Group [$managersSgDisplayName]"
                 $managersMemberOf = @($combinedSg.ExternalDirectoryObjectId)
                 if($ownersAreRealManagers){$managersMemberOf += "Managers (All)"}
-                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -membersUpns $managerUpns -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers" -WhatIf:$WhatIfPreference}
+                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -fixedSuffix $managersSgDisplayNameSuffix -membersUpns $managerUpns -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers" -WhatIf:$WhatIfPreference -Verbose}
                 catch{Write-Error $_}
                 }
 
             if(!$membersSg){ #And create a Members SG if required
                 Write-Verbose "Creating Members Security Group [$membersSgDisplayName]"
                 try{
-                    $membersSg = new-mailEnabledSecurityGroup -dgDisplayName $("$membersSgDisplayName") -membersUpns $teamMemberUpns -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -WhatIf:$WhatIfPreference
+                    $membersSg = new-mailEnabledSecurityGroup -dgDisplayName $membersSgDisplayName -fixedSuffix $membersSgDisplayNameSuffix -membersUpns $teamMemberUpns -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -WhatIf:$WhatIfPreference
                     if(![string]::IsNullOrWhiteSpace($memberOf)){
                         $memberOf | % { #We now nest membership via Members groups, rather than Combined Groups, so this is a little more complicated now.
                             $parentGroup = get-membersGroup -groupName $_
@@ -429,7 +433,6 @@ function new-365Group(){
                       ]
                     }"
                 Write-Verbose $creategroup
-                Write-Verbose "Test3"
                 $creategroup = [System.Text.Encoding]::UTF8.GetBytes($creategroup)
                 $response = Invoke-RestMethod -Uri https://graph.microsoft.com/v1.0/groups -Body $creategroup -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
                 
@@ -600,7 +603,7 @@ function new-365Group_deprecated($displayName, $description, $managers, $teamMem
 
             if(!$membersSg){ #And create a Members SG if required
                 Write-Host -ForegroundColor Yellow "Creating Members Security Group [$membersSgDisplayName]"
-                try{$membersSg = new-mailEnabledSecurityGroup -dgDisplayName $("$membersSgDisplayName") -members $teamMembers -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group"}
+                try{$membersSg = new-mailEnabledSecurityGroup -dgDisplayName $("$membersSgDisplayName") -fixedSuffix -members $teamMembers -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -owners "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group"}
                 catch{$Error}
                 }
 
@@ -704,6 +707,8 @@ function new-mailEnabledSecurityGroup(){
         [Parameter(Mandatory=$true)]
             [string]$dgDisplayName
         ,[Parameter(Mandatory=$false)]
+            [string]$fixedSuffix
+        ,[Parameter(Mandatory=$false)]
             [string]$description
         ,[Parameter(Mandatory=$false)]
             [string[]]$ownersUpns
@@ -717,8 +722,7 @@ function new-mailEnabledSecurityGroup(){
             [bool]$blockExternalMail
         )
     Write-Verbose "new-mailEnabledSecurityGroup([$dgDisplayName], [$description], [$($ownersUpns -join ", ")], [$($membersUpns -join ", ")], [$($memberOf -join ", ")], $hideFromGal, $blockExternalMail)"
-    $mailName = $dgDisplayName
-    if($mailName.length -gt 64){$mailName = $mailName.SubString(0,64)}
+    $mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64
 
     #Check to see if this already exists. This is based on Alias, which is mutable :(    
     $mesg = rummage-forDistributionGroup -displayName $dgDisplayName 
@@ -731,7 +735,7 @@ function new-mailEnabledSecurityGroup(){
     else{ #If the group doesn't exist, try creating it
         try{
             Write-Verbose "New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($(guess-aliasFromDisplayName $dgDisplayName)+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference"
-            $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName $dgDisplayName)+"@anthesisgroup.com") -Notes $description -Alias $(guess-aliasFromDisplayName $dgDisplayName) -WhatIf:$WhatIfPreference
+            $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $fixedSuffix)+"@anthesisgroup.com") -Notes $description -Alias $(guess-aliasFromDisplayName $dgDisplayName) -WhatIf:$WhatIfPreference
             }
         catch{
             Write-Error "Error creating new Distribution Group [$($dgDisplayName)] in new-mailEnabledSecurityGroup()"
@@ -919,13 +923,13 @@ function rummage-forDistributionGroup(){
     if([string]::IsNullOrWhiteSpace($alias)){$alias = guess-aliasFromDisplayName $displayName}
     [array]$dg = Get-DistributionGroup -Filter "DisplayName -eq `'$displayName`'"
     if($dg.Count -ne 1){
-        Write-Verbose "Trying to get DG by alias [$alias]"
-        [array]$dg = Get-DistributionGroup -Filter "Alias -eq `'$alias`'" #If we can't find it by the DisplayName, check the Alias as this is less mutable
-        if($dg.Count -ne 1){
+        #Write-Verbose "Trying to get DG by alias [$alias]"
+        #[array]$dg = Get-DistributionGroup -Filter "Alias -eq `'$alias`'" #If we can't find it by the DisplayName, check the Alias as this is less mutable
+        #if($dg.Count -ne 1){
             $dg = $null
             if($dg.Count -gt 1){Write-Warning "Multiple Groups matched for Distribution Group [$displayName]`r`n`t $($dg.PrimarySmtpAddress -join "`r`n`t")"}
             if($dg.Count -eq 0){Write-Verbose "No Distribution Group found"}
-            }
+        #    }
         } 
     $dg
     }
