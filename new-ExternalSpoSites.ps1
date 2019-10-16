@@ -40,6 +40,7 @@ foreach ($currentRequest in $selectedRequests){
     $members = $members | Sort-Object | select -Unique
     try{
         $result = new-externalGroup -displayName $("External - $($fullRequest.FieldValues.Title)").Trim(" ") -managerUpns $managers -teamMemberUpns $members -membershipManagedBy 365 -tokenResponse $tokenResponse -alsoCreateTeam $false -pnpCreds $365creds -Verbose -ErrorAction Stop
+        Write-Host -ForegroundColor Yellow "Site Admin is : [$($fullRequest.FieldValues.Site_x0020_Admin.LookupValue)]"
         #If there we no errors returned, assume it worked and notify finish the setup
         #Add a link to the new Site on the External Hub
         Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/external" -Credentials $365creds

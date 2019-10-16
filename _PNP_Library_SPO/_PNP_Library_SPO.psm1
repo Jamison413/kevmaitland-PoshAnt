@@ -166,9 +166,9 @@ function copy-spoPage(){
                         Write-Verbose "Uploading file to [$($destinationSite.AbsoluteUri+"/SitePages/"+$(Split-Path $sourceUrl.AbsoluteUri -Leaf))]"
                         Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Credentials $pnpCreds
                         if([string]::IsNullOrWhiteSpace($renameFileAs)){
-                            Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop
+                            $file = Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop #Added '$file = ' to avoid https://github.com/SharePoint/PnP-PowerShell/issues/722
                             }
-                        else{Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop -NewFileName $renameFileAs}
+                        else{$file = Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop -NewFileName $renameFileAs} #Added '$file = ' to avoid https://github.com/SharePoint/PnP-PowerShell/issues/722
                         
                         try{
                             Write-Verbose "Disabling upload of .aspx files to destination [$($destinationSite.AbsoluteUri.TrimEnd("/"))]"
