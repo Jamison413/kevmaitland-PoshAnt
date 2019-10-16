@@ -14,20 +14,6 @@ Param ($displayName)
         New-PnPTerm -TermSet "Live Sharepoint Teams" -TermGroup "Anthesis" -Name $displayName -Lcid 1033
         }
 }
-function guess-aliasFromDisplayName($displayName){
-    #Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
-    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","")}
-    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
-    Write-Debug -Message "guess-aliasFromDisplayName($displayName) = [$guessedAlias]"
-    $guessedAlias
-    }
-function guess-shorterAliasFromDisplayName($displayName){
-    Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
-    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","").Replace("(","").Replace(")","").Replace(",","").Replace("&","")}
-    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
-    Write-Debug -Message "guess-shorterAliasFromDisplayName($displayName) = [$(guess-aliasFromDisplayName($displayName))]"
-    $guessedAlias
-    }
 function enumerate-groupMemberships(){
     Write-Host -ForegroundColor Magenta "enumerate-groupMemberships()"
     Get-AzureADMSGroup -All:$true | % {
@@ -146,6 +132,49 @@ function enumerate-nestedDistributionGroups(){
             }
         }
     $userObjects | sort Name | Get-Unique -AsString
+    }
+function get-dataManagerGroupNameFrom365GroupName(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$unifiedGroupDisplayName
+        )
+    #70 character limit is imposed by Exchange in Group Naming
+    $suffix = " - Data Managers"
+    $dataManagerGroupName = set-suffixAndMaxLength -string $unifiedGroupDisplayName -suffix $suffix -maxLength 70
+    $dataManagerGroupName
+    }
+function get-membersGroupNameFrom365GroupName(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$unifiedGroupDisplayName
+        )
+    #70 character limit is imposed by Exchange in Group Naming
+    $suffix = " - Members Subgroup"
+    $membersGroupName = set-suffixAndMaxLength -string $unifiedGroupDisplayName -suffix $suffix -maxLength 70
+    $membersGroupName
+    }
+function guess-aliasFromDisplayName(){
+    [CmdletBinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [string]$displayName
+        )
+    #Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
+    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","")}
+    $guessedAlias = sanitise-forMicrosoftEmailAddress -dirtyString $guessedAlias
+    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
+    $guessedAlias = remove-diacritics -String $guessedAlias
+    Write-Verbose -Message "guess-aliasFromDisplayName($displayName) = [$guessedAlias]"
+    $guessedAlias
+    }
+function guess-shorterAliasFromDisplayName($displayName){
+    Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
+    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","").Replace("(","").Replace(")","").Replace(",","").Replace("&","")}
+    if($guessedAlias.length -gt 64){$guessedAlias = $guessedAlias.SubString(0,64)} 
+    Write-Debug -Message "guess-shorterAliasFromDisplayName($displayName) = [$(guess-aliasFromDisplayName($displayName))]"
+    $guessedAlias
     }
 function get-membersGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]
@@ -272,6 +301,8 @@ function new-365Group(){
             [PSCustomObject]$tokenResponse
         ,[Parameter(Mandatory=$false)]
             [bool]$alsoCreateTeam = $false
+        ,[Parameter(Mandatory = $true)]
+        [pscredential]$pnpCreds
         )
 
     Write-Verbose "new-365Group($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $hideFromGal, $blockExternalMail, $isPublic, $autoSubscribe, $additionalEmailAddresses, $groupClassification, $ownersAreRealManagers,$membershipmanagedBy)"
@@ -309,8 +340,8 @@ function new-365Group(){
     else{
         Write-Verbose "No pre-existing 365 group found - checking for AAD Groups."
         $combinedSgDisplayName = $displayName
-        $managersSgDisplayName = "$displayName - Data Managers Subgroup"
-        $membersSgDisplayName = "$displayName - Members Subgroup"
+        $managersSgDisplayName = get-dataManagerGroupNameFrom365GroupName -unifiedGroupDisplayName $displayName
+        $membersSgDisplayName = get-membersGroupNameFrom365GroupName -unifiedGroupDisplayName $displayName
         $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
 
         #Check whether any of these MESG exist based on names (just in case we're re-creating a 365 group and want to retain the AAD Groups)
@@ -383,7 +414,7 @@ function new-365Group(){
                 $members = $($members+$owners) | Sort-Object | Get-Unique -AsString
 
                 $creategroup = "{`
-                    `"displayName`": `"$displayName`",
+                    `"displayName`": `"$(sanitise-forJson $displayName)`",
                     `"groupTypes`": [
                       `"Unified`"
                     ],
@@ -398,9 +429,12 @@ function new-365Group(){
                       ]
                     }"
                 Write-Verbose $creategroup
-                $response = Invoke-RestMethod -Uri https://graph.microsoft.com/v1.0/groups -Body $creategroup -ContentType "application/json" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+                Write-Verbose "Test3"
+                $creategroup = [System.Text.Encoding]::UTF8.GetBytes($creategroup)
+                $response = Invoke-RestMethod -Uri https://graph.microsoft.com/v1.0/groups -Body $creategroup -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
                 
                 Connect-PnPOnline -AccessToken $tokenResponse.access_token
+                Set-PnPUnifiedGroup -Identity $response.id -DisplayName $displayName <# Graph API doesn't handle accents/diacritics properly and replaces them with �, so we have to set the DisplayName again via Pnp #>
                 do{
                     Write-Verbose "Waiting for Unified Group to provision..."
                     $pnp365Group = Get-PnPUnifiedGroup -Identity $response.id -ErrorAction SilentlyContinue -WarningAction SilentlyContinue #This is (allegedly) the bit that triggers Site Collection creation
@@ -459,11 +493,21 @@ function new-365Group(){
 
     do{
         Write-Verbose "Waiting for Unified Group Site to provision..."
-        $pnp365Group = Get-PnPUnifiedGroup -Identity $response.id -ErrorAction SilentlyContinue -WarningAction SilentlyContinue #This is (allegedly) the bit that triggers Site Collection creation
+        Connect-PnPOnline -AccessToken $tokenResponse.access_token
+        if($response){
+            Write-Verbose "Get-PnPUnifiedGroup -Identity [$($response.id)] (`$GraphResponse)"
+            $pnp365Group = Get-PnPUnifiedGroup -Identity $response.id -ErrorAction SilentlyContinue -WarningAction SilentlyContinue <#This is (allegedly) the bit that triggers Site Collection creation#>
+            }
+        elseif($365Group){
+            Write-Verbose "Get-PnPUnifiedGroup -Identity [$($365Group.ExternalDirectoryObjectId)] (`$365Group)"
+            $pnp365Group = Get-PnPUnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -ErrorAction SilentlyContinue -WarningAction SilentlyContinue <#This is (allegedly) the bit that triggers Site Collection creation#>
+            }
+        else{Write-Warning "I haven't got a `$response or `$365Group object, so I can't check whether the Site has been provisioned!"}
         Start-Sleep -Seconds 5
         }
     while([string]::IsNullOrWhiteSpace($pnp365Group.SiteUrl))
-    set-standardTeamSitePermissions -teamSiteAbsoluteUrl $pnp365Group.SiteUrl
+    Write-Verbose "set-standardTeamSitePermissions -teamSiteAbsoluteUrl [$($pnp365Group.SiteUrl)]"
+    set-standardSitePermissions -unifiedGroupObject $365Group -tokenResponse $tokenResponse -pnpCreds $pnpCreds
     $365Group
 
     }
@@ -636,13 +680,14 @@ function new-externalGroup(){
     $accessType = "Private"
     $autoSubscribe = $true
     $groupClassification = "External"
-    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam
+    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $pnpCreds
     Connect-PnPOnline -AccessToken $tokenResponse.access_token
+    Write-Verbose "`$newTeam = Get-PnPUnifiedGroup -Identity [$displayName]"
     $newTeam = Get-PnPUnifiedGroup -Identity $displayName
     
     #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
-    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose
-    test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true
+    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
+    test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
     if((test-pnpConnectionMatchesResource -resourceUrl $newTeam.SiteUrl) -eq $true){
         Write-Verbose "Setting Homepage"
         Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
@@ -785,7 +830,6 @@ function new-teamGroup(){
     #set-defaultTeamSitePerissions
     #Set-defaultTeamSiteHomepage
     }
-     
 function report-groupMembershipEnumeration($allGroupStubs,$filePathAndName){
     #######################################################################################################################################
     #
