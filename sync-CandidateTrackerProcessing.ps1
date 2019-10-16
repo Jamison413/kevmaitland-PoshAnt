@@ -15,7 +15,7 @@ Import-Module _PNP_Library_SPO
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 
 
@@ -53,11 +53,12 @@ If($List.Description -match "Live Candidate Tracker"){
 }
 
 
+
 <#--------------Process each list--------------#>
 
 #Iterate through each list and check for any actions against candidates need processing - is the date modified more recent than the Last Modified Date?
 $Folderstocreate = @()
-ForEach($LiveTracker in $LiveCandidateTrackers[6]){
+ForEach($LiveTracker in $LiveCandidateTrackers){
 
     $Itemstoprocess = Get-PnPListItem -List $LiveTracker.Guid  
     
@@ -191,32 +192,96 @@ ForEach($LiveTracker in $LiveCandidateTrackers[6]){
 
 
 
-<#--------------Connect to the confidential HR team site with new pnp-context--------------#>  #Kimblebot is currently not allowed to connect to this site
-
-#Set Variables to connect to Sharepoint confidential HR site 
-#$SiteURL = "https://anthesisllc.sharepoint.com/sites/Confidential_Human_Resources_HR_Team_GBR_365/"
+<#--------------Connect to the confidential HR team site with Graph--------------#>  #Kimblebot is currently not allowed to connect to this site
 
 
+#Get salted credentials and get an Accesstoken
+$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$resource = "https://graph.microsoft.com"
+$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
+$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
+$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
+$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
 
-#Connect to Sharepoint
-#Connect-PnPOnline -Url $SiteURL -Credentials $adminCreds
-#$context = Get-PnPContext
+$ReqTokenBody = @{
+    Grant_Type    = "client_credentials"
+    Scope         = "https://graph.microsoft.com/.default"
+    client_Id     = $clientID
+    Client_Secret = $secret
+    } 
+$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
 
-<#--------------Process each new Employee folder--------------#>
+
+#Connnect to sharepoint via Graph
+Connect-PnPOnline -AccessToken $tokenResponse.access_token
 
 
-<#ForEach ($folder in $Folderstocreate){
+<#--------create the initial Parent folder--------#>
+$body = "{
+    `"name`": `"$($folder.'Candidate Name')`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$CandidateNameResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUILOIXGORD4QBFYI6MMKVPW4HZI/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 
-write-host "Creating employee folders on confidential HR site" -ForegroundColor Yellow
 
-    Add-PnPFolder -Name $folder.'Candidate Name' -Folder "Shared Documents"
-    $parentfolder = "Shared Documents" + "\" + $folder.'Candidate Name'
-    Add-PnPFolder -Name "1. Onboarding" -Folder $parentfolder
-    Add-PnPFolder -Name "2. Lifecycle" -Folder $parentfolder
-    Add-PnPFolder -Name "3. Offboarding" -Folder $parentfolder
-    
-    $Onboardingfoldername = "Shared Documents" + "\" + $folder.'Candidate Name' + "1. Onboarding"
-    Copy-PnPFile -SourceUrl "https://anthesisllc.sharepoint.com/:x:/r/sites/Confidential_Human_Resources_HR_Team_GBR_365/_layouts/15/Doc.aspx?sourcedoc=%7BAFD940AB-DED8-4C2B-BD2F-4AE144B72460%7D&file=New%20Starter%20Checklist.xlsx&action=default&mobileredirect=true" -TargetUrl $Onboardingfoldername
+<#--------create the subfolders within the parent folder created above--------#>
+#Subfolder 1.Onboarding
+$body = "{
+    `"name`": `"1. Onboarding`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+
+
+#Subfolder 2. Lifecycle
+$body = "{
+    `"name`": `"2. Lifecycle`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+
+#Check the last subfolder was created, this won't create if the parent folder creation was not successful. Send an email if there are any problems.
+#Subfolder 3. Offboarding
+Try{
+$body = "{
+    `"name`": `"3. Offboarding`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+}
+catch{
+
+            $subject = "Employee Folder Creation: Woops, something went wrong..."
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
+            $body += "Something went wrong when trying to create an employee folder for <b>$($folder.'Candidate Name')</b>. Should probably take a look and see what's gone wrong.`r`n`r`n<BR><BR>"
+            $body += "<b>Timestamp: </b>$(get-date)`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+
 }
 
-#>
+
+
+
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUNWN7IAV3SML5EYVWC6XIAWAJPF/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value.Name
+
+#AUK Employee Folders = 01LLWAYUOPYQEQ4RYWDJGZ2MPQ6QENEXEN
+
+    
+    #$Onboardingfoldername = "Shared Documents" + "\" + $folder.'Candidate Name' + "1. Onboarding"
+    #Copy-PnPFile -SourceUrl "https://anthesisllc.sharepoint.com/:x:/r/sites/Confidential_Human_Resources_HR_Team_GBR_365/_layouts/15/Doc.aspx?sourcedoc=%7BAFD940AB-DED8-4C2B-BD2F-4AE144B72460%7D&file=New%20Starter%20Checklist.xlsx&action=default&mobileredirect=true" -TargetUrl $Onboardingfoldername
+
+
