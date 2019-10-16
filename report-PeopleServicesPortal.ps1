@@ -73,8 +73,7 @@ $LiveRolesHTML = $LiveCandidateTrackers | ConvertTo-Html -Property "Title","Cand
 ###############################################################################
 
 
-#First, get all Live Trackers
-
+#First, get all the Live Candidate Trackers
 $FullListQuery = Get-PnPList
 $LiveCandidateTrackers = @()
 ForEach($List in $FullListQuery){
@@ -92,38 +91,39 @@ If($List.Description -match "Live Candidate Tracker"){
      }
 }
 
-#Then check each tracker for Items, add them to a big array with all the details
 
+#Then check each tracker for Items, add them to a big array with all the details
 $LiveOffers = @()
 ForEach($LiveTracker in $LiveCandidateTrackers){
 
     $Items = Get-PnPListItem -List $LiveTracker.Guid  
     
         foreach($Candidate in $Items){
-
-        $FinalDecision = $Candidate.FieldValues.Final_x0020_Decision
-        $StartDate = $Candidate.FieldValues.Proposed_x0020_Start_x0020_Date
-
-        #If 'Make Offer' and no start date, this indicates Offer is still pending
-            If(("Make Offer" -eq $FinalDecision) -and ($null -eq $StartDate)){
-
-                $htmlfriendlytitle = $LiveTracker.Title -replace " ",'%20'
+        #check for null or it throws errors and blank roles
+        If($Candidate.FieldValues.Final_x0020_Decision){
         
-                $LiveOffers += New-Object psobject -Property @{
+                $FinalDecision = $Candidate.FieldValues.Final_x0020_Decision
+                [string]$StartDate = $Candidate.FieldValues.Proposed_x0020_Start_x0020_Date #turning this into a string, cheating this part, doesn't like [datetime]
+
+                #If 'Make Offer' and no start date, this indicates Offer is still pending
+                        If(("Make Offer" -eq $FinalDecision) -and (!$StartDate)){
+
+                        $htmlfriendlytitle = $LiveTracker.Title -replace " ",'%20'
+        
+                        $LiveOffers += New-Object psobject -Property @{
                         
                         'Title' = $LiveTracker.Title;
                         'Candidate Name' = $($Candidate.FieldValues.Candidate_x0020_Name)
                         'Candidate Tracker Link' = $SiteURL + "/Lists" + "/$($htmlfriendlytitle)"
                                     }
-
-        
-            }
-
-      }
+                        }
+                }
+        }
 
 }
 
-$OffersHTML = $LiveOffers  | ConvertTo-Html -Property "Title","Candidate Name","Candidate Tracker Link" -Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
+#convert it to an HTML table
+$OffersHTML = $LiveOffers  | ConvertTo-Html -Property "Title","Candidate Name","Candidate Tracker Link" #-Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
 
 
 ###############################################################################                                      
@@ -143,12 +143,14 @@ $upcomingNewStarters = @()
 ForEach($NewStarter in $FullItemQuery){
 
 
-    
+      #check for null or it throws errors and blank roles
+      If($NewStarter.FieldValues.StartDate){
 
-    [datetime]$startdate = $NewStarter.FieldValues.StartDate #start date wil always be set to 23:00 by Sharepoint, hopefully will not cause issues?
-    $todaysdate = Get-Date
 
-    If(($startdate -lt $todaysdate) -or ($StartDate -eq $todaysdate)){
+        [datetime]$startdate = $NewStarter.FieldValues.StartDate #start date wil always be set to 23:00 by Sharepoint, hopefully will not cause issues?
+        $todaysdate = Get-Date
+
+            If(($startdate -lt $todaysdate) -or ($StartDate -eq $todaysdate)){
     
                  $upcomingNewStarters += New-Object psobject -Property @{
                 'New Starter Name' = $NewStarter.FieldValues.Employee_x0020_Preferred_x0020_N
@@ -158,43 +160,74 @@ ForEach($NewStarter in $FullItemQuery){
                 'Primary Office' = $NewStarter.FieldValues.Main_x0020_Office0.Label;
                 'Line Manager' = $NewStarter.FieldValues.Line_x0020_Manager.Label;
             }
+        }
     }
 }
 
-
-
-
-$NewStartersHTML = $upcomingNewStarters  | ConvertTo-Html -Property "'New Starter Name'","Job Title","Start Date","Starting Office","Primary Office","Line Manager" -Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
-
-
+#Convert it to an HTML table
+$NewStartersHTML = $upcomingNewStarters  | ConvertTo-Html -Property "New Starter Name","Job Title","Start Date","Starting Office","Primary Office","Line Manager" #-Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
 
 
 
 
+###############################################################################                                      
+#                                                                             #
+#                               Leavers                                       #
+#                                                                             #
+###############################################################################
+
+#Get the full list of leavers
+$AllLeavers = Get-PnPListItem -List "Notify Internal Teams of a Leaver"
+#Iterate through each leaver and figure out whether the leavving date it within the previous 10 days, or grater than the current date (to include reminders of people that have recently left).
+$LiveLeavers = @()
+ForEach ($Leaver in $AllLeavers){
+
+
+      #check for null or it throws errors and blank roles
+      If($NewStarter.FieldValues.StartDate){
+
+            [datetime]$Leaversdate = $Leaver.FieldValues.Proposed_x0020_Leaving_x0020_Dat
+            $thresholddate = (Get-Date) - ($timespan = New-TimeSpan -days 20)
+
+                    If($Leaversdate -gt $thresholddate){
+
+                    $LiveLeavers += New-Object psobject -Property @{
+                    'Employee Name' = $($Leaver.FieldValues.Employee_x0020_Name.Lookupvalue)
+                    'Notes' = $($Leaver.FieldValues.Notes1)
+                    'Proposed Leaving Date' = $($Leaver.FieldValues.Proposed_x0020_Leaving_x0020_Dat)
+                    }
+
+            }
+        }
+}
+
+
+#Convert it to an HTML table
+$LeaversHTML = $LiveLeavers  | ConvertTo-Html -Property "Employee Name","Notes","Proposed Leaving Date" #-Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
 
 
 
 
+##################################################################################################################################################                                     
+#                                                                                                                                                #
+#                                                         --Reporting Email--                                                                    #
+#                                                                                                                                                #
+##################################################################################################################################################
 
 
 
-
-
-
-
-
-
-
-
-#Send an email!
+#Put it all in an email and send!
 $subject = "Current List of Live Offers"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
-            $body += "<b>Here is a list of live Roles from Live Candidate Trackers on the People Services All Site.</b>`r`n`r`n<BR><BR>"
+            $body += "This is a current report from the entire People Services Portal. If something is amiss, please make any changes in the releavnt areas and this will reflect in the next report.`r`n`r`n<BR><BR>"
+            $body += "<b>Here is a list of live Roles from Live Candidate Trackers on the People Services All Site:</b>`r`n`r`n<BR><BR>"
             $body += "$LiveRolesHTML`r`n`r`n<BR><BR><BR><BR>"
-            $body += "<b>Here is a list of Live Offers from the Live Candidate Trackers on the People Services Site.</b>`r`n`r`n<BR><BR>"
+            $body += "<b>Here is a list of Live Offers from the Live Candidate Trackers on the People Services Site:</b>`r`n`r`n<BR><BR>"
             $body += "$OffersHTML`r`n`r`n<BR><BR><BR><BR>"
-            $body += "<b>Here is a list of New Starters on the People Services Site.</b>`r`n`r`n<BR><BR>"
+            $body += "<b>Here is a list of New Starters on the People Services Site:</b>`r`n`r`n<BR><BR>"
             $body += "$NewStartersHTML`r`n`r`n<BR><BR><BR><BR>"
+            $body += "<b>Here is a list of New Starters on the People Services Site:</b>`r`n`r`n<BR><BR>"
+            $body += "$LeaversHTML`r`n`r`n<BR><BR><BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
             
