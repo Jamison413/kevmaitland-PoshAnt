@@ -76,6 +76,7 @@ $LiveRolesHTML = $LiveCandidateTrackers | ConvertTo-Html -Property "Title","Cand
 #First, get all the Live Candidate Trackers
 $FullListQuery = Get-PnPList
 $LiveCandidateTrackers = @()
+
 ForEach($List in $FullListQuery){
 If($List.Description -match "Live Candidate Tracker"){
 
@@ -134,15 +135,17 @@ $OffersHTML = $LiveOffers  | ConvertTo-Html -Property "Title","Candidate Name","
 
 
 #First, get all the items in the New Starters List
+$List = "New Starter Details"
+$FullItemQuery = Get-PnPListItem -List $List
 
-$FullItemQuery = Get-PnPListItem -List "New Starter Details"
+$htmlfriendlytitle = $List -replace " ",'%20'
 
 
 #Second, iterate through them and check for any upcoming/starting today
 $upcomingNewStarters = @()
 ForEach($NewStarter in $FullItemQuery){
 
-
+        
       #check for null or it throws errors and blank roles
       If($NewStarter.FieldValues.StartDate){
 
@@ -151,6 +154,9 @@ ForEach($NewStarter in $FullItemQuery){
         $todaysdate = Get-Date
 
             If(($startdate -lt $todaysdate) -or ($StartDate -eq $todaysdate)){
+
+                $NewStarterLink = $SiteURL + "/Lists" + "/$($htmlfriendlytitle)" +  "/DispForm.aspx?" + "ID=$($NewStarter.FieldValues.ID)"
+
     
                  $upcomingNewStarters += New-Object psobject -Property @{
                 'New Starter Name' = $NewStarter.FieldValues.Employee_x0020_Preferred_x0020_N
@@ -159,13 +165,14 @@ ForEach($NewStarter in $FullItemQuery){
                 'Starting Office' = $NewStarter.FieldValues.Starting_x0020_Office.Label0;
                 'Primary Office' = $NewStarter.FieldValues.Main_x0020_Office0.Label;
                 'Line Manager' = $NewStarter.FieldValues.Line_x0020_Manager.Label;
-            }
+                'Link' = $NewStarterLink
+                }
         }
     }
 }
 
 #Convert it to an HTML table
-$NewStartersHTML = $upcomingNewStarters  | ConvertTo-Html -Property "New Starter Name","Job Title","Start Date","Starting Office","Primary Office","Line Manager" #-Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
+$NewStartersHTML = $upcomingNewStarters  | ConvertTo-Html -Property "New Starter Name","Job Title","Start Date","Starting Office","Primary Office","Line Manager","Link" #-Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
 
 
 
@@ -177,7 +184,11 @@ $NewStartersHTML = $upcomingNewStarters  | ConvertTo-Html -Property "New Starter
 ###############################################################################
 
 #Get the full list of leavers
-$AllLeavers = Get-PnPListItem -List "Notify Internal Teams of a Leaver"
+$List = "Notify Internal Teams of a Leaver"
+$AllLeavers = Get-PnPListItem -List $List
+$htmlfriendlytitle = $List -replace " ",'%20'
+
+
 #Iterate through each leaver and figure out whether the leavving date it within the previous 10 days, or grater than the current date (to include reminders of people that have recently left).
 $LiveLeavers = @()
 ForEach ($Leaver in $AllLeavers){
@@ -187,14 +198,17 @@ ForEach ($Leaver in $AllLeavers){
       If($NewStarter.FieldValues.StartDate){
 
             [datetime]$Leaversdate = $Leaver.FieldValues.Proposed_x0020_Leaving_x0020_Dat
-            $thresholddate = (Get-Date) - ($timespan = New-TimeSpan -days 20)
+            $thresholddate = (Get-Date) - ($timespan = New-TimeSpan -days 40)
 
                     If($Leaversdate -gt $thresholddate){
+
+                    $LeaverLink = $SiteURL + "/Lists" + "/$($htmlfriendlytitle)" +  "/DispForm.aspx?" + "ID=$($Leaver.FieldValues.ID)"
 
                     $LiveLeavers += New-Object psobject -Property @{
                     'Employee Name' = $($Leaver.FieldValues.Employee_x0020_Name.Lookupvalue)
                     'Notes' = $($Leaver.FieldValues.Notes1)
                     'Proposed Leaving Date' = $($Leaver.FieldValues.Proposed_x0020_Leaving_x0020_Dat)
+                    'Link' = $LeaverLink
                     }
 
             }
@@ -203,7 +217,7 @@ ForEach ($Leaver in $AllLeavers){
 
 
 #Convert it to an HTML table
-$LeaversHTML = $LiveLeavers  | ConvertTo-Html -Property "Employee Name","Notes","Proposed Leaving Date" #-Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
+$LeaversHTML = $LiveLeavers  | ConvertTo-Html -Property "Employee Name","Notes","Proposed Leaving Date","Link" #-Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
 
 
 
@@ -224,9 +238,9 @@ $subject = "Current List of Live Offers"
             $body += "$LiveRolesHTML`r`n`r`n<BR><BR><BR><BR>"
             $body += "<b>Here is a list of Live Offers from the Live Candidate Trackers on the People Services Site:</b>`r`n`r`n<BR><BR>"
             $body += "$OffersHTML`r`n`r`n<BR><BR><BR><BR>"
-            $body += "<b>Here is a list of New Starters on the People Services Site:</b>`r`n`r`n<BR><BR>"
+            $body += "<b>Here is a list of recent or upcoming New Starters on the People Services Site:</b>`r`n`r`n<BR><BR>"
             $body += "$NewStartersHTML`r`n`r`n<BR><BR><BR><BR>"
-            $body += "<b>Here is a list of New Starters on the People Services Site:</b>`r`n`r`n<BR><BR>"
+            $body += "<b>Here is a list of recent or upcoming Leavers on the People Services Site:</b>`r`n`r`n<BR><BR>"
             $body += "$LeaversHTML`r`n`r`n<BR><BR><BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
