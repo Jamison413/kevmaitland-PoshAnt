@@ -27,14 +27,15 @@ Connect-PnPOnline -Url $SiteURL -Credentials $adminCreds
 $context = Get-PnPContext
 
 
-<#--------------Get all lists--------------#>
+<#--------------Find what needs processing--------------#>
+
+#Find all lists on site
 $RecruitmentArea = Get-PnPList -Identity "Recruitment Area"
 $NewStarterList = Get-PnPList -Identity "New Starter Details"
 $items = Get-PnPListItem -List "Recruitment Area"
 
 
-<#--------------Get all the Lists from the Site, find the live ones, "Live Candidate Tracker" will be in the description"--------------#>
-
+#Find the live Candidate Trackers ("Live Candidate Tracker" will be in the description) and put them in an array
 $FullListQuery = Get-PnPList
 $LiveCandidateTrackers = @()
 ForEach($List in $FullListQuery){
@@ -46,22 +47,23 @@ If($List.Description -match "Live Candidate Tracker"){
         'Title' = $List.Title;
         'Guid' = $List.Id;
         'Description' = $List.Description;
-        'RoleID' = $RoleId;
-        
+        'RoleID' = $RoleId;        
         }
      }
 }
 
 
 
-<#--------------Process each list--------------#>
+<#--------------Process each list to see if anything has changed--------------#>
 
-#Iterate through each list and check for any actions against candidates need processing - is the date modified more recent than the Last Modified Date?
+#Iterate through each live Candidate Tracker and check for any actions against candidates need processing (currently through comparison columns, last modified dates caused issues)
 $Folderstocreate = @()
 ForEach($LiveTracker in $LiveCandidateTrackers){
-
+    
+    #Find each list by it's ID (found above) and get all items within it (these will be candidates going through the hiring process)
     $Itemstoprocess = Get-PnPListItem -List $LiveTracker.Guid  
     
+    #Iterate through each item within each Candidate Tracker and compare key columns
     foreach($Item in $Itemstoprocess){
 
         #I don't work, don't believe me - just compare the Decision Columns below instead...keeping this here in case I get fixed
@@ -69,13 +71,27 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         #$ModifiedDate = $Item.FieldValues.Modified
         #write-host "The last modified date of this item is older the the current Modified date, something has changed! Comparing the old entries to the new entries"
 
-    #First, check for Declined Candidates so we can skip the iteration and then compare the key columns for changes for non-declined candidates, if there is a change, we can process it below.
+        
+     #First, check for blanks in the trigger columns: Decision 1 and Final decision Last Entry fields. Errors will occur if thses fields are blank for the compare-object sections below.
 
+        #check for blanks in the Decision 1 Last Entry column
+        If(!$Item.FieldValues.D1LE){
+        Set-PnPListItem -List $List -Identity $item.ID -Values @{"D1LE" = "$($Item.FieldValues.Decision_x0020_1)"}
+        Continue
+            }
+        #check for blanks in the Final Decision Last Entry column
+        If(!$Item.FieldValues.FDLE){
+        Set-PnPListItem -List $List -Identity $item.ID -Values @{"FDLE" = "$($Item.FieldValues.Final_x0020_Decision)"}
+        Continue
+            }
 
-        #Check for Declined candidates - if Decision 1 is set to Decline, set the Last Entry fields and Final Decision  fields also as Decline and continue onto the next iteration. Same concept for Final Decision, but this won't change Interview 1 decision fields, just the Last entry field.
+      #Second, check for Declined Candidates so we can skip the iteration and then compare the key columns for changes for non-declined candidates, if there is a change, we can process it below.
+
+       #Check for Declined candidates - if Decision 1 is set to Decline, set the Last Entry fields and Final Decision  fields also as Decline and continue onto the next iteration. Same concept for Final Decision, but this won't change Interview 1 decision fields, just the Last entry field.
         If(("Decline" -eq $Item.FieldValues.Decision_x0020_1) -and ("Decline" -ne $Item.FieldValues.D1LE)){
            Write-Host "Looks like this Candidate has been declined after Interview 1 since we last ran through - setting other fields to decline and moving on"
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'D1LE' = "$($Item.FieldValues.Decision_x0020_1)"}
+           Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'Final_x0020_Decision' = "$($Item.FieldValues.Decision_x0020_1)"}
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Decision_x0020_1)"}
            Continue
         }
@@ -86,12 +102,12 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
            Continue
         }
 
-        #Compare the Decision Columns - only process them if they are different as it indicates a change.
+
+    #Third, the Decision Columns - only process them if they are different as it indicates a change.
+        
+        #Compare each column to it's Last Entry column (there are two currently, one for Decision 1 and one for Final Decision).
         $InterView1Decision = (Compare-Object -ReferenceObject $Item.FieldValues.Decision_x0020_1 -DifferenceObject $Item.FieldValues.D1LE)
         $FinalDecision = (Compare-Object -ReferenceObject $Item.FieldValues.Final_x0020_Decision -DifferenceObject $Item.FieldValues.FDLE)
-
-
-
         If($InterView1Decision){
         Write-host "$($Item.FieldValues.Candidate_x0020_Name): Something has changed on the Interview 1 Decision Field! Let's maybe do something about it!" -ForegroundColor Yellow
         }
@@ -101,7 +117,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         
     
 
-    #Second, check which part has changed and action based on input. We have included an -and statement to just include those that have changed since the last run or it will keep sending out emails
+    #Fourth, check which part has changed and action based on input. We have included an -and statement to just include those that have changed since the last run or it will keep sending out emails
         
         #Check if Interview 1 needs processing and it matches "Move to Next Stage" so we can let People Services know
         If(($InterView1Decision) -and ($Item.FieldValues.Decision_x0020_1 -match "Move to Next Stage")) {
@@ -127,7 +143,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
        }
 
 
-       #Check if Final Decision needs processing and it matches "Make Offer" so we can let People Services know
+       #Fifth, check if Final Decision needs processing and it matches "Make Offer" so we can let People Services know
         If(($FinalDecision) -and ($Item.FieldValues.Final_x0020_Decision -match "Make Offer")) {
 
         write-host "FinalDecision has changed from $($Item.FieldValues.FDLE) to $($Item.FieldValues.Final_x0020_Decision)"
@@ -155,22 +171,24 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         }
 
 
-    #Third, check if there is a Proposed Start Date, this suggests some firm date has been set and the Candidate is likely to start then, create a new template entry with what we know about the Candidate already in the 'New Starter Details' List. Set the Candidate Tracker as "Complete"
+    #Sixth, check if there is a Proposed Start Date, this suggests some firm date has been set and the Candidate is likely to start then, create a new template entry with what we know about the Candidate already in the 'New Starter Details' List. Set the Candidate Tracker as "Complete"
 
         If(($Item.FieldValues.Proposed_x0020_Start_x0020_Date) -and ("0" -eq $Item.FieldValues.IsDirty)){
         Write-host "Looks like the Hiring Process is complete. Let's set this Candidate Tracker to 'Complete' and put a placeholder in the 'New Starter Details' Form based on what we know already" -ForegroundColor Yellow
             Set-PnPListItem -List $RecruitmentArea -Identity $LiveTracker.RoleId -Values @{"Role_x0020_Hire_x0020_Status" = "Complete"}
-            $RecruitmentAreaItem = Get-PnPListItem -List $RecruitmentArea -Id $LiveTracker.RoleId
+            $RecruitmentAreaItem = Get-PnPListItem -List $RecruitmentArea -Id $($LiveTracker.RoleId)
 
         #Start Pre-populating the New Starter Details Form
+            [datetime]$Friendlystartdate = $($Item.FieldValues.Proposed_x0020_Start_x0020_Date)
+
             Add-PnPListItem -List $NewStarterList -Values @{
-            "Employee_x0020_Preferred_x0020_N" = $Item.FieldValues.Candidate_x0020_Name; 
-            "StartDate" = $Item.FieldValues.Proposed_x0020_Start_x0020_Date;  
-            "JobTitle" = $RecruitmentAreaItem.FieldValues.Role_x0020_Name;
-            "Line_x0020_Manager" = $RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager.LookupValue;
-            "Primary_x0020_Team" = $RecruitmentAreaItem.FieldValues.Primary_x0020_Team0.Label;
-            "Community0" = $RecruitmentAreaItem.FieldValues.Community0.Label;
-            "Business_x0020_Unit0" = $RecruitmentAreaItem.FieldValues.Business_x0020_Unit0.Label;
+            "Employee_x0020_Preferred_x0020_N" = $($Item.FieldValues.Candidate_x0020_Name); 
+            "StartDate" = $Friendlystartdate;  
+            "JobTitle" = $($RecruitmentAreaItem.FieldValues.Role_x0020_Name);
+            "Line_x0020_Manager" = $($RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager.LookupValue);#I'm not working - managed metadata is casuing issues
+            "Primary_x0020_Team" = $($RecruitmentAreaItem.FieldValues.Primary_x0020_Team0.Label);
+            "Community0" = $($RecruitmentAreaItem.FieldValues.Community0.Label);
+            "Business_x0020_Unit0" = $($RecruitmentAreaItem.FieldValues.Business_x0020_Unit0.Label);
             }
         
         #Send a confirmation email to People Services
@@ -209,12 +227,17 @@ $ReqTokenBody = @{
     client_Id     = $clientID
     Client_Secret = $secret
     } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+#$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
 
 
 #Connnect to sharepoint via Graph
 Connect-PnPOnline -AccessToken $tokenResponse.access_token
 
+
+<#--------Create the Employee Folder Structure--------#>
+
+
+ForEach($folder in $Folderstocreate){
 
 <#--------create the initial Parent folder--------#>
 $body = "{
@@ -272,7 +295,7 @@ catch{
 
 }
 
-
+}
 
 
 #$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUNWN7IAV3SML5EYVWC6XIAWAJPF/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
@@ -285,3 +308,8 @@ catch{
     #Copy-PnPFile -SourceUrl "https://anthesisllc.sharepoint.com/:x:/r/sites/Confidential_Human_Resources_HR_Team_GBR_365/_layouts/15/Doc.aspx?sourcedoc=%7BAFD940AB-DED8-4C2B-BD2F-4AE144B72460%7D&file=New%20Starter%20Checklist.xlsx&action=default&mobileredirect=true" -TargetUrl $Onboardingfoldername
 
 
+
+
+   $starters[0].FieldValues.StartDate  =  get-pnplistitem -List "New Starter Details" 
+
+   Set-PnPListItem -List "New Starter Details"  -Identity "3" -Values @{"Community0" = "Roots"}
