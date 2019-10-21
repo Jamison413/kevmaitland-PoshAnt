@@ -27,15 +27,14 @@ Connect-PnPOnline -Url $SiteURL -Credentials $adminCreds
 $context = Get-PnPContext
 
 
-<#--------------Find what needs processing--------------#>
-
-#Find all lists on site
+<#--------------Get all lists--------------#>
 $RecruitmentArea = Get-PnPList -Identity "Recruitment Area"
 $NewStarterList = Get-PnPList -Identity "New Starter Details"
 $items = Get-PnPListItem -List "Recruitment Area"
 
 
-#Find the live Candidate Trackers ("Live Candidate Tracker" will be in the description) and put them in an array
+<#--------------Get all the Lists from the Site, find the live ones, "Live Candidate Tracker" will be in the description"--------------#>
+
 $FullListQuery = Get-PnPList
 $LiveCandidateTrackers = @()
 ForEach($List in $FullListQuery){
@@ -47,25 +46,30 @@ If($List.Description -match "Live Candidate Tracker"){
         'Title' = $List.Title;
         'Guid' = $List.Id;
         'Description' = $List.Description;
-        'RoleID' = $RoleId;        
+        'RoleID' = $RoleId;
+        
         }
      }
 }
 
+  
 
 
-<#--------------Process each list to see if anything has changed--------------#>
 
-#Iterate through each live Candidate Tracker and check for any actions against candidates need processing (currently through comparison columns, last modified dates caused issues)
+<#--------------Process each list--------------#>
+
+#Iterate through each list and check for any actions against candidates need processing - is the date modified more recent than the Last Modified Date?
 $Folderstocreate = @()
 ForEach($LiveTracker in $LiveCandidateTrackers){
-    
-    #Find each list by it's ID (found above) and get all items within it (these will be candidates going through the hiring process)
+
     $Itemstoprocess = Get-PnPListItem -List $LiveTracker.Guid  
     
-    #Iterate through each item within each Candidate Tracker and compare key columns
     foreach($Item in $Itemstoprocess){
-
+    
+    
+    
+    
+    
         #I don't work, don't believe me - just compare the Decision Columns below instead...keeping this here in case I get fixed
         #$LastModifiedDate = $Item.FieldValues.Last_x0020_Modified_x0020_Date
         #$ModifiedDate = $Item.FieldValues.Modified
@@ -103,11 +107,11 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         }
 
 
-    #Third, the Decision Columns - only process them if they are different as it indicates a change.
-        
-        #Compare each column to it's Last Entry column (there are two currently, one for Decision 1 and one for Final Decision).
+
+      #Third, the Decision Columns - only process them if they are different as it indicates a change.
         $InterView1Decision = (Compare-Object -ReferenceObject $Item.FieldValues.Decision_x0020_1 -DifferenceObject $Item.FieldValues.D1LE)
         $FinalDecision = (Compare-Object -ReferenceObject $Item.FieldValues.Final_x0020_Decision -DifferenceObject $Item.FieldValues.FDLE)
+
         If($InterView1Decision){
         Write-host "$($Item.FieldValues.Candidate_x0020_Name): Something has changed on the Interview 1 Decision Field! Let's maybe do something about it!" -ForegroundColor Yellow
         }
@@ -143,7 +147,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
        }
 
 
-       #Fifth, check if Final Decision needs processing and it matches "Make Offer" so we can let People Services know
+       #Check if Final Decision needs processing and it matches "Make Offer" so we can let People Services know
         If(($FinalDecision) -and ($Item.FieldValues.Final_x0020_Decision -match "Make Offer")) {
 
         write-host "FinalDecision has changed from $($Item.FieldValues.FDLE) to $($Item.FieldValues.Final_x0020_Decision)"
@@ -170,25 +174,25 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
 
         }
 
+    #Fifth, check if there is a Proposed Start Date, this suggests some firm date has been set and the Candidate is likely to start then, create a new template entry with what we know about the Candidate already in the 'New Starter Details' List. Set the Candidate Tracker as "Complete"
 
-    #Sixth, check if there is a Proposed Start Date, this suggests some firm date has been set and the Candidate is likely to start then, create a new template entry with what we know about the Candidate already in the 'New Starter Details' List. Set the Candidate Tracker as "Complete"
-
-        If(($Item.FieldValues.Proposed_x0020_Start_x0020_Date) -and ("0" -eq $Item.FieldValues.IsDirty)){
+        If(($Item.FieldValues.Proposed_x0020_Start_x0020_Date) -and ("1" -eq $Item.FieldValues.IsDirty)){
         Write-host "Looks like the Hiring Process is complete. Let's set this Candidate Tracker to 'Complete' and put a placeholder in the 'New Starter Details' Form based on what we know already" -ForegroundColor Yellow
             Set-PnPListItem -List $RecruitmentArea -Identity $LiveTracker.RoleId -Values @{"Role_x0020_Hire_x0020_Status" = "Complete"}
             $RecruitmentAreaItem = Get-PnPListItem -List $RecruitmentArea -Id $($LiveTracker.RoleId)
 
-        #Start Pre-populating the New Starter Details Form
+            #Create some SP-friendly variables
             [datetime]$Friendlystartdate = $($Item.FieldValues.Proposed_x0020_Start_x0020_Date)
 
+            #Start Pre-populating the New Starter Details Form
             Add-PnPListItem -List $NewStarterList -Values @{
-            "Employee_x0020_Preferred_x0020_N" = $($Item.FieldValues.Candidate_x0020_Name); 
-            "StartDate" = $Friendlystartdate;  
-            "JobTitle" = $($RecruitmentAreaItem.FieldValues.Role_x0020_Name);
-            "Line_x0020_Manager" = $($RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager.LookupValue);#I'm not working - managed metadata is casuing issues
-            "Primary_x0020_Team" = $($RecruitmentAreaItem.FieldValues.Primary_x0020_Team0.Label);
-            "Community0" = $($RecruitmentAreaItem.FieldValues.Community0.Label);
-            "Business_x0020_Unit0" = $($RecruitmentAreaItem.FieldValues.Business_x0020_Unit0.Label);
+            "Employee_x0020_Preferred_x0020_N" = "$($Item.FieldValues.Candidate_x0020_Name)"; 
+            "StartDate" = "$Friendlystartdate"; 
+            "JobTitle" = "$($RecruitmentAreaItem.FieldValues.Role_x0020_Name)";
+            "Line_x0020_Manager" = "$($RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager.LookupValue)";
+            "Primary_x0020_Team0" = "$($RecruitmentAreaItem.FieldValues.Primary_x0020_Team0.TermGuid)";
+            "Community0" = "$($RecruitmentAreaItem.FieldValues.Community0.TermGuid)";
+            "Business_x0020_Unit0" = "$($RecruitmentAreaItem.FieldValues.Business_x0020_Unit0.TermGuid)";
             }
         
         #Send a confirmation email to People Services
@@ -308,8 +312,8 @@ catch{
     #Copy-PnPFile -SourceUrl "https://anthesisllc.sharepoint.com/:x:/r/sites/Confidential_Human_Resources_HR_Team_GBR_365/_layouts/15/Doc.aspx?sourcedoc=%7BAFD940AB-DED8-4C2B-BD2F-4AE144B72460%7D&file=New%20Starter%20Checklist.xlsx&action=default&mobileredirect=true" -TargetUrl $Onboardingfoldername
 
 
+  
 
 
-   $starters[0].FieldValues.StartDate  =  get-pnplistitem -List "New Starter Details" 
 
-   Set-PnPListItem -List "New Starter Details"  -Identity "3" -Values @{"Community0" = "Roots"}
+   
