@@ -298,6 +298,11 @@ ForEach($item in $AllChangersitems){
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             Set-PnPListItem -List $List -Identity $item.ID -Values @{"IsDirty" = "0"}
             }
+            Else{
+
+            write-host "Looks like there are no new Changers" -ForegroundColor Yellow
+
+            }
     
 
     }
