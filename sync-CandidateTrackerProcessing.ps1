@@ -35,7 +35,7 @@ $items = Get-PnPListItem -List "Recruitment Area"
 
 <#--------------Get all the Lists from the Site, find the live ones, "Live Candidate Tracker" will be in the description"--------------#>
 
-$FullListQuery = Get-PnPList
+$FullListQuery = Get-PnPList 
 $LiveCandidateTrackers = @()
 ForEach($List in $FullListQuery){
 If($List.Description -match "Live Candidate Tracker"){
@@ -128,7 +128,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         If(($InterView1Decision) -and ($Item.FieldValues.Decision_x0020_1 -match "Move to Next Stage")) {
 
         write-host "Interview 1 Decision for $($Item.FieldValues.Candidate_x0020_Name) has changed from $($Item.FieldValues.D1LE) to $($Item.FieldValues.Decision_x0020_1)" -ForegroundColor Yellow
-            
+#try block
             #Send email to People services letting them know to schedule a second interview
             $subject = "Recruitment Update: A Candidate is Ready to Move to Second Interview"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
