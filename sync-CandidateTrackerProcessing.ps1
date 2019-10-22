@@ -55,7 +55,6 @@ If($List.Description -match "Live Candidate Tracker"){
   
 
 
-
 <#--------------Process each list--------------#>
 
 #Iterate through each list and check for any actions against candidates need processing - is the date modified more recent than the Last Modified Date?
@@ -78,13 +77,15 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         
      #First, check for blanks in the trigger columns: Decision 1 and Final decision Last Entry fields. Errors will occur if thses fields are blank for the compare-object sections below.
 
-        #check for blanks in the Decision 1 Last Entry column
+        #check for blanks in the Decision 1 Last Entry column, just in case - the default value is "Decision Pending" on item creation
         If(!$Item.FieldValues.D1LE){
+        write-host "Looks like Decision 1 Last Entry is blank, filling it in" -ForegroundColor Yellow
         Set-PnPListItem -List $List -Identity $item.ID -Values @{"D1LE" = "$($Item.FieldValues.Decision_x0020_1)"}
         Continue
             }
-        #check for blanks in the Final Decision Last Entry column
+        #check for blanks in the Final Decision Last Entry column  - the default value is "Decision Pending" on item creation
         If(!$Item.FieldValues.FDLE){
+        write-host "Looks like Final Decision Last Entry is blank, filling it in" -ForegroundColor Yellow
         Set-PnPListItem -List $List -Identity $item.ID -Values @{"FDLE" = "$($Item.FieldValues.Final_x0020_Decision)"}
         Continue
             }
@@ -93,7 +94,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
 
        #Check for Declined candidates - if Decision 1 is set to Decline, set the Last Entry fields and Final Decision  fields also as Decline and continue onto the next iteration. Same concept for Final Decision, but this won't change Interview 1 decision fields, just the Last entry field.
         If(("Decline" -eq $Item.FieldValues.Decision_x0020_1) -and ("Decline" -ne $Item.FieldValues.D1LE)){
-           Write-Host "Looks like this Candidate has been declined after Interview 1 since we last ran through - setting other fields to decline and moving on"
+           Write-Host "Looks like $($Item.FieldValues.Candidate_x0020_Name) has been declined after Interview 1 since we last ran through - setting other fields to decline and moving on" -ForegroundColor Yellow
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'D1LE' = "$($Item.FieldValues.Decision_x0020_1)"}
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'Final_x0020_Decision' = "$($Item.FieldValues.Decision_x0020_1)"}
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Decision_x0020_1)"}
@@ -101,7 +102,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         }
 
         If(("Decline" -eq $Item.FieldValues.Final_x0020_Decision) -and ("Decline" -ne $Item.FieldValues.FDLE)){
-           Write-Host "Looks like this Candidate has been declined after final interview since we last ran through - setting other fields to decline and moving on"
+           Write-Host "Looks like $($Item.FieldValues.Candidate_x0020_Name) has been declined after final interview since we last ran through - setting other fields to decline and moving on" -ForegroundColor Yellow
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Final_x0020_Decision)"}
            Continue
         }
@@ -126,7 +127,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         #Check if Interview 1 needs processing and it matches "Move to Next Stage" so we can let People Services know
         If(($InterView1Decision) -and ($Item.FieldValues.Decision_x0020_1 -match "Move to Next Stage")) {
 
-        write-host "Interview 1 Decision has changed from $($Item.FieldValues.D1LE) to $($Item.FieldValues.Decision_x0020_1)"
+        write-host "Interview 1 Decision for $($Item.FieldValues.Candidate_x0020_Name) has changed from $($Item.FieldValues.D1LE) to $($Item.FieldValues.Decision_x0020_1)" -ForegroundColor Yellow
             
             #Send email to People services letting them know to schedule a second interview
             $subject = "Recruitment Update: A Candidate is Ready to Move to Second Interview"
@@ -150,7 +151,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
        #Check if Final Decision needs processing and it matches "Make Offer" so we can let People Services know
         If(($FinalDecision) -and ($Item.FieldValues.Final_x0020_Decision -match "Make Offer")) {
 
-        write-host "FinalDecision has changed from $($Item.FieldValues.FDLE) to $($Item.FieldValues.Final_x0020_Decision)"
+        write-host "FinalDecision for $($Item.FieldValues.Candidate_x0020_Name) has changed from $($Item.FieldValues.FDLE) to $($Item.FieldValues.Final_x0020_Decision)" -ForegroundColor Yellow
             
             #Send email to People services letting them know to make an offer to this Candidate
             $subject = "Recruitment Update: A Candidate is Ready to Receive an Offer"
@@ -175,17 +176,28 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         }
 
     #Fifth, check if there is a Proposed Start Date, this suggests some firm date has been set and the Candidate is likely to start then, create a new template entry with what we know about the Candidate already in the 'New Starter Details' List. Set the Candidate Tracker as "Complete"
+        
+        <#This bit is messy - figure out a better way with IsDirty instead of setting it halfway through#>
 
-        If(($Item.FieldValues.Proposed_x0020_Start_x0020_Date) -and ("1" -eq $Item.FieldValues.IsDirty)){
-        Write-host "Looks like the Hiring Process is complete. Let's set this Candidate Tracker to 'Complete' and put a placeholder in the 'New Starter Details' Form based on what we know already" -ForegroundColor Yellow
+        #Check for Satrt Date, if so set the Candidate Tracker in Recruitment Area as complete 
+        If($Item.FieldValues.Proposed_x0020_Start_x0020_Date){
+        Write-host "Looks like the Hiring Process is complete for $($LiveTracker.RoleId). Let's set this Candidate Tracker to 'Complete' and put a placeholder in the 'New Starter Details' Form based on what we know already" -ForegroundColor Yellow
             Set-PnPListItem -List $RecruitmentArea -Identity $LiveTracker.RoleId -Values @{"Role_x0020_Hire_x0020_Status" = "Complete"}
-            $RecruitmentAreaItem = Get-PnPListItem -List $RecruitmentArea -Id $($LiveTracker.RoleId)
+            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{"IsDirty" = "1"}
 
+            $RecruitmentAreaItem = Get-PnPListItem -List $RecruitmentArea -Id $($LiveTracker.RoleId)
+            #Take a break - wait for the IsDirty column to update
+            Start-Sleep -s 15
+            }
+        
+        #Re-get the item to process
+        $Item = Get-PnPListItem -List $LiveTracker.Guid -Id $Item.ID
+            If("1" -eq $Item.FieldValues.IsDirty){
             #Create some SP-friendly variables
             [datetime]$Friendlystartdate = $($Item.FieldValues.Proposed_x0020_Start_x0020_Date)
 
             #Start Pre-populating the New Starter Details Form
-            Add-PnPListItem -List $NewStarterList -Values @{
+            $newstarterenrty = Add-PnPListItem -List $NewStarterList -Values @{
             "Employee_x0020_Preferred_x0020_N" = "$($Item.FieldValues.Candidate_x0020_Name)"; 
             "StartDate" = "$Friendlystartdate"; 
             "JobTitle" = "$($RecruitmentAreaItem.FieldValues.Role_x0020_Name)";
@@ -210,8 +222,28 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'IsDirty' = "2"}
 
         }
+    
+
+            #Check a new item was actually created in the New Starters List, if so, close it off so it doesn't re-run. Set Candidate tracker description as complete
+            If($newstarterenrty){
+            write-host "Success! A new template entry was made in the New Starters Form for $($Item.FieldValues.Candidate_x0020_Name)" -ForegroundColor Yellow
+            Set-PnPList -Identity "ID$($ListTitle)" -Description "Closed Candidate Tracker - RoleID:$($Role.'ID')" #Set the description to omit this in our processing script, which searches for "Live Candidate Tracker" in the List Description
+             }
+            Else{
+            Write-Host "Failure! ): Not sure what happened but a template entry could not be added to the New Starters From: $($Item.FieldValues.Candidate_x0020_Name)"
+            $subject = "Employee New Starter Template Creation: Woops, something went wrong..."
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
+            $body += "Something went wrong when trying to create template in the New Starters Form for <b>$($Item.FieldValues.Candidate_x0020_Name)</b>. Should probably take a look and see what's gone wrong.`r`n`r`n<BR><BR>"
+            $body += "<b>Timestamp: </b>$(get-date)`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+
     }
 
+
+ }
 
 
 <#--------------Connect to the confidential HR team site with Graph--------------#>  #Kimblebot is currently not allowed to connect to this site
