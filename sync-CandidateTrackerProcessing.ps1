@@ -126,6 +126,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             $body += "Please schedule an interview with the candidate and fill in the details of the date and type of interview in the candidate tracker.`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
+            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             #Set the Decision 1 Last Entry column (D1LE) to the new Entry, this will stop it from re-processing - we don't want people getting multiple emails
             Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'D1LE' = "$($Item.FieldValues.Decision_x0020_1)"}
@@ -157,6 +158,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             $body += "When a proposed date is entered, a template entry will be added to the New Starter Form (you will receive an email with a link to this). This will use information we already know about the role and candidate, but will not be complete. Please fill this entry out as soon as possible so internal teams can set them up ready for their first day. `r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
+            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             
             #Set item 'Offer Outcome' to 'Pending', which People Services will change on Candidate response.
@@ -232,6 +234,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             }
             Else{
             Write-Host "Failure! ): Not sure what happened but a template entry could not be added to the New Starters Form: $($Item.FieldValues.Candidate_x0020_Name)"

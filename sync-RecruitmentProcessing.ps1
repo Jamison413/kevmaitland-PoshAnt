@@ -75,6 +75,7 @@ write-host "Creating new Candidate Tracker List for Role: ID$($Role.'ID') $($Rol
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot<BR><BR><BR><BR>"
             $body += "*Please note, this is an automated email. If you notice any issues, please get in touch with the IT Team"
+            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
 
 #If it's worked then let's move through the script    

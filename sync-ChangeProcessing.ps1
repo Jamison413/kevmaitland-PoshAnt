@@ -16,7 +16,7 @@ Import-Module _PNP_Library_SPO
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 
 
@@ -50,6 +50,8 @@ $context = Get-PnPContext
 $AllNewStartersitems = Get-PnPListItem -List $List
 
 <#--------------New Starter Intitial Notification Email---------------#>
+
+#If PowersehllTrigger is set to "1"
 $NewStarterInformation = @()
 ForEach($Item in $AllNewStartersitems){
 
@@ -86,6 +88,11 @@ ForEach($Item in $AllNewStartersitems){
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
 
+            Send-MailMessage -To "IT_Team_GBR_365@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "elle.wright@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"PowershellTrigger" = "0"}
             }
@@ -194,6 +201,12 @@ ForEach($Item in $AllLeaversitems){
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
 
+
+            Send-MailMessage -To "IT_Team_GBR_365@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "elle.wright@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             Set-PnPListItem -List $List -Identity $item.ID -Values @{"PowershellTrigger" = "0"}
             }
@@ -295,13 +308,13 @@ ForEach($item in $AllChangersitems){
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
 
+            Send-MailMessage -To "IT_Team_GBR_365@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "elle.wright@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             Set-PnPListItem -List $List -Identity $item.ID -Values @{"IsDirty" = "0"}
-            }
-            Else{
-
-            write-host "Looks like there are no new Changers" -ForegroundColor Yellow
-
             }
     
 
