@@ -12,6 +12,10 @@ Start-Transcript $transcriptLogName -Append
 
 <#Connect to everything and load modules#>
 Import-Module _PNP_Library_SPO
+#create a funciton to capture script lines to help troubleshoot
+Function Get-CurrentLine {
+    $Myinvocation.ScriptlineNumber
+}
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
@@ -64,17 +68,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
     $Itemstoprocess = Get-PnPListItem -List $LiveTracker.Guid  
     
     foreach($Item in $Itemstoprocess){
-    
-    
-    
-    
-    
-        #I don't work, don't believe me - just compare the Decision Columns below instead...keeping this here in case I get fixed
-        #$LastModifiedDate = $Item.FieldValues.Last_x0020_Modified_x0020_Date
-        #$ModifiedDate = $Item.FieldValues.Modified
-        #write-host "The last modified date of this item is older the the current Modified date, something has changed! Comparing the old entries to the new entries"
-
-        
+           
      #First, check for blanks in the trigger columns: Decision 1 and Final decision Last Entry fields. Errors will occur if thses fields are blank for the compare-object sections below.
 
         #check for blanks in the Decision 1 Last Entry column, just in case - the default value is "Decision Pending" on item creation
@@ -83,7 +77,7 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         Set-PnPListItem -List $List -Identity $item.ID -Values @{"D1LE" = "$($Item.FieldValues.Decision_x0020_1)"}
         Continue
             }
-        #check for blanks in the Final Decision Last Entry column  - the default value is "Decision Pending" on item creation
+        #Check for blanks in the Final Decision Last Entry column  - the default value is "Decision Pending" on item creation
         If(!$Item.FieldValues.FDLE){
         write-host "Looks like Final Decision Last Entry is blank, filling it in" -ForegroundColor Yellow
         Set-PnPListItem -List $List -Identity $item.ID -Values @{"FDLE" = "$($Item.FieldValues.Final_x0020_Decision)"}
@@ -99,20 +93,17 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'Final_x0020_Decision' = "$($Item.FieldValues.Decision_x0020_1)"}
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Decision_x0020_1)"}
            Continue
-        }
-
+            }
         If(("Decline" -eq $Item.FieldValues.Final_x0020_Decision) -and ("Decline" -ne $Item.FieldValues.FDLE)){
            Write-Host "Looks like $($Item.FieldValues.Candidate_x0020_Name) has been declined after final interview since we last ran through - setting other fields to decline and moving on" -ForegroundColor Yellow
            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Final_x0020_Decision)"}
            Continue
-        }
-
-
+            }
 
       #Third, the Decision Columns - only process them if they are different as it indicates a change.
+
         $InterView1Decision = (Compare-Object -ReferenceObject $Item.FieldValues.Decision_x0020_1 -DifferenceObject $Item.FieldValues.D1LE)
         $FinalDecision = (Compare-Object -ReferenceObject $Item.FieldValues.Final_x0020_Decision -DifferenceObject $Item.FieldValues.FDLE)
-
         If($InterView1Decision){
         Write-host "$($Item.FieldValues.Candidate_x0020_Name): Something has changed on the Interview 1 Decision Field! Let's maybe do something about it!" -ForegroundColor Yellow
         }
@@ -120,15 +111,14 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
         Write-host "$($Item.FieldValues.Candidate_x0020_Name): Something has changed on the Final Decision Field! Let's maybe do something about it!" -ForegroundColor Yellow
         }
         
-    
-
-    #Fourth, check which part has changed and action based on input. We have included an -and statement to just include those that have changed since the last run or it will keep sending out emails
+      #Fourth, check which part has changed and action based on input. We have included an -and statement to just include those that have changed since the last run or it will keep sending out emails
         
         #Check if Interview 1 needs processing and it matches "Move to Next Stage" so we can let People Services know
         If(($InterView1Decision) -and ($Item.FieldValues.Decision_x0020_1 -match "Move to Next Stage")) {
 
         write-host "Interview 1 Decision for $($Item.FieldValues.Candidate_x0020_Name) has changed from $($Item.FieldValues.D1LE) to $($Item.FieldValues.Decision_x0020_1)" -ForegroundColor Yellow
-#try block
+        $currentline = (Get-CurrentLine)
+        Try{
             #Send email to People services letting them know to schedule a second interview
             $subject = "Recruitment Update: A Candidate is Ready to Move to Second Interview"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
@@ -136,23 +126,29 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             $body += "Please schedule an interview with the candidate and fill in the details of the date and type of interview in the candidate tracker.`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
-
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-
-            
             #Set the Decision 1 Last Entry column (D1LE) to the new Entry, this will stop it from re-processing - we don't want people getting multiple emails
             Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'D1LE' = "$($Item.FieldValues.Decision_x0020_1)"}
-            #Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{"Last_x0020_Modified_x0020_Date" = "$Item.FieldValues.Modified"}
             }
-
+        Catch{
+            $ErrorMessage = $_.Exception.Message
+            #Send email to People services letting them know to schedule a second interview
+            $subject = "Recruitment Update: something has gone wrong sending an email to People Services for the next interview stage for Candidate $($Item.FieldValues.Candidate_x0020_Name)."
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
+            $body += "Should probably check it out - I'm breaking at line $($currentline). The error is: $($ErrorMessage)`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            }
        }
 
 
-       #Check if Final Decision needs processing and it matches "Make Offer" so we can let People Services know
+       #Fifth, Check if Final Decision needs processing and it matches "Make Offer" so we can let People Services know
         If(($FinalDecision) -and ($Item.FieldValues.Final_x0020_Decision -match "Make Offer")) {
 
         write-host "FinalDecision for $($Item.FieldValues.Candidate_x0020_Name) has changed from $($Item.FieldValues.FDLE) to $($Item.FieldValues.Final_x0020_Decision)" -ForegroundColor Yellow
-            
+        $currentline = (Get-CurrentLine)
+            try{
             #Send email to People services letting them know to make an offer to this Candidate
             $subject = "Recruitment Update: A Candidate is Ready to Receive an Offer"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
@@ -161,53 +157,73 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             $body += "When a proposed date is entered, a template entry will be added to the New Starter Form (you will receive an email with a link to this). This will use information we already know about the role and candidate, but will not be complete. Please fill this entry out as soon as possible so internal teams can set them up ready for their first day. `r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
-
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
-
-    
+            
             #Set item 'Offer Outcome' to 'Pending', which People Services will change on Candidate response.
             Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{"Offer_x0020_Outcome" = "Pending"}
             Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'FDLE' = "$($Item.FieldValues.Final_x0020_Decision)"}
-            #Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{"$Item.FieldValues.Last_x0020_Modified_x0020_Date" = "$Item.FieldValues.Modified"}
 
             #Add the Candidate to a list so we can create their Employee folder later
             $Folderstocreate += New-Object psobject -Property @{"Candidate Name" = $Item.FieldValues.Candidate_x0020_Name}
+            }
+            Catch{
+            $ErrorMessage = $_.Exception.Message
+            $subject = "Recruitment Update: Something has gone wrong with the Final Decision email for Candidate $($Item.FieldValues.Candidate_x0020_Name)"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
+            $body += "Should probably check it out - I'm breaking at the script block starting with line $($currentline). The error is $($ErrorMessage).`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+            }
 
         }
 
-    #Fifth, check if there is a Proposed Start Date, this suggests some firm date has been set and the Candidate is likely to start then, create a new template entry with what we know about the Candidate already in the 'New Starter Details' List. Set the Candidate Tracker as "Complete"
+       #Sixth, check if there is a Proposed Start Date, this suggests some firm date has been set and the Candidate is likely to start then, create a new template entry with what we know about the Candidate already in the 'New Starter Details' List. Set the Candidate Tracker as "Complete"
         
-        <#This bit is messy - figure out a better way with IsDirty instead of setting it halfway through#>
-
-        #Check for Satrt Date, if so set the Candidate Tracker in Recruitment Area as complete 
+        #Check for Start Date, if so create a new template entry in the New starter Details List.
         If($Item.FieldValues.Proposed_x0020_Start_x0020_Date){
-        Write-host "Looks like the Hiring Process is complete for $($LiveTracker.RoleId). Let's set this Candidate Tracker to 'Complete' and put a placeholder in the 'New Starter Details' Form based on what we know already" -ForegroundColor Yellow
-            Set-PnPListItem -List $RecruitmentArea -Identity $LiveTracker.RoleId -Values @{"Role_x0020_Hire_x0020_Status" = "Complete"}
-            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{"IsDirty" = "1"}
+        Write-host "Looks like the Hiring Process is complete for $($LiveTracker.Title). Let's create a template entry in the 'New Starter Details' Form based on what we know already" -ForegroundColor Yellow
+        $currentline = (Get-CurrentLine)
 
-            $RecruitmentAreaItem = Get-PnPListItem -List $RecruitmentArea -Id $($LiveTracker.RoleId)
-            #Take a break - wait for the IsDirty column to update
-            Start-Sleep -s 15
-            }
-        
-        #Re-get the item to process
-        $Item = Get-PnPListItem -List $LiveTracker.Guid -Id $Item.ID
-            If("1" -eq $Item.FieldValues.IsDirty){
+
+        Try{
             #Create some SP-friendly variables
             [datetime]$Friendlystartdate = $($Item.FieldValues.Proposed_x0020_Start_x0020_Date)
+            $RecruitmentAreaItem = Get-PnPListItem -List $RecruitmentArea -Id $($LiveTracker.RoleId)
 
             #Start Pre-populating the New Starter Details Form
-            $newstarterenrty = Add-PnPListItem -List $NewStarterList -Values @{
-            "Employee_x0020_Preferred_x0020_N" = "$($Item.FieldValues.Candidate_x0020_Name)"; 
-            "StartDate" = "$Friendlystartdate"; 
-            "JobTitle" = "$($RecruitmentAreaItem.FieldValues.Role_x0020_Name)";
-            "Line_x0020_Manager" = "$($RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager.LookupValue)";
-            "Primary_x0020_Team0" = "$($RecruitmentAreaItem.FieldValues.Primary_x0020_Team0.TermGuid)";
-            "Community0" = "$($RecruitmentAreaItem.FieldValues.Community0.TermGuid)";
-            "Business_x0020_Unit0" = "$($RecruitmentAreaItem.FieldValues.Business_x0020_Unit0.TermGuid)";
+                Write-host "creating New Starter entry for $($Item.FieldValues.Candidate_x0020_Name)..." -ForegroundColor Yellow
+                $newstarterenrty = Add-PnPListItem -List $NewStarterList -Values @{
+                "Employee_x0020_Preferred_x0020_N" = "$($Item.FieldValues.Candidate_x0020_Name)"; 
+                "StartDate" = "$Friendlystartdate"; 
+                "JobTitle" = "$($RecruitmentAreaItem.FieldValues.Role_x0020_Name)";
+                "Line_x0020_Manager" = "$($RecruitmentAreaItem.FieldValues.Hiring_x0020_Manager.LookupValue)";
+                "Primary_x0020_Team0" = "$($RecruitmentAreaItem.FieldValues.Primary_x0020_Team0.TermGuid)";
+                "Community0" = "$($RecruitmentAreaItem.FieldValues.Community0.TermGuid)";
+                "Business_x0020_Unit0" = "$($RecruitmentAreaItem.FieldValues.Business_x0020_Unit0.TermGuid)";
+                }
             }
-        
-        #Send a confirmation email to People Services
+            Catch{
+            $ErrorMessage = $_.Exception.Message
+            Write-Host "Failure! ): Not sure what happened but a template entry could not be added to the New Starters From: $($Item.FieldValues.Candidate_x0020_Name)"
+            $subject = "Employee New Starter Template Creation: Woops, something went wrong..."
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
+            $body += "Something went wrong when trying to create template in the New Starters Form for <b>$($Item.FieldValues.Candidate_x0020_Name)</b>. Should probably take a look and see what's gone wrong - I'm breaking at the script block starting with line $($currentline). Error message is: $($ErrorMessage)`r`n`r`n<BR><BR>"
+            $body += "<b>Timestamp: </b>$(get-date)`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+            }
+
+            
+            #Check a new item was actually created in the New Starters List as a secondary check - sometimes PnP doesn't tell us if it is unsuccessful, if so, close it off so it doesn't re-run. Set Candidate tracker description as complete
+            
+            If($newstarterenrty){
+            write-host "Success! A new template entry was made in the New Starters Form for $($Item.FieldValues.Candidate_x0020_Name). Closing the Candidate tracker..." -ForegroundColor Yellow
+            Set-PnPList -Identity "ID$($ListTitle)" -Description "Closed Candidate Tracker - RoleID:$($Role.'ID')" #Set the description to omit this in our processing script, which searches for "Live Candidate Tracker" in the List Description
+            Set-PnPListItem -List $RecruitmentArea -Identity $LiveTracker.RoleId -Values @{"Role_x0020_Hire_x0020_Status" = "Complete"}
+
+            #Send a confirmation email to People Services
             $subject = "Recruitment Update: A Candidate is set to start and a Template Entry has been added to the New Starter Details List"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services Team,`r`n`r`n<BR><BR>"
             $body += "The Candidate $($Item.FieldValues.Candidate_x0020_Name) for role $($LiveTracker.Title) now has a provisional start date!`r`n`r`n<BR><BR>"
@@ -215,34 +231,21 @@ ForEach($LiveTracker in $LiveCandidateTrackers){
             $body += "You can see the New Starter Details List here: https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/Lists/New%20Starter%20Details/AllItems.aspx `r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
-
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
-
-            #Set is Dirty to 2 so it does not re-process (used 2 as a final action, 0 is the default for the column for other lists
-            Set-PnPListItem -List $LiveTracker.Guid -Identity $Item.ID -Values @{'IsDirty' = "2"}
-
-        }
-    
-
-            #Check a new item was actually created in the New Starters List, if so, close it off so it doesn't re-run. Set Candidate tracker description as complete
-            If($newstarterenrty){
-            write-host "Success! A new template entry was made in the New Starters Form for $($Item.FieldValues.Candidate_x0020_Name)" -ForegroundColor Yellow
-            Set-PnPList -Identity "ID$($ListTitle)" -Description "Closed Candidate Tracker - RoleID:$($Role.'ID')" #Set the description to omit this in our processing script, which searches for "Live Candidate Tracker" in the List Description
-             }
+            }
             Else{
-            Write-Host "Failure! ): Not sure what happened but a template entry could not be added to the New Starters From: $($Item.FieldValues.Candidate_x0020_Name)"
+            Write-Host "Failure! ): Not sure what happened but a template entry could not be added to the New Starters Form: $($Item.FieldValues.Candidate_x0020_Name)"
             $subject = "Employee New Starter Template Creation: Woops, something went wrong..."
             $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
-            $body += "Something went wrong when trying to create template in the New Starters Form for <b>$($Item.FieldValues.Candidate_x0020_Name)</b>. Should probably take a look and see what's gone wrong.`r`n`r`n<BR><BR>"
+            $body += "Something went wrong when trying to create template in the New Starters Form for <b>$($Item.FieldValues.Candidate_x0020_Name)</b>. Should probably take a look and see what's gone wrong - I'm breaking at the script block starting with line $($currentline)`r`n`r`n<BR><BR>"
             $body += "<b>Timestamp: </b>$(get-date)`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
-
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+            }
 
+        }
     }
-
-
  }
 
 
@@ -263,7 +266,7 @@ $ReqTokenBody = @{
     client_Id     = $clientID
     Client_Secret = $secret
     } 
-#$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
 
 
 #Connnect to sharepoint via Graph
