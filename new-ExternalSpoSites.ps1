@@ -46,12 +46,17 @@ foreach ($currentRequest in $selectedRequests){
         Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/external" -Credentials $365creds
         Add-PnPNavigationNode -Location QuickLaunch -Title $($fullRequest.FieldValues.Title) -Url $newPnpTeam.SiteUrl -First -External -Parent 2252 #2252 is the "Modern External Sites" NavNode
 
+
         switch($fullRequest.FieldValues.FileDirRef.Split("/")[1]){
             "clients" {
                 test-pnpConnectionMatchesResource -resourceUrl "https://anthesisllc.sharepoint.com/clients" -connectIfDifferent $true -pnpCreds $365creds | Out-Null
-                Set-PnPListItem -List "External Client Site Requests" -Identity $fullRequest.Id -Values @{Status="Created"}
+                Set-PnPListItem -List "External Client Site Requests" -Identity $fullRequest.Id -Values @{Status="Created";URL=$newPnpTeam.SiteUrl}
                 $externalParty = $fullRequest.FieldValues.ClientName.Label
                 $externalPartyType = "client"
+                #$managedMetaDataTerm = Get-PnPTerm -Identity $fullRequest.FieldValues.ClientName.TermGuid -Includes CustomProperties Get-PnpTerm doesn't return CustomProperties this way :(
+                $termGroup = $(Get-PnPTermGroup "Kimble") 
+                $termSet = $(Get-PnPTermSet -TermGroup $termGroup -Identity "Clients")
+                $managedMetaDataTerm = Get-PnPTerm -Identity $fullRequest.FieldValues.ClientName.Label -TermSet $termSet -TermGroup $termGroup -Includes CustomProperties
                 }
             "subs"    {
                 test-pnpConnectionMatchesResource -resourceUrl "https://anthesisllc.sharepoint.com/subs" -connectIfDifferent $true -pnpCreds $365creds | Out-Null
@@ -61,6 +66,12 @@ foreach ($currentRequest in $selectedRequests){
                 }
             default   {}
             }
+        
+        <#if(![string]::IsNullOrWhiteSpace($managedMetaDataTerm.CustomProperties["DocLibId"])){
+            Write-Verbose "Creating links between Client DocLib and new Site"
+            Connect-PnPOnline -AccessToken $tokenResponse.access_token
+            $clientDocLib = 
+            }#>
 
         $body = "<HTML><BODY><p>Hi $($fullRequest.FieldValues.Site_x0020_Admin.LookupValue.Split(" ")[0]),</p>
             <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">External

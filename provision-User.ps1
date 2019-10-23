@@ -1,8 +1,4 @@
 ﻿Import-Module -Name ActiveDirectory
-Import-Module _PS_Library_MSOL.psm1
-Import-Module _PS_Library_GeneralFunctionality
-Import-Module _REST_Library-SPO.psm1
-Import-Module _CSOM_Library-SPO
 
 <#
 $userSAM = "Dummy.User"
@@ -32,29 +28,15 @@ connect-toAAD -credential $msolCredentials
 
 $adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 
+#Get the New User Requests that have not been marked as processed
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -Credentials $msolCredentials
+$requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
+if($requests){#Display a subset of Properties to help the user identify the correct account(s)
+    $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.Start_x0020_Date} -Descending | select {$_.FieldValues.Title},{$_.FieldValues.Start_x0020_Date},{$_.FieldValues.Job_x0020_title},{$_.FieldValues.Primary_x0020_Workplace.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Primary_x0020_Team.LookupValue},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
+    #Then return the original requests as these contain the full details
+    [array]$selectedRequests = Compare-Object -ReferenceObject $requests -DifferenceObject $selectedRequests -Property Guid -IncludeEqual -ExcludeDifferent -PassThru
+    }
 
-$sharePointServerUrl = "https://anthesisllc.sharepoint.com"
-$hrSite = "/teams/hr"
-$taxonomyListName = "TaxonomyHiddenList"
-$taxonomyData = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $taxonomyListName -suppressProgress $false -restCreds $restCredentials -logFile $logFile -verboseLogging $true
-#region get New User List
-$newUserListName = "New User Requests"
-#$oDataUnprocessedUsers = '$select=*,Line_x0020_Manager/Name,Line_x0020_Manager/Title,Prinicpal_x0020_Community_x0020_/Name,Prinicpal_x0020_Community_x0020_/Title,Primary_x0020_Team/Name,Primary_x0020_Team/Title,Additional_x0020_Teams/Id,Additional_x0020_Teams/Title&$filter=Current_x0020_Status eq ''1 - Waiting for IT Team to set up accounts''&$expand=Line_x0020_Manager/Id,Prinicpal_x0020_Community_x0020_/Id,Primary_x0020_Team/Id,Additional_x0020_Teams/Id'
-$oDataUnprocessedUsers = "`$select=*"
-$oDataUnprocessedUsers += ",Line_x0020_Manager/Name,Line_x0020_Manager/Title"
-$oDataUnprocessedUsers += ",Prinicpal_x0020_Community_x0020_/Name,Prinicpal_x0020_Community_x0020_/Title"
-$oDataUnprocessedUsers += ",Primary_x0020_Team/Name,Primary_x0020_Team/Title"
-$oDataUnprocessedUsers += ",Additional_x0020_Teams/Id,Additional_x0020_Teams/Title"
-$oDataUnprocessedUsers += "&`$filter=Current_x0020_Status eq '1 - Waiting for IT Team to set up accounts'"
-$oDataUnprocessedUsers += "&`$expand=Line_x0020_Manager/Id,Prinicpal_x0020_Community_x0020_/Id,Primary_x0020_Team/Id,Additional_x0020_Teams/Id"
-$unprocessedStarters = get-itemsInList -serverUrl $sharePointServerUrl -sitePath $hrSite -listName $newUserListName -suppressProgress $false -oDataQuery $oDataUnprocessedUsers -restCreds $restCredentials -logFile $logFile
-#$unprocessedStarters | %{
-if($null -ne $unprocessedStartersFormatted){rv unprocessedStartersFormatted}
-$unprocessedStarters | %{[array]$unprocessedStartersFormatted += $(convert-listItemToCustomObject -spoListItem $_ -spoTaxonomyData $taxonomyData -debugMe $false)}
-#$selectedStarters = $unprocessedStartersFormatted | Out-GridView -PassThru
-$selectedStarters = $unprocessedStartersFormatted | select Title,JobTitle,Primary_Team,Line_Manager,Start_Date,Finance_Cost_Attribu,Guid | Out-GridView -PassThru
-[array]$selectedStarters = $unprocessedStartersFormatted | ?{$selectedStarters.GUID -contains $_.Guid}
-#endregion
 
 #region functions
 function create-ADUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pManagerSAM, $pPrimaryTeam, $pSecondaryTeams, $pJobTitle, $plaintextPassword, $pBusinessUnit, $adCredentials, $pPrimaryOffice){
@@ -204,7 +186,7 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN -BypassSecurityGroupManagerCheck}
     if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN -BypassSecurityGroupManagerCheck}}
     if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
-    Add-DistributionGroupMember -Identity "MDM - BYOD Mobile Device Users" -Member $pUPN -BypassSecurityGroupManagerCheck
+    Add-DistributionGroupMember -Identity "b264f337-ef04-432e-a139-3574331a4d18" -Member $pUPN -BypassSecurityGroupManagerCheck #"MDM - BYOD Users"
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
@@ -357,7 +339,9 @@ function provision-365user($userUPN, $userFirstName, $userSurname, $userDisplayN
         }
     try{
         log-Message "Setting SharePoint Timezone" -colour "Yellow"
-        update-sharePointInitialConfig -pUPN $userUPN -csomCreds $csomCredentials -pTimeZone $userTimeZone -p3LetterCountryIsoCode $(get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $userPrimaryOffice)
+        $isoCountryCode = $(get-3letterIsoCodeFromCountryName -pCountryName (get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $userPrimaryOffice))
+        if([string]::IsNullOrWhiteSpace($isoCountryCode)){$isoCountryCode = get-3letterIsoCodeFromCountryName -pCountryName (get-trailing3LettersIfTheyLookLikeAnIsoCountryCode -ambiguousString $userPrimaryOffice)}
+        if(![string]::IsNullOrWhiteSpace($isoCountryCode)){update-sharePointInitialConfig -pUPN $userUPN -csomCreds $csomCredentials -pTimeZone $userTimeZone -p3LetterCountryIsoCode $isoCountryCode}
         log-Message "SharePoint Timezone updated" -colour "DarkYellow"
         }
     catch{
@@ -422,25 +406,26 @@ function update-msolUserFromAd($userUPN){
 
 
 
-$selectedStarters | % {
-    provision-365user -userUPN $(remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")) `
-        -userFirstName $_.Title.Trim().Split(" ")[0].Trim() `
-        -userSurname $($_.Title.Trim().Split(" ")[$_.Title.Trim().Split(" ").Count-1]).Trim() `
-        -userDisplayName $($_.Title).Trim() `
-        -userManagerSAM $_.Line_Manager `
-        -userPrimaryOffice $_.Primary_Workplace `
+$selectedRequests | % {
+    $thisUser = $_
+    provision-365user -userUPN $(remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")) `
+        -userFirstName $thisUser.FieldValues.Title.Trim().Split(" ")[0].Trim() `
+        -userSurname $($thisUser.FieldValues.Title.Trim().Split(" ")[$thisUser.FieldValues.Title.Trim().Split(" ").Count-1]).Trim() `
+        -userDisplayName $($thisUser.FieldValues.Title).Trim() `
+        -userManagerSAM $($thisUser.FieldValues.Line_x0020_Manager.Email).Replace("@anthesisgroup.com","") `
+        -userPrimaryOffice $thisUser.FieldValues.Primary_x0020_Workplace.Label `
         -userCommunity $null `
-        -userPrimaryTeam $_.Primary_Team `
-        -userSecondaryTeams $_.Additional_Teams `
-        -userBusinessUnit $_.Finance_Cost_Attribu `
-        -userJobTitle $_.Job_title `
+        -userPrimaryTeam $thisUser.FieldValues.Primary_x0020_Team.Email `
+        -userSecondaryTeams $thisUser.FieldValues.Additional_x0020_Teams `
+        -userBusinessUnit $thisUser.FieldValues.Finance_x0020_Cost_x0020_Attribu.Label `
+        -userJobTitle $thisUser.FieldValues.Job_x0020_title `
         -plaintextPassword "Anthesis123" `
         -adCredentials $adCredentials `
         -restCredentials $restCredentials `
         -newUserListItem $_ `
-        -userTimeZone $_.TimeZone `
-        -user365License $_.Office_365_license `
-        -userSecondaryOffice $_.Nearest_Office
+        -userTimeZone $thisUser.FieldValues.TimeZone `
+        -user365License $thisUser.FieldValues.Office_x0020_365_x0020_license `
+        -userSecondaryOffice $thisUser.FieldValues.Nearest_x0020_Office
     }
 $selectedStarters  | % {
     provision-SustainADUser -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
@@ -466,26 +451,25 @@ $selectedStarters | % {
     update-msolUserFromAd -userUPN $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com")
     }
 
-$selectedStarters[1] | % {
-    $userUPN = remove-diacritics $($_.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
-    $userFirstName = $_.Title.Split(" ")[0].Trim()
-    $userSurname = $($_.Title.Split(" ")[$_.Title.Split(" ").Count-1]).Trim()
-    $userDisplayName = $($_.Title).Trim()
-    $userManagerSAM = $($_.Line_Manager).Replace("@anthesisgroup.com","")
+#<# Bodge this stuff
+    $userUPN = remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
+    $userFirstName = $thisUser.FieldValues.Title.Split(" ")[0].Trim()
+    $userSurname = $($thisUser.FieldValues.Title.Split(" ")[$thisUser.FieldValues.Title.Split(" ").Count-1]).Trim()
+    $userDisplayName = $($thisUser.FieldValues.Title).Trim()
+    $userManagerSAM = $($thisUser.FieldValues.Line_x0020_Manager.Email).Replace("@anthesisgroup.com","")
     $userCommunity = $null 
-    $userPrimaryTeam = $_.Primary_Team 
-    $userSecondaryTeams = $_.Additional_Teams 
-    $userPrimaryOffice = $_.Primary_Workplace
-    $userSecondaryOffice = $_.Nearest_Office
-    $userBusinessUnit = $_.Finance_Cost_Attribu 
-    $userJobTitle = $_.Job_title 
+    $userPrimaryTeam = $thisUser.FieldValues.Primary_x0020_Team.Email
+    $userSecondaryTeams = $thisUser.FieldValues.Additional_x0020_Teams.Email
+    $userPrimaryOffice = $thisUser.FieldValues.Primary_x0020_Workplace.Label
+    $userSecondaryOffice = $thisUser.FieldValues.Nearest_x0020_Office.Label
+    $userBusinessUnit = $thisUser.FieldValues.Finance_x0020_Cost_x0020_Attribu.Label
+    $userJobTitle = $thisUser.FieldValues.Job_x0020_title
     $plaintextPassword = "Welcome123" 
     $adCredentials = $adCredentials 
     $restCredentials = $restCredentials 
     $newUserListItem = $_ 
-    $userTimeZone = $_.TimeZone 
-    $user365License = $_.Office_365_license
+    $userTimeZone = $thisUser.FieldValues.TimeZone
+    $user365License = $thisUser.FieldValues.Office_x0020_365_x0020_license
     $userDDI="0117 403 2XXX"
-    }
-
+#>
 

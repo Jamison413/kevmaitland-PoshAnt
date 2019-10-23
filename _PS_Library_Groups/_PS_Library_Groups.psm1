@@ -828,6 +828,12 @@ function new-teamGroup(){
             [string[]]$additionalEmailAddresses
         ,[Parameter(Mandatory=$true)]
             [string]$membershipManagedBy
+        ,[Parameter(Mandatory=$true)]
+            [PSCustomObject]$tokenResponse
+        ,[Parameter(Mandatory=$true)]
+            [bool]$alsoCreateTeam = $false
+        ,[Parameter(Mandatory=$true)]
+            [PSCredential]$pnpCreds
         )
     Write-Verbose "new-teamGroup($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $additionalEmailAddress, $membershipManagedBy)"
     $hideFromGal = $false
@@ -835,13 +841,32 @@ function new-teamGroup(){
     $accessType = "Private"
     $autoSubscribe = $true
     $groupClassification = "Internal"
-    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference
-    add-toSharepointTeamsTermStore -displayName $displayName
-    $newTeam
-    #New Sites aren't provisioned automatically
-    #Provision new Site by browsing to $newSite.SharePointSiteUrl
-    #set-defaultTeamSitePerissions
-    #Set-defaultTeamSiteHomepage
+
+    if($managerUpns -notcontains ((Get-PnPConnection).PSCredential.UserName)){
+        $addExecutingUserAsTemporaryAdmin = $true
+        [array]$managerUpns += ((Get-PnPConnection).PSCredential.UserName)
+        }
+
+    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $pnpCreds
+    Connect-PnPOnline -AccessToken $tokenResponse.access_token
+    Write-Verbose "`$newTeam = Get-PnPUnifiedGroup -Identity [$displayName]"
+    $newPnpTeam = Get-PnPUnifiedGroup -Identity $displayName
+    
+    #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
+    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Candiate-Template-for-Team-Site-Landing-Page.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
+    test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
+    if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
+        Write-Verbose "Setting Homepage"
+        Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
+        }
+    Add-PnPHubSiteAssociation -Site $newPnpTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/TeamHub" | Out-Null
+    start-Process $newPnpTeam.SiteUrl
+    if($addExecutingUserAsTemporaryAdmin){
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-DistributionGroupMember -Identity $newTeam.CustomAttribute2 -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        }
+    $newPnpTeam
     }
 function report-groupMembershipEnumeration($allGroupStubs,$filePathAndName){
     #######################################################################################################################################
