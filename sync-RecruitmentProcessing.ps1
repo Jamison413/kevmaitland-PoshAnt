@@ -58,10 +58,28 @@ ForEach ($Role in $ItemstoProcess){
 $ListTitle = "$($Role.'ID')" + "  " + "$($Role.'Role Name')"
 $datetime = (Get-date)
 
+
+#Create the generic template list
 write-host "Creating new Candidate Tracker List for Role: ID$($Role.'ID') $($Role.'Role Name')" -ForegroundColor Yellow
     New-PnPList -Title "ID$($ListTitle)"  -Template GenericList
     Set-PnPList -Identity "ID$($ListTitle)" -Description "Live Candidate Tracker - RoleID:$($Role.'ID')" #Set the description to find this in our processing script, which searches for "Live Candidate Tracker" in the List Description, add RoleID to tie to Candidate Tracker
     
+    #Check for success
+    $currentlist = Get-PnPList -Identity "ID$($ListTitle)"
+    If($currentlist){
+    write-host "It looks like the correct list was made:" "ID$($ListTitle). Let's continue cretaing the Candidate Tracker." -ForegroundColor Yellow
+    #Send a success email
+            $subject = "Recruitment Update: A Candidate Tracker has been made for role " + "ID$($ListTitle)"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services and IT Team,`r`n`r`n<BR><BR>"
+            $body += "This email is just to let you know that it looks like a Candidate Tracker has been successfully created: $link`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot<BR><BR><BR><BR>"
+            $body += "*Please note, this is an automated email. If you notice any issues, please get in touch with the IT Team"
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+
+#If it's worked then let's move through the script    
+
+#Add Content Types to give the lsit the default Canddiate Tracker Columns and then add Views
 write-host "Adding Content Types and Views to list (also removing default views)'" -ForegroundColor Yellow
     Add-PnPContentTypeToList -List "ID$($ListTitle)" -ContentType "Candidate Tracker V2" -DefaultContentType
     
@@ -74,7 +92,7 @@ write-host "Adding Content Types and Views to list (also removing default views)
     Set-PnPView -List "ID$($ListTitle)" -Identity "Candidates" -Values @{DefaultView=$True}
 
 
-
+#Apply restricted permissions - break them first and then apply Hiring Manager, People Services and IT permissions (IT will have full control role, so they will be the only ones who will be able to edit key things like the description and title.) 
 write-host "Applying Hiring Manager Permissions" -ForegroundColor Yellow
     Set-PnPList -Identity "ID$($ListTitle)" -BreakRoleInheritance -ClearSubscopes
     Set-PnPListPermission -Identity "ID$($ListTitle)" -User $Role.'Hiring Manager Email' -AddRole "Contribute" #Hiring Manager Permissions
@@ -82,35 +100,22 @@ write-host "Applying Hiring Manager Permissions" -ForegroundColor Yellow
     Set-PnPListPermission -Identity "ID$($ListTitle)" -User emily.pressey@anthesisgroup.com -AddRole "Full Control" #IT Permissions
     Set-PnPListPermission -Identity "ID$($ListTitle)" -User kevin.maitland@anthesisgroup.com -AddRole "Full Control" #IT Permissions
 
-
+#Set it as processed and update the Recruitment Area item with the candidate Tracker link so it's easy to navigate to it, set it to "Live".
 write-host "Setting item as processed in Recruitment Area: $($Role.'Role Name'). Setting link to Role Candidate Tracker." -ForegroundColor Yellow
     $CandidateListPathway = "$($SiteURL)" + "/Lists/" + "ID$($ListTitle)" + "/Candidates.aspx"
     $fullurl = [uri]::EscapeUriString($CandidateListPathway)
-    Set-PnPListItem -List "Recruitment Area" -Identity $Role.ID -Values @{"IsDirty" = "0"}
     Set-PnPListItem -List "Recruitment Area" -Identity $Role.ID -Values @{"Candidate_x0020_Tracker" = "$($fullurl), ID$($ListTitle) Candidate Tracker"}
     Set-PnPListItem -List "Recruitment Area" -Identity $Role.ID -Values @{"Role_x0020_Hire_x0020_Status" = "Live"}
+    #set the IsDirty field as "0" as a last step to stop it from reprocessing.
+    Set-PnPListItem -List "Recruitment Area" -Identity $Role.ID -Values @{"IsDirty" = "0"}
+
+    #Create a link for the notification email
     $link = "<a href=$($fullurl)>ID$($ListTitle)</a>"
 
-
-    #Check for success
-    $currentlist = Get-PnPList -Identity "ID$($ListTitle)"
-
-    If($currentlist){
-    write-host "It looks like the correct list was made:" "ID$($ListTitle)" -ForegroundColor Yellow
     
-    #Send a success email
-            $subject = "Recruitment Update: A Candidate Tracker has been made for role " + "ID$($ListTitle)"
-            $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services and IT Team,`r`n`r`n<BR><BR>"
-            $body += "This email is just to let you know that it looks like a Candidate Tracker has been successfully created: $link`r`n`r`n<BR><BR>"
-            $body += "Love,`r`n`r`n<BR><BR>"
-            $body += "The People Services Robot<BR><BR><BR><BR>"
-            $body += "*Please note, this is an automated email. If you notice any issues, please get in touch with the IT Team"
-            
-            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-
-    }
-
+    }    
     Else{
+    #If it doesn't find the list - this indicates that it was not created.
     Write-Host "Woops, looks like something has gone wrong" -ForegroundColor Yellow
     #Send a failure email
             $subject = "Failure: Recruitment Processing - a Candidate Tracker has *not* been made for role " + "ID$($ListTitle)"
@@ -120,17 +125,14 @@ write-host "Setting item as processed in Recruitment Area: $($Role.'Role Name').
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot<BR><BR><BR><BR>"
             $body += "*Please note, this is an automated email. If you notice any issues, please get in touch with the IT Team"
-            
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-
-
     }
-    
+
 }
 
 
 
-
+                                                                                                          
 
    
 
