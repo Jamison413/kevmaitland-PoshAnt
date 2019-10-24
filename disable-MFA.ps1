@@ -29,37 +29,31 @@ else{
     }
 connect-ToMsol -Credential $adminCreds
 
-#Create an empty StrongAuthenticationRequirement object
-$emptyAuthObject = New-Object -TypeName Microsoft.Online.Administration.StrongAuthenticationRequirement
-$emptyAuthObject.RelyingParty = "*"
-$emptyAuthObject.State = "Enabled"
-$emptyAuthObject.RememberDevicesNotIssuedBefore = (Get-Date)
-
-#Get the GUID for the SSPR Group
-#$ssprGroup = Get-MsolGroup -SearchString "SSPR Testers"
-[guid]$ssprGroupObjectId = "fee80bd5-6e2f-4888-a51c-9581cf64eb18" #This is the GUID for the SSPR Testers Group
-
-
 #Figure out who to run this for
-$upnsToEnable = convertTo-arrayOfEmailAddresses $upnsString
+$upnsToDisable = convertTo-arrayOfEmailAddresses $upnsString
 
 
-$upnsToEnable | % {
+$upnsToDisable | % {
     $thisUser = Get-MsolUser -UserPrincipalName $_
     Write-Verbose "MFA is currently set to [$($thisUser.StrongAuthenticationRequirements.State)] for $_"
+
+$emptyAuthObject = New-Object -TypeName Microsoft.Online.Administration.StrongAuthenticationRequirement
+$emptyAuthObject.RelyingParty = $thisUser.StrongAuthenticationRequirements[0].RelyingParty
+$emptyAuthObject.State = "Disabled"
+$emptyAuthObject.RememberDevicesNotIssuedBefore = $thisUser.StrongAuthenticationRequirements[0].RememberDevicesNotIssuedBefore
+Write-Verbose $emptyAuthObject
+#$emptyAuthObject.ExtensionData = $thisUser.StrongAuthenticationRequirements.ExtensionData
     if([string]::IsNullOrWhiteSpace($thisUser.StrongAuthenticationRequirements)){
-        Write-Verbose "Enabling MFA for $_"
-        Set-MsolUser -UserPrincipalName $thisUser.UserPrincipalName -StrongAuthenticationRequirements $emptyAuthObject
+        Write-Verbose "MFA already [$($thisUser.StrongAuthenticationRequirements.State)] for $_"
         }
-    else{Write-Verbose "MFA already [$($thisUser.StrongAuthenticationRequirements.State)] for $_"}
-    Add-MsolGroupMember -GroupObjectId $ssprGroupObjectId -GroupMemberType User -GroupMemberObjectId $thisUser.ObjectId
+    else{
+        Write-Verbose "Disabling MFA for $_"
+        Set-MsolUser -UserPrincipalName $_ -StrongAuthenticationRequirements $emptyAuthObject
+        }
     }
 
 Stop-Transcript
 
+<#Disable MFA for specific user#>
 
 
-#To check enabled# 
-
-$Name = Get-MsolUser -UserPrincipalName xxxx.xxxx@anthesisgroup.com
-$Name.StrongAuthenticationRequirements.state 

@@ -25,7 +25,7 @@ if($requests){$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.
 foreach ($currentRequest in $selectedRequests){
     $fullRequest = $requests | ? {$_.FieldValues.GUID.Guid -eq $currentRequest.'$_.FieldValues.GUID.Guid'}
     $managers = convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Admin.Email) | sort | select -Unique
-    $members = convertTo-arrayOfEmailAddresses ($managers + $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique
+    $members = convertTo-arrayOfEmailAddresses ($managers + "," + $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique
     $members | % {
         $thisEmail = $_
         try{
