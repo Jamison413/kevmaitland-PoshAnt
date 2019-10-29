@@ -312,7 +312,7 @@ function new-365Group(){
     $365MailAlias = $(guess-aliasFromDisplayName "$displayName 365")
 
     #Firstly, check whether we have already created a Unified Group for this DisplayName
-    $365Group = Get-UnifiedGroup -Filter "DisplayName -eq `'$displayName`'"
+    $365Group = Get-UnifiedGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
     if(!$365Group){$365Group = Get-UnifiedGroup -Filter "Alias -eq `'$365MailAlias`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
 
     #If we have a UG, check whether we can find the associated groups (we certainly should be able to!)
@@ -355,7 +355,7 @@ function new-365Group(){
         if($managersSg){Write-Verbose "Managers Group [$($managersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
         $membersSg  = rummage-forDistributionGroup -displayName $membersSgDisplayName 
         if($membersSg){Write-Verbose "Members Group [$($membersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
-        $sharedMailbox = Get-Mailbox -Filter "DisplayName -eq `'$sharedMailboxDisplayName`'"
+        $sharedMailbox = Get-Mailbox -Filter "DisplayName -eq `'$(sanitise-forSql $sharedMailboxDisplayName)`'"
         if(!$sharedMailbox){$sharedMailbox = Get-Mailbox -Filter "Alias -eq `'$(guess-aliasFromDisplayName $sharedMailboxDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
         if($sharedMailbox){Write-Verbose "Shared Mailbox [$($sharedMailbox.DisplayName)] found"}else{Write-Verbose "Mailbox not found"}
 
@@ -955,7 +955,7 @@ function rummage-forDistributionGroup(){
 
     Write-Verbose "rummage-forDistributionGroup([$displayName],[$alias])"
     if([string]::IsNullOrWhiteSpace($alias)){$alias = guess-aliasFromDisplayName $displayName}
-    [array]$dg = Get-DistributionGroup -Filter "DisplayName -eq `'$displayName`'"
+    [array]$dg = Get-DistributionGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
     if($dg.Count -ne 1){
         #Write-Verbose "Trying to get DG by alias [$alias]"
         #[array]$dg = Get-DistributionGroup -Filter "Alias -eq `'$alias`'" #If we can't find it by the DisplayName, check the Alias as this is less mutable
