@@ -179,11 +179,13 @@ function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verbos
 function get-3letterIsoCodeFromCountryName($pCountryName){
     switch ($pCountryName) {
         {@("UAE","UE","AE","ARE","United Arab Emirates","Dubai") -contains $_} {"ARE"}
+        {@("BR","BRA","Brazil","Brasil") -contains $_} {"BRA"}
         {@("CA","CAN","Canada","Canadia") -contains $_} {"CAN"}
         {@("CN","CHN","China") -contains $_} {"CHN"}
         {@("DE","DEU","GE","GER","Germany","Deutschland","Deutchland") -contains $_} {"DEU"}
         {@("ES","ESP","SP","SPA","Spain","España","Espania") -contains $_} {"ESP"}
         {@("FI","FIN","Finland","Suomen","Suomen tasavalta") -contains $_} {"FIN"}
+        {@("F","FR",,"FRA","France") -contains $_} {"FRA"}
         {@("UK","GB","GBR","United Kingdom","Great Britain","Scotland","England","Wales","Northern Ireland") -contains $_} {"GBR"}
         {@("IE","IRL","IR","IER","Ireland") -contains $_} {"IRL"}
         {@("PH","PHL","PHI","FIL","Philippenes","Phillippenes","Philipenes","Phillipenes") -contains $_} {"IRL"}
@@ -191,7 +193,7 @@ function get-3letterIsoCodeFromCountryName($pCountryName){
         {@("US","USA","United States","United States of America") -contains $_} {"USA"}
         {@("IT","ITA","Italy","Italia") -contains $_} {"ITA"}
         #Add more countries
-        default {"GBR"}
+        default {}
         }
     }
 function get-2letterIsoCodeFrom3LetterIsoCode($p3letterIsoCode){
@@ -392,6 +394,16 @@ function get-timeZoneSpsIdFromUnformattedTimeZone($pUnformattedTimeZone, $pTimeZ
         }
         else{$spoTimeZoneHashTable = $pSpoTimeZoneHashTable}
 
+    }
+function get-trailing3LettersIfTheyLookLikeAnIsoCountryCode(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ambiguousString
+        )
+    if($ambiguousString -match ", [a-zA-Z]{3}$"){
+        $ambiguousString.Substring($ambiguousString.Length-3,3)
+        }
     }
 function get-unformattedTimeZone ($pFormattedTimeZone){
     if ($pFormattedTimeZone -eq "" -or $pFormattedTimeZone -eq $null){"Unknown"}

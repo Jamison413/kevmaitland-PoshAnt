@@ -694,145 +694,6 @@ function send-itemsWithUniquePermissionsReport($arrayOfManagerMailboxes,$arrayOf
 
 
     }
-function set-standardTeamPermissions(){
-    [cmdletbinding(SupportsShouldProcess=$true)]
-    param(
-        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
-        [PSObject]$UnifiedGroupObject
-        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [string]$UnifiedGroupId
-
-        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [string]$fullLogPathAndName
-        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [string]$errorLogPathAndName
-        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [string[]]$adminEmailAddresses
-        )
-    
-    #region Get $UnifiedGroupObject, regardless of which parameters we've been given
-    switch ($PsCmdlet.ParameterSetName){
-        “UnifiedGroupId”  {
-            Write-Verbose "We've been given a 365 Id, so we need the Group object"
-            $UnifiedGroupObject = Get-UnifiedGroup $UnifiedGroupId
-            if(!$UnifiedGroupObject){
-                Write-Error "Could not retrieve Unified Group from ID [$UnifiedGroupId]"
-                break
-                }
-            }
-        }
-    #endregion
-
-    Write-Verbose "set-standardTeamPermissions([$($UnifiedGroupObject.ExternalDirectoryObjectId)])"
-    
-    #Check the classification is correct, try to fix it, and alert the Owners and Admins
-    if($UnifiedGroupObject.Classification -ne $UnifiedGroupObject.CustomAttribute7){
-        $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misclassified as [$($UnifiedGroupObject.Classification)] instead of [$($UnifiedGroupObject.CustomAttribute7)]"
-        Write-Verbose $warningMessage
-        try{
-            Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -Classification $UnifiedGroupObject.CustomAttribute7 -ErrorAction Stop
-            $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute7)]"
-            $priorty = "Normal"
-            }
-        catch{
-            $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
-            $priorty = "High"
-            }
-
-        if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
-        $groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID
-        Write-Verbose `t$result
-        Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
-        }
-
-    #Check the privacy setting is correct, try to fix it, and alert the Owners and Admins
-    if($UnifiedGroupObject.AccessType -ne $UnifiedGroupObject.CustomAttribute8){
-        $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was mis-privacy-ed as [$($UnifiedGroupObject.AccessType)] instead of [$($UnifiedGroupObject.CustomAttribute8)]"
-        Write-Verbose $warningMessage
-        try{
-            Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -AccessType $UnifiedGroupObject.CustomAttribute8 -ErrorAction Stop
-            $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute8)]"
-            $priorty = "Normal"
-            }
-        catch{
-            $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
-            $priorty = "High"
-            }
-        if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
-        if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
-        Write-Verbose `t$result
-        Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
-        }
-    
-    #Check the _intended_ Guest Access setting (based on [CustomAttribute6]) is correct, try to fix it, and alert the Owners and Admins
-    switch($UnifiedGroupObject.CustomAttribute7){
-        "External" {
-            if($UnifiedGroupObject.AllowAddGuests -eq $false){
-                $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misconfigured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)], which is wrong for an $($UnifiedGroupObject.Classification) group"
-                Write-Verbose $warningMessage
-                try{
-                    $currentSettings = Get-AzureADObjectSetting -TargetType Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId 
-                    if($currentSettings){
-                        Write-Verbose "Removing pre-existing settings [$($currentSettings.Id)]"
-                        Remove-AzureADObjectSetting -id $currentSettings.Id -targettype Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId
-                        }
-                    $template = Get-AzureADDirectorySettingTemplate | ? {$_.displayname -eq "group.unified.guest"}
-                    $settingsCopy = $template.CreateDirectorySetting()
-                    $settingsCopy["AllowToAddGuests"]=$true
-                    New-AzureADObjectSetting -TargetType Groups -TargetObjectId $UnifiedGroupObject.ExternalDirectoryObjectId -DirectorySetting $settingsCopy 
-                    $result = "Don't worry - I've fixed it now and set it back to [$true]"
-                    $priorty = "Normal"
-                    }
-                catch{
-                    $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
-                    $priorty = "High"
-                    }
-                if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
-                if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
-                Write-Verbose `t$result
-                #Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
-                Send-MailMessage -to kevin.maitland@anthesisgroup.com -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
-                }
-            else{Write-Verbose "Unified Group [$($UnifiedGroupObject.DisplayName)] was correctly configured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)]"}
-            }
-        {@("Internal","Confidential") -contains $_} {
-            if($UnifiedGroupObject.AllowAddGuests -eq $true){
-                $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misconfigured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)], which is wrong for an $($UnifiedGroupObject.Classification) group"
-                Write-Verbose $warningMessage
-                try{
-                    $currentSettings = Get-AzureADObjectSetting -TargetType Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId 
-                    if($currentSettings){
-                        Write-Verbose "Removing pre-existing settings [$($currentSettings.Id)]"
-                        Remove-AzureADObjectSetting -id $currentSettings.Id -targettype Groups -TargetObjectID $UnifiedGroupObject.ExternalDirectoryObjectId
-                        }
-                    $template = Get-AzureADDirectorySettingTemplate | ? {$_.displayname -eq "group.unified.guest"}
-                    $settingsCopy = $template.CreateDirectorySetting()
-                    $settingsCopy["AllowToAddGuests"]=$False
-                    New-AzureADObjectSetting -TargetType Groups -TargetObjectId $UnifiedGroupObject.ExternalDirectoryObjectId -DirectorySetting $settingsCopy 
-                    $result = "Don't worry - I've fixed it now and set it back to [$false]"
-                    $priorty = "Normal"
-                    }
-                catch{
-                    $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
-                    $priorty = "High"
-                    }
-                if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
-                if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
-                Write-Verbose `t$result
-                Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
-                }
-            else{Write-Verbose "Unified Group [$($UnifiedGroupObject.DisplayName)] was correctly configured with [AllowAddGuests] = [$($UnifiedGroupObject.AllowAddGuests)]"}
-            }
-        "Confidential" {
-            #Do Owner Stuff too
-            }
-        }
-    
-
-    }
 function set-standardSitePermissions(){
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
@@ -872,7 +733,7 @@ function set-standardSitePermissions(){
     try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupObject.ExternalDirectoryObjectId -ErrorAction Stop -WarningAction Stop}
     catch{#Connect to the root site if we're not connected to anything
         Write-Verbose "Connecting to Graph"
-        Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/" -AccessToken $tokenResponse.access_token
+        Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
         $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupObject.ExternalDirectoryObjectId
         }
 
@@ -884,75 +745,28 @@ function set-standardSitePermissions(){
     #region Get connected to the Site
     try{
         Write-Verbose "Checking to see if the executing user already has admin permissions for the Site"
-        test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl -connectIfDifferent $true -pnpCreds $pnpCreds -ErrorAction Stop
-        Write-Verbose "Connected successfully to [$($pnpUnifiedGroupObject.SiteUrl)]"
+        $pnpGroupAdmins = Get-PnPUnifiedGroupOwners -Identity $unifiedGroupObject.ExternalDirectoryObjectId
+        if($pnpGroupAdmins.UserPrincipalName -notcontains $pnpCreds.UserName){
+            Write-Verbose "`tNope - temporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
+            $requiresTemporaryAdminRights = $true
+            Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -Credentials $pnpCreds            
+            Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName
+            }
+        Connect-PnPOnline -Url $pnpUnifiedGroupObject.SiteUrl -Credentials $pnpCreds -ErrorAction Stop -WarningAction Stop
         }
     catch{
-        if($_.Exception.HResult -eq "-2146233079"){ #Unauthorised
-            Write-Verbose "No they didn't. Temporarily adding them and waiting for the permissions to propagate..."
-            $requiresTemporaryAdminRights = $true
-            try{
-                Write-Verbose "Temporarily adding [$((Get-PnPConnection).PSCredential.UserName)] to [$($unifiedGroupObject.DisplayName)][$($unifiedGroupObject.ExternalDirectoryObjectId)] Owners"
-                get-help Add-PnPSiteCollectionAdmin -full
-                Add-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -ErrorAction Stop
-                }
-            catch{
-                if($_.Exception.HResult -eq "-2146233087"){
-                    $requiresTemporaryMembership = $true
-                    Write-Verbose "Temporarily adding [$((Get-PnPConnection).PSCredential.UserName)] to [$($unifiedGroupObject.DisplayName)][$($unifiedGroupObject.ExternalDirectoryObjectId)] Members"
-                    Add-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Members -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-                    Add-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-                    }
-                }
-            do{
-                Write-Verbose "Waiting for temporary SharePoint permissions to propagate..."
-                start-sleep -Seconds 5
-                try{test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl -connectIfDifferent $true -pnpCreds $pnpCreds -ErrorAction Stop}
-                catch{
-                    if($_.Exception.HResult -ne "-2146233079"){ #Unauthorised
-                        Write-Error "Additional (unexpected) error connecting to [$($pnpUnifiedGroupObject.SiteUrl)]. Sorry - this isn't going to work :("
-                        break
-                        }
-                    }
-                }
-            while((test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl -connectIfDifferent $true -pnpCreds $pnpCreds) -eq $false)
-            }
+        Write-Verbose "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
+        break
         }
     #endregion
 
     if(test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl){
-        #Do all the generic stuff first that applies to all Sites
-        if($requiresTemporaryAdminRights){Add-PnPSiteCollectionAdmin -Owners $((Get-PnPConnection).PSCredential.UserName)}
-        $spoSiteCollectionAdmins = Get-PnPSiteCollectionAdmin
-        $spoOwnersGroup = Get-PnPGroup -AssociatedOwnerGroup
+        if([string]::IsNullOrWhiteSpace((Get-PnPFeature -Scope Site -Identity "b50e3104-6812-424f-a011-cc90e6327318"))){
+            Write-Verbose "Enabling the DocID service"
+            Enable-PnPFeature -Identity "b50e3104-6812-424f-a011-cc90e6327318" -Scope Site -Verbose
+            }
 
-        Write-Verbose "Enable the DocID service"
-        $pnpSite = Get-PnPSite -Includes Features
-        if($pnpSite.Features.DefinitionId -notcontains "b50e3104-6812-424f-a011-cc90e6327318"){
-            Write-Verbose "Enabling DocID Service for [$($pnpUnifiedGroupObject.SiteUrl)]"
-            $pnpSite.Features.Add([guid]"b50e3104-6812-424f-a011-cc90e6327318",$false,[Microsoft.SharePoint.Client.FeatureDefinitionScope]::None)
-            try{$pnpSite.Context.ExecuteQuery()}
-            catch{Write-Warning $_}
-            }
-        else{Write-Verbose "DocID Service was already enabled for [$pnpUnifiedGroupObject.SiteUrl]"}
-
-        Write-Verbose "Untick Members can share boxes"
-        $pnpWeb = Get-PnPWeb -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
-        if($pnpWeb.MembersCanShare){
-            Write-Warning "MembersCanShare was set to $true for $[($pnpUnifiedGroupObject.SiteUrl)]"
-            $pnpWeb.MembersCanShare = $false
-            }
-        if($pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
-            Write-Warning "AssociatedMemberGroup.AllowMembersEditMembership was set to $true for $[($pnpUnifiedGroupObject.SiteUrl)]"
-            $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
-            $pnpWeb.AssociatedMemberGroup.Update()
-            }
-        if($pnpWeb.MembersCanShare -or $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
-            $pnpWeb.Update()
-            $pnpWeb.Context.ExecuteQuery()
-            }
-            
-        Write-Verbose "Now do the Classification-specific settings"
+        Write-Verbose "Now set the Classification-specific Sharing settings"
         switch($unifiedGroupObject.CustomAttribute7){
             "External" {
                 #Allow external sharing
@@ -968,12 +782,54 @@ function set-standardSitePermissions(){
                 }
             }
 
-        #Now tidy up
+        Write-Verbose "Now set Access Requests to go to default Owners Group (Set-PnPSite above seems to break this)"
+        $pnpWeb = Get-PnPWeb -Includes RequestAccessEmail
+        $pnpWeb.Context.Web.SetUseAccessRequestDefaultAndUpdate($true)
+        $pnpWeb.Context.ExecuteQuery()
+
+        Write-Verbose "Now check the classification is correct, try to fix it, and alert the Owners and Admins"
+        if($UnifiedGroupObject.Classification -ne $UnifiedGroupObject.CustomAttribute7){
+            $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misclassified as [$($UnifiedGroupObject.Classification)] instead of [$($UnifiedGroupObject.CustomAttribute7)]"
+            Write-Verbose $warningMessage
+            try{
+                Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -Classification $UnifiedGroupObject.CustomAttribute7 -ErrorAction Stop
+                $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute7)]"
+                $priorty = "Normal"
+                }
+            catch{
+                $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
+                $priorty = "High"
+                }
+
+            if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
+            $groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID
+            Write-Verbose `t$result
+            Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
+            }
+
+        Write-Verbose "Now check the privacy setting is correct, try to fix it, and alert the Owners and Admins"
+        if($UnifiedGroupObject.AccessType -ne $UnifiedGroupObject.CustomAttribute8){
+            $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was mis-privacy-ed as [$($UnifiedGroupObject.AccessType)] instead of [$($UnifiedGroupObject.CustomAttribute8)]"
+            Write-Verbose $warningMessage
+            try{
+                Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -AccessType $UnifiedGroupObject.CustomAttribute8 -ErrorAction Stop
+                $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute8)]"
+                $priorty = "Normal"
+                }
+            catch{
+                $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
+                $priorty = "High"
+                }
+            if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
+            if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
+            Write-Verbose `t$result
+            Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
+            }
+
         Write-Verbose "Remove everything that isn't the 365 Group Owners object from Site Owners (it looks like adding the Data Managers AAD group has been deprecated to match the user-only membership behaviour of 365 Groups)"
+        $spoOwnersGroup = Get-PnPGroup -AssociatedOwnerGroup
         [array]$unexpectedSiteOwners = $spoOwnersGroup.Users | ? {($_.LoginName -notmatch $unifiedGroupObject.ExternalDirectoryObjectId) -and ($_.LoginName -ne "SHAREPOINT\system")}
         if($unexpectedSiteOwners.Count -gt 0){
-            #Report Unexpected Site Owners
-##########################################
             #Remove Unexpected Site Owners
             $unexpectedSiteOwners | % {
                 Write-Verbose "`tRemove-PnPUserFromGroup -LoginName $($_.LoginName) -Identity $($spoOwnersGroup.Id)"
@@ -982,300 +838,19 @@ function set-standardSitePermissions(){
             }
 
         Write-Verbose "Remove everything that isn't the 365 Group Owners object from Site Collection Admins (except executing user otherwise we might saw off the branch we're sitting on) :)"
+        $spoSiteCollectionAdmins = Get-PnPSiteCollectionAdmin
         [array]$unexpectedSiteCollectionAdmins = $spoSiteCollectionAdmins | ? {($_.LoginName -notmatch $unifiedGroupObject.ExternalDirectoryObjectId -and $_.LoginName -notmatch (Get-PnPConnection).PSCredential.UserName)}
         if($unexpectedSiteCollectionAdmins.Count -gt 0){
-            #Report Unexpected Site Admins
-##########################################
             #Remove Unexpected Site Admins
             $unexpectedSiteCollectionAdmins | % {
                 Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
                 }
             }
-
-        Write-Verbose "Finally, remove any owner/memberships we've temporarily granted ourselves"
-        if($requiresTemporaryMembership){Remove-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Members -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false}
-        if($requiresTemporaryAdminRights){
-            Remove-UnifiedGroupLinks -Identity $unifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners -Links ((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-            Remove-PnPSiteCollectionAdmin -Owners $((Get-PnPConnection).PSCredential.UserName)
-            }
-
-        }
-    }
-function set-standardTeamSitePermissions_deprecated2(){
-    [cmdletbinding(SupportsShouldProcess=$true)]
-    param(
-        [parameter(Mandatory = $true,ParameterSetName="URL")]
-        [System.Uri]$teamSiteAbsoluteUrl
-        ,[parameter(Mandatory = $false,ParameterSetName="URL")]
-        [Object[]]$fullArrayOfUnifiedGroups #To optionally save on repeated get-UnifiedGroup calls
-        #,[parameter(Mandatory = $true,ParameterSetName="URL")]
-        #[pscredential]$pnpCreds
-        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
-        [PSObject]$UnifiedGroupObject
-        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [string]$UnifiedGroupId
-
-        ,[parameter(Mandatory = $false,ParameterSetName="URL")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [string]$fullLogPathAndName
-        ,[parameter(Mandatory = $false,ParameterSetName="URL")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [string]$errorLogPathAndName
-        )
-    Write-Verbose "set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $($adminCredentials.Username))"
-
-    #region Get $teamSiteAbsoluteUrl & $UnifiedGroupObject, regardless of which parameters we've been given
-    switch ($PsCmdlet.ParameterSetName){
-        “UnifiedGroupId”  {
-            Write-Verbose "We've been given a 365 Id, so we need the Group object"
-            $UnifiedGroupObject = Get-UnifiedGroup $UnifiedGroupId
-            if(!$UnifiedGroupObject){
-                Write-Error "Could not retrieve Unified Group from ID [$UnifiedGroupId]"
-                break
-                }
-            }
-        {$_ -match "Unified"}  {
-            Write-Verbose "We have a Unified Group object, so we need the URL"
-            $teamSiteAbsoluteUrl = $UnifiedGroupObject.SharePointSiteUrl
-            if(![string]::IsNullOrWhiteSpace($teamSiteAbsoluteUrl)){
-                Write-Error "Could not retrieve 365 Group URL from Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)]. Exiting without attempting to check/set permissions"
-                break
-                }
-            }
-        "URL" {
-            if(!$fullArrayOfUnifiedGroups){$fullArrayOfUnifiedGroups = Get-UnifiedGroup}
-            }
         }
 
-    if(!$UnifiedGroupObject){$unifiedGroupObject = $fullArrayOfUnifiedGroups | ? {$_.SharePointSiteUrl -eq $teamSiteAbsoluteUrl}}#-Filter "SharePointSiteUrl -eq '$teamSiteAbsoluteUrl'" Cannot bind parameter 'Filter' to the target. Exception setting "Filter": ""SharePointSiteUrl" is not a recognized filterable property.
-    #endregion
-
-    if(test-pnpConnectionMatchesResource -resourceUrl $teamSiteAbsoluteUrl){
-        $spoSiteCollectionAdmins = Get-PnPSiteCollectionAdmin
-        $spoOwnersGroup = Get-PnPGroup -AssociatedOwnerGroup
-
-        #Block all external sharing
-        $pnpTenantSite = Get-PnPTenantSite -Url $teamSiteAbsoluteUrl
-        Write-Verbose "SharingCapability is [$($pnpTenantSite.SharingCapability)] for [$($teamSiteAbsoluteUrl)]"
-        if($pnpTenantSite.SharingCapability -ne "Disabled"){
-            Write-Warning "SharingCapability was [$($pnpTenantSite.SharingCapability)] for [$($teamSiteAbsoluteUrl)] - Disabling now"
-            Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled
-            }
-
-        #Enable the DocID service
-        $pnpSite = Get-PnPSite -Includes Features
-        if($pnpSite.Features.DefinitionId -notcontains "b50e3104-6812-424f-a011-cc90e6327318"){
-            Write-Verbose "Enabling DocID Service for [$teamSiteAbsoluteUrl]"
-            $pnpSite.Features.Add([guid]"b50e3104-6812-424f-a011-cc90e6327318",$false,[Microsoft.SharePoint.Client.FeatureDefinitionScope]::None)
-            $pnpSite.Context.ExecuteQuery()
-            }
-        else{Write-Verbose "DocID Service was already enabled for [$teamSiteAbsoluteUrl]"}
-        
-        #Untick Members can share boxes 
-            $pnpWeb = Get-PnPWeb -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
-            if($pnpWeb.MembersCanShare){
-                Write-Warning "MembersCanShare was set to $true for $[($teamSiteAbsoluteUrl)]"
-                $pnpWeb.MembersCanShare = $false
-                }
-            if($pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
-                Write-Warning "AssociatedMemberGroup.AllowMembersEditMembership was set to $true for $[($teamSiteAbsoluteUrl)]"
-                $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
-                $pnpWeb.AssociatedMemberGroup.Update()
-                }
-            if($pnpWeb.MembersCanShare -or $pnpWeb.AssociatedMemberGroup.AllowMembersEditMembership){
-                $pnpWeb.Update()
-                $pnpWeb.Context.ExecuteQuery()
-                }
-
-
-        #Remove all non-Datamanager entries from Site Owners
-        [array]$unexpectedSiteOwners = $spoOwnersGroup.Users | ? {($_.LoginName -notmatch $UnifiedGroupObject.ExternalDirectoryObjectId) -and ($_.LoginName -ne "SHAREPOINT\system")}
-        if($unexpectedSiteOwners.Count -gt 0){
-            #Report Unexpected Site Owners
-##########################################
-            #Remove Unexpected Site Owners
-            $unexpectedSiteOwners | % {
-                Write-Verbose "`tRemove-PnPUserFromGroup -LoginName $($_.LoginName) -Identity $($spoOwnersGroup.Id)"
-                Remove-PnPUserFromGroup -LoginName $_.LoginName -Identity $spoOwnersGroup.Id -Verbose:$VerbosePreference
-                }
-            }
-
-        #Remove all non-DataManager entries from Site Collection Admins (except executing user otherwise we might saw off the branch we're sitting on) :)
-        [array]$unexpectedSiteCollectionAdmins = $spoSiteCollectionAdmins | ? {($_.LoginName -notmatch $UnifiedGroupObject.CustomAttribute2 -and $_.LoginName -notmatch (Get-PnPConnection).PSCredential.UserName)}
-        if($unexpectedSiteCollectionAdmins.Count -gt 0){
-            #Report Unexpected Site Admins
-##########################################
-            #Remove Unexpected Site Admins
-            $unexpectedSiteCollectionAdmins | % {
-                Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
-                }
-            }
-        #Finally, remove the executing User from Site Collection Admins, if present
-        $spoSiteCollectionAdmins | ? {$_.LoginName -match (Get-PnPConnection).PSCredential.UserName} | % {
-            Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
-            }
-
-        }
-    }
-function set-standardTeamSitePermissions_deprecated($teamSiteAbsoluteUrl, $adminCredentials, $verboseLogging,$fullLogPathAndName,$errorLogPathAndName){
-    #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Energy_Engineering_Team_All_365/"
-    #$teamSiteAbsoluteUrl = "https://anthesisllc.sharepoint.com/teams/Waste_&_Resource_Sustainability_WRS_Team_All_365"
-   if($verboseLogging){Write-Host -ForegroundColor Magenta "set-standardTeamSitePermissions($teamSiteAbsoluteUrl, $($adminCredentials.Username))"}
-    if([string]::IsNullOrWhiteSpace($teamSiteAbsoluteUrl)){
-        $false
-        Write-Error "Null or Empty value passed to set-standardTeamSitePermissions() for `$teamSiteAbsoluteUrl"
-        }
-    else{
-        $teamSiteAbsoluteUrl = $teamSiteAbsoluteUrl.TrimEnd("/")
-        if(!(test-pnpConnectionMatchesResource -resourceUrl $teamSiteAbsoluteUrl -verboseLogging $verboseLogging)){
-            Write-Warning "Connect-PnPOnline connection mismatch - connecting to [$teamSiteAbsoluteUrl]"
-            Connect-PnPOnline -Url $teamSiteAbsoluteUrl -Credentials $adminCredentials
-            }
-
-        if((test-pnpConnectionMatchesResource -resourceUrl $teamSiteAbsoluteUrl -verboseLogging $verboseLogging)){
-            #Find the 365 Group associated with this Team Site
-            log-action "Finding 365 group associated with [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -logFile $fullLogPathAndName
-            try{
-                $ownersSpoGroup = Get-PnPGroup -AssociatedOwnerGroup 
-                #Temporarily add this user to Site Collection Admins
-                Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners (Get-PnPConnection).PSCredential.UserName
-                $owner365Group = $ownersSpoGroup.Users | ? {$_.LoginName -match "federateddirectoryclaimprovider"}
-                if(Get-PnPProperty -ClientObject $owner365Group -Property AadObjectId){log-result "SUCCESS: [$($owner365Group.Title)] [$($owner365Group.AadObjectId.NameId)] owns [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -logFile $fullLogPathAndName}
-                else{log-result "FAILED: Could not identify Guid for [$($owner365Group.Title)]" -logFile $fullLogPathAndName}
-                }
-            catch{log-error -myError $_ -myFriendlyMessage "Error finding 365 group associated with [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
-        
-            #Get the corresponding Mail-Enabeld Security Groups from AAD
-            log-action "Finding the AAD groups associated with [$($owner365Group.Title)] [$($owner365Group.AadObjectId.NameId)]" -logFile $fullLogPathAndName
-            try{
-               if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`$unifiedGroup = Get-UnifiedGroup -Identity `$owner365Group.AadObjectId.NameId [$($owner365Group.AadObjectId.NameId)]"}
-                $unifiedGroup = Get-UnifiedGroup -Identity $owner365Group.AadObjectId.NameId
-               if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`$aadManagersGroup = Get-DistributionGroup -Identity `$unifiedGroup.CustomAttribute2 [$($unifiedGroup.CustomAttribute2)]"}
-                $aadManagersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute2
-               if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`$aadMembersGroup = Get-DistributionGroup -Identity `$unifiedGroup.CustomAttribute3 [$($unifiedGroup.CustomAttribute3)]"}
-                $aadMembersGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute3
-               if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "`$aadOverallGroup = Get-DistributionGroup -Identity `$unifiedGroup.CustomAttribute4 [$($unifiedGroup.CustomAttribute4)]"}
-                $aadOverallGroup = Get-DistributionGroup -Identity $unifiedGroup.CustomAttribute4
-                if($unifiedGroup -and $aadManagersGroup -and $aadMembersGroup -and $aadOverallGroup){log-result "SUCCESS: For [$($unifiedGroup.DisplayName)], the Managers group is [$($aadManagersGroup.DisplayName)], the Members Group is [$($aadMembersGroup.DisplayName)] and the combined Group is [$($aadOverallGroup.DisplayName)]" -logFile $fullLogPathAndName}
-                else{log-result "FAILED: For [$($unifiedGroup.DisplayName)], the Managers group is [$($aadManagersGroup.DisplayName)], the Members Group is [$($aadMembersGroup.DisplayName)] and the combined Group is [$($aadOverallGroup.DisplayName)]"}
-                }
-            catch{log-error -myError $_ -myFriendlyMessage "Error finding AAD groups associated with [$(Split-Path $teamSiteAbsoluteUrl -Leaf)]" -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName}
-
-            if([string]::IsNullOrWhiteSpace($aadMembersGroup)){
-                #Notify someone that there is no Members Group associated with this 365 Group
-                }
-            if([string]::IsNullOrWhiteSpace($aadManagersGroup)){
-                #Notify someone that there is no Managers Group associated with this 365 Group
-                }
-
-
-            #Add Managers group to Site Coll Admins & Site Owners Group
-            if($aadManagersGroup){
-                #Add the AAD Managers group to the Site Owners Group #I'm not sure we want to do this :/
-                #Add-PnPUserToGroup -EmailAddress $aadManagersGroup.PrimarySmtpAddress -Identity $ownersSpoGroup.Id -SendEmail:$false
-                #Get the SPO version of the AAD Managers Group (as we need the SharePoint LoginName)
-                $managersSpoObject = Get-PnPUser | ? {$_.Email -eq $($aadManagersGroup.PrimarySmtpAddress)}
-                #If we didn;t find it, we need to add it like this:
-                if(!$managersSpoObject){$managersSpoObject = New-PnPUser -LoginName $($aadManagersGroup.PrimarySmtpAddress)}
-                #Add the Managers group as a Site Collection Administrator
-                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $($managersSpoObject.LoginName)"}
-                Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners $managersSpoObject.LoginName
-                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners 'kimblebot@anthesisgroup.com'"}
-                Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Owners "kimblebot@anthesisgroup.com"
-                }
-
-            #Check the Site Collection Administrators
-            $siteCollectionAdmins = Get-PnPSiteCollectionAdmin
-            if($aadMembersGroup){
-                $siteCollectionAdmins | ? {$_.Email -eq $aadMembersGroup.PrimarySmtpAddress} | % {
-                    #Remove the AAD Members Group from Site Collection admins (if it's there)
-                    if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Remove-PnPSiteCollectionAdmin -Owners $($_.Email)"}
-                    Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
-                    }
-                }
-            if($aadOverallGroup){
-                $siteCollectionAdmins | ? {$_.Email -eq $aadOverallGroup.PrimarySmtpAddress} | % {
-                    #Remove the AAD Members Group from Site Collection admins (if it's there)
-                    if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Remove-PnPSiteCollectionAdmin -Owners $($_.Email)"}
-                    Remove-PnPSiteCollectionAdmin -Owners $_.LoginName
-                    }
-                }
-            if($siteCollectionAdmins.Title -notcontains "Kimble Bot"){Write-Warning "KimbleBot is not a Site Collection Administrator"}
-            if($siteCollectionAdmins.Email -notcontains $managersGroup.Email){
-                if($managersGroup){Write-Warning "$($managersGroup.Title) was not added as a Site Collection Administrator"}
-                }
-
-            #Block all external sharing
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Blocking external Sharing: Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled"}
-            Set-PnPTenantSite -Url $teamSiteAbsoluteUrl -Sharing Disabled
-
-            #Enable the DocID service
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Enabling Document ID Service Feature on Site Collection"}
-            $site = Get-PnPSite
-            $site.Features.Add([guid]"b50e3104-6812-424f-a011-cc90e6327318",$false,[Microsoft.SharePoint.Client.FeatureDefinitionScope]::None)
-            $site.Context.ExecuteQuery()
-                    
-            #Untick Members can share boxes 
-            #***************************************************************************************************************************
-            # Requires temporary elevation to Site Owners Group (assumes Site Collection administrator rights already granted)
-            #***************************************************************************************************************************
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Restricting internal Sharing: (MembersCanShare & AllowMembersEditMembership = `$false)"}
-            Add-PnPUserToGroup -EmailAddress (Get-PnPConnection).PSCredential.UserName -Identity $ownersSpoGroup.Id -SendEmail:$false
-            $thisWeb = Get-PnPWeb -Includes MembersCanShare, AssociatedMemberGroup.AllowMembersEditMembership
-            $thisWeb.MembersCanShare = $false
-            $thisWeb.AssociatedMemberGroup.AllowMembersEditMembership = $false
-            $thisWeb.AssociatedMemberGroup.Update()
-            $thisWeb.Update()
-            $thisWeb.Context.ExecuteQuery()
-            if((Get-PnPConnection).PSCredential.UserName -eq "kimblebot@anthesisgroup.com"){Remove-PnPUserFromGroup -LoginName "i:0#.f|membership|kimblebot@anthesisgroup.com" -Identity $ownersSpoGroup.Id} #Special case for KimbleBot as it (intentionally) doesn't have an E1 license
-            else{#Remove the current user from the Site Owners and Site Collection Admins
-                Remove-PnPUserFromGroup -LoginName (Get-PnPConnection).PSCredential.UserName -Identity $ownersSpoGroup.Id
-                Remove-PnPSiteCollectionAdmin -Owners (Get-PnPConnection).PSCredential.UserName
-                }
-        
-            <#
-            #Break inheritance on Documents folder and prevent Owners from sharing contents
-            $standardDocumentLibrary = Get-PnPList -Includes FirstUniqueAncestorSecurableObject,HasUniqueRoleAssignments -Identity "Shared Documents"
-            #if($standardDocumentLibrary.FirstUniqueAncestorSecurableObject.Id -eq $standardDocumentLibrary.Id){
-            if($standardDocumentLibrary){
-                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Resetting permissions on Documents Library"}
-                $standardDocumentLibrary.ResetRoleInheritance()
-                $standardDocumentLibrary.Update()
-                $standardDocumentLibrary.Context.ExecuteQuery()
-                $standardDocumentLibrary.BreakRoleInheritance($true,$true)
-                $standardDocumentLibrary.Update()
-                $standardDocumentLibrary.Context.ExecuteQuery()
-                Set-PnPListPermission -Identity "Documents" -Group $ownersSpoGroup -AddRole "Edit" -RemoveRole "Full Control"
-                #E-mail Managers to let them know that content had been shared.
-                }
-            #Check whether any items in the Documents have unique permissions on them
-            if ((get-allSpoListsWithItemsWithUniquePermissions -siteAbsoluteUrl $teamSiteAbsoluteUrl -adminCredentials $adminCredentials -verboseLogging $verboseLogging).Title -contains $standardDocumentLibrary.Title){
-                if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Custom permissions found on LIst Items - resetting them"}
-                [array]$itemsWithUniquePermissions = get-allSpoListItemsWithUniquePermissions -pnpList $standardDocumentLibrary -adminCredentials $adminCredentials -verboseLogging $verboseLogging
-                if($itemsWithUniquePermissions){
-                    $itemsWithUniquePermissions | % {
-                        $thisItem = $_
-                        $thisItem.ResetRoleInheritance()
-                        $thisItem.Update()
-                        $thisItem.BreakRoleInheritance($true,$true)
-                        $thisItem.Update()
-                        $thisItem.ResetRoleInheritance()
-                        $thisItem.FieldValues["SharedWithUsers"].SetValue([Microsoft.SharePoint.Client.FieldLookupValue]::new())
-                    
-                        $thisItem.Update()
-                        $thisItem.Context.ExecuteQuery()
-                        #Set-PnPListItemPermission -List $standardDocumentLibrary.Id -Identity $thisItem.Id -InheritPermissions
-                        }
-                    $itemsWithUniquePermissions[0].Context.ExecuteQuery()
-                    report-itemsWithUniquePermissions -pnpListItems $itemsWithUniquePermissions -permissionsHaveBeenReset $true -verboseLogging $verboseLogging
-                    }
-                }
-                #>
-            if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "All finished"}
-            }
-        else{Write-Error "Could not connect to Site"}
+    Write-Verbose "Finally, remove any owner/memberships we've temporarily granted ourselves"
+    if($requiresTemporaryAdminRights){
+        Remove-PnPSiteCollectionAdmin -Owners $($pnpCreds.UserName)
         }
     }
 function test-pnpConnectionMatchesResource(){

@@ -73,6 +73,47 @@ function add-kimbleAccountToFocalPointCache{
         $result
         }
     }
+function add-kimbleAccountMigrationDataToFocalPointCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$kimbleAccount 
+
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "add-kimbleAccountToFocalPointCache [$($kimbleAccount.Name)]"
+    $sql = "SELECT Id FROM SUS_Kimble_Accounts_MigrationData WHERE Id = '$($kimbleAccount.Id)'"
+    Write-Verbose "`t$sql"
+    $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    if ($alreadyPresent){
+        Write-Verbose "`tId [$($kimbleAccount.Id)] already present in Cache, not adding duplicate"
+        -1 #Return "unsuccessful" as the record is in the DB, but we didn't add it and this might need investigating
+        }
+    else{
+        Write-Verbose "`tId [$($kimbleAccount.Id)] not present in SQL, adding to [SUS_Kimble_Accounts_MigrationData]"
+        $sql = "INSERT INTO SUS_Kimble_Accounts_MigrationData (Id,GenericEmail,GenericPhone,ParentId,CurrencyType,Terms,VatNumber,ShippingStreet,ShippingCity,ShippingState,ShippingPostalCode,ShippingCountry,Locale) VALUES ("
+        $sql += $(sanitise-forSqlValue -value $kimbleAccount.Id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Generic_email_address__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.Phone -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.ParentId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.CurrencyIsoCode -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.KimbleOne__InvoicePaymentTermDays__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.KimbleOne__TaxCodeReference__c -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.ShippingStreet -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.ShippingCity -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.ShippingState -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.ShippingPostalCode -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.ShippingCountry -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $kimbleAccount.KimbleOne__Locale__c -dataType String)
+        $sql += ")"
+        Write-Verbose "`t$sql"
+        $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
+        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+        else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+        $result
+        }
+    }
 function add-kimbleContactToFocalPointCache($kimbleContact, $dbConnection, $verboseLogging){
     if($verboseLogging){Write-Host -ForegroundColor Yellow "add-kimbleAccountToFocalPointCache"}
     $sql = "SELECT Name,Id FROM SUS_Kimble_Contacts WHERE Id = '$($kimbleContact.Id)'"
