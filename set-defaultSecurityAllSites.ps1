@@ -16,6 +16,22 @@ if($PSCommandPath){
 Import-Module SharePointPnPPowerShellOnline
 Import-Module _PNP_Library_SPO
 
+$teamBotDetails = Import-Csv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$resource = "https://graph.microsoft.com"
+$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
+$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
+$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
+$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
+
+$ReqTokenBody = @{
+    Grant_Type    = "client_credentials"
+    Scope         = "https://graph.microsoft.com/.default"
+    client_Id     = $clientID
+    Client_Secret = $secret
+    } 
+$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+
+
 $groupAdmin = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString ""
 $groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
@@ -30,25 +46,19 @@ connect-ToExo -credential $exoCreds
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $sharePointCreds
 
 $allUnifiedGroups = Get-UnifiedGroup
-
 $excludeThese = @("https://anthesisllc.sharepoint.com/teams/Energy_%26_Carbon_Consulting_Analysts_%26_Software_ECCAST_Community_","https://anthesisllc.sharepoint.com/sites/AccountsPayable","https://anthesisllc.sharepoint.com/sites/anthesisnorthamerica","https://anthesisllc.sharepoint.com/sites/apparel","https://anthesisllc.sharepoint.com/sites/bdcontacts42","https://anthesisllc.sharepoint.com/teams/BusinessDevelopmentTeam-GBR-","https://anthesisllc.sharepoint.com/teams/PreSalesTeam","https://anthesisllc.sharepoint.com/teams/teamstestingteam","https://anthesisllc.sharepoint.com/sites/sparke","https://anthesisllc.sharepoint.com/sites/supplychainsym")
 
-$groupsToProcess = $allUnifiedGroups | ? {$excludeThese -notcontains $_.SharePointSiteUrl -and $_.Displayname -notmatch "Confidential" -and $_.CustomAttribute7 -ne "External"}
+$groupsToProcess = $allUnifiedGroups | ? {$excludeThese -notcontains $_.SharePointSiteUrl -and $_.Displayname -notmatch "Confidential"}
 $groupsToProcess | % {
-    $thisTeamSite = $_
-    #Write-Host $thisTeamSite.Url
-    if([string]::IsNullOrWhiteSpace($thisTeamSite.SharePointSiteUrl)){
-        Write-Verbose "Site [$($thisTeamSite.DisplayName)] is not provisioned yet. having a pop at it, but don't hold your breath."
-        #$web = Invoke-WebRequest -Uri "https://outlook.office365.com/owa/$($thisTeamSite.PrimarySmtpAddress)/groupsubscription.ashx?realm=anthesisgroup.com&source=WelcomeEmail&action=files" -Credential $sharePointCreds -SessionVariable thisSession
-        #$web2 = Invoke-WebRequest -Uri "https://anthesisllc.sharepoint.com/_layouts/15/groupstatus.aspx?id=$($thisTeamSite.ExternalDirectoryObjectId)&target=documents" -Credential $sharePointCreds -SessionVariable thisSession -Method Get
-        #$web3 = Invoke-WebRequest -Uri "https://anthesisllc.sharepoint.com/_layouts/15/groupstatus.aspx?id=$($thisTeamSite.ExternalDirectoryObjectId)&target=documents" -Credential $sharePointCreds -SessionVariable $thisSession
+    $thisUnifiedGroup = $_
+    #Write-Host $thisUnifiedGroup.Url
+    if([string]::IsNullOrWhiteSpace($thisUnifiedGroup.SharePointSiteUrl)){
+        Write-Verbose "Site [$($thisUnifiedGroup.DisplayName)] is not provisioned yet..."
         }
     else{
-        Write-Verbose "Setting security defaults for [$($thisTeamSite.DisplayName)]"
-        Set-PnPTenantSite -Url $thisTeamSite.SharePointSiteUrl -Owners $((Get-PnPConnection).PSCredential.UserName)
-        Connect-PnPOnline -Url $thisTeamSite.SharePointSiteUrl -Credentials $sharePointCreds
-        set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisTeamSite.SharePointSiteUrl -fullArrayOfUnifiedGroups $allUnifiedGroups -Verbose
+        #set-standardTeamSitePermissions -teamSiteAbsoluteUrl $thisUnifiedGroup.SharePointSiteUrl -fullArrayOfUnifiedGroups $allUnifiedGroups -Verbose
+        Write-Verbose ""
+        set-standardSitePermissions -unifiedGroupObject $thisUnifiedGroup -tokenResponse $tokenResponse -pnpCreds $sharePointCreds -Verbose
         }
     }
-
 

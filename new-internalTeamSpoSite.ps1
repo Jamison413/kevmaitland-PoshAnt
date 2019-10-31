@@ -17,10 +17,10 @@ $ReqTokenBody = @{
 $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
 
 
-$displayName = "Diversity & Inclusivity (All)"
-$managers = convertTo-arrayOfEmailAddresses ("") | sort | select -Unique
+$displayName = "Diversity & Inclusivity (Global Steering)"
+$managers = convertTo-arrayOfEmailAddresses ("fiona.place@anthesisgroup.com, verity.worthington@anthesisgroup.com") | sort | select -Unique
 $members = @()
-$members += convertTo-arrayOfEmailAddresses ("Diversity_&_Inclusivity_GBR_-_365_Mirror@anthesisgroup.com") | sort | select -Unique
+$members += convertTo-arrayOfEmailAddresses ("Paul.Crewe@anthesisgroup.com,Emma.Armstrong@anthesisgroup.com,Saga.Ekelin@anthesisgroup.com,Candan.Ergeneman@anthesisgroup.com,Merce.Autonell@anthesisgroup.com,Fiona.Place@anthesisgroup.com,Verity.Worthington@anthesisgroup.com") | sort | select -Unique
 $members | % {
     $thisEmail = $_
     try{
@@ -33,7 +33,7 @@ $members | % {
     catch{<# Anything that isn't an e-mail address for a Distribution Group will cause errors here, and we don't really care about them #>}
     }
 $members = $members | Sort-Object | select -Unique
-$managedBy = "AAD"
+$managedBy = "365"
 
 if($managedBy -eq "AAD"){$managers = "groupbot@anthesisgroup.com"}
 new-teamGroup -displayName $displayName -managerUpns $managers -teamMemberUpns $members -membershipManagedBy $managedBy -tokenResponse $tokenResponse -pnpCreds $365creds -alsoCreateTeam $false -Verbose
