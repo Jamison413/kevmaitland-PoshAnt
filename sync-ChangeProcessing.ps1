@@ -16,10 +16,15 @@ Import-Module _PNP_Library_SPO
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
+$credential = Import-CliXml -Path 'C:\Users\Emily.Pressey\Desktop\JScred'
 
 
+<#--------------Connect to Jira--------------#>
+
+Set-JiraConfigServer 'https://anthesisit.atlassian.net'
+New-JiraSession -Credential $credential
 
 
 #######################################################################################
@@ -45,7 +50,7 @@ $List = "New Starter Details"
 Connect-PnPOnline -Credentials $adminCreds -Url $SiteURL
 $context = Get-PnPContext
 
-
+$task = "test"
 #Get all the items
 $AllNewStartersitems = Get-PnPListItem -List $List
 
@@ -74,12 +79,22 @@ ForEach($Item in $AllNewStartersitems){
             "Starting Office" = $($Item.FieldValues.Starting_x0020_Office0.Label);
             }
 
+            #Set the fields for Jira Tickets
+            $fields = @{
+                customfield_10045 = @{
+                value = "Bristol"
+                }
+
+                
+            }
+
             $NewStarterHTML = $NewStarterInformation | ConvertTo-Html -Property "Employee Preferred Name","Start Date","Job Title","Line Manager","Primary Team","Community","Business Unit","Starting Office" -Head "<style>table, th, td {border: 1px solid;border-collapse: collapse ;padding: 5px;text-align: left;}</style>"
 
             $htmlfriendlytitle = $List -replace " ",'%20'
             $StarterItemLink = $SiteURL + "/Lists" + "/$($htmlfriendlytitle)" +  "/DispForm.aspx?" + "ID=$($Item.FieldValues.ID)"
 
             #Send an email to People Services and IT to notify of the change and to make the change 
+
             $subject = "New Starters Update: A New Starter has been Added!"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services & IT Teams,`r`n`r`n<BR><BR>"
             $body += "You're receiving this email as someone has added a New Starter to the New Starters List; a new entry will be added to the New Starters, Changers and Leavers Shared Calendar. Here is some information about them:`r`n`r`n<BR><BR>"
@@ -95,6 +110,17 @@ ForEach($Item in $AllNewStartersitems){
             Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"PowershellTrigger" = "0"}
+
+            #We will also try to make a Jira task for the IT Team
+            Try{ $newissue = New-JiraIssue -Project ITC -IssueType 'Task' -Summary "External site Request: $($task)" -Fields $fields}
+            Catch{
+            write-host "Woops, something went wrong creating a Jira Tsk for this new starter" -ForegroundColor Yellow
+            }
+
+            }
+
+
+
             }
             Else{
             
@@ -104,6 +130,7 @@ ForEach($Item in $AllNewStartersitems){
 
 
 }
+
 
 
 <#--------------Start Date Change Processing---------------#>
