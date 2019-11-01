@@ -129,6 +129,7 @@ If("1" -eq $Item.FieldValues.PowershellTrigger){
                     $newissue = New-JiraIssue -Project ITC -IssueType 'Service Request' -Summary "New Starter Request: $($Item.FieldValues.Employee_x0020_Preferred_x0020_N)" -Description $($StarterItemLink) -Fields $fields
 
             If($newissue){
+            Write-Host "Success! Jira ticket created:`$($newissue)"
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"JiraTaskCreated" = "0"}
                          }
             Else{
@@ -139,7 +140,7 @@ If("1" -eq $Item.FieldValues.PowershellTrigger){
 
 }
 Else{
-write-host "Looks like there are no new starters" -ForegroundColor Yellow
+write-host "$($Item.FieldValues.Employee_x0020_Preferred_x0020_N): Looks like I'm not a new starter" -ForegroundColor Yellow
 }
 }
 
@@ -287,7 +288,7 @@ ForEach($Item in $AllLeaversitems){
                     $newissue = New-JiraIssue -Project ITC -IssueType 'Service Request' -Summary "Leaver Request: $($Item.FieldValues.Employee_x0020_Name.LookupValue)" -Description "Proposed Leaving Date: $($Item.FieldValues.Proposed_x0020_Leaving_x0020_Dat)` $($LeaverItemLink)" -Fields $fields
 
             If($newissue){
-            Write-Host "Success! Jira ticket created"
+            Write-Host "Success! Jira ticket created:`$($newissue)"
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"JiraTaskCreated" = "0"}
                          }
             Else{
@@ -297,7 +298,7 @@ ForEach($Item in $AllLeaversitems){
 
 
 Else{
-write-host "Looks like there are no new leavers" -ForegroundColor Yellow
+write-host "$($Item.FieldValues.Employee_x0020_Name.LookupValue): Looks like I'm not a new Leaver" -ForegroundColor Yellow
 }
 
 }
@@ -414,7 +415,7 @@ ForEach($item in $AllChangersitems){
 
 #Set Variables to connect to Sharepoint - People Services (All) and Notify Internal Teams of a Leaver
 $SiteURL = "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365"
-$List = "Notify of Maternity / Paternity Leave"
+$List = "Notify of Maternity and Paternity Leave"
 
 #Connect to Sharepoint
 Connect-PnPOnline -Credentials $adminCreds -Url $SiteURL
@@ -422,48 +423,96 @@ $context = Get-PnPContext
 
 
 #Get all the items
-$AllMatPatitems = Get-PnPListItem -List $List
+$AllMatPatItems = Get-PnPListItem -List $List
 
-<#
+ForEach($Item in $AllMatPatItems){
+
         #Format the relevant fields - Sharepoint gets confused with DateTime
-        [datetime]$startdateformat = $($Item.FieldValues.StartDate)
+        [datetime]$Leavedateformat = $($Item.FieldValues.Proposed_x0020_Leaving_x0020_Dat)
+        [datetime]$LastLeavedateformat = $($Item.FieldValues.Last_Proposed_x0020_Leaving_x002)
+        [datetime]$Returndateformat = $($Item.FieldValues.Proposed_x0020_Return_x0020_Date)
+        [datetime]$LastReturndateformat = $($Item.FieldValues.Last_Proposed_x0020_Return_x0020)
+
+        $htmlfriendlytitle = $List -replace " ",'%20'
+        $htmlfriendlytitle2 = $htmlfriendlytitle -replace "and",''
+        $MatPatLink = $SiteURL + "/Lists" + "/$($htmlfriendlytitle2)" +  "/DispForm.aspx?" + "ID=$($item.FieldValues.ID)"
+
         
-        #If there is no Last Start Date, then set the Last Start Date to the same as the current Start Date and then skip over this iteration onto the next element.
-        If(!$Item.FieldValues.Last_StartDate){
-            Set-PnPListItem -List $List -Identity $item.ID -Values @{"Last_StartDate" = "$startdateformat"}
+<#--------------------------Check Leave Date and Process--------------------------#>
+
+        #If there is no Last Leave Date, then set the Last Leave Date to the same as the current Leave Date and then skip over this iteration onto the next element.
+        If(!$Item.FieldValues.Last_Proposed_x0020_Leaving_x002){
+            Set-PnPListItem -List $List -Identity $item.ID -Values @{"Last_Proposed_x0020_Leaving_x002" = "$Leavedateformat"}
             Continue
             }
         Else{
-        #If there is a Last Start Date then compare the two and see if it is different, because this implies that the Start Date has changed.
-            [string]$Startdate = $Item.FieldValues.StartDate
-            [string]$Last_StartDate = $Item.FieldValues.Last_StartDate
-            $Startdatecomparison = (Compare-Object -ReferenceObject $Startdate -DifferenceObject $Last_StartDate)
+        #If there is a Last Leave Date then compare the two and see if it is different, because this implies that the Start Date has changed.
+            $Leavedatecomparison = (Compare-Object -ReferenceObject $Leavedateformat -DifferenceObject $LastLeavedateformat)
             }        
         #Check if there is a difference, if there $startdate variable is null, there is no change, if there is something in there, then looks like there must be a change. Set the Last start Date to the Current Start Date and amend the FlowTrigger to set of the Calendar Management Flow.
-        If($Startdatecomparison){
-        Write-host "There has been a change to the Start Date: '$($Item.FieldValues.Employee_x0020_Preferred_x0020_N)'" -ForegroundColor Yellow
+        If($Leavedatecomparison){
+        Write-host "There has been a change to the Mat/Pat Leave Date: '$($Item.FieldValues.Employee_x0020_Name.LookupValue)'" -ForegroundColor Yellow
 
         #Send email letting people know
-                    $subject = "New Starters Update: The Start Date for $($Item.FieldValues.Employee_x0020_Preferred_x0020_N) has been changed!"
+                    $subject = "Maternity / Paternity Update: The Leave Date for $($Item.FieldValues.Employee_x0020_Name.LookupValue) has been changed!"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services & IT Teams,`r`n`r`n<BR><BR>"
-            $body += "You're receiving this email as someone has changed the Start Date for a New Starter. We'll try to update the calendar entry in the New Starters and Leavers shared calendar.`r`n`r`n<BR><BR>"
-            $body += "$($Item.FieldValues.Employee_x0020_Preferred_x0020_N): From $($Item.FieldValues.Last_StartDate) to $($Item.FieldValues.StartDate).`r`n`r`n<BR><BR>"
-            $body += "You can see more information about the New Starter here: $($StarterItemLink)`r`n`r`n<BR><BR><BR><BR>"
+            $body += "You're receiving this email as someone has changed the Leave Date for an employee going on Maternity or Paternity Leave. We'll try to update the calendar entry in the New Starters and Leavers shared calendar.`r`n`r`n<BR><BR>"
+            $body += "$($Item.FieldValues.Employee_x0020_Name.LookupValue): From $($Item.FieldValues.Last_Proposed_x0020_Leaving_x002) to $($Item.FieldValues.Proposed_x0020_Leaving_x0020_Dat).`r`n`r`n<BR><BR>"
+            $body += "You can see more information about this leave here: $($MatPatLink)`r`n`r`n<BR><BR><BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
 
-            Send-MailMessage -To "IT_Team_GBR_365@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-            Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-            Send-MailMessage -To "elle.wright@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-            Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
-            Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "IT_Team_GBR_365@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "elle.wright@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             
             
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"PowershellTrigger" = "0"}
-            Set-PnPListItem -List $List -Identity $item.ID -Values @{"Last_StartDate" = "$startdateformat"}
+            Set-PnPListItem -List $List -Identity $item.ID -Values @{"Last_Proposed_x0020_Leaving_x002" = "$Leavedateformat"}
             Set-PnPListItem -List $List -Identity $item.ID -Values @{"FlowTrigger" = "Change"}
          }
 
 
-         #>
+<#--------------------------Check Return Date and Process--------------------------#>
+
+        #If there is no Last return Date, then set the Last Return Date to the same as the current Return Date and then skip over this iteration onto the next element.
+        If(!$Item.FieldValues.Last_Proposed_x0020_Return_x0020){
+            Set-PnPListItem -List $List -Identity $item.ID -Values @{"Last_Proposed_x0020_Return_x0020" = "$Returndateformat"}
+            Continue
+            }
+        Else{
+        #If there is a Last Leave Date then compare the two and see if it is different, because this implies that the Start Date has changed.
+            $Returndatecomparison = (Compare-Object -ReferenceObject $Returndateformat -DifferenceObject $LastReturndateformat)
+            }        
+        #Check if there is a difference, if there $startdate variable is null, there is no change, if there is something in there, then looks like there must be a change. Set the Last start Date to the Current Start Date and amend the FlowTrigger to set of the Calendar Management Flow.
+        If($Returndatecomparison){
+        Write-host "There has been a change to the Mat/Pat Return Date: '$($Item.FieldValues.Employee_x0020_Name.LookupValue)'" -ForegroundColor Yellow
+
+        #Send email letting people know
+                    $subject = "Maternity / Paternity Update: The Return Date for $($Item.FieldValues.Employee_x0020_Name.LookupValue) has been changed!"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services & IT Teams,`r`n`r`n<BR><BR>"
+            $body += "You're receiving this email as someone has changed the Return Date for an employee returning from Maternity or Paternity Leave. We'll try to update the calendar entry in the New Starters and Leavers shared calendar.`r`n`r`n<BR><BR>"
+            $body += "$($Item.FieldValues.Employee_x0020_Name.LookupValue): From $($Item.FieldValues.Last_Proposed_x0020_Return_x0020) to $($Item.FieldValues.Proposed_x0020_Return_x0020_Date).`r`n`r`n<BR><BR>"
+            $body += "You can see more information about this leave here: $($MatPatLink)`r`n`r`n<BR><BR><BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+
+            #Send-MailMessage -To "IT_Team_GBR_365@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "elle.wright@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            #Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+            
+            
+            Set-PnPListItem -List $List -Identity $Item.ID -Values @{"PowershellTrigger" = "0"}
+            Set-PnPListItem -List $List -Identity $item.ID -Values @{"Last_Proposed_x0020_Return_x0020" = "$Returndateformat"}
+            Set-PnPListItem -List $List -Identity $item.ID -Values @{"FlowTrigger" = "Change"}
+         }
+
+
+
+}
