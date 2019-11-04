@@ -29,6 +29,13 @@ else{
     }
 connect-ToMsol -Credential $adminCreds
 
+
+#########################################
+#                                       #
+#             Enable MFA                #
+#                                       #
+#########################################
+
 #Create an empty StrongAuthenticationRequirement object
 $emptyAuthObject = New-Object -TypeName Microsoft.Online.Administration.StrongAuthenticationRequirement
 $emptyAuthObject.RelyingParty = "*"
@@ -54,12 +61,115 @@ $upnsToEnable | % {
     else{Write-Verbose "MFA already [$($thisUser.StrongAuthenticationRequirements.State)] for $_"}
     Add-MsolGroupMember -GroupObjectId $ssprGroupObjectId -GroupMemberType User -GroupMemberObjectId $thisUser.ObjectId
     }
-
 Stop-Transcript
 
 
 
-#To check enabled# 
+#########################################
+#                                       #
+#             Disable MFA               #
+#                                       #
+#########################################
 
-$Name = Get-MsolUser -UserPrincipalName xxxx.xxxx@anthesisgroup.com
-$Name.StrongAuthenticationRequirements.state 
+
+#As long as the StrongAuthenticationRequirements is empty, it is disabled, click through form "More information needed" on login and press "Skip Setup" in the bottom right corner of the MFA screen.
+
+
+$upnsToDisable = convertTo-arrayOfEmailAddresses $upnsString
+
+$upnsToDisable | % {
+    $thisUser = Get-MsolUser -UserPrincipalName $upnsToDisable
+    Set-MsolUser -UserPrincipalName $thisUser.UserPrincipalName -StrongAuthenticationRequirements @()
+    $thisUser = Get-MsolUser -UserPrincipalName $upnsToDisable
+    $thisUser | Format-List | select -Property StrongAuthenticationRequirements #if blank it is successful
+
+}
+Stop-Transcript
+
+
+
+
+
+
+
+<#
+$disabledUsers | % {
+    $thisUser = $_
+    Write-Host -ForegroundColor DarkYellow "MFA is currently set to [$($thisUser.StrongAuthenticationRequirements.State)] for [$($thisUser.DisplayName)]"
+    if([string]::IsNullOrWhiteSpace($thisUser.StrongAuthenticationRequirements)){
+        Write-Host -ForegroundColor Yellow "Enabling MFA for [$($thisUser.DisplayName)]"
+        Set-MsolUser -UserPrincipalName $thisUser.UserPrincipalName -StrongAuthenticationRequirements $auth
+        }
+    else{Write-Host -ForegroundColor DarkYellow "MFA already $($thisUser.StrongAuthenticationRequirements.State) for [$($thisUser.DisplayName)]"}
+    
+    }
+  
+<#
+Get-MsolUser -UserPrincipalName ben.lynch@anthesisgroup.com | fl
+$allUsers = Get-MsolUser -all 
+$allUsers | ? {$_.StrongAuthenticationRequirements -ne $null -and $_.StrongAuthenticationUserDetails -eq $null}
+$allUsers | ? {$_.DisplayName -match "Greg Francis"} | fl
+$allUsers[0]
+
+
+$users | % {
+    Add-DistributionGroupMember -Identity GuineapigsSpamExperimentalGroup@anthesisgroup.com -Member "Rebecca Hughes"
+    }
+
+
+
+
+
+
+$allUsers = Get-MsolUser -all 
+$msolg = Get-MsolGroup -All 
+$msolg | ? {$_.DisplayName -notmatch "∂" }| % {
+    $thisGroup = $_
+    $members = Get-MsolGroupMember -GroupObjectId $thisGroup.ObjectId
+    $members | ? {$_.GroupMemberType -eq "User"} | %{
+        $thisMember = $_
+        if($($allUsers | ? {$_.userprincipalname -eq $thisMember.EmailAddress}).IsLicensed){
+            $detailObject = New-Object psobject -Property @{
+                "DisplayName" = $thisMember.DisplayName;
+                "Email" = $thisMember.EmailAddress;
+                "Group" = $thisGroup.DisplayName
+                "GroupType" = $thisGroup.GroupType
+                "MfaStatus" = $($allUsers | ? {$_.userprincipalname -eq $thisMember.EmailAddress}).StrongAuthenticationRequirements.State
+                "MfaOptions" =  $($allUsers | ? {$_.userprincipalname -eq $thisMember.EmailAddress}).StrongAuthenticationUserDetails
+                }
+            [array]$mfaDetails += $detailObject
+            }
+        }
+    }
+
+$mfaDetails | Export-Csv  $env:USERPROFILE\Desktop\MfaStatus_$(Get-Date -Format "yyMMdd").csv -NoTypeInformation
+
+
+get-help Set-MailboxAutoReplyConfiguration -Detailed
+Set-MailboxAutoReplyConfiguration -Identity Shared_Mailbox_Bodge_-_Finance_Team_GBR_-_Energy -AutoReplyState enabled -ExternalMessage "Thank you for your email.
+The Finance Department will process any invoices and respond to any enquires within 2-3 working days.
+Our company name has changed to Anthesis Energy UK Ltd and our email addresses have changed as well. Please update your records.
+Invoices to be sent to energyinvoices@anthesisgroup.com
+Remittances advices to energyremittances@anthesisgroup.com
+Enquiries and statements to energyfinance@anthesisgroup.com
+If you have any queries then please contact kath.addison-scott@anthesisgroup.com or greg.francis@anthesisgroup.com
+
+Kind Regards,
+Anthesis  Energy UK's AutoReply Robot"
+
+
+
+
+$gb = Get-MsolUser -all | ?{($_.Country -eq "United Kingdom" -or $_.UsageLocation -eq "GB") -and $_.IsLicensed -eq $true}
+
+
+$gb | %{
+    Write-Host $_.DisplayName`t $_.UserPrincipalName`t$_.Country`t$_.UsageLocation`t $_.StrongAuthenticationRequirements[0].State`t $($_.StrongAuthenticationMethods | ?{$_.IsDefault}).MethodType
+    }
+
+Get-MsolUser -all | ? {$_.IsLicensed -eq $true} | %{
+    Write-Host $_.DisplayName`t$($_.UserPrincipalName)`t$($_.Country)`t$($_.UsageLocation)`t $_.StrongAuthenticationRequirements[0].State`t $($_.StrongAuthenticationMethods | ?{$_.IsDefault}).MethodType
+    }
+#>
+
+
