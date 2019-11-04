@@ -426,8 +426,8 @@ function new-365Group(){
         $365Group = Get-UnifiedGroup $365Group.ExternalDirectoryObjectId
         
         if(!$sharedMailbox){
-            Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $mailboxAlias -ErrorAction Continue -WhatIf:$WhatIfPreference "
-            try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -ErrorAction Stop -WhatIf:$WhatIfPreference}
+            Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -ErrorAction Continue -WhatIf:$WhatIfPreference "
+            try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $(guess-aliasFromDisplayName $sharedMailboxDisplayName) -ErrorAction Stop -WhatIf:$WhatIfPreference}
             catch{
                 if($_.Exception.Message -match "is already being used by the proxy addresses or LegacyExchangeDN. Please choose another proxy address."){ #Shit, but it returns generic HResult -2146233087, which is even less help.
                     Write-Warning $_.Exception.Message
@@ -497,65 +497,6 @@ function new-365Group(){
     #>
     $365Group
 
-    }
-function new-externalGroup(){
-    [CmdletBinding(SupportsShouldProcess=$true)]
-    param(
-        [Parameter(Mandatory=$true)]
-            [string]$displayName
-        ,[Parameter(Mandatory=$false)]
-            [string]$description
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$managerUpns
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$teamMemberUpns
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$memberOf
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$additionalEmailAddresses
-        ,[Parameter(Mandatory=$true)]
-            [string]$membershipManagedBy
-        ,[Parameter(Mandatory=$true)]
-            [PSCustomObject]$tokenResponse
-        ,[Parameter(Mandatory=$true)]
-            [bool]$alsoCreateTeam = $false
-        ,[Parameter(Mandatory=$true)]
-            [PSCredential]$pnpCreds
-        )
-    Write-Verbose "new-externalGroup($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $additionalEmailAddress, $membershipManagedBy)"
-    $hideFromGal = $false
-    $blockExternalMail = $false
-    $accessType = "Private"
-    $autoSubscribe = $true
-    $groupClassification = "External"
-
-    if($managerUpns -notcontains ((Get-PnPConnection).PSCredential.UserName)){
-        $addExecutingUserAsTemporaryAdmin = $true
-        [array]$managerUpns += ((Get-PnPConnection).PSCredential.UserName)
-        }
-
-    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $pnpCreds
-    Connect-PnPOnline -AccessToken $tokenResponse.access_token
-    Write-Verbose "`$newTeam = Get-PnPUnifiedGroup -Identity [$displayName]"
-    $newPnpTeam = Get-PnPUnifiedGroup -Identity $displayName
-    
-    #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
-    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
-    test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
-    if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
-        Write-Verbose "Setting Homepage"
-        Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
-        }
-    Write-Verbose "Setting Hub Site association"
-    Add-PnPHubSiteAssociation -Site $newPnpTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub" | Out-Null
-    Write-Verbose "Opening in browser"
-    start-Process $newPnpTeam.SiteUrl
-    if($addExecutingUserAsTemporaryAdmin){
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-DistributionGroupMember -Identity $newTeam.CustomAttribute2 -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
-        }
-    $newPnpTeam
     }
 function new-mailEnabledSecurityGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]
