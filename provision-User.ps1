@@ -141,18 +141,22 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     Write-Host -ForegroundColor DarkYellow "`tPrimaryOffice: $pPrimaryOffice"
     switch($pPrimaryOffice){
         "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers")}
-        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)"}
-        "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)"}
-        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
-        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
-        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
-        "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)"}
-        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)"}
-        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
-        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
-        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)"}
-        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)"}
-        "Stockholm, SWE" {$streetAddress = "Barnhusgatan 4";$postalCode="SE-111 23";$country="Sweden";$usageLocation="SE";$group = "All (SWE)"}
+        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)";$timezoneID = "2"}
+        "London, GBR" {$streetAddress = "Unit J, Taper Studios, 175 Long Lane";$postalCode="SE1 4GT";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)";$timezoneID = "2"}
+        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)";$timezoneID = "2"}
+        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)";$timezoneID = "2"}
+        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)";$timezoneID = "2"}
+        "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)";$timezoneID = "24"}
+        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)";$timezoneID = "21"}
+        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All (DEU)";$timezoneID = "4"}
+        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All (DEU)";$timezoneID = "4"}
+        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)";$timezoneID = "12"}
+        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)";$timezoneID = "13"}
+        "Stockholm, SWE" {$streetAddress = "Barnhusgatan 4";$postalCode="SE-111 23";$country="Sweden";$usageLocation="SE";$group = "All (SWE)";$timezoneID = "4"}
+        "Barcelona, ESP" {$streetAddress = "Rbla. Catalunya, 6, 2a planta";$postalCode="08007";$country="Spain";$usageLocation="ES";$group = "All Barcelona (ESP)";$timezoneID = "3"}
+        "Manlleu, ESP" {$streetAddress = "Av. de Roma, 254";$postalCode="08560";$country="Spain";$usageLocation="ES";$group = "All Manlleu (ESP)";$timezoneID = "3"}
+        "Madrid, ESP" {$streetAddress = "Calle Gran Vía, 63";$postalCode="28013";$country="Spain";$usageLocation="ES";$group = "All Madrid (ESP)";$timezoneID = "3"}
+        "Bogota, COL" {$streetAddress = "Calle 73 # 7-31 Of. 303";$postalCode="";$country="Columbia";$usageLocation="CO";$group = "All Bogota (COL)";$timezoneID = "35"}
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
         }
     Write-Host -ForegroundColor DarkYellow "`tUsername:`t`t`t$($pUPN.Split("@")[0])@anthesisgroup.com"
