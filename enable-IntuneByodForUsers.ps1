@@ -14,7 +14,7 @@ $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 Connect-AzureAD -Credential $adminCreds
 connect-ToExo -credential $adminCreds
 
-$usersToEnable = convertTo-arrayOfEmailAddresses "Jake.Cowan@anthesisgroup.com, Charlotte.Moss@anthesisgroup.com"
+$usersToEnable = convertTo-arrayOfEmailAddresses "Adriana.Quintero@anthesisgroup.com, Alexandre.Lemille@anthesisgroup.com"
 #$usersToEnable = Get-DistributionGroupMember "All Bristol (GBR)" | % {$_.WindowsLiveID}
 $mdmByodDistributionGroup = get-mdmByodDistributionGroup -fullLogFile $fullLogPathAndName -errorLogFile $errorLogPathAndName
 
