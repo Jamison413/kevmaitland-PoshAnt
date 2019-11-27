@@ -304,6 +304,7 @@ $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthe
 #Place new Onboarding folder ID into variable to use next
 $OnboardingfolderID = $response.id
 $ParentFolderID = $CandidateNameResponse.id
+$PSConfidentialDriveID = "b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY"
 
 #Create New Starter Checklist template in the Onboarding folder we created above
 $body = "{
@@ -314,7 +315,7 @@ $body = "{
     `"name`": `"New Starter Checklist.xlsx`",
     `"@microsoft.graph.conflictBehavior`": `"rename`"
 }"
-$body = $body.Replace("b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY","$($ParentFolderID)")#Replace JSON parent folder
+$body = $body.Replace("b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY","$($PSConfidentialDriveID)")#Replace JSON parent folder
 $body = $body.Replace("01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR","$($OnboardingfolderID)")#Replace JSON Onboarding subfolder
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
 $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6/copy" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
@@ -392,6 +393,7 @@ catch{
 #$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
 #$response.value
 
+#Shared Documents doclib
 #b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY
 
 #$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/root/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
@@ -453,3 +455,4 @@ $response.value = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites
 #Documentation is using Patch method instead, tried this and results in "The parameter parentReference does not exist in method getByIdThenPath."
 #Someone worked around this by using 
 #>
+
