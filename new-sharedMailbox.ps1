@@ -3,10 +3,10 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "iRobot PEC"
-$primaryEmail = "irobot.pec@anthesisgroup.com"
-$owner = "kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses (enumerate-nestedDistributionGroups -distributionGroupObject $dg).WindowsLiveID
+$displayName = "Vastum"
+$primaryEmail = "Vastum@anthesisgroup.com"
+$owner = "emily.pressey@anthesisgroup.com"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses ""#(enumerate-nestedDistributionGroups -distributionGroupObject $dg).WindowsLiveID
 $grantSendAsToo = $true
 $hideFromGal = $false
 
