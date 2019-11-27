@@ -19,7 +19,7 @@ Function Get-CurrentLine {
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 
 
@@ -301,6 +301,23 @@ $body = "{
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
 $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 
+#Place new Onboarding folder ID into variable to use next
+$OnboardingfolderID = $response.id
+$ParentFolderID = $CandidateNameResponse.id
+
+#Create New Starter Checklist template in the Onboarding folder we created above
+$body = "{
+    `"parentReference`": {
+        `"driveId`": `"b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY`",
+        `"id`": `"01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR`"
+         },
+    `"name`": `"New Starter Checklist.xlsx`",
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = $body.Replace("b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY","$($ParentFolderID)")#Replace JSON parent folder
+$body = $body.Replace("01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR","$($OnboardingfolderID)")#Replace JSON Onboarding subfolder
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6/copy" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 
 
 #Subfolder 2. Lifecycle
@@ -340,10 +357,26 @@ catch{
 }
 
 
+#Other working out stuff I don't want to delete just yet - please excuse the mess!
+
 #$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUNWN7IAV3SML5EYVWC6XIAWAJPF/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
 #$response.value.Name
 
-#AUK Employee Folders = 01LLWAYUOPYQEQ4RYWDJGZ2MPQ6QENEXEN
+#$response.value = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/efabaf43-a7ba-4d45-a4d6-cdbeb7f93cd8/items/" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value.Name
+
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/efabaf43-a7ba-4d45-a4d6-cdbeb7f93cd8/items/" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value.Name
+
+
+#Shared Documents = efabaf43-a7ba-4d45-a4d6-cdbeb7f93cd8
+    #AUK Employee Folders = 01LLWAYUOPYQEQ4RYWDJGZ2MPQ6QENEXEN
+        #Current Employees = 01LLWAYUILOIXGORD4QBFYI6MMKVPW4HZI
+            #1. Staff folder template = 01LLWAYUNWN7IAV3SML5EYVWC6XIAWAJPF
+
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUOPYQEQ4RYWDJGZ2MPQ6QENEXEN/children/" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value.Name
+
 
     
     #$Onboardingfoldername = "Shared Documents" + "\" + $folder.'Candidate Name' + "1. Onboarding"
@@ -351,7 +384,72 @@ catch{
 
 
   
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com:/teams/IT_Team_All_365" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#write-host "The ID for $($response.displayname) is $($response.id)"
+
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value
+
+#b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY
+
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/root/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value
+
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value
 
 
 
+
+#This points directly to the file
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+#$response.value
+
+
+#file ID
+#01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6
+
+#Folder ID
+#01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR
    
+
+<#
+$body = "{
+    `"name`": `"1. Onboarding2`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+#$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+
+
+
+
+$body = "{
+    `"parentReference`": {
+        `"driveId`": `"b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY`",
+        `"id`": `"01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR`"
+         },
+    `"name`": `"New Starter Checklist1.xlsx`",
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6/copy" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+$body = "{
+    `"parentReference`": {
+        `"id`": `"01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR`",
+         },
+    `"name`": `"New Starter Checklist`",
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response.value = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR/children/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+#using Post causes "message": "Either 'folder' or 'file' must be provided, but not both.": https://stackoverflow.com/questions/35631616/move-item-doesnt-work-in-ms-graph-api-for-onedrive
+#Documentation is using Patch method instead, tried this and results in "The parameter parentReference does not exist in method getByIdThenPath."
+#Someone worked around this by using 
+#>
