@@ -662,24 +662,52 @@ function get-available365licensecount{
         [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true,ParameterSetName="LicenseType")]
-            [PSObject]$LicenseType
+            [String]$LicenseType
             )
 
-            if(![string]::IsNullOrWhiteSpace($licenseType)){
+            #E1 Licenses
+            if("E1" -eq $LicenseType){
 
               $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
               write-host "E1 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
               If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
-              write-host "There are available E1 licenses!"
+              write-host "There are available E1 licenses!"-ForegroundColor Green
               }
               Else{
-              write-host "There are no available E1 licenses! Please procure one before running the script if you want the licensing to be applied via Powershell"
+              write-host "There are no available E1 licenses!"
               }
-              $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
-              $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+              }
+
+            #E3 Licenses
+            if("E3" -eq $LicenseType){
+
+              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
+              write-host "E3 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
+              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
+              write-host "There are available E3 licenses!" -ForegroundColor Green
+              }
+              Else{
+              write-host "There are no available E3 licenses!"
+              }
+              }
+              
+            #EMS licenses
+             if("EMS" -eq $LicenseType){
+
+              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+              write-host "EMS License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
+              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
+              write-host "There are available EMS licenses!" -ForegroundColor DarkYellow
+              }
+              Else{
+              write-host "There are no available EMS licenses!"
+              }
+              }
+
             }
 
 
-}
 
 #endregion
+
+

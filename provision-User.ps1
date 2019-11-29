@@ -243,10 +243,7 @@ function update-sharePointInitialConfig($pUPN, $csomCreds, $pTimeZone, $p3Letter
     #$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-AltCalendarType", 1)
     #$adminContext.ExecuteQuery()
 
-    $pUPN = "Testing.TimeZone@anthesisgroup.com"
-    $timezoneID = "3"
-    $countryLocale = "1027"
-    $languageCode = "CA-*"
+    
 
     Write-Host "Setting SP timezone"
     Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-RegionalSettings-FollowWeb' -Value "False"
