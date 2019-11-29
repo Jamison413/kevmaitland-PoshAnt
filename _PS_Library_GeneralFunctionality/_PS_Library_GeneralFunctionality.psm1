@@ -658,4 +658,28 @@ function stringify-hashTable($hashtable,$interlimiter,$delimiter){
         $dirty.Substring(0,$dirty.Length-$delimiter.length)
         }
     }
+function get-available365licensecount{
+        [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="LicenseType")]
+            [PSObject]$LicenseType
+            )
+
+            if(![string]::IsNullOrWhiteSpace($licenseType)){
+
+              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
+              write-host "E1 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
+              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
+              write-host "There are available E1 licenses!"
+              }
+              Else{
+              write-host "There are no available E1 licenses! Please procure one before running the script if you want the licensing to be applied via Powershell"
+              }
+              $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
+              $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+            }
+
+
+}
+
 #endregion

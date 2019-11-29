@@ -192,7 +192,11 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN -BypassSecurityGroupManagerCheck}}
     if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
     If(("Anthesis Energy UK Ltd (GBR)" -eq $pBusinessUnit) -or ("Anthesis (UK) Ltd (GBR)" -eq $pBusinessUnit) -or ("Anthesis Consulting Group Ltd (GBR)" -eq $pBusinessUnit)){
+    write-host "I look like I'm in the correct business Unit to be addedd to the MDM BYOD group, however please check that I'm correct!"
     Add-DistributionGroupMember -Identity "b264f337-ef04-432e-a139-3574331a4d18" -Member $pUPN -BypassSecurityGroupManagerCheck #"MDM - BYOD Users", adding GBR only
+    }
+    Else{
+    write-host "I don't look like I'm in the correct business Unit to be addedd to the MDM BYOD group, however please check!"
     }
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
