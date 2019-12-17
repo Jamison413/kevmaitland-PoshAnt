@@ -29,7 +29,7 @@ connect-toAAD -credential $msolCredentials
 $adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 
 #Get the New User Requests that have not been marked as processed
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -Credentials $msolCredentials
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -UseWebLogin #-Credentials $msolCredentials
 $requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
 if($requests){#Display a subset of Properties to help the user identify the correct account(s)
     $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.Start_x0020_Date} -Descending | select {$_.FieldValues.Title},{$_.FieldValues.Start_x0020_Date},{$_.FieldValues.Job_x0020_title},{$_.FieldValues.Primary_x0020_Workplace.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Primary_x0020_Team.LookupValue},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
@@ -141,18 +141,23 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     Write-Host -ForegroundColor DarkYellow "`tPrimaryOffice: $pPrimaryOffice"
     switch($pPrimaryOffice){
         "Home worker" {$streetAddress = $null;$postalCode=$null;$country=$pCountry;$usageLocation=$(get-2letterIsoCodeFromCountryName $pCountry;$group = "All Homeworkers")}
-        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)"}
-        "London, GBR" {$streetAddress = "Unit 12.2.1, The Leathermarket, 11-13 Weston Street";$postalCode="SE1 3ER";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)"}
-        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)"}
-        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)"}
-        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)"}
-        "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)"}
-        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)"}
-        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
-        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All (DEU)"}
-        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)"}
-        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)"}
-        "Stockholm, SWE" {$streetAddress = "Barnhusgatan 4";$postalCode="SE-111 23";$country="Sweden";$usageLocation="SE";$group = "All (SWE)"}
+        "Bristol, GBR" {$streetAddress = "Royal London Buildings, 42-46 Baldwin Street";$postalCode="BS1 1PN";$country="United Kingdom";$usageLocation="GB";$group = "All Bristol (GBR)";$timezoneID = "2"}
+        "London, GBR" {$streetAddress = "Unit J, Taper Studios, 175 Long Lane";$postalCode="SE1 4GT";$country="United Kingdom";$usageLocation="GB";$group = "All London (GBR)";$timezoneID = "2"}
+        "Oxford, GBR" {$streetAddress = "9 Newtec Place, Magdalen Road";$postalCode="OX4 1RE";$country="United Kingdom";$usageLocation="GB";$group = "All Oxford (GBR)";$timezoneID = "2"}
+        "Macclesfield, GBR" {$streetAddress = "Riverside Suite 1, Sunderland House, Sunderland St";$postalCode="SK11 6LF";$country="United Kingdom";$usageLocation="GB";$group = "All Macclesfield (GBR)";$timezoneID = "2"}
+        "Manchester, GBR" {$streetAddress = "40 King Street";$postalCode="M2 6BA";$country="United Kingdom";$usageLocation="GB";$group = "All Manchester (GBR)";$timezoneID = "2"}
+        "Dubai, ARE" {$streetAddress = "1605 The Metropolis Building, Burj Khalifa St";$postalCode="PO Box 392563";$country="United Arab Emirates";$usageLocation="AE";$group = "All (ARE)";$timezoneID = "24"}
+        "Manila, PHI" {$streetAddress = "10F Unit C & D, Strata 100 Condominium, F. Ortigas Jr. Road, Ortigas Center Brgy. San Antonio";$postalCode="1605";$country="Philippines";$usageLocation="PH";$group = "All (PHI)";$timezoneID = "21"}
+        "Frankfurt, DEU" {$streetAddress = "Münchener Str. 7";$postalCode="60329";$country="Germany";$usageLocation="DE";$group = "All (DEU)";$timezoneID = "4"}
+        "Nuremberg, DEU" {$streetAddress = "Sulzbacher Str. 70";$postalCode="90489";$country="Germany";$usageLocation="DE";$group = "All (DEU)";$timezoneID = "4"}
+        "Boulder, CO, USA" {$streetAddress = "1877 Broadway #100";$postalCode="80302";$country="United States";$usageLocation="US";$group = "All (North America)";$timezoneID = "12"}
+        "Emeryville, CA, USA" {$streetAddress = "1900 Powell Street, Ste 600";$postalCode="94608";$country="United States";$usageLocation="US";$group = "All (North America)";$timezoneID = "13"}
+        "Stockholm, SWE" {$streetAddress = "Barnhusgatan 4";$postalCode="SE-111 23";$country="Sweden";$usageLocation="SE";$group = "All (SWE)";$timezoneID = "4"}
+        "Barcelona, ESP" {$streetAddress = "Rbla. Catalunya, 6, 2a planta";$postalCode="08007";$country="Spain";$usageLocation="ES";$group = "All Barcelona (ESP)";$timezoneID = "3"}
+        "Manlleu, ESP" {$streetAddress = "Av. de Roma, 254";$postalCode="08560";$country="Spain";$usageLocation="ES";$group = "All Manlleu (ESP)";$timezoneID = "3"}
+        "Madrid, ESP" {$streetAddress = "Calle Gran Vía, 63";$postalCode="28013";$country="Spain";$usageLocation="ES";$group = "All Madrid (ESP)";$timezoneID = "3"}
+        "Bogota, COL" {$streetAddress = "Calle 73 # 7-31 Of. 303";$postalCode="";$country="Columbia";$usageLocation="CO";$group = "All Bogota (COL)";$timezoneID = "35"}
+        "Rome, ITA" {$streetAddress = "Via Giorgio Ribotta 11 c/o Regus Europarco, 1st Floor, Room 101";$postalCode="00144";$country="Italy";$usageLocation="IT";$group = "All (ITA)";$timezoneID = "35"} #For now - will create Rome group and stack
         default {$streetAddress = $currentUser.StreetAddress;$postalCode=$currentUser.PostalCode;$country=$currentUser.Country;$usageLocation=$currentUser.UsageLocation}
         }
     Write-Host -ForegroundColor DarkYellow "`tUsername:`t`t`t$($pUPN.Split("@")[0])@anthesisgroup.com"
@@ -186,7 +191,13 @@ function update-MsolUser($pUPN, $pFirstName, $pSurname, $pDisplayName, $pPrimary
     if($pPrimaryTeam -ne $null){Add-DistributionGroupMember -Identity $pPrimaryTeam -Member $pUPN -BypassSecurityGroupManagerCheck}
     if($pSecondaryTeams -ne $null){$pSecondaryTeams | % {Add-DistributionGroupMember -Identity $_ -Member $pUPN -BypassSecurityGroupManagerCheck}}
     if($group -ne $null){Add-DistributionGroupMember -Identity $group -Member $pUPN -BypassSecurityGroupManagerCheck}
-    Add-DistributionGroupMember -Identity "b264f337-ef04-432e-a139-3574331a4d18" -Member $pUPN -BypassSecurityGroupManagerCheck #"MDM - BYOD Users"
+    If(("Anthesis Energy UK Ltd (GBR)" -eq $pBusinessUnit) -or ("Anthesis (UK) Ltd (GBR)" -eq $pBusinessUnit) -or ("Anthesis Consulting Group Ltd (GBR)" -eq $pBusinessUnit)){
+    write-host "I look like I'm in the correct business Unit to be addedd to the MDM BYOD group, however please check that I'm correct!"
+    Add-DistributionGroupMember -Identity "b264f337-ef04-432e-a139-3574331a4d18" -Member $pUPN -BypassSecurityGroupManagerCheck #"MDM - BYOD Users", adding GBR only
+    }
+    Else{
+    write-host "I don't look like I'm in the correct business Unit to be addedd to the MDM BYOD group, however please check!"
+    }
     }
 function update-msolMailbox($pUPN,$pFirstName,$pSurname,$pDisplayName,$pBusinessUnit,$pTimeZone){
     #$pUPN = $userUPN; $pFirstName = $userFirstName; $pSurname = $userSurname;$pDisplayName=$userDisplayName;$pBusinessUnit=$userBusinessUnit,$pTimeZone=$userTimeZone
@@ -211,26 +222,38 @@ function update-msolSharePointProfileFromAnotherProfile($sourceSpProfile,$destSp
     $destContext.ExecuteQuery()
     }
 function update-sharePointInitialConfig($pUPN, $csomCreds, $pTimeZone, $p3LetterCountryIsoCode){
-    $spoLoginPrefix = "i:0#.f|membership|"
+    #$spoLoginPrefix = "i:0#.f|membership|"
     $countryLocale = get-spoLocaleFromCountry -p3LetterCountryIsoCode $p3LetterCountryIsoCode
     $languageCode = guess-languageCodeFromCountry -p3LetterCountryIsoCode $p3LetterCountryIsoCode
 
     #Getting the TimeZoneID is a massive PITA:
-    $timeZones = get-timeZones
-    $tz = $timeZones | ?{$_.PSChildName -eq $pTimeZone} #Look that up in the registry list
-    if($spoTimeZones -eq $null){$spoTimeZones = get-spoTimeZoneHashTable -credentials $csomCredentials}
-    $tzID = $spoTimeZones[$tz.Display.replace("+00:00","")] #Then match a different property of the registry object to the SPO object
+    #$timeZones = get-timeZones
+    #$tz = $timeZones | ?{$_.PSChildName -eq $pTimeZone} #Look that up in the registry list
+    #if($spoTimeZones -eq $null){$spoTimeZones = get-spoTimeZoneHashTable -credentials $csomCredentials}
+    #$tzID = $spoTimeZones[$tz.Display.replace("+00:00","")] #Then match a different property of the registry object to the SPO object
 
-    $adminContext = new-csomContext -fullSitePath "https://anthesisllc-admin.sharepoint.com/" -sharePointCredentials $csomCreds
-    $spoUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($adminContext)
-    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-RegionalSettings-Initialized", $true)
-    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-RegionalSettings-FollowWeb", $false)
-    if($tzID.Length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-TimeZone", $tzID)}
-    if($countryLocale.length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-Locale", $countryLocale)}
-    if($languageCode.length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-MUILanguages", $languageCode)}
-    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-CalendarType", 1)
-    $spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-AltCalendarType", 1)
-    $adminContext.ExecuteQuery()
+    #$adminContext = new-csomContext -fullSitePath "https://anthesisllc-admin.sharepoint.com/" -sharePointCredentials $csomCreds
+    #$spoUsers = New-Object Microsoft.SharePoint.Client.UserProfiles.PeopleManager($adminContext)
+    #$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-RegionalSettings-Initialized", $true)
+    #$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-RegionalSettings-FollowWeb", $false)
+    #if($tzID.Length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-TimeZone", $tzID)}
+    #if($countryLocale.length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-Locale", $countryLocale)}
+    #if($languageCode.length -gt 0){$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-MUILanguages", $languageCode)}
+    #$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-CalendarType", 1)
+    #$spoUsers.SetSingleValueProfileProperty($spoLoginPrefix+$pUPN, "SPS-AltCalendarType", 1)
+    #$adminContext.ExecuteQuery()
+
+    
+
+    Write-Host "Setting SP timezone"
+    Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-RegionalSettings-FollowWeb' -Value "False"
+    Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-RegionalSettings-Initialized' -Value "True"
+    Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-TimeZone' -Value $($timezoneID)
+    Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-Locale' -Value $($countryLocale)
+    Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-MUILanguages' -Value $($languageCode)
+    Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-CalendarType' -Value "1"
+    Set-PnPUserProfileProperty -Account $pUPN -PropertyName 'SPS-AltCalendarType' -Value "1"
+
     }
 function create-personalFolder($pUPN){
     $dirRoot = "X:\Personal"
