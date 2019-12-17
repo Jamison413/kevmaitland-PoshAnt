@@ -89,3 +89,15 @@ $body = "{
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
 $CandidateNameResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUILOIXGORD4QBFYI6MMKVPW4HZI/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 
+#Copy a file - this example is from the IT site, copies an individual file into a folder
+$body = "{
+    `"parentReference`": {
+        `"driveId`": `"b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY`",
+        `"id`": `"01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR`"
+         },
+    `"name`": `"New Starter Checklist.xlsx`",
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6/copy" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+#More MS help: https://docs.microsoft.com/en-us/graph/api/driveitem-copy?view=graph-rest-1.0&tabs=http
