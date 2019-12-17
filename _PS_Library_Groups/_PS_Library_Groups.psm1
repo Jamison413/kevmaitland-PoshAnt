@@ -566,7 +566,7 @@ function new-mailEnabledSecurityGroup(){
     $mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64
 
     #Check to see if this already exists. This is based on Alias, which is mutable :(    
-    $mesg = rummage-forDistributionGroup -displayName $dgDisplayName 
+    $mesg = rummage-forDistributionGroup -displayName $dgDisplayName
     if($mesg){ #If the group already exists, add the new Members (ignore any removals - we'll let sync-groupMembership figure that out)
         $members  | % {
             Write-Verbose "Adding TeamMember Add-DistributionGroupMember $($mesg.ExternalDirectoryObjectId) -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
@@ -575,12 +575,30 @@ function new-mailEnabledSecurityGroup(){
         }
     else{ #If the group doesn't exist, try creating it
         try{
-            Write-Verbose "New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($(guess-aliasFromDisplayName $dgDisplayName)+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference"
-            $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $fixedSuffix)+"@anthesisgroup.com") -Notes $description -Alias $(guess-aliasFromDisplayName $dgDisplayName) -WhatIf:$WhatIfPreference
+            write-host "Blurble"
+            $mailAlias = $(guess-aliasFromDisplayName $dgDisplayName)
+            Write-Verbose "New-DistributionGroup -Name [$mailName] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes [$description] -Alias [$mailAlias] -WhatIf:$WhatIfPreference"
+            $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $fixedSuffix)+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference -ErrorAction Stop
             }
         catch{
-            Write-Error "Error creating new Distribution Group [$($dgDisplayName)] in new-mailEnabledSecurityGroup()"
-            $Error
+            write-host "Blurble2"
+            if($_ -match "is already being used by the proxy addresses or LegacyExchangeDN of"){ #Name collision, but no DisplayName collision
+                #Create the DG with a temporary Guid in the Name/Alias to eliminate the collision
+                $tempGuid = $([guid]::NewGuid().Guid)
+                $tempMailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $tempGuid -maxLength 64 
+                $tempMailAlias = guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $tempGuid
+                Write-Verbose "`t2nd attempt: New-DistributionGroup -Name [$tempMailName] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($tempMailAlias+"@anthesisgroup.com") -Notes [$description] -Alias [$tempMailAlias] -WhatIf:$WhatIfPreference"
+                $mesg = New-DistributionGroup -Name $tempMailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $tempGuid)+"@anthesisgroup.com") -Notes $description -Alias $tempMailAlias -WhatIf:$WhatIfPreference
+                #Then use the ExternalDirectoryObjectId property to re-set the Name and Alias properties to a "useful" Guid
+                $newMailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $mesg.ExternalDirectoryObjectId -maxLength 64
+                $newmailAlias = guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $mesg.ExternalDirectoryObjectId
+                $mesg | Set-DistributionGroup -Name $newMailName -Alias $newmailAlias -PrimarySmtpAddress $($newmailAlias+"@anthesisgroup.com")
+                $mesg = Get-DistributionGroup -Identity $mesg.ExternalDirectoryObjectId
+                }
+            else{
+                Write-Error "Error creating new Distribution Group [$($dgDisplayName)] in new-mailEnabledSecurityGroup()"
+                $Error
+                }
             }
         }
 
@@ -673,15 +691,16 @@ function rummage-forDistributionGroup(){
         )
 
     Write-Verbose "rummage-forDistributionGroup([$displayName],[$alias])"
-    if([string]::IsNullOrWhiteSpace($alias)){$alias = guess-aliasFromDisplayName $displayName}
     [array]$dg = Get-DistributionGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
     if($dg.Count -ne 1){
-        #Write-Verbose "Trying to get DG by alias [$alias]"
-        #[array]$dg = Get-DistributionGroup -Filter "Alias -eq `'$alias`'" #If we can't find it by the DisplayName, check the Alias as this is less mutable
+#        if($alias){
+#            Write-Verbose "Trying to get DG by alias [$alias]"
+#            [array]$dg = Get-DistributionGroup -Filter "Alias -eq `'$alias`'" #If we can't find it by the DisplayName, check the Alias as this is less mutable
+#            }
         #if($dg.Count -ne 1){
-            $dg = $null
             if($dg.Count -gt 1){Write-Warning "Multiple Groups matched for Distribution Group [$displayName]`r`n`t $($dg.PrimarySmtpAddress -join "`r`n`t")"}
             if($dg.Count -eq 0){Write-Verbose "No Distribution Group found"}
+            $dg = $null
         #    }
         } 
     $dg
@@ -996,7 +1015,7 @@ function sync-groupMemberships(){
                 }
             "AAD" {
                 #Add extra users from MESG to UG
-                $usersDelta | ?{$_.SideIndicator -eq "=>"} | %{
+                $usersDelta | ?{$_.SideIndicator -eq "=>" -and $_.DisplayName -notmatch "Shared Mailbox"} | %{
                     $userToBeChanged = $_
                     Write-Verbose "`tAdding [$($userToBeChanged.userPrincipalName)] to [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.Id)] UG $syncWhat"
                     try{
