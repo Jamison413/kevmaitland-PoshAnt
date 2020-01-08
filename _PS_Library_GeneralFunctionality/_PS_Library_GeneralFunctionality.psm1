@@ -707,7 +707,24 @@ function get-available365licensecount{
             }
 
 
+function get-user365licenses{
+        [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="upn")]
+            [String]$upn
+            )
+
+
+           if(![string]::IsNullOrWhiteSpace($upn)){
+
+           $user = Get-MsolUser -UserPrincipalName $upn
+           write-host "$($user.Licenses)"
+           
+           }
+           }
+
+
+
+
 
 #endregion
-
-
