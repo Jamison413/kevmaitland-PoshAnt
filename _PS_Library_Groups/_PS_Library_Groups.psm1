@@ -5,7 +5,7 @@ Import-Module _PS_Library_GeneralFunctionality
 #Import-Module *pnp*
 
 
-function addto-SharepointTeamsTermStore{
+function add-SPOSitetoSharepointTeamsTermStore{
 [CmdletBinding()]
 Param ($displayName)
 
