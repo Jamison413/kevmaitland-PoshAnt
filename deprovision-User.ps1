@@ -137,7 +137,7 @@ function delete-userAccounts($userSAM){
 #endregion
 
 $logFileLocation = "C:\ScriptLogs\"
-$scriptName = "get-bitlockerRecoveryKeysFromAad"
+$scriptName = "deprovision-user"
 $fullLogPathAndName = $logFileLocation+$scriptName+".ps1_FullLog_$(Get-Date -Format "yyMMdd").log"
 $errorLogPathAndName = $logFileLocation+$scriptName+".ps1_ErrorLog_$(Get-Date -Format "yyMMdd").log"
 if($PSCommandPath){

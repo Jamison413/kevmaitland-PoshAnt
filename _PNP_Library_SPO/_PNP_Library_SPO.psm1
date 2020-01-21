@@ -1,4 +1,6 @@
-﻿function add-spoLibrarySubfolders($pnpList, $arrayOfSubfolderNames, $recreateIfNotEmpty, $spoCredentials, $verboseLogging){
+﻿$spoRoot = "https://anthesisllc.sharepoint.com"
+$spoAdminRoot = "https://anthesisllc-admin.sharepoint.com"
+function add-spoLibrarySubfolders($pnpList, $arrayOfSubfolderNames, $recreateIfNotEmpty, $spoCredentials, $verboseLogging){
     #$arrayOfSubfolderNames - I think these are supposed to be serverRelativeUrls
     if($verboseLogging){Write-Host -ForegroundColor Magenta "add-spoLibrarySubfolders($($pnpList.Title), $($arrayOfSubfolderNames -join ", "), `$recreateIfNotEmpty=$recreateIfNotEmpty"}
     if($(Get-PnPConnection).Url -notmatch $pnpList.ParentWebUrl){
