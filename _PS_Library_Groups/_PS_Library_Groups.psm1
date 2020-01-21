@@ -1,11 +1,4 @@
-﻿#Sync Office 365 Group membership to correspnoding security group membership
-
-Import-Module _PS_Library_MSOL.psm1
-Import-Module _PS_Library_GeneralFunctionality
-#Import-Module *pnp*
-
-
-function addto-SharepointTeamsTermStore{
+﻿function addto-SharepointTeamsTermStore{
 [CmdletBinding()]
 Param ($displayName)
 
