@@ -15,6 +15,8 @@ $horriblyUnformattedStringOfMembers = "AnalystsTeam@anthesisgroup.com
 $365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
+Import-Module _PS_Library_Groups
+
 $teamBotDetails = Import-Csv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
 $resource = "https://graph.microsoft.com"
 $tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)

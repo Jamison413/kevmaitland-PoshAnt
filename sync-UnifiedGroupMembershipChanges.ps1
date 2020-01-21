@@ -31,10 +31,16 @@ $365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayNam
 
 $adminEmailAddresses = get-groupAdminRoleEmailAddresses
 
+$startProcessing = $false
 $365GroupsToProcess | % {
     $365Group = $_
-    sync-groupMemberships -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose 
-    sync-groupMemberships -UnifiedGroup $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose
+    $365Group.DisplayName
+    if($365Group.DisplayName -match "External - Assistència tècnica per al programa d'Acords voluntaris per la reducció d'emissions de GEH"){$startProcessing = $true}
+    if($startProcessing -eq $false){return}
+    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose }
+    catch{$_;break}
+    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose}
+    catch{$_;break}
     }
 
 

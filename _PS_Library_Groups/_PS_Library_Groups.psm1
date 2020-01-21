@@ -5,7 +5,7 @@ Import-Module _PS_Library_GeneralFunctionality
 #Import-Module *pnp*
 
 
-function addto-SharepointTeamsTermStore{
+function add-SPOSitetoSharepointTeamsTermStore{
 [CmdletBinding()]
 Param ($displayName)
 
@@ -222,7 +222,7 @@ function guess-aliasFromDisplayName(){
     $guessedAlias = set-suffixAndMaxLength -string $guessedAlias -suffix $fixedSuffix -maxLength 64
     $guessedAlias = sanitise-forMicrosoftEmailAddress -dirtyString $guessedAlias
     $guessedAlias = remove-diacritics -String $guessedAlias
-    Write-Verbose -Message "guess-aliasFromDisplayName([$displayName],[$fixedSuffix]) = [$guessedAlias]"
+    Write-Verbose -Message "guess-aliasFromDisplayName($displayName) = [$guessedAlias]"
     $guessedAlias
     }
 function new-365Group(){
@@ -279,10 +279,8 @@ function new-365Group(){
         )
 
     Write-Verbose "new-365Group($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $hideFromGal, $blockExternalMail, $isPublic, $autoSubscribe, $additionalEmailAddresses, $groupClassification, $ownersAreRealManagers,$membershipmanagedBy)"
+    $shortName = $displayName.Replace(" (All)","")
     $365MailAlias = $(guess-aliasFromDisplayName "$displayName 365")
-    $managersSgDisplayNameSuffix = " - Data Managers Subgroup"
-    $membersSgDisplayNameSuffix = " - Members Subgroup"
-    $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
 
     #Firstly, check whether we have already created a Unified Group for this DisplayName
     $365Group = Get-UnifiedGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
@@ -290,7 +288,7 @@ function new-365Group(){
 
     #If we have a UG, check whether we can find the associated groups (we certainly should be able to!)
     if($365Group){
-        Write-Verbose "Pre-existing 365 Group found [$($365Group.DisplayName)] with: `r`n`t`tCA1=[$($365Group.CustomAttribute1)], `r`n`t`tCA2=[$($365Group.CustomAttribute2)], `r`n`t`tCA3=[$($365Group.CustomAttribute3)], `r`n`t`tCA4=[$($365Group.CustomAttribute4)], `r`n`t`tCA5=[$($365Group.CustomAttribute5)], `r`n`t`tCA6=[$($365Group.CustomAttribute6)], `r`n`t`tCA7=[$($365Group.CustomAttribute7)], `r`n`t`tCA8=[$($365Group.CustomAttribute8)]"
+        Write-Verbose "Pre-existing 365 Group found [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)], CA6=[$($365Group.CustomAttribute6)]"
         if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute2)){
             $managersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq `'$($365Group.CustomAttribute2)`'"
             if(!$managersSg){Write-Warning "Data Managers Group [$($365Group.CustomAttribute2)] for UG [$($365Group.DisplayName)] could not be retrieved"}
@@ -314,38 +312,44 @@ function new-365Group(){
         }
     else{
         Write-Verbose "No pre-existing 365 group found - checking for AAD Groups."
+        $combinedSgDisplayName = $displayName
+        $managersSgDisplayNameSuffix = " - Data Managers Subgroup"
+        $managersSgDisplayName = "$displayName$managersSgDisplayNameSuffix"
+        $membersSgDisplayNameSuffix = " - Members Subgroup"
+        $membersSgDisplayName = "$displayName$membersSgDisplayNameSuffix"
+        $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
 
         #Check whether any of these MESG exist based on names (just in case we're re-creating a 365 group and want to retain the AAD Groups)
-        $combinedSg = rummage-forDistributionGroup -displayName $displayName
-        if($combinedSg){Write-Verbose "`tCombined Group [$($combinedSg.DisplayName)] found"}else{Write-Verbose "`tCombined group not found"}
-        $managersSg = rummage-forDistributionGroup -displayName ($displayName+$managersSgDisplayNameSuffix)
-        if($managersSg){Write-Verbose "`tManagers Group [$($managersSg.DisplayName)] found"}else{Write-Verbose "`tManagers group not found"}
-        $membersSg  = rummage-forDistributionGroup -displayName ($displayName +$membersSgDisplayNameSuffix)
-        if($membersSg){Write-Verbose "`tMembers Group [$($membersSg.DisplayName)] found"}else{Write-Verbose "`tMembers group not found"}
+        $combinedSg = rummage-forDistributionGroup -displayName $combinedSgDisplayName
+        if($combinedSg){Write-Verbose "Combined Group [$($combinedSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
+        $managersSg = rummage-forDistributionGroup -displayName $managersSgDisplayName 
+        if($managersSg){Write-Verbose "Managers Group [$($managersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
+        $membersSg  = rummage-forDistributionGroup -displayName $membersSgDisplayName 
+        if($membersSg){Write-Verbose "Members Group [$($membersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
         $sharedMailbox = Get-Mailbox -Filter "DisplayName -eq `'$(sanitise-forSql $sharedMailboxDisplayName)`'"
         if(!$sharedMailbox){$sharedMailbox = Get-Mailbox -Filter "Alias -eq `'$(guess-aliasFromDisplayName $sharedMailboxDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
-        if($sharedMailbox){Write-Verbose "`tShared Mailbox [$($sharedMailbox.DisplayName)] found"}else{Write-Verbose "`tMailbox not found"}
+        if($sharedMailbox){Write-Verbose "Shared Mailbox [$($sharedMailbox.DisplayName)] found"}else{Write-Verbose "Mailbox not found"}
 
         #Create any groups that don't already exist
         if(!$combinedSg){
-            Write-Verbose "Creating Combined Security Group [$displayName]"
-            try{$combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $displayName -membersUpns $null -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName" -WhatIf:$WhatIfPreference}
+            Write-Verbose "Creating Combined Security Group [$combinedSgDisplayName]"
+            try{$combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $combinedSgDisplayName -membersUpns $null -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName" -WhatIf:$WhatIfPreference}
             catch{Write-Error $_}
             }
 
         if($combinedSg -or $WhatIfPreference){ #If we now have a Combined SG
             if(!$managersSg){ #Create a Managers SG if required
-                Write-Verbose "Creating Data Managers Security Group [$displayName$managersSgDisplayNameSuffix]"
+                Write-Verbose "Creating Data Managers Security Group [$managersSgDisplayName]"
                 $managersMemberOf = @($combinedSg.ExternalDirectoryObjectId)
                 if($ownersAreRealManagers){$managersMemberOf += "Managers (All)"}
-                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $displayName -fixedSuffix $managersSgDisplayNameSuffix -membersUpns $managerUpns -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for managing Ownership of $displayName Unified Group" -WhatIf:$WhatIfPreference -Verbose}
+                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -fixedSuffix $managersSgDisplayNameSuffix -membersUpns $managerUpns -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers" -WhatIf:$WhatIfPreference -Verbose}
                 catch{Write-Error $_}
                 }
 
             if(!$membersSg){ #And create a Members SG if required
-                Write-Verbose "Creating Members Security Group [$displayName$membersSgDisplayNameSuffix]"
+                Write-Verbose "Creating Members Security Group [$membersSgDisplayName]"
                 try{
-                    $membersSg = new-mailEnabledSecurityGroup -dgDisplayName $displayName -fixedSuffix $membersSgDisplayNameSuffix -membersUpns $teamMemberUpns -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $displayName$members Unified Group" -WhatIf:$WhatIfPreference
+                    $membersSg = new-mailEnabledSecurityGroup -dgDisplayName $membersSgDisplayName -fixedSuffix $membersSgDisplayNameSuffix -membersUpns $teamMemberUpns -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -WhatIf:$WhatIfPreference
                     if(![string]::IsNullOrWhiteSpace($memberOf)){
                         $memberOf | % { #We now nest membership via Members groups, rather than Combined Groups, so this is a little more complicated now.
                             $parentGroup = get-membersGroup -groupName $_
@@ -356,19 +360,19 @@ function new-365Group(){
                 catch{Write-Error $_}
                 }
             }
-        else{Write-Error "Combined Security Group [$displayName] not available. Cannot proceed with SubGroup creation"}        
+        else{Write-Error "Combined Security Group [$combinedSgDisplayName] not available. Cannot proceed with SubGroup creation"}        
         }
 
     #Check that everything's worked so far
     if(!$combinedSg){
-        if($WhatIfPreference){Write-Verbose "Combined Security Group [$displayName] not created because we're only pretending."}
-        else{Write-Error "Combined Security Group [$displayName] not available. Cannot proceed with UnifiedGroup creation";break}}
+        if($WhatIfPreference){Write-Verbose "Combined Security Group [$combinedSgDisplayName] not created because we're only pretending."}
+        else{Write-Error "Combined Security Group [$combinedSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}}
     if(!$managersSg){
-        if($WhatIfPreference){Write-Verbose "Managers Security Group [$displayName$managersSgDisplayNameSuffix] not created because we're only pretending."}
-        else{Write-Error "Managers Security Group [$displayName$managersSgDisplayNameSuffix] not available. Cannot proceed with UnifiedGroup creation";break}}
+        if($WhatIfPreference){Write-Verbose "Managers Security Group [$combinedSgDisplayName] not created because we're only pretending."}
+        else{Write-Error "Managers Security Group [$managersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}}
     if(!$membersSg){
-        if($WhatIfPreference){Write-Verbose "Members Security Group [$displayName$membersSgDisplayNameSuffix] not created because we're only pretending."}
-        else{Write-Error "Members Security Group [$displayName$membersSgDisplayNameSuffix] not available. Cannot proceed with UnifiedGroup creation";break}}
+        if($WhatIfPreference){Write-Verbose "Members Security Group [$combinedSgDisplayName] not created because we're only pretending."}
+        else{Write-Error "Members Security Group [$membersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}}
     if(!$365Group -or $WhatIfPreference){
         if(($combinedSg -and $managersSg -and $membersSg)){#If we now have all the prerequisite groups, create a UG
             try{
@@ -400,11 +404,11 @@ function new-365Group(){
                       ]
                     }"
                 Write-Verbose $creategroup
-                $creategroup = [System.Text.Encoding]::UTF8.GetBytes($creategroup) #To ensure Non-English characters are encoded correctly
+                $creategroup = [System.Text.Encoding]::UTF8.GetBytes($creategroup)
                 $response = Invoke-RestMethod -Uri https://graph.microsoft.com/v1.0/groups -Body $creategroup -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
                 
                 Connect-PnPOnline -AccessToken $tokenResponse.access_token
-                #Set-PnPUnifiedGroup -Identity $response.id -DisplayName $displayName <# Graph API doesn't handle accents/diacritics properly and replaces them with �, so we have to set the DisplayName again via Pnp #>
+                Set-PnPUnifiedGroup -Identity $response.id -DisplayName $displayName <# Graph API doesn't handle accents/diacritics properly and replaces them with �, so we have to set the DisplayName again via Pnp #>
                 do{
                     Write-Verbose "Waiting for Unified Group to provision..."
                     $pnp365Group = Get-PnPUnifiedGroup -Identity $response.id -ErrorAction SilentlyContinue -WarningAction SilentlyContinue #This is (allegedly) the bit that triggers Site Collection creation
@@ -415,35 +419,24 @@ function new-365Group(){
                 }
             catch{Write-Error $_}
             }
-        else{Write-Error "Combined/Managers/Members Security Group [$displayName]/[$displayName$managersSgDisplayNameSuffix]/[$displayName$membersSgDisplayNameSuffix] not available. Cannot proceed with UnifiedGroup creation";break}
+        else{Write-Error "Combined/Managers/Members Security Group [$combinedSgDisplayName]/[$managersSgDisplayName]/[$membersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}
         }
 
     if($365Group){ #If we now have a 365 UG, set the CustomAttributes, and create a Shared Mailbox (if required) and configure it
-        if($groupIsNew){$ca5Disclaimer = "It's okay if this is empty at the moment"}
-        else{$ca5Disclaimer = "This shouldn't be empty now"}
-        Write-Verbose "`tSet-UnifiedGroup -Identity [$($365Group.ExternalDirectoryObjectId)] -HiddenFromAddressListsEnabled [$true] `r`n`t`t-CustomAttribute1 [$($365Group.ExternalDirectoryObjectId)] `r`n`t`t-CustomAttribute2 [$($managersSg.ExternalDirectoryObjectId)] `r`n`t`t-CustomAttribute3 [$($membersSg.ExternalDirectoryObjectId)] `r`n`t`t-CustomAttribute4 [$($combinedSg.ExternalDirectoryObjectId)] `r`n`t`t-CustomAttribute5 [$($sharedMailbox.ExternalDirectoryObjectId)] - $ca5Disclaimer `r`n`t`t-CustomAttribute6 [$($membershipmanagedBy)] `r`n`t`t-CustomAttribute7 [$($groupClassification)] `r`n`t`t-CustomAttribute8 [$($accessType)] `r`n`t`t-WhatIf:[$($WhatIfPreference)] -AccessType [$($accessType)] -RequireSenderAuthenticationEnabled [$($blockExternalMail)] -AutoSubscribeNewMembers:[$($autoSubscribe)] -AlwaysSubscribeMembersToCalendarEvents:[$($autoSubscribe)] -Classification [$($groupClassification)]"
+        Write-Verbose "`tSet-UnifiedGroup -Identity [$($365Group.ExternalDirectoryObjectId)] -HiddenFromAddressListsEnabled [$true] -CustomAttribute1 [$($365Group.ExternalDirectoryObjectId)] -CustomAttribute2 [$($managersSg.ExternalDirectoryObjectId)] -CustomAttribute3 [$($membersSg.ExternalDirectoryObjectId)] -CustomAttribute4 [$($combinedSg.ExternalDirectoryObjectId)] -CustomAttribute6 [$($membershipmanagedBy)] -CustomAttribute7 [$($groupClassification)] -CustomAttribute8 [$($accessType)] -WhatIf:[$($WhatIfPreference)] -AccessType [$($accessType)] -RequireSenderAuthenticationEnabled [$($blockExternalMail)] -AutoSubscribeNewMembers:[$($autoSubscribe)] -AlwaysSubscribeMembersToCalendarEvents:[$($autoSubscribe)] -Classification [$($groupClassification)]"
         Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -CustomAttribute1 $365Group.ExternalDirectoryObjectId -CustomAttribute2 $managersSg.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId -CustomAttribute6 $membershipmanagedBy -CustomAttribute7 $groupClassification -CustomAttribute8 $accessType -WhatIf:$WhatIfPreference -AccessType $accessType -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Classification $groupClassification
         $365Group = Get-UnifiedGroup $365Group.ExternalDirectoryObjectId
+        #Set the standard sharing permissions for the Site
+        set-standardTeamPermissions -UnifiedGroupObject $365Group
         
         if(!$sharedMailbox){
-            Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -ErrorAction Continue -WhatIf:$WhatIfPreference "
-            try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $(guess-aliasFromDisplayName $sharedMailboxDisplayName) -ErrorAction Stop -WhatIf:$WhatIfPreference}
-            catch{
-                if($_.Exception.Message -match "is already being used by the proxy addresses or LegacyExchangeDN. Please choose another proxy address."){ #Shit, but it returns generic HResult -2146233087, which is even less help.
-                    Write-Warning $_.Exception.Message
-                    try{
-                        $alternativeAlias = guess-aliasFromDisplayName -displayName $sharedMailboxDisplayName -fixedSuffix $("_"+([guid]::NewGuid()).Guid)
-                        Write-Verbose "`tTrying again with unique Name/Alias/Email: [$sharedMailboxDisplayName][$($alternativeAlias)]"
-                        $sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $alternativeAlias -Alias $alternativeAlias -PrimarySmtpAddress ($alternativeAlias+"@anthesisgroup.com") -ErrorAction Continue -WhatIf:$WhatIfPreference
-                        }
-                    catch{$_}
-                    }
-                else{$_} 
-                }
+            Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference "
+            try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference }
+            catch{$Error}
             }
 
         if($sharedMailbox){
-            Write-Verbose "Found Mailbox: [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] `r`n`t`tSet-Mailbox -Identity $($sharedMailbox.ExternalDirectoryObjectId) -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $($365Group.PrimarySmtpAddress) -DeliverToMailboxAndForward $true -Confirm:$false -WhatIf:$WhatIfPreference"
+            Write-Verbose "Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] found: Set-Mailbox -Identity $($sharedMailbox.ExternalDirectoryObjectId) -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $($365Group.PrimarySmtpAddress) -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $$365Group.PrimarySmtpAddress) -Confirm:$false -WhatIf:$WhatIfPreference"
             Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $365Group.PrimarySmtpAddress -DeliverToMailboxAndForward $true  -Confirm:$false -WhatIf:$WhatIfPreference 
             Set-user -Identity $sharedMailbox.ExternalDirectoryObjectId -Manager kevin.maitland -WhatIf:$WhatIfPreference  #For want of someone better....
             #Assign the Shared Mailbox as a member of the Security Group
@@ -458,17 +451,15 @@ function new-365Group(){
         }
     else{Write-Error "Unified Group [$displayName] not available. Cannot proceed with Shared Mailbox creation."}
 
-    #Now we've set everything, retrieve the object to confirm the changes were applied successfully:
-    $365Group = Get-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId
-    if($groupIsNew){Write-Verbose "New 365 Group created: [$($365Group.DisplayName)] with: `r`n`t`tCA1=[$($365Group.CustomAttribute1)], `r`n`t`tCA2=[$($365Group.CustomAttribute2)], `r`n`t`tCA3=[$($365Group.CustomAttribute3)], `r`n`t`tCA4=[$($365Group.CustomAttribute4)], `r`n`t`tCA5=[$($365Group.CustomAttribute5)], `r`n`t`tCA6=[$($365Group.CustomAttribute6)], `r`n`t`tCA7=[$($365Group.CustomAttribute7)], `r`n`t`tCA8=[$($365Group.CustomAttribute8)]"}
-    elseif($365Group){Write-Verbose "Pre-existing 365 Group found: [$($365Group.DisplayName)] with: `r`n`t`tCA1=[$($365Group.CustomAttribute1)], `r`n`t`tCA2=[$($365Group.CustomAttribute2)], `r`n`t`tCA3=[$($365Group.CustomAttribute3)], `r`n`t`tCA4=[$($365Group.CustomAttribute4)], `r`n`t`tCA5=[$($365Group.CustomAttribute5)], `r`n`t`tCA6=[$($365Group.CustomAttribute6)], `r`n`t`tCA7=[$($365Group.CustomAttribute7)], `r`n`t`tCA8=[$($365Group.CustomAttribute8)]"}
-    else{Write-Warning "It doesn't look like there's a [$displayName] 365 Group available...";break}
+    if($groupIsNew){Write-Verbose "New 365 Group created: [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)], CA6=[$($365Group.CustomAttribute6)]"}
+    elseif($365Group){Write-Verbose "Pre-existing 365 Group found: [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)], CA6=[$($365Group.CustomAttribute6)]"}
+    else{Write-Verbose "It doesn't look like there's a [$displayName] 365 Group available..."}
 
     #Provision MS Team if requested
     if($alsoCreateTeam -and $365Group){
         Write-Verbose "Provisioning new MS Team (as requested)"
         if(Get-Team -GroupId $365Group.ExternalDirectoryObjectId){
-            Write-Warning "Existing Team found - not attempting to reprovision"
+            Write-Verbose "Existing Team found - not attempting to reprovision"
             }
         else{New-Team -GroupId $365Group.ExternalDirectoryObjectId -AllowGuestCreateUpdateChannels $false -AllowGuestDeleteChannels $false}
         }
@@ -489,14 +480,67 @@ function new-365Group(){
         Start-Sleep -Seconds 5
         }
     while([string]::IsNullOrWhiteSpace($pnp365Group.SiteUrl))
-    
-    <#Is this a good idea here? It will immediately remove the executing user from the Site Collections Admins, which means they won;t be able to set a Homepage, or enable Site features. 
-    Probably better if it's run as part of the new-externalSpoSites or new-internalSpoSites scripts. There's also a scheduled script that runs this too, so it won't stay wrong for long even if there's an error further through the provisioning scripts...
     Write-Verbose "set-standardTeamSitePermissions -teamSiteAbsoluteUrl [$($pnp365Group.SiteUrl)]"
     set-standardSitePermissions -unifiedGroupObject $365Group -tokenResponse $tokenResponse -pnpCreds $pnpCreds
-    #>
     $365Group
 
+    }
+function new-externalGroup(){
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    param(
+        [Parameter(Mandatory=$true)]
+            [string]$displayName
+        ,[Parameter(Mandatory=$false)]
+            [string]$description
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$managerUpns
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$teamMemberUpns
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$memberOf
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$additionalEmailAddresses
+        ,[Parameter(Mandatory=$true)]
+            [string]$membershipManagedBy
+        ,[Parameter(Mandatory=$true)]
+            [PSCustomObject]$tokenResponse
+        ,[Parameter(Mandatory=$true)]
+            [bool]$alsoCreateTeam = $false
+        ,[Parameter(Mandatory=$true)]
+            [PSCredential]$pnpCreds
+        )
+    Write-Verbose "new-externalGroup($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $additionalEmailAddress, $membershipManagedBy)"
+    $hideFromGal = $false
+    $blockExternalMail = $false
+    $accessType = "Private"
+    $autoSubscribe = $true
+    $groupClassification = "External"
+
+    if($managerUpns -notcontains ((Get-PnPConnection).PSCredential.UserName)){
+        $addExecutingUserAsTemporaryAdmin = $true
+        [array]$managerUpns += ((Get-PnPConnection).PSCredential.UserName)
+        }
+
+    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $pnpCreds
+    Connect-PnPOnline -AccessToken $tokenResponse.access_token
+    Write-Verbose "`$newTeam = Get-PnPUnifiedGroup -Identity [$displayName]"
+    $newPnpTeam = Get-PnPUnifiedGroup -Identity $displayName
+    
+    #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
+    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
+    test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
+    if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
+        Write-Verbose "Setting Homepage"
+        Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
+        }
+    Add-PnPHubSiteAssociation -Site $newPnpTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub" | Out-Null
+    start-Process $newPnpTeam.SiteUrl
+    if($addExecutingUserAsTemporaryAdmin){
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-DistributionGroupMember -Identity $newTeam.CustomAttribute2 -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        }
+    $newPnpTeam
     }
 function new-mailEnabledSecurityGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]
@@ -519,55 +563,48 @@ function new-mailEnabledSecurityGroup(){
             [bool]$blockExternalMail
         )
     Write-Verbose "new-mailEnabledSecurityGroup([$dgDisplayName], [$description], [$($ownersUpns -join ", ")], [$($membersUpns -join ", ")], [$($memberOf -join ", ")], $hideFromGal, $blockExternalMail)"
-    $mailName = guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $fixedSuffix
+    $mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64
 
-    #Check to see if this already exists
-    $mesg = rummage-forDistributionGroup -displayName ($dgDisplayName+$fixedSuffix)
+    #Check to see if this already exists. This is based on Alias, which is mutable :(    
+    $mesg = rummage-forDistributionGroup -displayName $dgDisplayName
     if($mesg){ #If the group already exists, add the new Members (ignore any removals - we'll let sync-groupMembership figure that out)
-        Write-Verbose "Existing Mail-Enabled Distribution Group [$($mesg.DisplayName)][$($mesg.ExternalDirectoryObjectId)] retrieved"
         $members  | % {
             Write-Verbose "Adding TeamMember Add-DistributionGroupMember $($mesg.ExternalDirectoryObjectId) -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck"
             Add-DistributionGroupMember $mesg.ExternalDirectoryObjectId -Member $_ -Confirm:$false -BypassSecurityGroupManagerCheck -WhatIf:$WhatIfPreference
             }
         }
     else{ #If the group doesn't exist, try creating it
-        $possibleNameCollision = rummage-forDistributionGroup -name $mailName
-        if($possibleNameCollision){
-            if(($possibleNameCollision.DisplayName -ne ($dgDisplayName+$fixedSuffix)) -and ($possibleNameCollision.Name -ne $mailName)){
-                $alternativeName = set-suffixAndMaxLength -string $mailName -suffix $("_"+([guid]::NewGuid()).Guid) -maxLength $mailName.Length
-                Write-Warning "This looks like a `"Name`" collision. Searching for [$mailName] has returned: `r`n`t[$($possibleNameCollision.DisplayName)][$($possibleNameCollision.ExternalDirectoryObjectId)]`r`n`tInstead of: `r`n`t[$($dgDisplayName+$fixedSuffix)]`r`n`tWill create new group with an alternative name [$alternativeName]"
-                $mailName = $alternativeName
-                }
-            }
         try{
-            Write-Verbose "New-DistributionGroup -Name $mailName -DisplayName ($dgDisplayName+$fixedSuffix) -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($mailName+"@anthesisgroup.com") -Notes $description -Alias $mailName -WhatIf:$WhatIfPreference"
-            $mesg = New-DistributionGroup -Name $mailName -DisplayName ($dgDisplayName+$fixedSuffix) -Type Security -Members $membersUpns -PrimarySmtpAddress $($mailName+"@anthesisgroup.com") -Notes $description -Alias $mailName -WhatIf:$WhatIfPreference -ErrorAction Stop
-            Write-Verbose "New Mail-Enabled Distribution Group [$($mesg.DisplayName)][$($mesg.ExternalDirectoryObjectId)] created"
+            write-host "Blurble"
+            $mailAlias = $(guess-aliasFromDisplayName $dgDisplayName)
+            Write-Verbose "New-DistributionGroup -Name [$mailName] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes [$description] -Alias [$mailAlias] -WhatIf:$WhatIfPreference"
+            $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $fixedSuffix)+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference -ErrorAction Stop
             }
         catch{
-            if($_.Exception.Message -match "is already being used by the proxy addresses or LegacyExchangeDN"){ #Shit, but it returns generic HResult -2146233087, which is even less help.
-                Write-Warning $_.Exception.Message
-                try{
-                    $alternativeName = guess-aliasFromDisplayName -displayName ($dgDisplayName+$fixedSuffix) -fixedSuffix $("_"+([guid]::NewGuid()).Guid)
-                    Write-Verbose "`tTrying New-DistributionGroup again with unique Name/Alias/Email: [($dgDisplayName$fixedSuffix)][$($alternativeName)]"
-                    $mesg = New-DistributionGroup -Name $alternativeName -DisplayName ($dgDisplayName+$fixedSuffix) -Type Security -Members $membersUpns -PrimarySmtpAddress $($alternativeName+"@anthesisgroup.com") -Notes $description -Alias $alternativeName -WhatIf:$WhatIfPreference -ErrorAction Stop
-                    if(!$mesg){
-                        Write-Error "Could not create New-DistributionGroup again with unique Name/Alias/Email: [($dgDisplayName$fixedSuffix)][$($alternativeName)]"
-                        return
-                        }
-                    }
-                catch{$_}
+            write-host "Blurble2"
+            if($_ -match "is already being used by the proxy addresses or LegacyExchangeDN of"){ #Name collision, but no DisplayName collision
+                #Create the DG with a temporary Guid in the Name/Alias to eliminate the collision
+                $tempGuid = $([guid]::NewGuid().Guid)
+                $tempMailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $tempGuid -maxLength 64 
+                $tempMailAlias = guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $tempGuid
+                Write-Verbose "`t2nd attempt: New-DistributionGroup -Name [$tempMailName] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($tempMailAlias+"@anthesisgroup.com") -Notes [$description] -Alias [$tempMailAlias] -WhatIf:$WhatIfPreference"
+                $mesg = New-DistributionGroup -Name $tempMailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $tempGuid)+"@anthesisgroup.com") -Notes $description -Alias $tempMailAlias -WhatIf:$WhatIfPreference
+                #Then use the ExternalDirectoryObjectId property to re-set the Name and Alias properties to a "useful" Guid
+                $newMailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $mesg.ExternalDirectoryObjectId -maxLength 64
+                $newmailAlias = guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $mesg.ExternalDirectoryObjectId
+                $mesg | Set-DistributionGroup -Name $newMailName -Alias $newmailAlias -PrimarySmtpAddress $($newmailAlias+"@anthesisgroup.com")
+                $mesg = Get-DistributionGroup -Identity $mesg.ExternalDirectoryObjectId
                 }
             else{
-                Write-Error "Error creating new Distribution Group [$($dgDisplayName+$fixedSuffix)] in new-mailEnabledSecurityGroup()"
-                $_
-                } 
+                Write-Error "Error creating new Distribution Group [$($dgDisplayName)] in new-mailEnabledSecurityGroup()"
+                $Error
+                }
             }
         }
 
-    if(!$mesg){Write-Error "Mail-Enabled Security Group [$dgDisplayName$fixedSuffix] neither found, nor created :/"}
+    if(!$mesg){Write-Error "Mail-Enabled Security Group [$dgDisplayName] neither found, nor created :/"}
     else{ #Now set the additional properties and MemberOf
-        Write-Verbose "Set-DistributionGroup -Identity [$($mesg.ExternalDirectoryObjectId)] -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy [$($ownersUpns -join ", ")]"
+        Write-Verbose "Set-DistributionGroup -Identity $mailAlias -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy [$($ownersUpns -join ", ")]"
         Set-DistributionGroup -Identity $mesg.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $blockExternalMail -ManagedBy $ownersUpns -WhatIf:$WhatIfPreference
         $memberOf | % {
             if(![string]::IsNullOrWhiteSpace($_)){
@@ -590,29 +627,25 @@ function new-symGroup($displayName, $description, $managers, $teamMembers, $memb
 function rummage-forDistributionGroup(){
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true,ParameterSetName="DisplayName")]
+        [Parameter(Mandatory=$true)]
             [string]$displayName
-        ,[Parameter(Mandatory=$false,ParameterSetName="DisplayName")]
-        [Parameter(Mandatory=$true,ParameterSetName="ObjectName")]
-            [string]$name
+        ,[Parameter(Mandatory=$false)]
+            [string]$alias
         )
 
-    Write-Verbose "rummage-forDistributionGroup([$displayName],[$name])"
-    if(![string]::IsNullOrWhiteSpace($displayName)){
-        Write-Verbose "`tTrying to get DG by DisplayName [$displayName]"
-        [array]$dg = Get-DistributionGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
-        }
+    Write-Verbose "rummage-forDistributionGroup([$displayName],[$alias])"
+    [array]$dg = Get-DistributionGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
     if($dg.Count -ne 1){
-        if(![string]::IsNullOrWhiteSpace($name)){
-            Write-Verbose "`tTrying to get DG by (Object) Name [$name]"
-            [array]$dg = Get-DistributionGroup -Filter "Name -eq `'$name`'" #If we can't find it by the DisplayName, check the Name as this is less mutable and we might be testing to see whether we can create a new Group with this Name.
-            }
+#        if($alias){
+#            Write-Verbose "Trying to get DG by alias [$alias]"
+#            [array]$dg = Get-DistributionGroup -Filter "Alias -eq `'$alias`'" #If we can't find it by the DisplayName, check the Alias as this is less mutable
+#            }
+        #if($dg.Count -ne 1){
+            if($dg.Count -gt 1){Write-Warning "Multiple Groups matched for Distribution Group [$displayName]`r`n`t $($dg.PrimarySmtpAddress -join "`r`n`t")"}
+            if($dg.Count -eq 0){Write-Verbose "No Distribution Group found"}
+            $dg = $null
+        #    }
         } 
-    if($dg.Count -ne 1){
-        $dg = $null
-        if($dg.Count -gt 1){Write-Warning "`t`tMultiple Groups matched for Distribution Group [$displayName]`r`n`t $($dg.PrimarySmtpAddress -join "`r`n`t")"}
-        if($dg.Count -eq 0){Write-Verbose "`t`tNo Distribution Group found"}
-        }
     $dg
     }
 function send-membershipChangeReportToManagers(){
@@ -925,7 +958,7 @@ function sync-groupMemberships(){
                 }
             "AAD" {
                 #Add extra users from MESG to UG
-                $usersDelta | ?{$_.SideIndicator -eq "=>"} | %{
+                $usersDelta | ?{$_.SideIndicator -eq "=>" -and $_.DisplayName -notmatch "Shared Mailbox"} | %{
                     $userToBeChanged = $_
                     Write-Verbose "`tAdding [$($userToBeChanged.userPrincipalName)] to [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.Id)] UG $syncWhat"
                     try{

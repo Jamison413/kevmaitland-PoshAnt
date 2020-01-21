@@ -8,6 +8,8 @@
     [pscredential]$authenticationAdminCreds
     )
 
+    Clara.Borras@anthesisgroup.com ; Daniela.Romero@anthesisgroup.com  ; Gabriela.Peixoto@anthesisgroup.com  ; Marina.Clara@anthesisgroup.com  ; Neus.Cardona@anthesisgroup.com ; Noelia.Lopez@anthesisgroup.com 
+
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_MSOL
 
@@ -88,8 +90,8 @@ Stop-Transcript
 
 
 
-
-
+$e = Get-MsolUser -UserPrincipalName "Aga.Siemiginowska@anthesisgroup.com"
+$e.StrongAuthenticationUserDetails
 
 
 <#
