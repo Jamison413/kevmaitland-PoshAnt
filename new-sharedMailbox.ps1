@@ -3,17 +3,24 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Vastum"
-$primaryEmail = "Vastum@anthesisgroup.com"
-$owner = "emily.pressey@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses ""#(enumerate-nestedDistributionGroups -distributionGroupObject $dg).WindowsLiveID
+$displayName = "Shared Mailbox - RPC Calebgroup.net"
+$primaryEmail = "RPC@calebgroup.net"
+$owner = "kevin.maitland@anthesisgroup.com"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "paul.ashford@anthesisgroup.com
+helen.kean@anthesisgroup.com"
+$additionalEmailAddresses = convertTo-arrayOfEmailAddresses "ERGTC@calebgroup.net
+Registration@calebgroup.net
+mpc@calebgroup.net
+fatac@calebgroup.net
+reach@calebgroup.net"
+$allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
 $grantSendAsToo = $true
-$hideFromGal = $false
+$hideFromGal = $true
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){
     $exchangeAlias = $(guess-aliasFromDisplayName -displayName $displayName)
-    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias -PrimarySmtpAddress $primaryEmail | Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false -MessageCopyForSendOnBehalfEnabled $true -MessageCopyForSentAsEnabled $true
+    New-Mailbox -Shared -ModeratedBy $owner -DisplayName $displayName -Name $displayName -Alias $exchangeAlias -PrimarySmtpAddress $primaryEmail | Set-Mailbox -HiddenFromAddressListsEnabled $hideFromGal -RequireSenderAuthenticationEnabled $false -MessageCopyForSendOnBehalfEnabled $true -MessageCopyForSentAsEnabled $true -EmailAddresses $allEmailAddresses
     $arrayOfFullAccessMembers  | %{
         Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
         if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs -Confirm:$false}
@@ -51,3 +58,4 @@ $emailAddressesToMove | %{
 
 
 #>
+

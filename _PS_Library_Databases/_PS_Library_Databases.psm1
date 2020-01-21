@@ -27,11 +27,13 @@ function Execute-SQLQueryOnSQLDB([string]$query, [string]$queryType, $sqlServerC
             $results = @()
             while ($oReader.Read()){
                 $result = New-Object PSObject
+                $skipMe = 0
                 for ($i = 0; $oReader.FieldCount -gt $i; $i++){
-                        $columnName = ($query.Replace(",","") -split '\s+')[$i+1]
-                        if (1 -lt $columnName.Split(".").Length){$columnName = $columnName.Split(".")[1]} #Trim off any table names
-                        $result | Add-Member NoteProperty $columnName $oReader[$i]
-                        }
+                    $columnName = ($query.Replace(",","") -split '\s+')[$i+$skipMe+1]
+                    if($columnName -eq "TOP"){$skipMe = 2;$columnName = ($query.Replace(",","") -split '\s+')[$i+$skipMe+1]}
+                    if (1 -lt $columnName.Split(".").Length){$columnName = $columnName.Split(".")[1]} #Trim off any table names
+                    $result | Add-Member NoteProperty $columnName $oReader[$i]
+                    }
                  $results += $result
                 }
             $oReader.Close()
