@@ -37,13 +37,12 @@ function convert-csvToSecureStrings(){
         [parameter(Mandatory = $true)]
         [PSCustomObject]$rawCsvData        
         )
-
-    foreach ($record in $rawCsvData){
-        foreach ($property in ($record | Get-Member -MemberType NoteProperty)){
-            $record.($property.Name) = convertTo-localisedSecureString $($record.($property.Name))
-            }
+    
+    $encryptedObject = New-Object psobject
+    $rawCsvData.PSObject.Properties | ForEach-Object {
+        $encryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $(convertTo-localisedSecureString -plainText $_.Value)
         }
-    $rawCsvData
+    $encryptedObject
     }
 function convertTo-arrayOfEmailAddresses($blockOfText){
     [string[]]$addresses = @()
@@ -86,6 +85,30 @@ function convertTo-localisedSecureString($plainText){
 function decrypt-SecureString($secureString){
     $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
     [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+    }
+function export-encryptedCsv(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "PreEncrypted")]
+            [psobject]$encryptedCsvData        
+        ,[parameter(Mandatory = $true,ParameterSetName = "NotEncrypted")]
+            [psobject]$unencryptedCsvData
+        ,[parameter(Mandatory = $true,ParameterSetName = "PreEncrypted")]
+            [parameter(Mandatory = $true,ParameterSetName = "NotEncrypted")]
+            [string]$pathToOutputCsv
+        ,[parameter(Mandatory = $false,ParameterSetName = "PreEncrypted")]
+            [parameter(Mandatory = $false,ParameterSetName = "NotEncrypted")]
+            [switch]$force
+        )
+    if(!$encryptedCsvData){
+        $encryptedCsvData = convert-csvToSecureStrings -rawCsvData $unencryptedCsvData
+        }
+    if(Test-Path $pathToOutputCsv){
+        if($force){Remove-Item -Path $pathToOutputCsv -Force}
+        else{Write-Error "File [$pathToOutputCsv] already exists";break}
+        }
+    Export-Csv -InputObject $encryptedCsvData -Path $pathToOutputCsv -NoTypeInformation -NoClobber
+    remove-doubleQuotesFromCsv -inputFile $pathToOutputCsv
     }
 function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[boolean]$localise){
     if($pDirtyNumber.Length -gt 0){
@@ -456,6 +479,20 @@ function guess-nameFromString([string]$ambiguousString){
         }
     $leastAmbiguousString.Trim()
     }
+function import-encryptedCsv(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$pathToEncryptedCsv        
+        )
+
+    $encryptedCsvData = import-csv $pathToEncryptedCsv
+    $decryptedObject = New-Object psobject
+    $encryptedCsvData.PSObject.Properties | ForEach-Object {
+        $decryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $(decrypt-SecureString -secureString $(ConvertTo-SecureString $_.Value))
+        }
+    $decryptedObject
+    }
 function log-action($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`tACTION:`t$myMessage") -Path $logFile}
     if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Yellow $myMessage}
@@ -499,6 +536,27 @@ function matchContains($term, $arrayOfStrings){
 function remove-diacritics{
     PARAM ([string]$String)
     [Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($String))
+    }
+function remove-doubleQuotesFromCsv(){
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]
+        $inputFile,
+
+        [string]
+        $outputFile
+        )
+
+    if (-not $outputFile){
+        $outputFile = $inputFile
+        }
+
+    $inputCsv = Import-Csv $inputFile
+    $quotedData = $inputCsv | ConvertTo-Csv -NoTypeInformation
+    $outputCsv = $quotedData | % {$_ -replace  `
+        '\G(?<start>^|,)(("(?<output>[^,"]*?)"(?=,|$))|(?<output>".*?(?<!")("")*?"(?=,|$)))' `
+        ,'${start}${output}'}
+    $outputCsv | Out-File $outputFile -Encoding utf8 -Force
     }
 function sanitise-forJson(){
     [cmdletbinding()]
@@ -658,73 +716,6 @@ function stringify-hashTable($hashtable,$interlimiter,$delimiter){
         $dirty.Substring(0,$dirty.Length-$delimiter.length)
         }
     }
-function get-available365licensecount{
-        [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true,ParameterSetName="LicenseType")]
-            [String]$LicenseType
-            )
-
-            #E1 Licenses
-            if("E1" -eq $LicenseType){
-
-              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
-              write-host "E1 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
-              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
-              write-host "There are available E1 licenses!"-ForegroundColor Green
-              }
-              Else{
-              write-host "There are no available E1 licenses!"
-              }
-              }
-
-            #E3 Licenses
-            if("E3" -eq $LicenseType){
-
-              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
-              write-host "E3 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
-              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
-              write-host "There are available E3 licenses!" -ForegroundColor Green
-              }
-              Else{
-              write-host "There are no available E3 licenses!"
-              }
-              }
-              
-            #EMS licenses
-             if("EMS" -eq $LicenseType){
-
-              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
-              write-host "EMS License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
-              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
-              write-host "There are available EMS licenses!" -ForegroundColor DarkYellow
-              }
-              Else{
-              write-host "There are no available EMS licenses!"
-              }
-              }
-
-            }
-
-
-function get-user365licenses{
-        [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true,ParameterSetName="upn")]
-            [String]$upn
-            )
-
-
-           if(![string]::IsNullOrWhiteSpace($upn)){
-
-           $user = Get-MsolUser -UserPrincipalName $upn
-           write-host "$($user.Licenses)"
-           
-           }
-           }
-
-
-
-
-
 #endregion
+
+[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR([securestring]"01000000d08c9ddf0115d1118c7a00c04fc297eb0100000098686d30eb8df74dbe30d227c42550070000000002000000000003660000c000000010000000965452f3921e8bfddd5b92b77cf97f330000000004800000a0000000100000006f2548d0c1ddd768f970c367f0e751ce880000004b4f456962e2b3bb513df1ad7cefb48d5ce77f1be8641e7209d76277c6d596c475357995b7e235b3aaaa8cce021ed11c6dece0dc167ce9305f6aa4b91e502b5663867e53dcf003ecf79d4786bc70554cac9056612d3b7a39e493c671dd3d718b1cd5029bc345fea86317420731aa6376bcc93ecb2f8d34812d1337c4bb6400f20d52149c5cb1d857140000006852086fdb72daaf6654933d29d87a521401e1f9")
