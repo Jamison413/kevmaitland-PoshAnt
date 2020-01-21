@@ -31,18 +31,25 @@ $365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayNam
 
 $adminEmailAddresses = get-groupAdminRoleEmailAddresses
 
-$startProcessing = $false
 $365GroupsToProcess | % {
     $365Group = $_
-    $365Group.DisplayName
-    if($365Group.DisplayName -match "External - Assistència tècnica per al programa d'Acords voluntaris per la reducció d'emissions de GEH"){$startProcessing = $true}
-    if($startProcessing -eq $false){return}
-    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose }
-    catch{$_;break}
-    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -Verbose}
-    catch{$_;break}
+    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true } #-Verbose }
+    catch{
+        $_
+        Send-MailMessage -To $adminEmailAddresses  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnfiedGroupMembership [$($365Group.DisplayName)]" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members" -From "$env:COMPUTERNAME@anthesisgroup.com"
+        continue
+        }
+    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true} # -Verbose}
+    catch{        
+        $_
+        Send-MailMessage -To $adminEmailAddresses  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnfiedGroupMembership [$($365Group.DisplayName)]" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners" -From "$env:COMPUTERNAME@anthesisgroup.com"
+        continue
+        }
+    $365GroupsToProcess = $365GroupsToProcess | ? {$_.ExternalDirectoryObjectId -ne $365Group.ExternalDirectoryObjectId}
     }
 
-
+if($365GroupsToProcess.Count -gt 0){
+    Send-MailMessage -To kevin.maitland@anthesisgroup.com  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnfiedGroupMembership [$($365GroupsToProcess.Count)] 365Groups remain unprocessed" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nGroups are: `r`n`t$($365GroupsToProcess.DisplayName -join "`r`n`t")" -From "$env:COMPUTERNAME@anthesisgroup.com"
+    }
 
 Stop-Transcript
