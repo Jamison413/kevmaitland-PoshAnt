@@ -16,7 +16,7 @@ if($PSCommandPath){
 Import-Module SharePointPnPPowerShellOnline
 Import-Module _PNP_Library_SPO
 
-$teamBotDetails = Import-Csv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
 $resource = "https://graph.microsoft.com"
 $tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
 $clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)

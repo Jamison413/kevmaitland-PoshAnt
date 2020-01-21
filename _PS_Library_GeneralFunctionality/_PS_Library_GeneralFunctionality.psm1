@@ -658,4 +658,73 @@ function stringify-hashTable($hashtable,$interlimiter,$delimiter){
         $dirty.Substring(0,$dirty.Length-$delimiter.length)
         }
     }
+function get-available365licensecount{
+        [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="LicenseType")]
+            [String]$LicenseType
+            )
+
+            #E1 Licenses
+            if("E1" -eq $LicenseType){
+
+              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
+              write-host "E1 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
+              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
+              write-host "There are available E1 licenses!"-ForegroundColor Green
+              }
+              Else{
+              write-host "There are no available E1 licenses!"
+              }
+              }
+
+            #E3 Licenses
+            if("E3" -eq $LicenseType){
+
+              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
+              write-host "E3 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
+              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
+              write-host "There are available E3 licenses!" -ForegroundColor Green
+              }
+              Else{
+              write-host "There are no available E3 licenses!"
+              }
+              }
+              
+            #EMS licenses
+             if("EMS" -eq $LicenseType){
+
+              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+              write-host "EMS License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
+              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
+              write-host "There are available EMS licenses!" -ForegroundColor DarkYellow
+              }
+              Else{
+              write-host "There are no available EMS licenses!"
+              }
+              }
+
+            }
+
+
+function get-user365licenses{
+        [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="upn")]
+            [String]$upn
+            )
+
+
+           if(![string]::IsNullOrWhiteSpace($upn)){
+
+           $user = Get-MsolUser -UserPrincipalName $upn
+           write-host "$($user.Licenses)"
+           
+           }
+           }
+
+
+
+
+
 #endregion

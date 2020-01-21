@@ -16,9 +16,9 @@ Import-Module _PNP_Library_SPO
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-$credential = Import-CliXml -Path 'C:\Users\Emily.Pressey\Desktop\JScred'
+$credential = Import-CliXml -Path 'C:\Users\Admin\Desktop\JiraPS.xml'
 
 
 <#--------------Connect to Jira--------------#>
@@ -57,6 +57,7 @@ $AllNewStartersitems = Get-PnPListItem -List $List
 
 #If PowersehllTrigger is set to "1"
 $NewStarterInformation = @()
+$Folderstocreate = @()
 ForEach($Item in $AllNewStartersitems){
 
 $NewStarterInformation = @()
@@ -87,7 +88,7 @@ If("1" -eq $Item.FieldValues.PowershellTrigger){
             #[datetime]$date = $($Item.FieldValues.StartDate)
             #$date = $($Item.FieldValues.StartDate) -split "/"
 
-            #Send an email to People Services and IT to notify of the change and to make the change 
+            #Send an email to People Services to notify of New Starter 
 
             $subject = "New Starters Update: A New Starter has been Added!"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services & IT Teams,`r`n`r`n<BR><BR>"
@@ -97,13 +98,19 @@ If("1" -eq $Item.FieldValues.PowershellTrigger){
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot"
 
-            Send-MailMessage -To "IT_Team_GBR_365@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "nina.cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "elle.wright@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"PowershellTrigger" = "0"}
+
+
+
+            #Set information for Employee Folder creation in confidential People Services Sharepoint Site lower down
+
+            $Folderstocreate += New-Object psobject -Property @{"Candidate Name" = $($Item.FieldValues.Employee_x0020_Preferred_x0020_N.trim())}
+
 
             #We will also try to make a Jira task for the IT Team
             If("1" -eq $Item.FieldValues.JiraTaskCreated){
@@ -131,6 +138,21 @@ If("1" -eq $Item.FieldValues.PowershellTrigger){
             If($newissue){
             Write-Host "Success! Jira ticket created:`$($newissue)"
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"JiraTaskCreated" = "0"}
+
+            #Send an email to IT to notify of New Starter, include link to Jira ticket
+
+            $subject = "New Starters Update: A New Starter has been Added!"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services & IT Teams,`r`n`r`n<BR><BR>"
+            $body += "You're receiving this email as someone has added a New Starter to the New Starters List; a new entry will be added to the New Starters, Changers and Leavers Shared Calendar. Here is some information about them:`r`n`r`n<BR><BR>"
+            $body += "$($NewStarterHTML)`r`n`r`n<BR><BR>"
+            $body += "You can see more information about the New Starter here: $($StarterItemLink)`r`n`r`n<BR><BR><BR><BR>"
+            $body += "A Jira Ticket was also created! <br>$($newissue.Key): $($newissue.HttpUrl)`r`n`r`n<BR><BR><BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+
+            Send-MailMessage -To "Emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "andrew.ost@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
                          }
             Else{
             Write-Host "Woops, something went wrong whilst creating a Jira Ticket for New Starter Request: $($Item.FieldValues.Employee_x0020_Preferred_x0020_N)"
@@ -143,6 +165,121 @@ Else{
 write-host "$($Item.FieldValues.Employee_x0020_Preferred_x0020_N): Looks like I'm not a new starter" -ForegroundColor Yellow
 }
 }
+
+<#Connect to the confidential HR team site with Graph#> #Kimblebot is currently not allowed to connect to this site
+
+
+#Get salted credentials and get an Accesstoken
+$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$resource = "https://graph.microsoft.com"
+$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
+$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
+$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
+$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
+
+$ReqTokenBody = @{
+    Grant_Type    = "client_credentials"
+    Scope         = "https://graph.microsoft.com/.default"
+    client_Id     = $clientID
+    Client_Secret = $secret
+    } 
+$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+
+
+#Connnect to sharepoint via Graph
+Connect-PnPOnline -AccessToken $tokenResponse.access_token
+
+
+<#--------Create the Employee Folder Structure--------#>
+
+
+ForEach($folder in $Folderstocreate){
+
+$foldername = ($folder.'Candidate Name'.Trim())
+
+<#--------create the initial Parent folder--------#>
+write-host "Creating initial parent folder for $($foldername)" -ForegroundColor Yellow
+$body = "{
+    `"name`": `"$foldername`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$CandidateNameResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUILOIXGORD4QBFYI6MMKVPW4HZI/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+
+<#--------create the subfolders within the parent folder created above--------#>
+write-host "Creating subfolders within the parent folder for $($foldername)" -ForegroundColor Yellow
+write-host "1. Onboarding" -ForegroundColor Yellow
+#Subfolder 1.Onboarding
+$body = "{
+    `"name`": `"1. Onboarding`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+#Place new Onboarding folder ID into variable to use next
+$OnboardingfolderID = $response.id
+$ParentFolderID = $CandidateNameResponse.id
+$PSConfidentialDriveID = "b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY"
+
+#Create New Starter Checklist template in the Onboarding folder we created above
+write-host "Copying New Starter Checklist file into 1. Onboarding" -ForegroundColor Yellow
+$body = "{
+    `"parentReference`": {
+        `"driveId`": `"b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY`",
+        `"id`": `"01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR`"
+         },
+    `"name`": `"New Starter Checklist.xlsx`",
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = $body.Replace("b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY","$($PSConfidentialDriveID)")#Replace JSON parent folder
+$body = $body.Replace("01V67YTVHO2Y3JHJUM35EZTMY3LNCLRVNR","$($OnboardingfolderID)")#Replace JSON Onboarding subfolder
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6/copy" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+
+#Subfolder 2. Lifecycle
+write-host "2. Lifecycle" -ForegroundColor Yellow
+$body = "{
+    `"name`": `"2. Lifecycle`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+
+
+#Check the last subfolder was created, this won't create if the parent folder creation was not successful. Send an email if there are any problems.
+#Subfolder 3. Offboarding
+write-host "3. Offboarding" -ForegroundColor Yellow
+
+Try{
+$body = "{
+    `"name`": `"3. Offboarding`",
+    `"folder`": { },
+    `"@microsoft.graph.conflictBehavior`": `"rename`"
+}"
+$body = [System.Text.Encoding]::UTF8.GetBytes($body)
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+}
+catch{
+
+            $subject = "Employee Folder Creation: Woops, something went wrong..."
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
+            $body += "Something went wrong when trying to create an employee folder for <b>$($folder.'Candidate Name')</b>. Should probably take a look and see what's gone wrong.`r`n`r`n<BR><BR>"
+            $body += "<b>Timestamp: </b>$(get-date)`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+
+}
+
+}
+
 
 
 <#--------------Start Date Change Processing---------------#>

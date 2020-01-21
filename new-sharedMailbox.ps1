@@ -13,9 +13,7 @@ Registration@calebgroup.net
 mpc@calebgroup.net
 fatac@calebgroup.net
 reach@calebgroup.net"
-
 $allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
-
 $grantSendAsToo = $true
 $hideFromGal = $true
 
