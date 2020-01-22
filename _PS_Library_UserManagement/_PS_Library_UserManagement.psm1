@@ -9,7 +9,7 @@ Param (
    ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
         [String]$firstname
     ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-        [String]$lastname
+        [String]$surname
     ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
         [String]$displayname
     ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
@@ -27,25 +27,17 @@ Param (
     ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
     [ValidateSet("Andorra, AND", "Barcelona, ESP", "Bogota, COL","Boulder, CO, USA","Bristol, GBR","Dubai, ARE","Emeryville, CA, USA","Frankfurt, DEU","Helsinki, FIN","London, GBR","Macclesfield, GBR","Madrid, ESP","Manchester, GBR","Manila, PHL","Manlleu, ESP","Nuremberg, DEU","Oxford, GBR","Rome, ITA","Stockholm, SWE","Tormarton, GBR")]
         [String[]]$office
-    #,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-     #   [String]$twitteraccount
-    #,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-     #   [String]$website
-    #,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-     #   [String]$DDI
-    #,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-     #   [String]$ouDn
-    #,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-     #   [String]$upnsuffix
-    #,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-     #   [String]$receptionDDI
+    ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+    [String]$allpermanentstaffadgroupprompt
+    ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+    [String]$SAMaccountname
     )
 
 #Get BU details
 
 switch ($businessunit) {
     "Anthesis Energy UK Ltd (GBR)" {$upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
-    "Anthesis (UK) Ltd (GBR)"  {write-host -ForegroundColor Magenta "AUK, but creating Sustain account"; $upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
+    "Anthesis (UK) Ltd (GBR)"  {$upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
     "Anthesis Consulting Group Ltd (GBR)" {}
     "Anthesis LLC" {}
     default {Write-Host -ForegroundColor DarkRed "Warning: Could not not identify Business Unit [$businessunit]"}
@@ -79,8 +71,8 @@ if(![string]::IsNullOrWhiteSpace($upn)){New-ADUser -Name $upn.Replace("."," ").S
     -HomePage $website `
     -OfficePhone $DDI `
     -Path $ouDn `
-    -SAMAccountName $($upn.Split("@")[0]) `
-    -lastname $lastname `
+    -SAMAccountName $SAMAccountName `
+    -Surname $surname `
     -Title $jobtitle `
     -UserPrincipalName "$($upn.Split("@")[0])$upnsuffix" `
     -EmailAddress "$($upn.Split("@")[0])$upnsuffix" `
@@ -88,7 +80,8 @@ if(![string]::IsNullOrWhiteSpace($upn)){New-ADUser -Name $upn.Replace("."," ").S
     -Credential $adCredentials
     
 #Check the account was created and add the new account to a group if there is a primaryteam specified.
-$newAdUserAccount = Get-ADUser -filter "UserPrincipalName -like '$($upn.Split("@")[0])'" -Credential $adCredentials 
+$newAdUserAccount = Get-ADUser -filter {SamAccountName -eq $SAMaccountname} -Credential $adCredentials 
+Write-Host "Looks like the AD account for $($upn) was created successfully!" -ForegroundColor Green
 
 <#--------Add to the primary team--------#>
 #$primaryteam = Get-ADGroup -Filter {name -like $primaryteam} 
@@ -98,14 +91,39 @@ $newAdUserAccount = Get-ADUser -filter "UserPrincipalName -like '$($upn.Split("@
 #}
 
 <#--------Set Manager field (if the Manager has an AD account)--------#>
-$manager = (Get-ADUser -Filter {SamAccountName -like $managerSAM} -Credential $adcredentials)
-If(!$manager){
-    Set-ADUser -Identity $newAdUserAccount.SamAccountName -Manager $managerSAM -Credential $adcredentials
+$manager = (Get-ADUser -Filter {SamAccountName -eq $managerSAM} -Credential $adcredentials)
+If($manager){
+    Set-ADUser -Identity $SAMaccountname -Manager $managerSAM -Credential $adcredentials
 }
 Else{
 write-host "The Line Manager doesn't appear to have an account on our domain, skipping..." -ForegroundColor White
 }
 
+Write-Host "Adding to the relevant AD groups..." -ForegroundColor Yellow
+<#--------Add to relevant AD groups--------#>
+#Prompt to add to all permanent staff
+If("y" -eq $allpermanentstaffadgroupprompt){
+Add-ADGroupMember -Identity "All Permanent Staff" -members $SAMaccountname -Credential $adCredentials
+}
+Else{
+write-host "Okay, we won't add $($upn) to the All Permanent Staff group" -ForegroundColor White
+}
+#If London based, add to Taper Building AD group
+If(("London, GBR" -eq $office) -and ("y" -eq $allpermanentstaffadgroupprompt)){
+    Write-Host "We'll add the new starter to the Taper Building AD group...." -ForegroundColor White
+    Add-ADGroupMember -Identity "The Taper Building" -members $SAMaccountname -Credential $adCredentials
+    Write-Host "...and the AlwaysOn VPN Users group"
+    Add-ADGroupMember -Identity "AlwaysOn VPN Users" -members $SAMaccountname -Credential $adCredentials
+    }
+    Else{
+    }
+#Add to AlwaysOn VPN AD Group if Bristol based
+If(("Bristol, GBR" -eq $office) -and ("y" -eq $allpermanentstaffadgroupprompt)){
+    Write-Host "We'll add them to the AlwaysOn VPN Users group"
+    Add-ADGroupMember -Identity "AlwaysOn VPN Users" -members $SAMaccountname -Credential $adCredentials
+    }
+    Else{
+    }          
 }
 }
 <#
@@ -128,7 +146,7 @@ function create-msolUser{
             [String]$plaintextpassword
             )
 
-        Try{
+Try{
         #create the Mailbox rather than the MSOLUser, which will effectively create an unlicensed E1 user
         if(![string]::IsNullOrWhiteSpace($upn)){New-Mailbox -Name $upn.Replace("."," ").Split("@")[0] -Password (ConvertTo-SecureString -AsPlainText $plaintextpassword -Force) -MicrosoftOnlineServicesID $upn}
         }
@@ -136,7 +154,7 @@ function create-msolUser{
         Write-Error "Failed to create new Msol user [$($upn)] in create-msoluser"
         Write-Error $_
         }
-
+    }
 <#
 .SYNOPSIS
 Creates Msol User object by first creating a new mailbox, which will create an unlicensed E1 user.
@@ -144,7 +162,7 @@ Creates Msol User object by first creating a new mailbox, which will create an u
 .EXAMPLE
 create-msolUser -upn "jo.bloggs@anthesisgroup.com" -plaintextpassword $plaintextpassword
 #>
-}
+
 
 
 #done! :) Main licensing tested - issues with having $lO and remove license on same line as add license
@@ -173,9 +191,9 @@ function license-msolUser{
         }
         Write-Host -ForegroundColor Yellow "Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $($licenseToAssign.AccountSkuId) -RemoveLicenses $($licenseToRemove.AccountSkuId)"
         $LO = New-MsolLicenseOptions -AccountSkuId "AnthesisLLC:ENTERPRISEPACK" -DisabledPlans "YAMMER_ENTERPRISE" #restrict Yammer
-        write-host "****************Adding licenses****************" -ForegroundColor Yellow
+        write-host "Adding licenses: $($licenseToAssign.AccountSkuId)" -ForegroundColor Yellow
         Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $($licenseToAssign.AccountSkuId)
-        write-host "****************Removing licenses****************" -ForegroundColor Yellow
+        write-host "Removing licenses: Yammer" -ForegroundColor Yellow
         Set-MsolUserLicense -UserPrincipalName $upn -RemoveLicenses $($licenseToRemove.AccountSkuId) -LicenseOptions $LO     
         }
         Catch{
