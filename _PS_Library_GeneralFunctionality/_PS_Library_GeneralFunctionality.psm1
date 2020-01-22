@@ -241,7 +241,42 @@ function get-2letterIsoCodeFromCountryName($pCountryName){
     $3letterCode = get-3letterIsoCodeFromCountryName -pCountryName $pCountryName
     get-2letterIsoCodeFrom3LetterIsoCode -p3letterIsoCode $3letterCode
     }
-function get-azureAdBitlockerHeader{
+function get-available365licensecount{
+        [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="LicenseType")]
+            [ValidateSet("E1", "E3", "EMS", "All")]
+            [string[]]$licensetype
+            )
+            if(![string]::IsNullOrWhiteSpace($licensetype)){
+                    switch ($licensetype){
+                        "E1" {
+                            $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
+                        }
+                        "E3" {
+                            $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
+                        }
+                        "EMS"{
+                            $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+                        }
+                        "All"{
+                            $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
+                            $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
+                            $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+                            }
+                        
+                        }
+                        If(("E1" -eq $licensetype) -or ("E3" -eq $licensetype) -or ("EMS" -eq $licensetype)){
+                            Write-Host "$($licensetype)" "license count:" "$($availableLicenses.ConsumedUnits)"  "/"  "$($availableLicenses.ActiveUnits)" -ForegroundColor Yellow
+                        }
+                        Else{
+                            Write-Host "Available E1 license count: "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available E3 license count: "$($availableE3Licenses.ConsumedUnits)"  "/"  "$($availableE3Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available EMS license count: "$($availableEMSLicenses.ConsumedUnits)"  "/"  "$($availableEMSLicenses.ActiveUnits)"" -ForegroundColor Yellow
+                        }
+            }
+}
+    function get-azureAdBitlockerHeader{
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $false)]
@@ -770,4 +805,4 @@ function stringify-hashTable($hashtable,$interlimiter,$delimiter){
     }
 #endregion
 
-[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR([securestring]"01000000d08c9ddf0115d1118c7a00c04fc297eb0100000098686d30eb8df74dbe30d227c42550070000000002000000000003660000c000000010000000965452f3921e8bfddd5b92b77cf97f330000000004800000a0000000100000006f2548d0c1ddd768f970c367f0e751ce880000004b4f456962e2b3bb513df1ad7cefb48d5ce77f1be8641e7209d76277c6d596c475357995b7e235b3aaaa8cce021ed11c6dece0dc167ce9305f6aa4b91e502b5663867e53dcf003ecf79d4786bc70554cac9056612d3b7a39e493c671dd3d718b1cd5029bc345fea86317420731aa6376bcc93ecb2f8d34812d1337c4bb6400f20d52149c5cb1d857140000006852086fdb72daaf6654933d29d87a521401e1f9")
+#[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR([securestring]"01000000d08c9ddf0115d1118c7a00c04fc297eb0100000098686d30eb8df74dbe30d227c42550070000000002000000000003660000c000000010000000965452f3921e8bfddd5b92b77cf97f330000000004800000a0000000100000006f2548d0c1ddd768f970c367f0e751ce880000004b4f456962e2b3bb513df1ad7cefb48d5ce77f1be8641e7209d76277c6d596c475357995b7e235b3aaaa8cce021ed11c6dece0dc167ce9305f6aa4b91e502b5663867e53dcf003ecf79d4786bc70554cac9056612d3b7a39e493c671dd3d718b1cd5029bc345fea86317420731aa6376bcc93ecb2f8d34812d1337c4bb6400f20d52149c5cb1d857140000006852086fdb72daaf6654933d29d87a521401e1f9")

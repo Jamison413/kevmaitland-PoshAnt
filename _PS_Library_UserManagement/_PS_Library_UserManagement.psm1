@@ -26,48 +26,53 @@ Param (
         [System.Management.Automation.PSCredential]$adCredentials
     ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
     [ValidateSet("Andorra, AND", "Barcelona, ESP", "Bogota, COL","Boulder, CO, USA","Bristol, GBR","Dubai, ARE","Emeryville, CA, USA","Frankfurt, DEU","Helsinki, FIN","London, GBR","Macclesfield, GBR","Madrid, ESP","Manchester, GBR","Manila, PHL","Manlleu, ESP","Nuremberg, DEU","Oxford, GBR","Rome, ITA","Stockholm, SWE","Tormarton, GBR")]
-        [String[]]$primaryoffice
-    ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-        [String]$twitteraccount
-    ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-        [String]$website
-    ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-        [String]$DDI
-    ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-        [String]$ouDn
-    ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-        [String]$upnsuffix
-    ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-        [String]$receptionDDI
+        [String[]]$office
+    ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+    [String]$allpermanentstaffadgroupprompt
+    ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+    [String]$SAMaccountname
     )
 
 #Get BU details
 
 switch ($businessunit) {
     "Anthesis Energy UK Ltd (GBR)" {$upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
-    "Anthesis (UK) Ltd (GBR)"  {write-host -ForegroundColor Magenta "AUK, but creating Sustain account"; $upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
+    "Anthesis (UK) Ltd (GBR)"  {$upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
     "Anthesis Consulting Group Ltd (GBR)" {}
     "Anthesis LLC" {}
     default {Write-Host -ForegroundColor DarkRed "Warning: Could not not identify Business Unit [$businessunit]"}
     }
 write-host "Business Unit is $($businessunit)" -ForegroundColor White
+
+
+
 #Create AD account
+write-host "*******************This is what we will try to set:*******************" -ForegroundColor White
+write-host "ad upn: $($upn)" -ForegroundColor Yellow
+write-host "firstname: $($firstname)" -ForegroundColor Yellow
+write-host "lastname: $($lastname)" -ForegroundColor Yellow
+write-host "displayname: $($displayname)" -ForegroundColor Yellow
+write-host "jobtitle: $($jobtitle)" -ForegroundColor Yellow
+write-host "businessunit: $($businessunit)" -ForegroundColor Yellow
+write-host "department: $($primaryteam)" -ForegroundColor Yellow
+write-host "managerSAM: $($managerSAM)" -ForegroundColor Yellow
+write-host "**********************************************************************" -ForegroundColor White
 
 if(![string]::IsNullOrWhiteSpace($upn)){New-ADUser -Name $upn.Replace("."," ").Split("@")[0] `
     -AccountPassword (ConvertTo-SecureString $plaintextpassword -AsPlainText -force) `
     -CannotChangePassword $False `
     -ChangePasswordAtLogon $False `
     -Company $businessunit `
-    -Department $displayname `
+    -DisplayName $displayname `
+    -Department  $primaryteam `
     -Enabled $True `
     -Fax $twitteraccount `
     -GivenName $firstname `
     -HomePage $website `
-    -Manager $(Get-ADUser -Filter {SamAccountName -like $managerSAM}) `
     -OfficePhone $DDI `
     -Path $ouDn `
-    -SAMAccountName $($upn.Split("@")[0]) `
-    -surname $surname `
+    -SAMAccountName $SAMAccountName `
+    -Surname $surname `
     -Title $jobtitle `
     -UserPrincipalName "$($upn.Split("@")[0])$upnsuffix" `
     -EmailAddress "$($upn.Split("@")[0])$upnsuffix" `
@@ -75,12 +80,50 @@ if(![string]::IsNullOrWhiteSpace($upn)){New-ADUser -Name $upn.Replace("."," ").S
     -Credential $adCredentials
     
 #Check the account was created and add the new account to a group if there is a primaryteam specified.
+$newAdUserAccount = Get-ADUser -filter {SamAccountName -eq $SAMaccountname} -Credential $adCredentials 
+Write-Host "Looks like the AD account for $($upn) was created successfully!" -ForegroundColor Green
 
-$newAdUserAccount = Get-ADUser -filter {UserPrincipalName -like $upn} -Credential $adCredentials 
-$primaryteam = Get-ADGroup -Filter {name -like $primaryteam} 
-if($primaryteam){
-        Write-Host "Adding [$($newAdUserAccount.Name)] to [$($primaryteam.Name)]"
-        Add-ADGroupMember -Identity $primaryteam.ObjectGUID -Members $newAdUserAccount -Credential $adCredentials
+<#--------Add to the primary team--------#>
+#$primaryteam = Get-ADGroup -Filter {name -like $primaryteam} 
+#if($primaryteam){
+ #       Write-Host "Adding [$($newAdUserAccount.Name)] to [$($primaryteam.Name)]"
+ #       Add-ADGroupMember -Identity $primaryteam.ObjectGUID -Members $newAdUserAccount -Credential $adCredentials
+#}
+
+<#--------Set Manager field (if the Manager has an AD account)--------#>
+$manager = (Get-ADUser -Filter {SamAccountName -eq $managerSAM} -Credential $adcredentials)
+If($manager){
+    Set-ADUser -Identity $SAMaccountname -Manager $managerSAM -Credential $adcredentials
+}
+Else{
+write-host "The Line Manager doesn't appear to have an account on our domain, skipping..." -ForegroundColor White
+}
+
+Write-Host "Adding to the relevant AD groups..." -ForegroundColor Yellow
+<#--------Add to relevant AD groups--------#>
+#Prompt to add to all permanent staff
+If("y" -eq $allpermanentstaffadgroupprompt){
+Add-ADGroupMember -Identity "All Permanent Staff" -members $SAMaccountname -Credential $adCredentials
+}
+Else{
+write-host "Okay, we won't add $($upn) to the All Permanent Staff group" -ForegroundColor White
+}
+#If London based, add to Taper Building AD group
+If(("London, GBR" -eq $office) -and ("y" -eq $allpermanentstaffadgroupprompt)){
+    Write-Host "We'll add the new starter to the Taper Building AD group...." -ForegroundColor White
+    Add-ADGroupMember -Identity "The Taper Building" -members $SAMaccountname -Credential $adCredentials
+    Write-Host "...and the AlwaysOn VPN Users group"
+    Add-ADGroupMember -Identity "AlwaysOn VPN Users" -members $SAMaccountname -Credential $adCredentials
+    }
+    Else{
+    }
+#Add to AlwaysOn VPN AD Group if Bristol based
+If(("Bristol, GBR" -eq $office) -and ("y" -eq $allpermanentstaffadgroupprompt)){
+    Write-Host "We'll add them to the AlwaysOn VPN Users group"
+    Add-ADGroupMember -Identity "AlwaysOn VPN Users" -members $SAMaccountname -Credential $adCredentials
+    }
+    Else{
+    }          
 }
 }
 <#
@@ -88,10 +131,9 @@ if($primaryteam){
 Creates AD user object
 
 .EXAMPLE
-  create-ADUser -upn $upn -managerSAM $managerSAM -primaryteam $primaryteam -plaintextpassword $plaintextpassword -adCredentials $adCredentials -primaryoffice $primaryoffice -DDI $DDI -ouDn $ouDn -website $website -receptionDDI $receptionDDI -Fax $twitteraccount -jobtitle $jobtitle -upnsuffix $upnsuffix
+  create-ADUser -upn $upn -managerSAM $managerSAM -primaryteam $primaryteam -plaintextpassword $plaintextpassword -adCredentials $adCredentials -office $office -DDI $DDI -ouDn $ouDn -website $website -receptionDDI $receptionDDI -Fax $twitteraccount -jobtitle $jobtitle -upnsuffix $upnsuffix
 #>
 
-}
 
 
 #done! :)
@@ -104,7 +146,7 @@ function create-msolUser{
             [String]$plaintextpassword
             )
 
-        Try{
+Try{
         #create the Mailbox rather than the MSOLUser, which will effectively create an unlicensed E1 user
         if(![string]::IsNullOrWhiteSpace($upn)){New-Mailbox -Name $upn.Replace("."," ").Split("@")[0] -Password (ConvertTo-SecureString -AsPlainText $plaintextpassword -Force) -MicrosoftOnlineServicesID $upn}
         }
@@ -112,7 +154,7 @@ function create-msolUser{
         Write-Error "Failed to create new Msol user [$($upn)] in create-msoluser"
         Write-Error $_
         }
-
+    }
 <#
 .SYNOPSIS
 Creates Msol User object by first creating a new mailbox, which will create an unlicensed E1 user.
@@ -120,7 +162,7 @@ Creates Msol User object by first creating a new mailbox, which will create an u
 .EXAMPLE
 create-msolUser -upn "jo.bloggs@anthesisgroup.com" -plaintextpassword $plaintextpassword
 #>
-}
+
 
 
 #done! :) Main licensing tested - issues with having $lO and remove license on same line as add license
@@ -131,8 +173,8 @@ function license-msolUser{
             [String]$upn
        ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
             [String]$licensetype
-       ,[parameter(Mandatory = $true,ParameterSetName="UPN")]
-            [String]$usagelocation
+       #,[parameter(Mandatory = $true,ParameterSetName="UPN")]
+            #[String]$usagelocation
             )
 
 #Core 365 licensing
@@ -149,8 +191,10 @@ function license-msolUser{
         }
         Write-Host -ForegroundColor Yellow "Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $($licenseToAssign.AccountSkuId) -RemoveLicenses $($licenseToRemove.AccountSkuId)"
         $LO = New-MsolLicenseOptions -AccountSkuId "AnthesisLLC:ENTERPRISEPACK" -DisabledPlans "YAMMER_ENTERPRISE" #restrict Yammer
+        write-host "Adding licenses: $($licenseToAssign.AccountSkuId)" -ForegroundColor Yellow
         Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $($licenseToAssign.AccountSkuId)
-        Set-MsolUserLicense -UserPrincipalName $upn -RemoveLicenses $($licenseToRemove.AccountSkuId) -LicenseOptions $LO          
+        write-host "Removing licenses: Yammer" -ForegroundColor Yellow
+        Set-MsolUserLicense -UserPrincipalName $upn -RemoveLicenses $($licenseToRemove.AccountSkuId) -LicenseOptions $LO     
         }
         Catch{
         Write-Error "Failed to license new Msol user [$($upn)] in license-msoluser (Core 365 Licensing)"
@@ -160,7 +204,8 @@ function license-msolUser{
     Try{
         If("GB" -eq $usagelocation){
         $licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:EMS"}
-        Set-MsolUserLicense -UserPrincipalName $UPN -AddLicenses $licenseToAssign.AccountSkuId
+        write-host "****************Adding EMS license****************"
+        Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $licenseToAssign.AccountSkuId
         }
         Else{
         write-host "I Shouldn't have an EMS license (yet) - Usage Location is $($usagelocation)"
@@ -191,16 +236,23 @@ function update-msoluserdetails{
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$firstname
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-        [string]$lastName
+        [string]$lastname
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$displayname
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$primaryteam
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-        [ValidateSet("Andorra, AND", "Barcelona, ESP", "Bogota, COL","Boulder, CO, USA","Bristol, GBR","Dubai, ARE","Emeryville, CA, USA","Frankfurt, DEU","Helsinki, FIN","London, GBR","Macclesfield, GBR","Madrid, ESP","Manchester, GBR","Manila, PHL","Manlleu, ESP","Nuremberg, DEU","Oxford, GBR","Rome, ITA","Stockholm, SWE","Tormarton, GBR")]
-        [string[]]$primaryoffice
-        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$country
+        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+        [string]$streetaddress
+        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+        [string]$office
+        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+        [string]$city
+        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+        [string]$usagelocation
+        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+        [string]$postcode
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$jobtitle
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
@@ -213,22 +265,82 @@ function update-msoluserdetails{
 
 #If key details aren't null, set them on the Msol user object
 Try{
-if(![string]::IsNullOrWhiteSpace($firstname)){Set-MsolUser -UserPrincipal $upn -firstname $firstname}
-if(![string]::IsNullOrWhiteSpace($lastName)){Set-MsolUser -UserPrincipal $upn -LastName $lastName}
-if(![string]::IsNullOrWhiteSpace($displayname)){Set-MsolUser -UserPrincipal $upn -displayname $displayname}
-if(![string]::IsNullOrWhiteSpace($country)){Set-MsolUser -UserPrincipal $upn -Country $country}
-if(![string]::IsNullOrWhiteSpace($jobtitle)){Set-MsolUser -UserPrincipal $upn -title $jobtitle}
-if(![string]::IsNullOrWhiteSpace($primaryoffice)){Set-MsolUser -UserPrincipal $upn -City $primaryoffice}
+    write-host "Setting Firstname user: $($upn): $($firstname)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($firstname)){Set-MsolUser -UserPrincipal $upn -firstname $firstname}
 }
-catch{
-    Write-Error "Failed to update msoluser object [$($upn)] in update-msoluser"
-    Write-Error $_
+Catch{
+    Write-Error "Failed to update msoluser object firstname [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting lastname user: $($upn): $($lastname)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($lastname)){Set-MsolUser -UserPrincipal $upn -lastname $lastname}
+}
+Catch{
+    Write-Error "Failed to update msoluser object lastname [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting displayname user: $($upn): $($displayname)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($displayname)){Set-MsolUser -UserPrincipal $upn -displayname $displayname}
+}
+Catch{
+    Write-Error "Failed to update msoluser object displayname [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting country user: $($upn): $($country)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($country)){Set-MsolUser -UserPrincipal $upn -Country $country}
+}
+Catch{
+    Write-Error "Failed to update msoluser object country [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting jobtitle user: $($upn): $($jobtitle)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($jobtitle)){Set-MsolUser -UserPrincipal $upn -title $jobtitle}
+}
+Catch{
+    Write-Error "Failed to update msoluser object jobtitle [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting city user: $($upn): $($city)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($city)){Set-MsolUser -UserPrincipal $upn -City $city}
+}
+Catch{
+    Write-Error "Failed to update msoluser object city [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting usagelocation user: $($upn): $($usagelocation)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($city)){Set-MsolUser -UserPrincipal $upn -UsageLocation $usagelocation}
+}
+Catch{
+    Write-Error "Failed to update msoluser object city [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting streetaddress user: $($upn): $($streetaddress)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($streetaddress)){Set-MsolUser -UserPrincipal $upn -StreetAddress $streetaddress}
+}
+Catch{
+    Write-Error "Failed to update msoluser object streetaddress [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting postcode user: $($upn): $($postcode)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($postcode)){Set-MsolUser -UserPrincipal $upn -PostalCode $postcode}
+}
+Catch{
+    Write-Error "Failed to update msoluser object postcode [$($upn)] in update-msoluser"
+} 
+Try{
+    write-host "Setting office user: $($upn): $($office)" -ForegroundColor Yellow
+    if(![string]::IsNullOrWhiteSpace($office)){Set-MsolUser -UserPrincipal $upn -Office $office}
+}
+Catch{
+    Write-Error "Failed to update msoluser object office [$($upn)] in update-msoluser"
+} 
+
 }
 <#
 .SYNOPSIS
 Updates Msol User object with correct details, such as first name, last name, etc.
 #>
-}
+
 
 
 
@@ -240,17 +352,18 @@ function update-msolusercoregroups{
         [PSObject]$upn
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [ValidateSet("Andorra, AND", "Barcelona, ESP", "Bogota, COL","Boulder, CO, USA","Bristol, GBR","Dubai, ARE","Emeryville, CA, USA","Frankfurt, DEU","Helsinki, FIN","London, GBR","Macclesfield, GBR","Madrid, ESP","Manchester, GBR","Manila, PHL","Manlleu, ESP","Nuremberg, DEU","Oxford, GBR","Rome, ITA","Stockholm, SWE","Tormarton, GBR")]
-        [string[]]$primaryoffice
+        [string[]]$office
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$businessunit
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-        [string]$365regionalgroup
+        [string]$regionalgroup
     )
 
 #If key details aren't null, let's add the msoluser to the correct regional group based on Office location (from Term Store)
 Try{
-    if(![string]::IsNullOrWhiteSpace($primaryoffice)){
-    Add-DistributionGroupMember -Identity $365regionalgroup -Member $upn -BypassSecurityGroupManagerCheck 
+    if(![string]::IsNullOrWhiteSpace($office)){
+        write-host "Adding to regionalgroup: $($office)"
+    Add-DistributionGroupMember -Identity $regionalgroup -Member $upn -BypassSecurityGroupManagerCheck 
     }
     }
     catch{
@@ -260,13 +373,25 @@ Try{
     #If they are in one of the GBR business units, add them to the MDM BYOD group
     try {
     if(![string]::IsNullOrWhiteSpace($businessunit) -and (("Anthesis Energy UK Ltd (GBR)" -eq $businessunit) -or ("Anthesis (UK) Ltd (GBR)" -eq $businessunit) -or ("Anthesis Consulting Group Ltd (GBR)" -eq $businessunit))){
-    Add-DistributionGroupMember -Identity "b264f337-ef04-432e-a139-3574331a4d18" -Member $upn -BypassSecurityGroupManagerCheck
+    write-host "Adding to MDM BYOD Group"
+        Add-DistributionGroupMember -Identity "b264f337-ef04-432e-a139-3574331a4d18" -Member $upn -BypassSecurityGroupManagerCheck
     }
     }
     catch {
         Write-Error "Failed to update msoluser group membership for MDM BYOD group [$($upn)] in update-msoluser"
         Write-Error $_
     }
+    try {
+        if(![string]::IsNullOrWhiteSpace($businessunit) -and (("Anthesis Energy UK Ltd (GBR)" -eq $businessunit) -or ("Anthesis (UK) Ltd (GBR)" -eq $businessunit) -or ("Anthesis Consulting Group Ltd (GBR)" -eq $businessunit))){
+        write-host "Adding to All Sharepoint Users"
+        Add-DistributionGroupMember -Identity "f30dfb2c-88d4-4e4d-8953-3d68f0d92a9e" -Member $upn -BypassSecurityGroupManagerCheck
+        }
+        }
+        catch {
+            Write-Error "Failed to update msoluser group membership for All Sharepoint Users [$($upn)] in update-msoluser"
+            Write-Error $_
+        }
+    
 <#
 .SYNOPSIS
 Updates Msol User object with correct core groups, such as regional and MDM groups.
@@ -302,7 +427,7 @@ function update-msolMailboxViaUpn{
             ,[parameter(Mandatory = $false,ParameterSetName="Mailbox")]
         [parameter(Mandatory = $false,ParameterSetName="UPN")]
         [ValidateSet("Andorra, AND", "Barcelona, ESP", "Bogota, COL","Boulder, CO, USA","Bristol, GBR","Dubai, ARE","Emeryville, CA, USA","Frankfurt, DEU","Helsinki, FIN","London, GBR","Macclesfield, GBR","Madrid, ESP","Manchester, GBR","Manila, PHL","Manlleu, ESP","Nuremberg, DEU","Oxford, GBR","Rome, ITA","Stockholm, SWE","Tormarton, GBR")]
-            [string[]]$primaryoffice
+            [string[]]$office
         )
 
     switch ($PsCmdlet.ParameterSetName){
@@ -314,20 +439,20 @@ function update-msolMailboxViaUpn{
         if(![string]::IsNullOrWhiteSpace($displayname)){Set-Mailbox -Identity $upn -displayname $displayname}
         if(![string]::IsNullOrWhiteSpace($businessunit)){Set-Mailbox -Identity $upn -CustomAttribute1 $businessunit}
         if(![string]::IsNullOrWhiteSpace($linemanager)){Set-User -Identity $upn -Manager $linemanager}
+        if(![string]::IsNullOrWhiteSpace($timezone)){Set-MailboxRegionalConfiguration -Identity $upn -timezone $timezone}
         }
     catch{
         Write-Error "Failed to set displayname or CustomAttribute1 on mailbox [$($upn)] in update-msolMailbox"
         Write-Error $_
         }
-    if(![string]::IsNullOrWhiteSpace($primaryoffice)){
-        #Get the correct timezone from term store by Office
-        $OfficeTerm = Get-PnPTerm -Identity $($primaryoffice) -TermGroup "Anthesis" -TermSet "Offices" -Includes CustomProperties
-        $timezone = $($OfficeTerm.CustomProperties.timezone)
-        if(![string]::IsNullOrWhiteSpace($timezone)){Set-MailboxRegionalConfiguration -Identity $upn -timezone $timezone}
-        }
+    try{
     Set-Mailbox -Identity $upn -Alias $($upn.Split("@")[0]) -AuditEnabled $true -AuditLogAgeLimit 180 -AuditAdmin Update, MoveToDeletedItems, SoftDelete, HardDelete, SendAs, SendOnBehalf, Create, UpdateFolderPermission -AuditDelegate Update, SoftDelete, HardDelete, SendAs, Create, UpdateFolderPermissions, MoveToDeletedItems, SendOnBehalf -AuditOwner UpdateFolderPermission, MailboxLogin, Create, SoftDelete, HardDelete, Update, MoveToDeletedItems 
     }
-    
+    catch{
+        Write-Error "Failed to set audit info [$($upn)] in update-msolMailbox"
+        Write-Error $_
+    }
+}    
 
 <#Kev's example/#>
 
@@ -353,7 +478,7 @@ function update-sharePointConfig{
         
         Try{
             Write-Host "Setting Sharepoint initial config" -ForegroundColor Yellow
-            Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-RegionalSettings-FollowWeb' -Value "False"
+            if(![string]::IsNullOrWhiteSpace($timezoneID)){Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-RegionalSettings-FollowWeb' -Value "False"}
             Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-RegionalSettings-Initialized' -Value "True"
             Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-timezone' -Value $($timezoneID)
             Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-Locale' -Value $($countrylocale)
