@@ -493,6 +493,58 @@ function import-encryptedCsv(){
         }
     $decryptedObject
     }
+function invoke-graphGet(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$graphQuery
+        )
+    $sanitisedGraphQuery = $graphQuery.Trim("/")
+    Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
+    }
+function invoke-graphPatch(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$graphQuery
+        ,[parameter(Mandatory = $true)]
+            [Hashtable]$graphBodyHashtable
+        )
+
+    $sanitisedGraphQuery = $graphQuery.Trim("/")
+    Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+        
+    $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable
+    Write-Verbose $graphBodyJson
+    $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
+    
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Patch
+    }
+function invoke-graphPost(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$graphQuery
+        ,[parameter(Mandatory = $true)]
+            [Hashtable]$graphBodyHashtable
+        )
+
+    $sanitisedGraphQuery = $graphQuery.Trim("/")
+    Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+        
+    $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable
+    Write-Verbose $graphBodyJson
+    $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
+    
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+    }
 function log-action($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`tACTION:`t$myMessage") -Path $logFile}
     if(!$doNotLogToScreen -or $logToScreen){Write-Host -ForegroundColor Yellow $myMessage}
@@ -650,6 +702,10 @@ function sanitise-forResourcePath($dirtyString){
         $dirtyString
         }
     }
+function sanitise-forSql([string]$dirtyString){
+    if([string]::IsNullOrWhiteSpace($dirtyString)){}
+    else{$dirtyString.Replace("'","`'`'").Replace("`'`'","`'`'")}
+    }
 function sanitise-forSqlValue{
     [cmdletbinding()]
     Param (
@@ -669,10 +725,6 @@ function sanitise-forSqlValue{
         "Guid"   {if([string]::IsNullOrWhiteSpace($value)){"NULL"}else{"`'$value`'"}} #This could be handled better
         "Date"   {if([string]::IsNullOrWhiteSpace($value)){"NULL"}else{"`'"+$(Get-Date (smartReplace -mysteryString $value -findThis "+0000" -replaceWithThis "") -Format s)+"`'"}}
         }
-    }
-function sanitise-forSql([string]$dirtyString){
-    if([string]::IsNullOrWhiteSpace($dirtyString)){}
-    else{$dirtyString.Replace("'","`'`'").Replace("`'`'","`'`'")}
     }
 function sanitise-forTermStore($dirtyString){
     #$dirtyString.Replace("\t", " ").Replace(";", ",").Replace("\", "\uFF02").Replace("<", "\uFF1C").Replace(">", "\uFF1E").Replace("|", "\uFF5C")
