@@ -253,10 +253,10 @@ function get-available365licensecount{
               $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
               write-host "E1 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
               If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
-              write-host "There are available E1 licenses!"
+              write-host "There are available E1 licenses!" -ForegroundColor Green
               }
               Else{
-              write-host "There are no available E1 licenses! Please procure one before running the script if you want the licensing to be applied via Powershell"
+              write-host "There are no available E1 licenses! Please procure one before running the script if you want the licensing to be applied via Powershell" -ForegroundColor Red
               }
               $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
               $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
