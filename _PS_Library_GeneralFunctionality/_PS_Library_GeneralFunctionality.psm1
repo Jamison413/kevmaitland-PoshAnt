@@ -245,24 +245,36 @@ function get-available365licensecount{
         [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true,ParameterSetName="LicenseType")]
-            [PSObject]$LicenseType
+            [ValidateSet("E1", "E3", "EMS", "All")]
+            [string[]]$licensetype
             )
-
-            if(![string]::IsNullOrWhiteSpace($licenseType)){
-
-              $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
-              write-host "E1 License count:" "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"
-              If($availableE1Licenses.ConsumedUnits -ne $availableE1Licenses.ActiveUnits){
-              write-host "There are available E1 licenses!" -ForegroundColor Green
-              }
-              Else{
-              write-host "There are no available E1 licenses! Please procure one before running the script if you want the licensing to be applied via Powershell" -ForegroundColor Red
-              }
-              $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
-              $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+            if(![string]::IsNullOrWhiteSpace($licensetype)){
+                    switch ($licensetype){
+                        "E1" {
+                            $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
+                        }
+                        "E3" {
+                            $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
+                        }
+                        "EMS"{
+                            $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+                        }
+                        "All"{
+                            $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
+                            $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
+                            $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+                            }
+                        
+                        }
+                        If(("E1" -eq $licensetype) -or ("E3" -eq $licensetype) -or ("EMS" -eq $licensetype)){
+                            Write-Host "$($licensetype)" "license count:" "$($availableLicenses.ConsumedUnits)"  "/"  "$($availableLicenses.ActiveUnits)" -ForegroundColor Yellow
+                        }
+                        Else{
+                            Write-Host "Available E1 license count: "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available E3 license count: "$($availableE3Licenses.ConsumedUnits)"  "/"  "$($availableE3Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available EMS license count: "$($availableEMSLicenses.ConsumedUnits)"  "/"  "$($availableEMSLicenses.ActiveUnits)"" -ForegroundColor Yellow
+                        }
             }
-
-
 }
     function get-azureAdBitlockerHeader{
     [cmdletbinding()]

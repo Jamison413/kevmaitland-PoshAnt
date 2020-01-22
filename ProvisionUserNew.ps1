@@ -19,13 +19,6 @@
 <#------------------------------------------------------------------------------------------------------#>
 
 
-
-
-
-
-
-
-
 #######################
 #                     #
 #        Setup        #
@@ -62,9 +55,8 @@ $adCredentials = Get-Credential -Message "Enter local AD Administrator credentia
 
 #Just in case you want to save yourself a few more clicks, this will show you currently available licensing
 
-get-available365licensecount -LicenseType "E3"
-get-available365licensecount -LicenseType "E1"
-get-available365licensecount -LicenseType "EMS" #Need to fix the colours in this ones, why are they like 3 different outputs??
+get-available365licensecount -licensetype "all"
+
 
 
 <#--------Create Meta-Functions--------#>
@@ -174,7 +166,7 @@ $officeterm = Get-PnPTerm -Identity $($thisUser.FieldValues.Main_x0020_Office0.L
 $regionalgroup = (Get-DistributionGroup -Identity $officeterm.CustomProperties.'365 Regional Group').guid
 $country = $officeTerm.CustomProperties.Country
    
-#Create the 365 user
+#365 user account: Create the 365 user
 write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) first, which will create the unliscensed 365 E1 user"    
     provision-365user -upn ($upn = (remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) `
     -plaintextpassword ($plaintextpassword = "Anthesis123") `
@@ -202,8 +194,7 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -countrylocale = ($countrylocale = "2057") `
 
     
-
-#If user will be based in Bristol or London office, offer to create an AD user account
+#AD user account: If user will be based in Bristol or London office, offer to create an AD user account
 If((![string]::IsNullOrWhiteSpace($upn)) -and (("Bristol, GBR" -eq $office) -or ("London, GBR" -eq $office))){
 write-host "It looks like this user will either be based in the Bristol or London offices." -ForegroundColor Yellow
 $confirmation = Read-Host "Create an AD account? (y/n)"
