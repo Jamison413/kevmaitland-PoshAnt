@@ -118,6 +118,11 @@ function add-netSuiteAccountToSharePoint{
         Write-Verbose "$($newGraphList.list.template) [$($newGraphList.webUrl)][$($newGraphList.parentReference) | $($newGraphList.id)] created with displayName [$($newGraphList.displayName)]"
         $updateSqlRecord = $true
         }
+    
+    if($graphDrive){ #If we've got a /drive object now, try creating the standard folders
+        $standardClientFolders = @("_These Client Document Libraries are created automatically by NetSuite","_These Client Document Libraries are created automatically by NetSuite\_That's clever!","_These Client Document Libraries are created automatically by NetSuite\Create a Client in NetSuite and see" )
+        add-graphArrayOfFoldersToDrive -graphDriveId $graphDrive.id -foldersAndSubfoldersArray $standardClientFolders -tokenResponse $tokenResponse -conflictResolution Fail
+        }
 
     if($updateSqlRecord){#If we think we should update this record from re-processings on the next cycle
         Write-Verbose "Updating SQL record after successful proccesing"
