@@ -1,4 +1,138 @@
-﻿function combine-url($arrayOfStrings){
+﻿function add-graphArrayOfFoldersToDrive(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="DriveId")]
+            [string]$graphDriveId 
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveObject")]
+            [string]$graphDriveObject 
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject")]
+            [array]$foldersAndSubfoldersArray
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject")]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject")]
+            [ValidateSet(“Fail”,”Rename”,”Replace”)]
+            [string]$conflictResolution
+        )
+
+    switch ($PsCmdlet.ParameterSetName){
+        'DriveObject' {$graphDriveId = $graphDriveObject.Id}
+        }
+    Write-Verbose "add-graphArrayOfFoldersToDrive [$($graphDriveId)]"    
+    
+    #Prep the folders array (in case the user has provided junk like @("Test","test\test2\test3\test4","test","/test/TeSt2\")
+    $expandedFoldersAndSubfoldersArray = ,@()
+    $foldersAndSubfoldersArray | % {
+        $thisFolder = $_.Replace("\","/").Trim("/")
+        $expandingFolderPath = ""
+        $thisFolder.Split("/") | % {
+            $expandingFolderPath += "$_/"
+            $expandedFoldersAndSubfoldersArray += $expandingFolderPath.Trim("/")
+            }
+        }
+
+    $driveItemsToReturn = ,@()
+    #Iterate through our sanitised folder array and create the folders
+    $expandedFoldersAndSubfoldersArray | Sort-Object -Unique | ? {![string]::IsNullOrWhiteSpace($_)} | % {
+        $folderName = Split-Path $_ -Leaf
+        if($folderName -eq $_){ #If it is _just_ a folder (i.e. not a subfolder), just create it
+            try{
+                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -Verbose:$VerbosePreference -ErrorAction Stop
+                $driveItemsToReturn += $newFolder
+                }
+            catch{
+                if($_.Exception.Message -eq "The remote server returned an error: (409) Conflict."){ #If the folder already existed, get and return it
+                    $existingFolder = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/root:/$folderName"
+                    $driveItemsToReturn += $existingFolder
+                    }
+                else{Write-Error $_}
+                }
+            }
+        else{ #If it _is_ a subfolder, we also need to supply the relative path (and invoke-graphGet doesn't like a $null value for -relativePathToFolder)
+            try{
+                $relativePath = Split-Path $_ -Parent
+                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -Verbose:$VerbosePreference -ErrorAction Stop -relativePathToFolder $relativePath
+                $driveItemsToReturn += $newFolder
+                }
+            catch{
+                if($_.Exception.Message -eq "The remote server returned an error: (409) Conflict."){ #If the folder already existed, get and return it
+                    $existingFolder = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/root:/$relativePath/$folderName"
+                    $driveItemsToReturn += $existingFolder
+                    }
+                else{Write-Error $_}
+                }
+            }
+        }
+
+    $driveItemsToReturn
+    }
+function add-graphFolderToDrive(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="DriveId_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_Neither")]
+            [string]$graphDriveId 
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveObject_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Neither")]
+            [string]$graphDriveObject 
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_Neither")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Neither")]
+            [string]$folderName
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Id")]
+            [string]$parentItemId
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_RelativePath")]
+            [string]$relativePathToFolder
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_Neither")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Neither")]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName="DriveId_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveId_Neither")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Id")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_RelativePath")]
+            [parameter(Mandatory = $true,ParameterSetName="DriveObject_Neither")]
+            [ValidateSet(“Fail”,”Rename”,”Replace”)]
+            [string]$conflictResolution
+        )
+    switch ($PsCmdlet.ParameterSetName){
+        {$_ -match 'DriveObject'} {$graphDriveId = $graphDriveObject.Id}
+        {$_ -match 'RelativePath'} {
+            $useRelativePath = $true
+            $relativePathToFolder = $relativePathToFolder.Replace("\","/").Trim("/")
+            }
+        }
+
+    if($parentItemId){Write-Verbose "add-graphFolderToDrive [$($graphDriveId)]\[$($parentItemId)]\[$($folderName)]"}
+    else{Write-Verbose "add-graphFolderToDrive [$($graphDriveId)]\[$($folderName)] _[$($PsCmdlet.ParameterSetName)]_"}
+    
+    if(!$parentItemId){$parentItemId = "root"}
+
+    $folderHash = @{
+        "name"   = $folderName
+        "folder" = @{}
+        "@microsoft.graph.conflictBehavior" = "$($conflictResolution.ToLower())"
+        }
+    
+    if($useRelativePath){$graphQuery = "/drives/$graphDriveId/root:/$relativePathToFolder`:/children".Replace("root:/:/","root:/")}
+    else{$graphQuery = "/drives/$graphDriveId/items/$parentItemId/children".Replace("items/root","root")}
+    Write-Verbose $graphQuery
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery $graphQuery -graphBodyHashtable $folderHash -Verbose:$VerbosePreference
+    }
+function combine-url($arrayOfStrings){
     $output = ""
     $arrayOfStrings | % {
         $output += $_.TrimStart("/").TrimEnd("/")+"/"
@@ -276,7 +410,7 @@ function get-available365licensecount{
                         }
             }
 }
-    function get-azureAdBitlockerHeader{
+function get-azureAdBitlockerHeader{
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $false)]
