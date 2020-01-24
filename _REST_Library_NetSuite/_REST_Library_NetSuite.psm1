@@ -13,53 +13,6 @@ $AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'
 [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
-function add-netsuiteAccountToSqlCache{
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true)]
-        [PSCustomObject]$nsNetsuiteAccount 
-        ,[parameter(Mandatory = $true)]
-        [ValidateSet("Client","Supplier")]
-        [string]$accountType
-        ,[parameter(Mandatory = $true)]
-        [System.Data.Common.DbConnection]$dbConnection
-        )
-    Write-Verbose "add-netsuiteAccountToSqlCache [$($nsNetsuiteAccount.companyName)]"
-    $sql = "SELECT TOP 1 AccountName, NsInternalId, LastModified FROM ACCOUNTS WHERE NsInternalId = '$($nsNetsuiteAccount.Id)' ORDER BY LastModified Desc"
-    Write-Verbose "`t$sql"
-    $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
-    if((remove-diacritics $nsNetsuiteAccount.companyName) -eq (remove-diacritics $alreadyPresent.AccountName)){
-        if($(Get-Date $nsNetsuiteAccount.lastModifiedDate) -ne $(Get-Date $alreadyPresent.LastModified)){
-            Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] has been updated, but the name has not changed. Updating LastModified for existing record adn flagging as IsDirty = $false."
-            update-netSuiteAccountInSqlCache -nsNetsuiteAccount $nsNetsuiteAccount -dbConnection $dbConnection -isNotDirty
-            }
-        else{
-            Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] doesn't seem to have changed (probably caused by a lack of granularity in NetSuite's REST WHERE clauses). Not updating anything."
-            }
-        }
-    else{
-        if(!$alreadyPresent){Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] not present in SQL, adding to [ACCOUNTS]"}
-        else{Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] CompanyName has changed from [$($alreadyPresent.AccountName)] to [$($nsNetsuiteAccount.companyName)], adding new record to [ACCOUNTS]"}
-        $now = $(Get-Date)
-        $sql = "INSERT INTO ACCOUNTS (NsInternalId,NsExternalId,RecordType,AccountName,entityStatus,DateCreated,LastModified,IsDirty,DateCreatedInSql,DateModifiedInSql) VALUES ("
-        $sql += $(sanitise-forSqlValue -value $nsNetsuiteAccount.id -dataType String)
-        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.accountNumber -dataType String)
-        $sql += ","+$(sanitise-forSqlValue -value $accountType -dataType String)
-        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.companyName -dataType String)
-        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.entityStatus.refName -dataType String)
-        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.dateCreated -dataType Date)
-        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.lastModifiedDate -dataType Date)
-        $sql += ","+$(sanitise-forSqlValue -value $true -dataType Boolean)
-        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
-        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
-        $sql += ")"
-        Write-Verbose "`t$sql"
-        $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
-        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
-        else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
-        $result
-        }
-    }
 function add-netSuiteAccountToSharePoint{
     [cmdletbinding()]
     Param (
@@ -88,7 +41,7 @@ function add-netSuiteAccountToSharePoint{
         Write-Verbose "Looking for /drive by Id [$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)]"
         $graphDrive = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)"
         }
-    if(!$graphDrive){ #If we don't have a Graph DriveId, or the one we do have doesn't work (e.g. it's ben deleted and manually re-created), have a rummage and try to find it by DisplayName(name)
+    if(!$graphDrive){ #If we don't have a Graph DriveId, or the one we do have doesn't work (e.g. it's been deleted and manually re-created), have a rummage and try to find it by DisplayName(name)
         Write-Verbose "Couldn't find the /drive by Id, looking for Name in case it's been deleted and manually recreated. "
         $allDrivesInSite = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$correctSiteId/drives" -Verbose  #/drives does not support $filter (as of 2020-01-21)
         $graphDrive = $allDrivesInSite.value | ? {(remove-diacritics $_.name) -eq (remove-diacritics $sqlNetsuiteAccount.AccountName)}
@@ -124,7 +77,7 @@ function add-netSuiteAccountToSharePoint{
         add-graphArrayOfFoldersToDrive -graphDriveId $graphDrive.id -foldersAndSubfoldersArray $standardClientFolders -tokenResponse $tokenResponse -conflictResolution Fail
         }
 
-    if($updateSqlRecord){#If we think we should update this record from re-processings on the next cycle
+    if($updateSqlRecord){#If we think we should update this record to prevent re-processing on the next cycle
         Write-Verbose "Updating SQL record after successful proccesing"
         $sqlNetsuiteAccount.SharePointDocLibGraphDriveId = $graphDrive.id
         $sqlNetsuiteAccount.DateModifiedInSql = Get-Date
@@ -134,6 +87,173 @@ function add-netSuiteAccountToSharePoint{
         }
 
     $graphDrive #Return the /drives object (if found)
+    }
+function add-netsuiteAccountToSqlCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$nsNetsuiteAccount 
+        ,[parameter(Mandatory = $true)]
+        [ValidateSet("Client","Supplier")]
+        [string]$accountType
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "add-netsuiteAccountToSqlCache [$($nsNetsuiteAccount.companyName)]"
+    $sql = "SELECT TOP 1 AccountName, NsInternalId, LastModified FROM t_ACCOUNTS WHERE NsInternalId = '$($nsNetsuiteAccount.Id)' ORDER BY LastModified Desc"
+    Write-Verbose "`t$sql"
+    $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    if((remove-diacritics $nsNetsuiteAccount.companyName) -eq (remove-diacritics $alreadyPresent.AccountName)){
+        if($(Get-Date $nsNetsuiteAccount.lastModifiedDate) -ne $(Get-Date $alreadyPresent.LastModified)){
+            Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] has been updated, but the name has not changed. Updating LastModified for existing record adn flagging as IsDirty = $false."
+            update-netSuiteAccountInSqlCache -nsNetsuiteAccount $nsNetsuiteAccount -dbConnection $dbConnection -isNotDirty
+            }
+        else{
+            Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] doesn't seem to have changed (probably caused by a lack of granularity in NetSuite's REST WHERE clauses). Not updating anything."
+            }
+        }
+    else{
+        if(!$alreadyPresent){Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] not present in SQL, adding to [ACCOUNTS]"}
+        else{Write-Verbose "`tNsInternalId [$($nsNetsuiteAccount.Id)] CompanyName has changed from [$($alreadyPresent.AccountName)] to [$($nsNetsuiteAccount.companyName)], adding new record to [ACCOUNTS]"}
+        $now = $(Get-Date)
+        $sql = "INSERT INTO t_ACCOUNTS (NsInternalId,NsExternalId,RecordType,AccountName,CustomerNumber,entityId,entityStatus,DateCreated,LastModified,IsDirty,DateCreatedInSql,DateModifiedInSql) VALUES ("
+        $sql += $(sanitise-forSqlValue -value $nsNetsuiteAccount.id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.accountNumber -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $accountType -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.companyName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $($nsNetsuiteAccount.entityId.Split(" ")[0]) -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.entityId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.entityStatus.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.dateCreated -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteAccount.lastModifiedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $true -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
+        $sql += ")"
+        Write-Verbose "`t$sql"
+        $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
+        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+        else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+        $result
+        }
+    }
+function add-netSuiteProjectToSharePoint{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$sqlNetsuiteProject 
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        ,[parameter(Mandatory = $true)]
+        [psobject]$tokenResponse
+        )
+    Write-Verbose "add-netSuiteProjectToSharePoint [$($sqlNetsuiteProject.entityId)]"
+
+    #Check if the folder already exists
+    #Get Drive Id
+    $sqlNetSuiteClient = get-netSuiteClientFromSqlCache -dbConnection $dbConnection -sqlWhereClause "WHERE NsInternalId = '$($sqlNetsuiteProject.AccountNsInternalId)'"
+    if(![string]::IsNullOrWhiteSpace($sqlNetsuiteProject.SharePointDriveItemId)){
+        Write-Verbose "Looking for /drive/{drive-id}/items/{item-id} by Id [$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)]"
+        $graphDriveItem = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetSuiteClient.SharePointDocLibGraphDriveId)/items/$($sqlNetsuiteProject.SharePointDriveItemId)" -ErrorAction SilentlyContinue
+        }
+    else{Write-Error "Unable to find SharePointDocLibGraphDriveId for Client [$($sqlNetsuiteProject.AccountNsInternalId)][$($sqlNetSuiteClient.AccountName)]. Cannot attempt to create Project Folders.";break}
+
+    if(!$graphDriveItem){#If we don't have a Graph DriveItemId, or the one we do have doesn't work (e.g. it's been deleted and manually re-created), have a rummage and try to find it by DisplayName(name)
+        Write-Verbose "Couldn't find the /drive/{drive-id}/items/{item-id} by Id, looking for Name in case it's been deleted and manually recreated. "
+        $allGraphDriveRootItems = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetSuiteClient.SharePointDocLibGraphDriveId)/root/children" #/drives does not support $filter (as of 2020-01-21)
+        $graphDriveItem = $allGraphDriveRootItems.value | ? {$(remove-diacritics $_.name) -eq $(remove-diacritics $sqlNetsuiteProject.entityId)}
+        }
+
+    if($graphDriveItem){#If we've found an existing item, check whether it needs updating
+        if($(remove-diacritics $_.name) -ne $(remove-diacritics $sqlNetsuiteProject.entityId)){ #Update the Project/folder name if it's changed
+            $folderUpdateHash = @{"name"="$($sqlNetsuiteProject.entityId)"}
+            Write-Verbose "Updating name from [$($graphDriveItem.name)] to [$($sqlNetsuiteProject.entityId)] for Project [$($graphDriveItem.webUrl)] | $($graphDriveItem.id)]"
+            $updatedGraphDriveItem = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetSuiteClient.SharePointDocLibGraphDriveId)/items/$($sqlNetsuiteProject.SharePointDriveItemId)" -graphBodyHashtable $folderUpdateHash
+            Write-Verbose "[$($updatedGraphDriveItem.webUrl)] | $($updatedGraphDriveItem.id)] changed displayName from [$($graphDriveItem.name)] to [$($updatedGraphDriveItem.name)]"
+            $updateSqlRecord = $true
+            }
+        else{$updateSqlRecord = $true} #We don't need to process anything in SharePoint if the Displayname hasn't changed, just prevent this record from re-processings on the next cycle
+        }
+    else{#If we still can't find an existing item, create a new one
+        $arrayOfProjectFolders = @(
+            "$($sqlNetsuiteProject.entityId)"
+            ,"$($sqlNetsuiteProject.entityId)\Admin & contracts"
+            ,"$($sqlNetsuiteProject.entityId)\Analysis"
+            ,"$($sqlNetsuiteProject.entityId)\Data $ refs"
+            ,"$($sqlNetsuiteProject.entityId)\Meetings"
+            ,"$($sqlNetsuiteProject.entityId)\Proposal"
+            ,"$($sqlNetsuiteProject.entityId)\Reports"
+            ,"$($sqlNetsuiteProject.entityId)\Summary (marketing) - end of project"
+            )
+        $newProjectFolders = add-graphArrayOfFoldersToDrive -graphDriveId $sqlNetSuiteClient.SharePointDocLibGraphDriveId -foldersAndSubfoldersArray $arrayOfProjectFolders -tokenResponse $tokenResponse -conflictResolution Fail
+        $graphDriveItem = $newProjectFolders | ? {$_.name -eq $sqlNetsuiteProject.entityId}
+        Write-Verbose "[$($graphDriveItem.webUrl)] | $($graphDriveItem.id)]  created with displayName [$($graphDriveItem.name)]"
+        $updateSqlRecord = $true
+        }
+
+    if($updateSqlRecord){#If we think we should update this record to prevent re-processing on the next cycle
+        Write-Verbose "Updating SQL Project record after successful proccesing"
+        $sqlNetsuiteProject.SharePointDriveItemId = $graphDriveItem.id
+        $sqlNetsuiteProject.DateModifiedInSql = Get-Date
+        $updateResult = update-netSuiteAccountInSqlCache -sqlNetsuiteProject $sqlNetSuiteProjects -dbConnection $dbConnection -isNotDirty
+        Write-Verbose "Update Result: [$($updateResult)]"
+        #One day, we'll write something to write the URL of the Folder back to NetSuite...
+        }
+
+    $graphDriveItem #Return the /drives object (if found)
+    }
+function add-netsuiteProjectToSqlCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$nsNetsuiteProject 
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "add-netsuiteProjectToSqlCache [$($nsNetsuiteProject.ProjectName)]"
+    $sql = "SELECT TOP 1 ProjectName, NsInternalId, LastModified FROM t_PROJECTS WHERE NsInternalId = '$($nsNetsuiteProject.Id)' ORDER BY LastModified Desc"
+    Write-Verbose "`t$sql"
+    $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    if((remove-diacritics $nsNetsuiteProject.companyName) -eq (remove-diacritics $alreadyPresent.ProjectName)){
+        if($(Get-Date $nsNetsuiteProject.lastModifiedDate) -ne $(Get-Date $alreadyPresent.LastModified)){
+            Write-Verbose "`tNsInternalId [$($nsNetsuiteProject.Id)] has been updated, but the name has not changed. Updating LastModified for existing record and flagging as IsDirty = $false."
+            #update-netSuiteProjectInSqlCache -nsNetsuiteProject $nsNetsuiteProject -dbConnection $dbConnection -isNotDirty
+            }
+        else{
+            Write-Verbose "`tNsInternalId [$($nsNetsuiteProject.Id)] doesn't seem to have changed (probably caused by a lack of granularity in NetSuite's REST WHERE clauses). Not updating anything."
+            }
+        }
+    else{
+        if(!$alreadyPresent){Write-Verbose "`tNsInternalId [$($nsNetsuiteProject.Id)] not present in SQL, adding to [t_PROJECTS]"}
+        else{Write-Verbose "`tNsInternalId [$($nsNetsuiteProject.Id)] ProjectName has changed from [$($alreadyPresent.ProjectName)] to [$($nsNetsuiteProject.companyName)], adding new record to [t_PROJECTS]"}
+        $now = $(Get-Date)
+        $sql = "INSERT INTO t_PROJECTS (NsInternalId, NsExternalId, AccountNsInternalId, ProjectName, ProjectNumber, entityId, entityStatus, custentity_atlas_svcs_mm_department, custentity_ant_projectsector, custentity_ant_projectsource, custentity_atlas_svcs_mm_location, custentity_atlas_svcs_mm_projectmngr, jobType, subsidiary, DateCreated, LastModified, IsDirty, DateCreatedInSql, DateModifiedInSql) VALUES ("
+        $sql += $(sanitise-forSqlValue -value $nsNetsuiteProject.id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.entityId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.parent.id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.companyName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $($nsNetsuiteProject.entityId.Split(" ")[0]) -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.entityId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.entityStatus.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.custentity_atlas_svcs_mm_department.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.custentity_ant_projectsector.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.custentity_ant_projectsource.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.custentity_atlas_svcs_mm_location.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.custentity_atlas_svcs_mm_projectmngr.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.jobType.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.subsidiary.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.dateCreated -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteProject.lastModifiedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $true -dataType Boolean)
+        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
+        $sql += ")"
+        Write-Verbose "`t$sql"
+        $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
+        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+        else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+        $result
+        }
     }
 function convert-nsNetSuiteAccountToSqlNetSuiteAccount(){
     [cmdletbinding()]
@@ -177,52 +297,7 @@ function convert-nsNetSuiteAccountToSqlNetSuiteAccount(){
         }
     $pretendSqlNetSuiteAccount
     }
-function get-netSuiteClientsFromNetSuite(){
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
-        [string]$query
-
-        ,[parameter(Mandatory=$false)]
-        [hashtable]$netsuiteParameters
-        )
-
-    Write-Verbose "`tget-allNetSuiteClients([$($query)])"
-    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
-
-    $customers = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $customersEnumerated = [psobject[]]::new($customers.count)
-    for ($i=0; $i -lt $customers.count;$i++) {
-        $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $customers.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
-        }
-    $customersEnumerated
-    }
-function get-netSuiteClientFromSqlCache{
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $false)]
-        [ValidatePattern('^[WHERE]')]
-        [string]$sqlWhereClause
-        ,[parameter(Mandatory = $true)]
-        [System.Data.Common.DbConnection]$dbConnection
-        )
-    Write-Verbose "get-netSuiteClientFromSqlCache [$sqlWhereClause]"
-    $sql = "SELECT  a.AccountName, a.NsInternalId, a.NsExternalId, a.RecordType, a.entityStatus, a.DateCreated, a.LastModified, a.DateCreatedInSql, a.DateModifiedInSql, a.IsDirty, a.SharePointDocLibGraphListId, a.SharePointDocLibGraphDriveId FROM ACCOUNTS a
-            INNER JOIN (
-                SELECT  AccountName, MAX(DateModifiedInSql) AS MaxDate
-                FROM ACCOUNTS
-                GROUP BY AccountName) am
-                ON a.AccountName = am.AccountName 
-                    AND a.DateModifiedInSql = am.MaxDate 
-            $sqlWhereClause"
-    Write-Verbose "`t$sql"
-    $result = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
-    if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
-    else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
-    $result
-    }
-function get-netsuiteAuthHeaders(){
+function get-netSuiteAuthHeaders(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true)]
@@ -267,7 +342,70 @@ function get-netsuiteAuthHeaders(){
         ) -join "&")"
     $authHeaders
     }
-function get-netsuiteParameters(){
+function get-netSuiteClientsFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^?[\w+][=][\w+]')]
+        [string]$query
+
+        ,[parameter(Mandatory=$false)]
+        [hashtable]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-allNetSuiteClients([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+
+    $customers = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $customersEnumerated = [psobject[]]::new($customers.count)
+    for ($i=0; $i -lt $customers.count;$i++) {
+        $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $customers.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+        }
+    $customersEnumerated
+    }
+function get-netSuiteClientFromSqlCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^[WHERE]')]
+        [string]$sqlWhereClause
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "get-netSuiteClientFromSqlCache [$sqlWhereClause]"
+    <#$sql = "SELECT  a.AccountName, a.NsInternalId, a.NsExternalId, a.RecordType, a.entityStatus, a.DateCreated, a.LastModified, a.DateCreatedInSql, a.DateModifiedInSql, a.IsDirty, a.SharePointDocLibGraphDriveId FROM t_ACCOUNTS a
+            INNER JOIN (
+                SELECT  AccountName, MAX(DateModifiedInSql) AS MaxDate
+                FROM t_ACCOUNTS
+                GROUP BY AccountName) am
+                ON a.AccountName = am.AccountName 
+                    AND a.DateModifiedInSql = am.MaxDate 
+            $sqlWhereClause" #>
+    $sql = "SELECT a.AccountName, a.NsInternalId, a.NsExternalId, a.RecordType, a.entityStatus, a.DateCreated, a.LastModified, a.DateCreatedInSql, a.DateModifiedInSql, a.IsDirty, a.SharePointDocLibGraphDriveId FROM v_ACCOUNTS_Current a $sqlWhereClause"
+    Write-Verbose "`t$sql"
+    $result = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+    else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+    $result
+    }
+function get-netSuitePaddedCode(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [string]$unpaddedCode
+        ,[parameter(Mandatory = $false)]
+        [string]$padToXDigits = 7
+        )
+
+    if($unpaddedCode -match '^[a-zA-Z]+'){$prefix = $Matches[0]}
+    else{Write-Error "Prefix not found";break}
+
+    if($unpaddedCode -match '[0-9]+$'){$suffix = $Matches[0]}
+    else{Write-Error "Suffix not found";break}
+
+    $prefix + $("{0:d$padToXDigits}" -f [int]$suffix)    
+    }
+function get-netSuiteParameters(){
     [cmdletbinding()]
     Param()
     Write-Verbose "get-netsuiteParameters()"
@@ -295,7 +433,52 @@ function get-netsuiteParameters(){
         $importedParameters
         }
     }
-function get-oauthSignature(){
+function get-netSuiteProjectFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^?[\w+][=][\w+]')]
+        [string]$query
+
+        ,[parameter(Mandatory=$false)]
+        [hashtable]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+
+    $projects = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $projectsEnumerated = [psobject[]]::new($projects.count)
+    for ($i=0; $i -lt $projects.count;$i++) {
+        $projectsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $projects.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+        }
+    $projectsEnumerated
+    }
+function get-netSuiteProjectFromSqlCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^[WHERE]')]
+        [string]$sqlWhereClause
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "get-netSuiteClientFromSqlCache [$sqlWhereClause]"
+    $sql = "SELECT  p.NsInternalId, p.NsExternalId, p.AccountNsInternalId, p.ProjectName, p.ProjectNumber, p.entityId, p.entityStatus, p.custentity_atlas_svcs_mm_department, p.custentity_ant_projectsector, p.custentity_ant_projectsource, p.custentity_atlas_svcs_mm_location, p.custentity_atlas_svcs_mm_projectmngr, p.jobType, p.subsidiary, p.DateCreated, p.LastModified, p.IsDirty, p.DateCreatedInSql, p.DateModifiedInSql, p.SharePointDriveItemId FROM t_PROJECTS p
+            INNER JOIN (
+                SELECT  entityId, MAX(DateModifiedInSql) AS MaxDate
+                FROM t_PROJECTS
+                GROUP BY entityId) pm
+                ON p.entityId = pm.entityId 
+                    AND p.DateModifiedInSql = pm.MaxDate 
+            $sqlWhereClause"
+    Write-Verbose "`t$sql"
+    $result = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+    else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+    $result
+    }
+function get-oAuthSignature(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true)]
@@ -358,7 +541,7 @@ function get-oauthSignature(){
     Write-Verbose "`t`$oauth_signature = [$oauth_signature]"
     $oauth_signature
     }
-function invoke-netsuiteRestMethod(){
+function invoke-netSuiteRestMethod(){
     [cmdletbinding()]
     Param(
         [parameter(Mandatory = $true)]
@@ -432,7 +615,7 @@ function update-netSuiteAccountInSqlCache(){
 
     Write-Verbose "update-netSuiteAccountInSqlCache [$($sqlNetsuiteAccount.AccountName)]"
     #Check record exists in SQL
-    $sql = "SELECT TOP 1 AccountName, NsInternalId, LastModified FROM ACCOUNTS WHERE NsInternalId = '$($sqlNetsuiteAccount.NsInternalId)' ORDER BY LastModified Desc"
+    $sql = "SELECT TOP 1 AccountName, NsInternalId, LastModified FROM t_ACCOUNTS WHERE NsInternalId = '$($sqlNetsuiteAccount.NsInternalId)' ORDER BY LastModified Desc"
     $preExistingRecord = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
     
     if($preExistingRecord){
@@ -444,7 +627,7 @@ function update-netSuiteAccountInSqlCache(){
             #Generate SQL statement
             $fieldsToUpdate = $sqlNetsuiteAccount.PSObject.Properties | ? {$_.Value -ne $null}
             if($fieldsToUpdate){
-                $sql = "UPDATE ACCOUNTS "
+                $sql = "UPDATE t_ACCOUNTS "
                 $sql += "SET "
                 $fieldsToUpdate | % {
                     $thisField = $_
