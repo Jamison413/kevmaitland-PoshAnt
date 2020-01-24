@@ -152,7 +152,7 @@ function add-netSuiteProjectToSharePoint{
     #Check if the folder already exists
     #Get Drive Id
     $sqlNetSuiteClient = get-netSuiteClientFromSqlCache -dbConnection $dbConnection -sqlWhereClause "WHERE NsInternalId = '$($sqlNetsuiteProject.AccountNsInternalId)'"
-    if(![string]::IsNullOrWhiteSpace($sqlNetsuiteProject.SharePointDriveItemId)){
+    if(![string]::IsNullOrWhiteSpace($sqlNetSuiteClient.SharePointDocLibGraphDriveId)){
         Write-Verbose "Looking for /drive/{drive-id}/items/{item-id} by Id [$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)]"
         $graphDriveItem = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetSuiteClient.SharePointDocLibGraphDriveId)/items/$($sqlNetsuiteProject.SharePointDriveItemId)" -ErrorAction SilentlyContinue
         }
@@ -195,7 +195,7 @@ function add-netSuiteProjectToSharePoint{
         Write-Verbose "Updating SQL Project record after successful proccesing"
         $sqlNetsuiteProject.SharePointDriveItemId = $graphDriveItem.id
         $sqlNetsuiteProject.DateModifiedInSql = Get-Date
-        $updateResult = update-netSuiteAccountInSqlCache -sqlNetsuiteProject $sqlNetSuiteProjects -dbConnection $dbConnection -isNotDirty
+        $updateResult = update-netSuiteProjectInSqlCache -sqlNetSuiteProject $sqlNetSuiteProject -dbConnection $dbConnection -isNotDirty
         Write-Verbose "Update Result: [$($updateResult)]"
         #One day, we'll write something to write the URL of the Folder back to NetSuite...
         }
@@ -659,4 +659,80 @@ function update-netSuiteAccountInSqlCache(){
             }
         }
     else{Write-Error "Record with NsInsternalId [$($sqlNetsuiteAccount.NsExternalId)] does not exist in database. Cannot UPDATE.";break}
+    }
+function update-netSuiteProjectInSqlCache(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true, ParameterSetName="nsNetSuiteProject")]
+            [PSCustomObject]$nsNetSuiteProject 
+        ,[parameter(Mandatory = $true, ParameterSetName="sqlNetSuiteProject")]
+            [PSCustomObject]$sqlNetSuiteProject 
+        ,[parameter(Mandatory = $true, ParameterSetName="nsNetSuiteProject")]
+            [parameter(Mandatory = $true, ParameterSetName="sqlNetSuiteProject")]
+            [System.Data.Common.DbConnection]$dbConnection
+        ,[parameter(Mandatory = $false, ParameterSetName="nsNetSuiteProject")]
+            [parameter(Mandatory = $false, ParameterSetName="sqlNetSuiteProject")]
+            [switch]$isDirty
+        ,[parameter(Mandatory = $false, ParameterSetName="nsNetSuiteProject")]
+            [parameter(Mandatory = $false, ParameterSetName="sqlNetSuiteProject")]
+            [switch]$isNotDirty
+        )
+    switch ($PsCmdlet.ParameterSetName){
+        'nsNetSuiteProject' {$sqlNetSuiteProject = convert-nsNetSuiteProjectToSqlNetSuiteProject -nsNetSuiteProject $nsNetSuiteProject}
+        }
+
+    Write-Verbose "update-netSuiteProjectInSqlCache [$($sqlNetSuiteProject.entityId)]"
+    #Check record exists in SQL
+    $sql = "SELECT TOP 1 ProjectName, NsInternalId, LastModified FROM t_PROJECTS WHERE NsInternalId = '$($sqlNetSuiteProject.NsInternalId)' ORDER BY LastModified Desc"
+    $preExistingRecord = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    
+    if($preExistingRecord){
+        if([string]::IsNullOrWhiteSpace($preExistingRecord.NsInternalId)){
+            Write-Error "No NsInsternalId found on sql record [$($sqlNetSuiteProject.entityId)]. Cannot identify unique record, so cannot UPDATE."
+            break
+            }
+        else{
+            #Generate SQL statement
+            $fieldsToUpdate = $sqlNetSuiteProject.PSObject.Properties | ? {$_.Value -ne $null}
+            if($fieldsToUpdate){
+                $sql = "UPDATE t_PROJECTS "
+                $sql += "SET "
+                $fieldsToUpdate | % {
+                    $thisField = $_
+                    switch($_.Name){
+                        "NsInternalId"                 {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.NsInternalId -dataType String), "}
+                        "NsExternalId"                 {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.NsExternalId -dataType String), "}
+                        "AccountNsInternalId"          {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.AccountNsInternalId -dataType String), "}
+                        "ProjectName"                  {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.ProjectName -dataType String), "}
+                        "ProjectNumber"                {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.ProjectNumber -dataType String), "}
+                        "entityId"                     {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.entityId -dataType String), "}
+                        "entityStatus"                 {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.entityStatus -dataType String), "}
+                        "custentity_atlas_svcs_mm_department"  {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.custentity_atlas_svcs_mm_department -dataType String), "}
+                        "custentity_ant_projectsector"         {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.custentity_ant_projectsector -dataType String), "}
+                        "custentity_ant_projectsource"         {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.custentity_ant_projectsource -dataType String), "}
+                        "custentity_atlas_svcs_mm_location"    {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.custentity_atlas_svcs_mm_location -dataType String), "}
+                        "custentity_atlas_svcs_mm_projectmngr" {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.custentity_atlas_svcs_mm_projectmngr -dataType String), "}
+                        "jobType"                      {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.jobType -dataType String), "}
+                        "subsidiary"                   {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.subsidiary -dataType String), "}
+                        "DateCreated"                  {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.dateCreated -dataType Date), "}
+                        "LastModified"                 {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.LastModified -dataType Date), "}
+                        "DateCreatedInSql"             {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.DateCreatedInSql -dataType Date), "}
+                        "DateModifiedInSql"            {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.DateModifiedInSql -dataType Date), "}
+                        "IsDirty"                      {
+                            if($isDirty)                    {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $true -dataType Boolean), "}
+                            elseif($isNotDirty)             {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $false -dataType Boolean), "}
+                            else                            {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.IsDirty -dataType Boolean), "}
+                                                        }
+                        "SharePointDriveItemId"  {$sql += "$($thisField.Name) = $(sanitise-forSqlValue -value $sqlNetSuiteProject.SharePointDocLibGraphListId -dataType String), "}
+                        }
+                    }
+                $sql = $sql.TrimEnd(", ")
+                $sql += " WHERE NsInternalId = $(sanitise-forSqlValue -value $preExistingRecord.NsInternalId -dataType String) "
+                $sql += "AND LastModified = $(sanitise-forSqlValue -value $preExistingRecord.LastModified -dataType Date) "
+                Write-Verbose "`t$sql"
+                Execute-SQLQueryOnSQLDB -query $sql -queryType NonQuery -sqlServerConnection $dbConnection
+                }
+            }
+        }
+    else{Write-Error "Record with NsInsternalId [$($sqlNetSuiteProject.NsExternalId)] does not exist in database. Cannot UPDATE.";break}
     }
