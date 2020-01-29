@@ -22,13 +22,13 @@
         }
     Write-Verbose "add-graphArrayOfFoldersToDrive [$($graphDriveId)]"    
     
-    #Prep the folders array (in case the user has provided junk like @("Test","test\test2\test3\test4","test","/test/TeSt2\")
+    #Prep the folders array (in case the user has provided junk like $foldersAndSubfoldersArray = @("Test","test\test2\test3\test4","test","/test/TeSt2\","tEST #3","Test | #4")
     $expandedFoldersAndSubfoldersArray = ,@()
     $foldersAndSubfoldersArray | % {
         $thisFolder = $_.Replace("\","/").Trim("/")
         $expandingFolderPath = ""
         $thisFolder.Split("/") | % {
-            $expandingFolderPath += "$_/"
+            $expandingFolderPath += "$(sanitise-forSharePointGroupName $_)/"
             $expandedFoldersAndSubfoldersArray += $expandingFolderPath.Trim("/")
             }
         }
@@ -53,7 +53,7 @@
         else{ #If it _is_ a subfolder, we also need to supply the relative path (and invoke-graphGet doesn't like a $null value for -relativePathToFolder)
             try{
                 $relativePath = Split-Path $_ -Parent
-                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -Verbose:$VerbosePreference -ErrorAction Stop -relativePathToFolder $relativePath
+                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -Verbose:$VerbosePreference -ErrorAction Stop -relativePathToFolder $([uri]::EscapeDataString($relativePath))
                 $driveItemsToReturn += $newFolder
                 }
             catch{
