@@ -1,7 +1,7 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-$teamBotDetails = Import-Csv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
 $resource = "https://graph.microsoft.com"
 $tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
 $clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
@@ -32,6 +32,7 @@ if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Titl
 
 
 foreach ($currentRequest in $selectedRequests){
+
     $fullRequest = $requests | ? {$_.FieldValues.GUID.Guid -eq $currentRequest.'$_.FieldValues.GUID.Guid'}
     $managers = convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Admin.Email) | sort | select -Unique
     $members = convertTo-arrayOfEmailAddresses ($managers + "," + $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique
@@ -75,7 +76,7 @@ foreach ($currentRequest in $selectedRequests){
         if($addExecutingUserAsTemporaryOwner){
             $addExecutingUserAsTemporarySiteCollectionAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true
             }
-        copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
+        copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" | Out-Null
         test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
         if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
             Write-Verbose "Setting Homepage"
