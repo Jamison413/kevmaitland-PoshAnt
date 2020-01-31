@@ -424,10 +424,19 @@ function new-365Group(){
 
     if($365Group){ #If we now have a 365 UG, set the CustomAttributes, and create a Shared Mailbox (if required) and configure it
         Write-Verbose "`tSet-UnifiedGroup -Identity [$($365Group.ExternalDirectoryObjectId)] -HiddenFromAddressListsEnabled [$true] -CustomAttribute1 [$($365Group.ExternalDirectoryObjectId)] -CustomAttribute2 [$($managersSg.ExternalDirectoryObjectId)] -CustomAttribute3 [$($membersSg.ExternalDirectoryObjectId)] -CustomAttribute4 [$($combinedSg.ExternalDirectoryObjectId)] -CustomAttribute6 [$($membershipmanagedBy)] -CustomAttribute7 [$($groupClassification)] -CustomAttribute8 [$($accessType)] -WhatIf:[$($WhatIfPreference)] -AccessType [$($accessType)] -RequireSenderAuthenticationEnabled [$($blockExternalMail)] -AutoSubscribeNewMembers:[$($autoSubscribe)] -AlwaysSubscribeMembersToCalendarEvents:[$($autoSubscribe)] -Classification [$($groupClassification)]"
-        Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -CustomAttribute1 $365Group.ExternalDirectoryObjectId -CustomAttribute2 $managersSg.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId -CustomAttribute6 $membershipmanagedBy -CustomAttribute7 $groupClassification -CustomAttribute8 $accessType -WhatIf:$WhatIfPreference -AccessType $accessType -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Classification $groupClassification
+        $customAttribsSet = $false
+        do{
+            try{
+                Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -CustomAttribute1 $365Group.ExternalDirectoryObjectId -CustomAttribute2 $managersSg.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId -CustomAttribute6 $membershipmanagedBy -CustomAttribute7 $groupClassification -CustomAttribute8 $accessType -WhatIf:$WhatIfPreference -AccessType $accessType -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Classification $groupClassification -ErrorAction Stop
+                $customAttribsSet = $true
+                }
+            catch{
+                Start-Sleep -Seconds 10
+                $customAttribsSet = $false
+                }
+            }
+        while($customAttribsSet -eq $false)    
         $365Group = Get-UnifiedGroup $365Group.ExternalDirectoryObjectId
-        #Set the standard sharing permissions for the Site
-        set-standardTeamPermissions -UnifiedGroupObject $365Group
         
         if(!$sharedMailbox){
             Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference "
