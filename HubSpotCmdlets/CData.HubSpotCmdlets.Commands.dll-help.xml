@@ -1,0 +1,3095 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<helpItems xmlns="http://msh" schema="maml">
+
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Add-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Inserts HubSpot data.</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Add</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>Inserts HubSpot data. The Add-HubSpot cmdlet allows you to use a syntax similar to SQL INSERT statements to create new HubSpot records.</maml:para><maml:para>Add-HubSpot -Connection $connection -Table "Contacts" -Columns @("Country") -Values @("U.S.A")</maml:para><maml:para></maml:para><maml:para></maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>Add-HubSpot [parameters]</maml:name>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Columns</maml:name>
+          <maml:description>
+            <maml:para>The columns on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string[]
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="0">
+          <maml:name>Connection</maml:name>
+          <maml:description>
+            <maml:para>The connection object.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            DataConnection
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Table</maml:name>
+          <maml:description>
+            <maml:para>The table on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Values</maml:name>
+          <maml:description>
+            <maml:para>The values that will be used to update the table.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string[]
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter required="true"
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Columns</maml:name>
+      <maml:description>
+        <maml:para>The columns on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string[]
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position=0 >
+      <maml:name>Connection</maml:name>
+      <maml:description>
+        <maml:para>The connection object.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        DataConnection
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Table</maml:name>
+      <maml:description>
+        <maml:para>The table on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Values</maml:name>
+      <maml:description>
+        <maml:para>The values that will be used to update the table.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string[]
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>InsertedRowId</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The unique Id of the inserted row.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The unique Id of the inserted row.
+      </maml:description> 
+    </command:returnValue>
+  
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Disconnect-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Closes a connection to HubSpot.</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Disconnect</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>Closes a connection to HubSpot. The Disconnect-HubSpot cmdlet is used to close a connection that was opened by the Connect-HubSpot cmdlet.</maml:para><maml:para>Disconnect-HubSpot -Connection $connection</maml:para><maml:para></maml:para><maml:para></maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>Disconnect-HubSpot [parameters]</maml:name>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="0">
+          <maml:name>Connection</maml:name>
+          <maml:description>
+            <maml:para>The connection object.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            DataConnection
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter required="true"
+  pipelineInput="true"
+  position=0 >
+      <maml:name>Connection</maml:name>
+      <maml:description>
+        <maml:para>The connection object.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        DataConnection
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+  
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Invoke-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Searches and updates HubSpot data.</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Invoke</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>Searches and updates HubSpot data. The Invoke-HubSpot cmdlet allows you to use SQL statements to execute any SQL statement directly. Below is the syntax for a parameterized query:</maml:para><maml:para>$query = Invoke-HubSpot -Connection $connection -Query 'SELECT * FROM Contacts WHERE VID=@VID' -Params @{'@VID'='123456789'}</maml:para><maml:para></maml:para><maml:para>This cmdlet is also useful for executing stored procedures. Use the EXEC keyword to call a stored procedure:</maml:para><maml:para></maml:para><maml:para>$query = Invoke-HubSpot -Connection $connection -Query 'EXEC GetOAuthAccessToken scope = @scope' -Params @{"events-rw settings-rw contacts-rw offline"}</maml:para><maml:para></maml:para><maml:para></maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>Invoke-HubSpot [parameters]</maml:name>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="0">
+          <maml:name>Connection</maml:name>
+          <maml:description>
+            <maml:para>The connection object.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            DataConnection
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Params</maml:name>
+          <maml:description>
+            <maml:para>The parameters that will be used for the query.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            Hashtable
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Query</maml:name>
+          <maml:description>
+            <maml:para>The SQL query to execute.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter required="true"
+  pipelineInput="true"
+  position=0 >
+      <maml:name>Connection</maml:name>
+      <maml:description>
+        <maml:para>The connection object.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        DataConnection
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Params</maml:name>
+      <maml:description>
+        <maml:para>The parameters that will be used for the query.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        Hashtable
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Query</maml:name>
+      <maml:description>
+        <maml:para>The SQL query to execute.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>AffectedRowsCount</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The number of rows affected by the operation.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The number of rows affected by the operation.
+      </maml:description> 
+    </command:returnValue>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>InsertedRowId</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The unique Id of the inserted row.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The unique Id of the inserted row.
+      </maml:description> 
+    </command:returnValue>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>QueryResults</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The results of the query.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The results of the query.
+      </maml:description> 
+    </command:returnValue>
+  
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Remove-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Deletes HubSpot data.</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Remove</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>Deletes HubSpot data. The Remove-HubSpot cmdlet allows you to use a syntax similar to SQL DELETE statements to delete HubSpot data.</maml:para><maml:para>$conn = Connect-HubSpot</maml:para><maml:para>Remove-HubSpot -Connection $conn -Table "Contacts" -Id "123456789"</maml:para><maml:para></maml:para><maml:para>The Where parameter can also be used to specify the primary key:</maml:para><maml:para></maml:para><maml:para>Remove-HubSpot -Connection $conn -Table "exTable;" -Where "Id = 123456789"</maml:para><maml:para></maml:para><maml:para>The primary key can also be passed to the cmdlet along the pipeline:</maml:para><maml:para></maml:para><maml:para>Select-HubSpot -Connection $conn -Table Contacts -Where "VID = '123456789'" | Remove-HubSpot</maml:para><maml:para></maml:para><maml:para></maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>Remove-HubSpot [parameters]</maml:name>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="0">
+          <maml:name>Connection</maml:name>
+          <maml:description>
+            <maml:para>The connection object.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            DataConnection
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Id</maml:name>
+          <maml:description>
+            <maml:para>The Id of the item on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Table</maml:name>
+          <maml:description>
+            <maml:para>The table on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>The SQL WHERE clause that will be used for the operation.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter required="true"
+  pipelineInput="true"
+  position=0 >
+      <maml:name>Connection</maml:name>
+      <maml:description>
+        <maml:para>The connection object.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        DataConnection
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Id</maml:name>
+      <maml:description>
+        <maml:para>The Id of the item on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Table</maml:name>
+      <maml:description>
+        <maml:para>The table on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Where</maml:name>
+      <maml:description>
+        <maml:para>The SQL WHERE clause that will be used for the operation.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>AffectedRowsCount</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The number of rows affected by the operation.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The number of rows affected by the operation.
+      </maml:description> 
+    </command:returnValue>
+  
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Connect-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Opens a new connection to HubSpot</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Connect</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>The Connect-HubSpot cmdlet is used to create a persistent connection object to be used with related cmdlets. When executing the cmdlet a connection object is returned. Pass this object to the Connection parameter of related cmdlets to use the newly created connection object. To disconnect, call Disconnect-HubSpot.</maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>$conn = Connect-HubSpot</maml:name>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ApiKey</maml:name>
+          <maml:description>
+            <maml:para>Your API key that gives you access to your HubSpot account.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>AutoCache</maml:name>
+          <maml:description>
+            <maml:para>Automatically caches the results of SELECT queries into a cache database specified by either CacheLocation or both of CacheConnection and CacheProvider .</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            SwitchParameter
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>CacheConnection</maml:name>
+          <maml:description>
+            <maml:para>The connection string for the cache database. This property is always used in conjunction with CacheProvider . Setting both properties will override the value set for CacheLocation for caching data.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>CacheLocation</maml:name>
+          <maml:description>
+            <maml:para>Specifies the path to the cache when caching to a file.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>CacheMetadata</maml:name>
+          <maml:description>
+            <maml:para>This property determines whether or not to cache the table metadata to a file store.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            SwitchParameter
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>CacheProvider</maml:name>
+          <maml:description>
+            <maml:para>The name of the provider to be used to cache data.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>CacheTolerance</maml:name>
+          <maml:description>
+            <maml:para>The tolerance for stale data in the cache specified in seconds when using AutoCache .</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>CallbackURL</maml:name>
+          <maml:description>
+            <maml:para>The OAuth callback URL to return to when authenticating. This value must match the callback URL you specify in your app settings.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ColumnSizes</maml:name>
+          <maml:description>
+            <maml:para>A file with a name=value comma separated list of column sizes. For use with custom fields.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>CompanyPropertiesFile</maml:name>
+          <maml:description>
+            <maml:para>A file with a comma separated list of properties to select from HubSpot for the Companies table.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ContactPropertiesFile</maml:name>
+          <maml:description>
+            <maml:para>A file with a comma separated list of properties to select from HubSpot for the Contacts table.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>DealPropertiesFile</maml:name>
+          <maml:description>
+            <maml:para>A file with a comma separated list of properties to select from HubSpot for the Deals table.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>FirewallPassword</maml:name>
+          <maml:description>
+            <maml:para>A password used to authenticate to a proxy-based firewall.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>FirewallPort</maml:name>
+          <maml:description>
+            <maml:para>The TCP port for a proxy-based firewall.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>FirewallServer</maml:name>
+          <maml:description>
+            <maml:para>The name or IP address of a proxy-based firewall.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>FirewallType</maml:name>
+          <maml:description>
+            <maml:para>The protocol used by a proxy-based firewall.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>FirewallUser</maml:name>
+          <maml:description>
+            <maml:para>The user name to use to authenticate with a proxy-based firewall.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>GenerateSchemaFiles</maml:name>
+          <maml:description>
+            <maml:para>Indicates the user preference as to when schemas should be generated and saved.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>InitiateOAuth</maml:name>
+          <maml:description>
+            <maml:para>Set this property to initiate the process to obtain or refresh the OAuth access token when you connect.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Location</maml:name>
+          <maml:description>
+            <maml:para>A path to the directory that contains the schema files defining tables, views, and stored procedures.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Logfile</maml:name>
+          <maml:description>
+            <maml:para>A path to the log file.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>MaxLogFileCount</maml:name>
+          <maml:description>
+            <maml:para>A string specifying the maximum file count of log files. When the limit is hit, a new log is created in the same folder with the date and time appended to the end and the oldest log file will be deleted.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>MaxLogFileSize</maml:name>
+          <maml:description>
+            <maml:para>A string specifying the maximum size in bytes for a log file (for example, 10 MB). When the limit is hit, a new log is created in the same folder with the date and time appended to the end.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>MaxRows</maml:name>
+          <maml:description>
+            <maml:para>Limits the number of rows returned rows when no aggregation or group by is used in the query. This helps avoid performance issues at design time.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="false"
+          position="named">
+          <maml:name>OAuthAccessToken</maml:name>
+          <maml:description>
+            <maml:para>The access token for connecting using OAuth.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>OAuthClientId</maml:name>
+          <maml:description>
+            <maml:para>The client ID assigned when you register your application with an OAuth authorization server.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>OAuthClientSecret</maml:name>
+          <maml:description>
+            <maml:para>The client secret assigned when you register your application with an OAuth authorization server.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>OAuthRefreshToken</maml:name>
+          <maml:description>
+            <maml:para>The OAuth refresh token for the corresponding OAuth access token.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>OAuthSettingsLocation</maml:name>
+          <maml:description>
+            <maml:para>The location of the settings file where OAuth values are saved when InitiateOAuth is set to GETANDREFRESH or REFRESH. Alternatively, this can be held in memory by specifying a value starting with memory://.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>OAuthVerifier</maml:name>
+          <maml:description>
+            <maml:para>The verifier code returned from the OAuth authorization URL.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Offline</maml:name>
+          <maml:description>
+            <maml:para>Use offline mode to get the data from the cache instead of the live source.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            SwitchParameter
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Other</maml:name>
+          <maml:description>
+            <maml:para>These hidden properties are used only in specific use cases.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxyAuthScheme</maml:name>
+          <maml:description>
+            <maml:para>The authentication type to use to authenticate to the ProxyServer proxy.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxyAutoDetect</maml:name>
+          <maml:description>
+            <maml:para>This indicates whether to use the system proxy settings or not. This takes precedence over other proxy settings, so you'll need to set ProxyAutoDetect to FALSE in order use custom proxy settings.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            bool
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxyExceptions</maml:name>
+          <maml:description>
+            <maml:para>A semicolon separated list of hosts or IPs that are exempt from connecting through the ProxyServer .</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxyPassword</maml:name>
+          <maml:description>
+            <maml:para>A password to be used to authenticate to the ProxyServer proxy.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxyPort</maml:name>
+          <maml:description>
+            <maml:para>The TCP port the ProxyServer proxy is running on.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxyServer</maml:name>
+          <maml:description>
+            <maml:para>The hostname or IP address of a proxy to route HTTP traffic through.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxySSLType</maml:name>
+          <maml:description>
+            <maml:para>The SSL type to use when connecting to the ProxyServer proxy.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>ProxyUser</maml:name>
+          <maml:description>
+            <maml:para>A user name to be used to authenticate to the ProxyServer proxy.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>PseudoColumns</maml:name>
+          <maml:description>
+            <maml:para>This property indicates whether or not to include pseudo columns as columns to the table.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Readonly</maml:name>
+          <maml:description>
+            <maml:para>You can use this property to enforce read-only access to HubSpot from the provider.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            SwitchParameter
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>SSLServerCert</maml:name>
+          <maml:description>
+            <maml:para>The certificate to be accepted from the server when connecting using TLS/SSL.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>SupportEnhancedSQL</maml:name>
+          <maml:description>
+            <maml:para>This property enhances SQL functionality beyond what can be supported through the API directly, by enabling in-memory client-side processing.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            bool
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Tables</maml:name>
+          <maml:description>
+            <maml:para>This property restricts the tables reported to a subset of the available tables. For example, Tables=TableA,TableB,TableC.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>TicketPropertiesFile</maml:name>
+          <maml:description>
+            <maml:para>A file with a comma separated list of properties to select from HubSpot for the Tickets table.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Timeout</maml:name>
+          <maml:description>
+            <maml:para>The value in seconds until the timeout error is thrown, canceling the operation.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>UseDisplayNames</maml:name>
+          <maml:description>
+            <maml:para>Boolean determining if the display names for the columns should be used instead of the API names.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            bool
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>UseDropdownLabels</maml:name>
+          <maml:description>
+            <maml:para>Boolean determining if dropdown labels should be used instead of internal values for enums.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            bool
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>UseSimpleNames</maml:name>
+          <maml:description>
+            <maml:para>Boolean determining if simple names should be used for tables and columns.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            SwitchParameter
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Verbosity</maml:name>
+          <maml:description>
+            <maml:para>The verbosity level that determines the amount of detail included in the log file.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Views</maml:name>
+          <maml:description>
+            <maml:para>Restricts the views reported to a subset of the available tables. For example, Views=ViewA,ViewB,ViewC.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter >
+      <maml:name>ApiKey</maml:name>
+      <maml:description>
+        <maml:para>Your API key that gives you access to your HubSpot account.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>AutoCache</maml:name>
+      <maml:description>
+        <maml:para>Automatically caches the results of SELECT queries into a cache database specified by either CacheLocation or both of CacheConnection and CacheProvider .</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        SwitchParameter
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        false
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>CacheLocation</maml:name>
+      <maml:description>
+        <maml:para>Specifies the path to the cache when caching to a file.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "%APPDATA%\\CData\\HubSpot Data Provider"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>CacheMetadata</maml:name>
+      <maml:description>
+        <maml:para>This property determines whether or not to cache the table metadata to a file store.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        SwitchParameter
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        false
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>CacheTolerance</maml:name>
+      <maml:description>
+        <maml:para>The tolerance for stale data in the cache specified in seconds when using AutoCache .</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "600"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>CallbackURL</maml:name>
+      <maml:description>
+        <maml:para>The OAuth callback URL to return to when authenticating. This value must match the callback URL you specify in your app settings.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ColumnSizes</maml:name>
+      <maml:description>
+        <maml:para>A file with a name=value comma separated list of column sizes. For use with custom fields.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>CompanyPropertiesFile</maml:name>
+      <maml:description>
+        <maml:para>A file with a comma separated list of properties to select from HubSpot for the Companies table.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ContactPropertiesFile</maml:name>
+      <maml:description>
+        <maml:para>A file with a comma separated list of properties to select from HubSpot for the Contacts table.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>DealPropertiesFile</maml:name>
+      <maml:description>
+        <maml:para>A file with a comma separated list of properties to select from HubSpot for the Deals table.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>FirewallPassword</maml:name>
+      <maml:description>
+        <maml:para>A password used to authenticate to a proxy-based firewall.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>FirewallPort</maml:name>
+      <maml:description>
+        <maml:para>The TCP port for a proxy-based firewall.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>FirewallServer</maml:name>
+      <maml:description>
+        <maml:para>The name or IP address of a proxy-based firewall.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>FirewallType</maml:name>
+      <maml:description>
+        <maml:para>The protocol used by a proxy-based firewall.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+      <dev:possibleValues>
+        <dev:possibleValue>
+          <dev:value>NONE</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>TUNNEL</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>SOCKS4</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>SOCKS5</dev:value>
+        </dev:possibleValue>
+  
+      </dev:possibleValues>
+      
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "NONE"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>FirewallUser</maml:name>
+      <maml:description>
+        <maml:para>The user name to use to authenticate with a proxy-based firewall.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>GenerateSchemaFiles</maml:name>
+      <maml:description>
+        <maml:para>Indicates the user preference as to when schemas should be generated and saved.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+      <dev:possibleValues>
+        <dev:possibleValue>
+          <dev:value>Never</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>OnUse</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>OnStart</dev:value>
+        </dev:possibleValue>
+  
+      </dev:possibleValues>
+      
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "Never"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>InitiateOAuth</maml:name>
+      <maml:description>
+        <maml:para>Set this property to initiate the process to obtain or refresh the OAuth access token when you connect.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+      <dev:possibleValues>
+        <dev:possibleValue>
+          <dev:value>OFF</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>GETANDREFRESH</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>REFRESH</dev:value>
+        </dev:possibleValue>
+  
+      </dev:possibleValues>
+      
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "OFF"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Location</maml:name>
+      <maml:description>
+        <maml:para>A path to the directory that contains the schema files defining tables, views, and stored procedures.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "%APPDATA%\\CData\\HubSpot Data Provider\\Schema"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Logfile</maml:name>
+      <maml:description>
+        <maml:para>A path to the log file.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>MaxLogFileCount</maml:name>
+      <maml:description>
+        <maml:para>A string specifying the maximum file count of log files. When the limit is hit, a new log is created in the same folder with the date and time appended to the end and the oldest log file will be deleted.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>MaxLogFileSize</maml:name>
+      <maml:description>
+        <maml:para>A string specifying the maximum size in bytes for a log file (for example, 10 MB). When the limit is hit, a new log is created in the same folder with the date and time appended to the end.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "100MB"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>MaxRows</maml:name>
+      <maml:description>
+        <maml:para>Limits the number of rows returned rows when no aggregation or group by is used in the query. This helps avoid performance issues at design time.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "-1"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true">
+      <maml:name>OAuthAccessToken</maml:name>
+      <maml:description>
+        <maml:para>The access token for connecting using OAuth.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>OAuthClientId</maml:name>
+      <maml:description>
+        <maml:para>The client ID assigned when you register your application with an OAuth authorization server.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>OAuthClientSecret</maml:name>
+      <maml:description>
+        <maml:para>The client secret assigned when you register your application with an OAuth authorization server.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>OAuthRefreshToken</maml:name>
+      <maml:description>
+        <maml:para>The OAuth refresh token for the corresponding OAuth access token.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>OAuthSettingsLocation</maml:name>
+      <maml:description>
+        <maml:para>The location of the settings file where OAuth values are saved when InitiateOAuth is set to GETANDREFRESH or REFRESH. Alternatively, this can be held in memory by specifying a value starting with memory://.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "%APPDATA%\\CData\\HubSpot Data Provider\\OAuthSettings.txt"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>OAuthVerifier</maml:name>
+      <maml:description>
+        <maml:para>The verifier code returned from the OAuth authorization URL.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Offline</maml:name>
+      <maml:description>
+        <maml:para>Use offline mode to get the data from the cache instead of the live source.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        SwitchParameter
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        false
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Other</maml:name>
+      <maml:description>
+        <maml:para>These hidden properties are used only in specific use cases.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxyAuthScheme</maml:name>
+      <maml:description>
+        <maml:para>The authentication type to use to authenticate to the ProxyServer proxy.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+      <dev:possibleValues>
+        <dev:possibleValue>
+          <dev:value>BASIC</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>DIGEST</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>NONE</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>NEGOTIATE</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>NTLM</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>PROPRIETARY</dev:value>
+        </dev:possibleValue>
+  
+      </dev:possibleValues>
+      
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "BASIC"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxyAutoDetect</maml:name>
+      <maml:description>
+        <maml:para>This indicates whether to use the system proxy settings or not. This takes precedence over other proxy settings, so you'll need to set ProxyAutoDetect to FALSE in order use custom proxy settings.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        bool
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        true
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxyExceptions</maml:name>
+      <maml:description>
+        <maml:para>A semicolon separated list of hosts or IPs that are exempt from connecting through the ProxyServer .</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxyPassword</maml:name>
+      <maml:description>
+        <maml:para>A password to be used to authenticate to the ProxyServer proxy.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxyPort</maml:name>
+      <maml:description>
+        <maml:para>The TCP port the ProxyServer proxy is running on.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "80"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxyServer</maml:name>
+      <maml:description>
+        <maml:para>The hostname or IP address of a proxy to route HTTP traffic through.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxySSLType</maml:name>
+      <maml:description>
+        <maml:para>The SSL type to use when connecting to the ProxyServer proxy.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+      <dev:possibleValues>
+        <dev:possibleValue>
+          <dev:value>AUTO</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>ALWAYS</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>NEVER</dev:value>
+        </dev:possibleValue>
+        <dev:possibleValue>
+          <dev:value>TUNNEL</dev:value>
+        </dev:possibleValue>
+  
+      </dev:possibleValues>
+      
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "AUTO"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>ProxyUser</maml:name>
+      <maml:description>
+        <maml:para>A user name to be used to authenticate to the ProxyServer proxy.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>PseudoColumns</maml:name>
+      <maml:description>
+        <maml:para>This property indicates whether or not to include pseudo columns as columns to the table.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Readonly</maml:name>
+      <maml:description>
+        <maml:para>You can use this property to enforce read-only access to HubSpot from the provider.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        SwitchParameter
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        false
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>RTK</maml:name>
+      <maml:description>
+        <maml:para>The runtime key used for licensing.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>SSLServerCert</maml:name>
+      <maml:description>
+        <maml:para>The certificate to be accepted from the server when connecting using TLS/SSL.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>SupportEnhancedSQL</maml:name>
+      <maml:description>
+        <maml:para>This property enhances SQL functionality beyond what can be supported through the API directly, by enabling in-memory client-side processing.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        bool
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        true
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Tables</maml:name>
+      <maml:description>
+        <maml:para>This property restricts the tables reported to a subset of the available tables. For example, Tables=TableA,TableB,TableC.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>TicketPropertiesFile</maml:name>
+      <maml:description>
+        <maml:para>A file with a comma separated list of properties to select from HubSpot for the Tickets table.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Timeout</maml:name>
+      <maml:description>
+        <maml:para>The value in seconds until the timeout error is thrown, canceling the operation.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "60"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>UseDisplayNames</maml:name>
+      <maml:description>
+        <maml:para>Boolean determining if the display names for the columns should be used instead of the API names.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        bool
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        true
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>UseDropdownLabels</maml:name>
+      <maml:description>
+        <maml:para>Boolean determining if dropdown labels should be used instead of internal values for enums.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        bool
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        true
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>UseSimpleNames</maml:name>
+      <maml:description>
+        <maml:para>Boolean determining if simple names should be used for tables and columns.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        SwitchParameter
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        false
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Verbosity</maml:name>
+      <maml:description>
+        <maml:para>The verbosity level that determines the amount of detail included in the log file.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        "1"
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter >
+      <maml:name>Views</maml:name>
+      <maml:description>
+        <maml:para>Restricts the views reported to a subset of the available tables. For example, Views=ViewA,ViewB,ViewC.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+
+    <command:returnValue>
+      <dev:type>
+        <maml:name>CData.HubSpotCmdlets.Commands.HubSpotPSConnection</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The HubSpot connection object.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The HubSpotConnection object may be passed to related cmdlets to use the connection.
+      </maml:description> 
+    </command:returnValue>
+
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+
+
+
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Select-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Searches HubSpot data.</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Select</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>Searches HubSpot data. The Select-HubSpot cmdlet allows you to use a syntax similar to SQL SELECT statements to search HubSpot data.</maml:para><maml:para>$conn = Connect-HubSpot</maml:para><maml:para>Select-HubSpot -Connection $conn -Table "Contacts" -Columns @("City","Country") -Where "VID='123456789'"</maml:para><maml:para></maml:para><maml:para></maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>Select-HubSpot [parameters]</maml:name>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Columns</maml:name>
+          <maml:description>
+            <maml:para>The columns to return.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string[]
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="0">
+          <maml:name>Connection</maml:name>
+          <maml:description>
+            <maml:para>The connection object.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            DataConnection
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>GroupBy</maml:name>
+          <maml:description>
+            <maml:para>A comma-separated list of columns that the result set will be grouped by.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>OrderBy</maml:name>
+          <maml:description>
+            <maml:para>The order in which columns will be returned.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Params</maml:name>
+          <maml:description>
+            <maml:para>The parameters that will be used for the query.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            Hashtable
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Table</maml:name>
+          <maml:description>
+            <maml:para>The table on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>The SQL WHERE clause that will be used for the operation.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Columns</maml:name>
+      <maml:description>
+        <maml:para>The columns to return.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string[]
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position=0 >
+      <maml:name>Connection</maml:name>
+      <maml:description>
+        <maml:para>The connection object.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        DataConnection
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>GroupBy</maml:name>
+      <maml:description>
+        <maml:para>A comma-separated list of columns that the result set will be grouped by.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>OrderBy</maml:name>
+      <maml:description>
+        <maml:para>The order in which columns will be returned.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Params</maml:name>
+      <maml:description>
+        <maml:para>The parameters that will be used for the query.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        Hashtable
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Table</maml:name>
+      <maml:description>
+        <maml:para>The table on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Where</maml:name>
+      <maml:description>
+        <maml:para>The SQL WHERE clause that will be used for the operation.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>QueryResults</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The results of the query.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The results of the query.
+      </maml:description> 
+    </command:returnValue>
+  
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Sync-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Syncs HubSpot data.</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Sync</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>Syncs HubSpot data. The Sync-HubSpot cmdlet allows you to replicate a data source locally and maintain it with the full caching functionality of the provider.</maml:para><maml:para>$conn = Connect-HubSpot</maml:para><maml:para>Sync-HubSpot -Connection $conn -Table "Contacts"</maml:para><maml:para></maml:para><maml:para></maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>Sync-HubSpot [parameters]</maml:name>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Columns</maml:name>
+          <maml:description>
+            <maml:para>The columns to sync.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string[]
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="0">
+          <maml:name>Connection</maml:name>
+          <maml:description>
+            <maml:para>The connection object.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            DataConnection
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="true"
+          position="named">
+          <maml:name>DestinationTable</maml:name>
+          <maml:description>
+            <maml:para>The table where the data will be placed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Params</maml:name>
+          <maml:description>
+            <maml:para>The parameters that will be used for the query.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            Hashtable
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Table</maml:name>
+          <maml:description>
+            <maml:para>The table on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Columns</maml:name>
+      <maml:description>
+        <maml:para>The columns to sync.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string[]
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position=0 >
+      <maml:name>Connection</maml:name>
+      <maml:description>
+        <maml:para>The connection object.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        DataConnection
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="true"
+  position="named" >
+      <maml:name>DestinationTable</maml:name>
+      <maml:description>
+        <maml:para>The table where the data will be placed.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Params</maml:name>
+      <maml:description>
+        <maml:para>The parameters that will be used for the query.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        Hashtable
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Table</maml:name>
+      <maml:description>
+        <maml:para>The table on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>AffectedRowsCount</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The number of rows affected by the operation.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The number of rows affected by the operation.
+      </maml:description> 
+    </command:returnValue>
+  
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+<!-- Cmdlet --><command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10">
+  
+  <command:details>
+    <command:name>
+      Update-HubSpot
+    </command:name>
+    <maml:description>
+      <maml:para>Updates HubSpot data.</maml:para>
+    </maml:description>
+    <maml:copyright>
+      <maml:para>Copyright (c) 2019 CData Software, Inc. - All rights reserved.</maml:para>
+    </maml:copyright>
+    <command:verb>Update</command:verb>
+    <command:noun>HubSpot</command:noun>
+    <dev:version>19.0</dev:version>
+  </command:details>
+  
+  <maml:description>
+    <maml:para>Updates HubSpot data. The Update-HubSpot cmdlet allows you to use a syntax similar to SQL UPDATE statements to update HubSpot data.</maml:para><maml:para>$conn = Connect-HubSpot</maml:para><maml:para>Update-HubSpot -Connection $conn -Table "Contacts" -Columns @("Country") -Values @("U.S.A") -Id "123456789"</maml:para><maml:para></maml:para><maml:para>The Where parameter can also be used to specify the primary key of the table:</maml:para><maml:para></maml:para><maml:para>Update-HubSpot -Connection $conn -Table "Contacts" -Columns @("Country") -Values @("U.S.A") -Where "Id = '123456789'"</maml:para><maml:para></maml:para><maml:para>The primary key can also be passed to the cmdlet along the pipeline:</maml:para><maml:para></maml:para><maml:para>Select-HubSpot -Connection $conn -Table Contacts -Where "VID = '123456789'" | Update-HubSpot -Columns @("VID") -Values @("123456789 2")</maml:para><maml:para></maml:para><maml:para></maml:para>
+  </maml:description>
+  
+  <!-- Cmdlet syntax section-->    
+  <command:syntax>
+      <command:syntaxItem>
+		<maml:name>Update-HubSpot [parameters]</maml:name>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Columns</maml:name>
+          <maml:description>
+            <maml:para>The columns on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string[]
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="0">
+          <maml:name>Connection</maml:name>
+          <maml:description>
+            <maml:para>The connection object.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            DataConnection
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Id</maml:name>
+          <maml:description>
+            <maml:para>The Id of the item on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="true"
+          position="named">
+          <maml:name>Table</maml:name>
+          <maml:description>
+            <maml:para>The table on which the operation will be performed.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="true"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Values</maml:name>
+          <maml:description>
+            <maml:para>The values that will be used to update the table.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string[]
+          </command:parameterValue>
+        </command:parameter>
+    
+        <command:parameter required="false"
+          pipelineInput="false"
+          position="named">
+          <maml:name>Where</maml:name>
+          <maml:description>
+            <maml:para>The SQL WHERE clause that will be used for the operation.</maml:para>
+          </maml:description>
+          <command:parameterValue >
+            string
+          </command:parameterValue>
+        </command:parameter>
+
+      </command:syntaxItem>
+    </command:syntax>
+
+  <!-- Cmdlet parameter section  --> 
+    <command:parameters>
+  <command:parameter required="true"
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Columns</maml:name>
+      <maml:description>
+        <maml:para>The columns on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string[]
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position=0 >
+      <maml:name>Connection</maml:name>
+      <maml:description>
+        <maml:para>The connection object.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        DataConnection
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Id</maml:name>
+      <maml:description>
+        <maml:para>The Id of the item on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="true"
+  position="named" >
+      <maml:name>Table</maml:name>
+      <maml:description>
+        <maml:para>The table on which the operation will be performed.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter required="true"
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Values</maml:name>
+      <maml:description>
+        <maml:para>The values that will be used to update the table.</maml:para>
+      </maml:description>
+      <command:parameterValue required="true" >
+        string[]
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        null
+      </dev:defaultValue>
+    </command:parameter>    
+      <command:parameter 
+  pipelineInput="false"
+  position="named" >
+      <maml:name>Where</maml:name>
+      <maml:description>
+        <maml:para>The SQL WHERE clause that will be used for the operation.</maml:para>
+      </maml:description>
+      <command:parameterValue  >
+        string
+      </command:parameterValue>
+
+      <dev:type>
+        <maml:name>System.String</maml:name>
+        <maml:uri/>
+      </dev:type>
+      <dev:defaultValue>
+        ""
+      </dev:defaultValue>
+    </command:parameter>    
+    
+
+  </command:parameters>
+
+  <!-- Input - Output section-->  <command:inputTypes>
+
+  </command:inputTypes>
+
+  <command:returnValues>
+      <command:returnValue>
+      <dev:type>
+        <maml:name>AffectedRowsCount</maml:name>
+        <maml:uri />
+        <maml:description>
+          <maml:para>
+            The number of rows affected by the operation.
+          </maml:para>
+        </maml:description>
+      </dev:type>   
+      <maml:description>
+        The number of rows affected by the operation.
+      </maml:description> 
+    </command:returnValue>
+  
+  </command:returnValues>
+
+  <command:terminatingErrors />
+
+  <command:nonTerminatingErrors />
+
+  <!-- Example section  --> 
+
+  <command:examples />
+
+  <!-- Link section  -->  <maml:relatedLinks>
+    <maml:navigationLink>
+      <maml:linkText></maml:linkText>
+      <maml:uri/>
+    </maml:navigationLink>
+  </maml:relatedLinks>
+</command:command>
+</helpItems>
