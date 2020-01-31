@@ -3,16 +3,15 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Shared Mailbox - RPC Calebgroup.net"
-$primaryEmail = "RPC@calebgroup.net"
+$displayName = "Norsk Hydro"
+$primaryEmail = "norsk.pec@anthesisgroup.com"
 $owner = "kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "paul.ashford@anthesisgroup.com
-helen.kean@anthesisgroup.com"
-$additionalEmailAddresses = convertTo-arrayOfEmailAddresses "ERGTC@calebgroup.net
-Registration@calebgroup.net
-mpc@calebgroup.net
-fatac@calebgroup.net
-reach@calebgroup.net"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Gerber.Manalo@anthesisgroup.com
+Michael.Malate@anthesisgroup.com
+Wolfgang.Wick@anthesisgroup.com
+acsmailboxaccess@anthesisgroup.com
+"
+$additionalEmailAddresses = convertTo-arrayOfEmailAddresses "norskstaging.pec@anthesisgroup.com"
 $allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
 $grantSendAsToo = $true
 $hideFromGal = $true

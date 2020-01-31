@@ -44,7 +44,7 @@ function add-netSuiteAccountToSharePoint{
     if(!$graphDrive){ #If we don't have a Graph DriveId, or the one we do have doesn't work (e.g. it's been deleted and manually re-created), have a rummage and try to find it by DisplayName(name)
         Write-Verbose "Couldn't find the /drive by Id, looking for Name in case it's been deleted and manually recreated. "
         $allDrivesInSite = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$correctSiteId/drives" -Verbose  #/drives does not support $filter (as of 2020-01-21)
-        $graphDrive = $allDrivesInSite.value | ? {(remove-diacritics $_.name) -eq (remove-diacritics $sqlNetsuiteAccount.AccountName)}
+        $graphDrive = $allDrivesInSite.value | ? {(sanitise-forSharePointGroupName (remove-diacritics $_.name)) -eq (sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteAccount.AccountName))}
         if($graphDrive.Count -gt 1){
             Write-Error "Multiple potential Graph /drive matches found with displayName [$($sqlNetsuiteAccount.AccountName)]:`r`n`t$($graphDrive.webUrl -join '`r`n`t')`r`nCannot continue"
             break
@@ -53,8 +53,8 @@ function add-netSuiteAccountToSharePoint{
         }
 
     if($graphDrive){ #Check Name -eq AccountName
-        if((remove-diacritics $graphDrive.name) -ne (remove-diacritics $sqlNetsuiteAccount.AccountName)){ #Update if different
-            $docLibNameUpdateHash = @{"displayName"="$($sqlNetsuiteAccount.AccountName)"}
+        if((sanitise-forSharePointGroupName (remove-diacritics $graphDrive.name)) -ne (sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteAccount.AccountName))){ #Update if different
+            $docLibNameUpdateHash = @{"displayName"="$(sanitise-forSharePointGroupName $sqlNetsuiteAccount.AccountName)"}
             #Get List Ids from /drive object
             $graphList = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($graphDrive.id)/list"
             $updatedGraphList = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$($graphList.parentReference.siteId)/lists/$($graphList.id)" -graphBodyHashtable $docLibNameUpdateHash
@@ -65,7 +65,7 @@ function add-netSuiteAccountToSharePoint{
         }
     else{ #If we can't find a /drives object, create a new one
         $docLibInnerHash = @{"template"="documentLibrary"}
-        $docLibOuterHash = @{"displayName"="$($sqlNetsuiteAccount.AccountName)";"list"=$docLibInnerHash}
+        $docLibOuterHash = @{"displayName"="$(sanitise-forSharePointGroupName $sqlNetsuiteAccount.AccountName)";"list"=$docLibInnerHash}
         $newGraphList = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$correctSiteId/lists" -graphBodyHashtable $docLibOuterHash
         $graphDrive = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$($newGraphList.parentReference.siteId)/lists/$($newGraphList.id)/drive"
         Write-Verbose "$($newGraphList.list.template) [$($newGraphList.webUrl)][$($newGraphList.parentReference) | $($newGraphList.id)] created with displayName [$($newGraphList.displayName)]"
@@ -73,7 +73,11 @@ function add-netSuiteAccountToSharePoint{
         }
     
     if($graphDrive){ #If we've got a /drive object now, try creating the standard folders
-        $standardClientFolders = @("_These Client Document Libraries are created automatically by NetSuite","_These Client Document Libraries are created automatically by NetSuite\_That's clever!","_These Client Document Libraries are created automatically by NetSuite\Create a Client in NetSuite and see" )
+        $standardClientFolders = @(
+            "_These Client Document Libraries are created automatically by NetSuite"
+            ,"_These Client Document Libraries are created automatically by NetSuite\_That's clever!"
+            ,"_These Client Document Libraries are created automatically by NetSuite\Create a Client in NetSuite and see"
+            )
         add-graphArrayOfFoldersToDrive -graphDriveId $graphDrive.id -foldersAndSubfoldersArray $standardClientFolders -tokenResponse $tokenResponse -conflictResolution Fail
         }
 
@@ -161,13 +165,13 @@ function add-netSuiteProjectToSharePoint{
     if(!$graphDriveItem){#If we don't have a Graph DriveItemId, or the one we do have doesn't work (e.g. it's been deleted and manually re-created), have a rummage and try to find it by DisplayName(name)
         Write-Verbose "Couldn't find the /drive/{drive-id}/items/{item-id} by Id, looking for Name in case it's been deleted and manually recreated. "
         $allGraphDriveRootItems = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetSuiteClient.SharePointDocLibGraphDriveId)/root/children" #/drives does not support $filter (as of 2020-01-21)
-        $graphDriveItem = $allGraphDriveRootItems.value | ? {$(remove-diacritics $_.name) -eq $(remove-diacritics $sqlNetsuiteProject.entityId)}
+        $graphDriveItem = $allGraphDriveRootItems.value | ? {$(sanitise-forSharePointGroupName (remove-diacritics $_.name)) -eq $(sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteProject.entityId))}
         }
 
     if($graphDriveItem){#If we've found an existing item, check whether it needs updating
-        if($(remove-diacritics $_.name) -ne $(remove-diacritics $sqlNetsuiteProject.entityId)){ #Update the Project/folder name if it's changed
-            $folderUpdateHash = @{"name"="$($sqlNetsuiteProject.entityId)"}
-            Write-Verbose "Updating name from [$($graphDriveItem.name)] to [$($sqlNetsuiteProject.entityId)] for Project [$($graphDriveItem.webUrl)] | $($graphDriveItem.id)]"
+        if($(sanitise-forSharePointGroupName (remove-diacritics $graphDriveItem.name)) -ne $(sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteProject.entityId))){ #Update the Project/folder name if it's changed
+            $folderUpdateHash = @{"name"="$(sanitise-forSharePointGroupName $sqlNetsuiteProject.entityId)"}
+            Write-Verbose "Updating name from [$($graphDriveItem.name)] to [$(sanitise-forSharePointGroupName $sqlNetsuiteProject.entityId)] for Project [$($graphDriveItem.webUrl)] | $($graphDriveItem.id)]"
             $updatedGraphDriveItem = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetSuiteClient.SharePointDocLibGraphDriveId)/items/$($sqlNetsuiteProject.SharePointDriveItemId)" -graphBodyHashtable $folderUpdateHash
             Write-Verbose "[$($updatedGraphDriveItem.webUrl)] | $($updatedGraphDriveItem.id)] changed displayName from [$($graphDriveItem.name)] to [$($updatedGraphDriveItem.name)]"
             $updateSqlRecord = $true
@@ -179,14 +183,14 @@ function add-netSuiteProjectToSharePoint{
             "$($sqlNetsuiteProject.entityId)"
             ,"$($sqlNetsuiteProject.entityId)\Admin & contracts"
             ,"$($sqlNetsuiteProject.entityId)\Analysis"
-            ,"$($sqlNetsuiteProject.entityId)\Data $ refs"
+            ,"$($sqlNetsuiteProject.entityId)\Data & refs"
             ,"$($sqlNetsuiteProject.entityId)\Meetings"
             ,"$($sqlNetsuiteProject.entityId)\Proposal"
             ,"$($sqlNetsuiteProject.entityId)\Reports"
             ,"$($sqlNetsuiteProject.entityId)\Summary (marketing) - end of project"
             )
         $newProjectFolders = add-graphArrayOfFoldersToDrive -graphDriveId $sqlNetSuiteClient.SharePointDocLibGraphDriveId -foldersAndSubfoldersArray $arrayOfProjectFolders -tokenResponse $tokenResponse -conflictResolution Fail
-        $graphDriveItem = $newProjectFolders | ? {$_.name -eq $sqlNetsuiteProject.entityId}
+        $graphDriveItem = $newProjectFolders | ? {$_.name -eq (sanitise-forSharePointGroupName $sqlNetsuiteProject.entityId)}
         Write-Verbose "[$($graphDriveItem.webUrl)] | $($graphDriveItem.id)]  created with displayName [$($graphDriveItem.name)]"
         $updateSqlRecord = $true
         }
@@ -350,7 +354,7 @@ function get-netSuiteClientsFromNetSuite(){
         [string]$query
 
         ,[parameter(Mandatory=$false)]
-        [hashtable]$netsuiteParameters
+        [psobject]$netsuiteParameters
         )
 
     Write-Verbose "`tget-allNetSuiteClients([$($query)])"
@@ -384,9 +388,49 @@ function get-netSuiteClientFromSqlCache{
     $sql = "SELECT a.AccountName, a.NsInternalId, a.NsExternalId, a.RecordType, a.entityStatus, a.DateCreated, a.LastModified, a.DateCreatedInSql, a.DateModifiedInSql, a.IsDirty, a.SharePointDocLibGraphDriveId FROM v_ACCOUNTS_Current a $sqlWhereClause"
     Write-Verbose "`t$sql"
     $result = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
-    if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
-    else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
     $result
+    }
+function get-netSuiteContactFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^?[\w+][=][\w+]')]
+        [string]$query
+
+        ,[parameter(Mandatory=$false)]
+        [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteContactFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+
+    $contacts = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/contact$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $contactsEnumerated = [psobject[]]::new($contacts.count)
+    for ($i=0; $i -lt $contacts.count;$i++) {
+        $contactsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $contacts.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+        }
+    $contactsEnumerated
+    }
+function get-netSuiteOpportunityFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^?[\w+][=][\w+]')]
+        [string]$query
+
+        ,[parameter(Mandatory=$false)]
+        [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+
+    $opportunities = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/opportunity$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $opportunitiesEnumerated = [psobject[]]::new($opportunities.count)
+    for ($i=0; $i -lt $opportunities.count;$i++) {
+        $opportunitiesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $opportunities.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+        }
+    $opportunitiesEnumerated
     }
 function get-netSuitePaddedCode(){
     [cmdletbinding()]
@@ -441,7 +485,7 @@ function get-netSuiteProjectFromNetSuite(){
         [string]$query
 
         ,[parameter(Mandatory=$false)]
-        [hashtable]$netsuiteParameters
+        [psobject]$netsuiteParameters
         )
 
     Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
@@ -588,8 +632,8 @@ function invoke-netSuiteRestMethod(){
     
     $netsuiteRestHeaders = get-netsuiteAuthHeaders -requestType $requestType -url $hostUrl -oauthParameters $oAuthParamsForSigning  -oauth_consumer_secret $netsuiteParameters.oauth_consumer_secret -oauth_token_secret $netsuiteParameters.oauth_token_secret -realm $netsuiteParameters.realm
     
-    #Write-Host -f Green "Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $(stringify-hashTable $netsuiteRestHeaders) -Method $requestType -Verbose -ContentType application/swagger+json"
-    $response = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -Verbose -ContentType "application/swagger+json"
+    Write-Verbose "Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $(stringify-hashTable $netsuiteRestHeaders) -Method $requestType -ContentType application/swagger+json"
+    $response = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
     $response            
     }
 function update-netSuiteAccountInSqlCache(){
