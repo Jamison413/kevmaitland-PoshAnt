@@ -862,11 +862,11 @@ function set-unifiedGroupCustomAttributes(){
 
     if($smb.Count -eq 1){
         Write-Verbose "Set-UnifiedGroup -Identity [$($unifiedGroup.ExternalDirectoryObjectId)] -CustomAttribute1 [$($unifiedGroup.CustomAttribute1)] -CustomAttribute2 [$($dataManagerSG[0].ObjectId)] -CustomAttribute3)] [$($membersSG[0].ObjectId)] -CustomAttribute4 [$($combinedSG[0].ObjectId)] -CustomAttribute5 [$($smb.ExternalDirectoryObjectId)] -CustomAttribute6 [$($pubPriv)] -CustomAttribute7 [$($groupType)] -CustomAttribute8 [$($masterMembership)]"
-        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute5 $smb.ExternalDirectoryObjectId -CustomAttribute6 $pubPriv -CustomAttribute7 $groupType -CustomAttribute8 $masterMembership
+        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute5 $smb.ExternalDirectoryObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
         }
     else{
         Write-Verbose "Set-UnifiedGroup -Identity [$($unifiedGroup.ExternalDirectoryObjectId)] -CustomAttribute1 [$($unifiedGroup.CustomAttribute1)] -CustomAttribute2 [$($dataManagerSG[0].ObjectId)] -CustomAttribute3)] [$($membersSG[0].ObjectId)] -CustomAttribute4 [$($combinedSG[0].ObjectId)] -CustomAttribute6 [$($pubPriv)] -CustomAttribute7 [$($groupType)] -CustomAttribute8 [$($masterMembership)]"
-        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute6 $pubPriv -CustomAttribute7 $groupType -CustomAttribute8 $masterMembership
+        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
         }
     }
 function sync-groupMemberships(){
