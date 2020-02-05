@@ -1,7 +1,4 @@
-﻿
-
-#Done and tested :)
-function create-ADUser{
+﻿function create-ADUser{
     [cmdletbinding()]
 Param (
     [parameter(Mandatory = $true,ParameterSetName="UPN")]
@@ -34,7 +31,6 @@ Param (
     )
 
 #Get BU details
-
 switch ($businessunit) {
     "Anthesis Energy UK Ltd (GBR)" {$upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
     "Anthesis (UK) Ltd (GBR)"  {$upnsuffix = "@anthesisgroup.com"; $twitteraccount = "anthesis_group"; $DDI = "0117 403 2XXX"; $receptionDDI = "0117 403 2700";$ouDn = "OU=Users,OU=Sustain,DC=Sustainltd,DC=local"; $website = "www.anthesisgroup.com"}
@@ -43,8 +39,6 @@ switch ($businessunit) {
     default {Write-Host -ForegroundColor DarkRed "Warning: Could not not identify Business Unit [$businessunit]"}
     }
 write-host "Business Unit is $($businessunit)" -ForegroundColor White
-
-
 
 #Create AD account
 write-host "*******************This is what we will try to set:*******************" -ForegroundColor White
@@ -134,9 +128,6 @@ Creates AD user object
   create-ADUser -upn $upn -managerSAM $managerSAM -primaryteam $primaryteam -plaintextpassword $plaintextpassword -adCredentials $adCredentials -office $office -DDI $DDI -ouDn $ouDn -website $website -receptionDDI $receptionDDI -Fax $twitteraccount -jobtitle $jobtitle -upnsuffix $upnsuffix
 #>
 
-
-
-#done! :)
 function create-msolUser{
         [cmdletbinding()]
     Param (
@@ -163,9 +154,6 @@ Creates Msol User object by first creating a new mailbox, which will create an u
 create-msolUser -upn "jo.bloggs@anthesisgroup.com" -plaintextpassword $plaintextpassword
 #>
 
-
-
-#done! :) Main licensing tested - issues with having $lO and remove license on same line as add license
 function license-msolUser{
         [cmdletbinding()]
     Param (
@@ -225,9 +213,6 @@ license-msolUser -upn "jo.bloggs@anthesisgroup.com" -licensetype "E1" -usageloca
 
 }
 
-
-#I've split this one into two functions for re-use - details vs groups as there may be more scope down the line with groups?
-#Needs testing
 function update-msoluserdetails{
     [cmdletbinding()]
     Param (
@@ -334,17 +319,12 @@ Try{
 Catch{
     Write-Error "Failed to update msoluser object office [$($upn)] in update-msoluser"
 } 
-
 }
 <#
 .SYNOPSIS
 Updates Msol User object with correct details, such as first name, last name, etc.
 #>
 
-
-
-
-#Needs testing
 function update-msolusercoregroups{
     [cmdletbinding()]
     Param (
@@ -398,11 +378,6 @@ Updates Msol User object with correct core groups, such as regional and MDM grou
 #>
 }
 
-
-
-
-
-<#Kev's example#>
 function update-msolMailboxViaUpn{
     [cmdletbinding()]
     Param (
@@ -454,50 +429,107 @@ function update-msolMailboxViaUpn{
     }
 }    
 
-<#Kev's example/#>
-
-
-#Needs testing
 function update-sharePointConfig{
-        [cmdletbinding()]
-    Param (
-         [parameter(Mandatory = $true,ParameterSetName="UPN")]
-            [String]$upn
-        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-            [String]$timezoneID
-        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-            [String]$countrylocale
-        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-            [String]$languagecode
-            )
-        
-
-        #Main provision user script will need to figure out the p3letter country code from the Main Office field, which is term store based. we can assume this is where (or at least close to where) they will be working.
-
-       if(![string]::IsNullOrWhiteSpace($upn)){
-        
-        Try{
-            Write-Host "Setting Sharepoint initial config" -ForegroundColor Yellow
-            if(![string]::IsNullOrWhiteSpace($timezoneID)){Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-RegionalSettings-FollowWeb' -Value "False"}
-            Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-RegionalSettings-Initialized' -Value "True"
-            Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-timezone' -Value $($timezoneID)
-            Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-Locale' -Value $($countrylocale)
-            Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-MUILanguages' -Value $($languagecode)
-            Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-CalendarType' -Value "1"
-            Set-PnPUserProfileProperty -Account $UPN -PropertyName 'SPS-AltCalendarType' -Value "1"
+    [cmdletbinding()]
+Param (
+     [parameter(Mandatory = $true,ParameterSetName="upn")]
+        [String]$upn
+    ,[parameter(Mandatory = $false,ParameterSetName="upn")]
+        [String]$office
+        )
+    
+   if(![string]::IsNullOrWhiteSpace($upn)){
+        #Check if there is an SPO profile with this upn
+        $profilename = ("i:0#.f|membership|" + "$($upn)").Trim()
+        Write-Host "$($profilename)" -ForegroundColor Yellow
+        $SPOUserProfile = Get-PnPUser -Identity $profilename
+        If($SPOUserProfile){write-host "Success! SPOUserProfile retrieved for $($upn)"}
+        Else{write-host "Failure! SPOUserProfile could not be retrieved for $($upn)"
+        break}
+        #Then see if the profile follows default profile settings via "follow-web"
+        $SPOUserProfileProperties = Get-PnPUserProfileProperty -Account $upn
+        If("True" -eq $($SPOUserProfileProperties.UserProfileProperties.'SPS-RegionalSettings-FollowWeb')){write-host "It looks like they are using the default settings!"}
+        Else{
+        write-host "It looks like they have unique settings already, meaning they are following their current offices timezone and locale settings" -ForegroundColor Yellow
+        If("True" -eq ([Environment]::UserInteractive)){
+            $syncconfiguration = Read-host "Do you want to re-sync their Sharepoint configuration? (y/n)"
+                If("y" -eq $syncconfiguration){write-host "Okay! Attempting to re-sync Sharepoint configuration"}
+                Else {break}
             }
-       Catch{
-            Write-Error "Failed to update SPO user [$($upn)] in update-sharePointInitialConfig"
+            Else{
+                Write-Host "You look like a robot, hello! We'll continue syncing Sharepoint Config" -ForegroundColor Yellow
+            }
+        }
+        #If we've gotten this far, the profile has default settings or we are interactively telling the script to update
+
+        #If office is missing, get the MSOL User object and office from there, Get secondary geographic information for office from term store
+        if([string]::IsNullOrWhiteSpace($office)){
+        write-host "It looks like an office wasn't provided, so we'll try to retrieve it from 365" -ForegroundColor Yellow 
+        [string]$office = Get-MsolUser -UserPrincipalName $upn | select-object -Property "Office" | Out-String -Stream
+        $termtofind = $office.Trim(" Office       ------       ")
+        Write-Host "I'm in $($termtofind) according to 365"
+        $officeterm = Get-PnPTerm -Identity $($termtofind) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
+        Write-Host "Here is the term I tried to get: $($officeterm.Name)" -ForegroundColor Yellow
+        #Set variables
+        $timezoneID = $($officeterm.CustomProperties.'Sharepoint Timezone ID')
+        $countrylocale = $($officeterm.CustomProperties.'Locale')
+        $languagecode = $($officeterm.CustomProperties.'Language Code')
+        }
+        Else{
+        Write-host "It looks like an office was provided! Retrieving term from term store"
+        $officeterm = Get-PnPTerm -Identity $($office) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
+        $timezoneID = $($officeterm.CustomProperties.'Sharepoint Timezone ID')
+        $countrylocale = $($officeterm.CustomProperties.'Locale')
+        $languagecode = $($officeterm.CustomProperties.'Language Code')
+        Write-host "Warning: We'll update the users timezone to match the provided office, however this will be out of sync with the office record for the user in 365 if the provided office is different - you'll need to change it to match if required " -ForegroundColor Red
+        }
+        Write-Host "Setting Sharepoint configuration for $($upn) in $($termtofind)" -ForegroundColor Yellow
+        Try{
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-RegionalSettings-FollowWeb' -Value "False"
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-RegionalSettings-Initialized' -Value "True"
+        }
+        Catch{
+            Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: RegionalSettings"
             Write-Error $_
-       }
-       }
+        }
+        if(![string]::IsNullOrWhiteSpace($timezoneID)){
+        Try{
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-timezone' -Value $($timezoneID)
+        }
+        Catch{
+            Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: TimezoneID"
+            Write-Error $_
+        }
+        }
+        if(![string]::IsNullOrWhiteSpace($countrylocale)){
+        Try{
+        if(![string]::IsNullOrWhiteSpace($countrylocale)){Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-Locale' -Value $($countrylocale)}
+        }
+        Catch{
+        Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: Country Locale"
+        Write-Error $_
+        }
+        }
+        if(![string]::IsNullOrWhiteSpace($languagecode)){
+        Try{
+        if(![string]::IsNullOrWhiteSpace($languagecode)){Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-MUILanguages' -Value $($languagecode)}
+        }
+        Catch{
+        Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: languagecode"
+        Write-Error $_
+        }
+        }
+        Try{
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-CalendarType' -Value "1"
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-AltCalendarType' -Value "1"
+        }
+        Catch{
+            Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: CalendarType"
+            Write-Error $_
+        }
 
 }
-
-
-
-
-
+}
 
 <#Still to do
 The three letter bu string is a question, as is the manager access?
