@@ -5,6 +5,13 @@
 #                                                                                                        #
 ##########################################################################################################
 
+            $office = Get-MsolUser -UserPrincipalName "emily.pressey@anthesisgroup.com" | select-object -Property "Office"
+            write-host "$($office)"
+            $office = ($office.office)
+            write-host "$($office)"
+            $office = $office.Trim()
+            write-host "$($office)"
+            $officeterm = Get-PnPTerm -Identity $office -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
 
 
 
@@ -111,16 +118,6 @@ If($msoluser){
         log-Error $Error
         }
         try{
-        Disconnect-PnPOnline 
-        Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -UseWebLogin #There may be an issue with timing here - might need to move this
-        update-sharePointConfig -upn $upn -timezoneID $timezoneID -countrylocale $countrylocale
-        }
-        catch{
-        Write-host "Failed to update MSOL account Sharepoint details" -ForegroundColor Red
-        log-Error "Failed to update MSOL account Sharepoint details"
-        log-Error $Error
-        }
-        try{
         license-msolUser -upn $upn -licensetype $licensetype
         }
         catch{
@@ -137,16 +134,16 @@ write-host "*****************Failed to retrieve msol user account in time: $($up
 
 
 
-#######################
-#                     #
-#      Runthrough     #
-#                     #
-#######################
+#################################
+#                               #
+#      Runthrough - New List    #
+#                               #
+#################################
 
 
 
 
-<#--------Retrieve Requests from Sharepoint - New List--------#>
+<#--------Retrieve Requests from Sharepoint--------#>
 
 #Get the New User Requests that have not been marked as processed
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/" -UseWebLogin #-Credentials $msolCredentials
@@ -189,9 +186,102 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -licensetype = ($licensetype = ($thisUser.FieldValues.Licensing.Split(" ")[1].Trim())) `
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) `
-    -timezoneID = ($timezoneID = ($officeterm.CustomProperties.'Sharepoint Timezone ID')) `
-    -languagecode = ($languagecode = "2057") `
-    -countrylocale = ($countrylocale = "2057") `
+
+    
+#AD user account: If user will be based in Bristol or London office, offer to create an AD user account
+If((![string]::IsNullOrWhiteSpace($upn)) -and (("Bristol, GBR" -eq $office) -or ("London, GBR" -eq $office))){
+write-host "It looks like this user will either be based in the Bristol or London offices." -ForegroundColor Yellow
+$confirmation = Read-Host "Create an AD account? (y/n)"
+if ($confirmation -eq 'y') {
+Write-Host "Okay, let's create an AD account for $($upn)..." -ForegroundColor Yellow
+}
+$allpermanentstaffadgroupprompt = Read-Host "Do we also want to add the New Starter to the All Permanant Staff AD Group? (y/n)"
+    try{
+write-host "Creating AD account for $(remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))"    
+    create-ADUser -upn $upn `
+    -firstname $firstname `
+    -surname ($surname = $lastname) `
+    -displayname $displayname `
+    -managerSAM ($managerSAM =  ($thisUser.FieldValues.Line_x0020_Manager.Email.split("@")[0])) `
+    -primaryteam $primaryteam `
+    -jobtitle $jobtitle `
+    -plaintextpassword $plaintextpassword `
+    -businessunit $businessunit `
+    -adCredentials $adCredentials `
+    -office $office `
+    -allpermanentstaffadgroupprompt $allpermanentstaffadgroupprompt `
+    -SAMaccountname ($SAMaccountname = $($upn.Split("@")[0]))
+    }
+Catch{
+    Write-host "Failed to create AD account" -ForegroundColor Red
+    log-Error "Failed to create AD account"
+    log-Error $Error
+    }
+}
+Else{
+write-host "Okay, we will stop here." -ForegroundColor White
+}
+}
+
+
+
+
+
+
+#################################
+#                               #
+#      Runthrough - Old List    #
+#                               #
+#################################
+
+
+
+
+
+<#--------Retrieve Requests from Sharepoint--------#>
+
+#Get the New User Requests
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -UseWebLogin #-Credentials $msolCredentials
+$requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
+if($requests){#Display a subset of Properties to help the user identify the correct account(s)
+    $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.Start_x0020_Date} -Descending | select {$_.FieldValues.Title},{$_.FieldValues.Start_x0020_Date},{$_.FieldValues.Job_x0020_title},{$_.FieldValues.Primary_x0020_Workplace.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Primary_x0020_Team.LookupValue},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
+    #Then return the original requests as these contain the full details
+    [array]$selectedRequests = Compare-Object -ReferenceObject $requests -DifferenceObject $selectedRequests -Property Guid -IncludeEqual -ExcludeDifferent -PassThru
+    }
+
+
+
+ForEach($thisUser in $selectedRequests){
+
+#Get secondary geographic data from the term store
+$officeterm = Get-PnPTerm -Identity $($thisUser.fieldvalues.Primary_x0020_Workplace.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
+$regionalgroup = (Get-DistributionGroup -Identity $officeterm.CustomProperties.'365 Regional Group').guid
+$country = $officeTerm.CustomProperties.Country
+
+   
+#365 user account: Create the 365 user
+write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) first, which will create the unliscensed 365 E1 user"    
+    provision-365user -upn ($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) `
+    -plaintextpassword ($plaintextpassword = "Anthesis123") `
+    -firstname ($firstname = "$($thisUser.FieldValues.Title.Trim().Split(" ")[0].Trim())") `
+    -lastname = ($lastname = "$(($thisUser.FieldValues.Title.Trim().Split(" ")[$thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ").Count-1]).Trim())") `
+    -displayname = ($displayname = "$(($thisUser.FieldValues.Title).Trim())") `
+    -primaryteam = ($primaryteam = "$(($thisUser.FieldValues.Primary_x0020_Team.Label).Trim())") `
+    -regionalgroup = $regionalgroup `
+    -office = ($office = "$(($thisUser.FieldValues.Primary_x0020_Workplace.Label).Trim())") `
+    -streetaddress = ($streetaddress = ($officeTerm.CustomProperties.'Street Address')) `
+    -country = ($country = ($officeTerm.CustomProperties.Country)) `
+    -city = ($city = "$(($thisUser.FieldValues.Primary_x0020_Workplace.Label).Trim())") `
+    -postcode = ($postcode = ($officeTerm.CustomProperties.'Postal Code')) `
+    -linemanager = ($linemanager = ($thisUser.FieldValues.Line_x0020_Manager.Email)) `
+    -businessunit = ($businessunit = ($thisUser.FieldValues.Finance_x0020_Cost_x0020_Attribu.Label)) `
+    -jobtitle = ($jobtitle = ($thisUser.FieldValues.Job_x0020_title)) `
+    -plaintextpassword = "Anthesis123" `
+    -adCredentials = $adCredentials `
+    -restCredentials = $restCredentials `
+    -licensetype = ($licensetype = ($thisUser.FieldValues.Office_x0020_365_x0020_license.Split(" ").Trim())) `
+    -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
+    -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) 
 
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account
@@ -240,34 +330,6 @@ write-host "Okay, we will stop here." -ForegroundColor White
 
 
 
-
-
-
-
-
-
-<#////old list - still to do#>
-
-
-
-
-Foreach($user in $selectedRequests){
-
-
-    provision-SustainADUser -userUPN $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") `
-        -userFirstName $thisUser.FieldValues.Title.Split(" ")[0] `
-        -userSurname $($thisUser.FieldValues.Title.Split(" ")[$_.Title.Split(" ").Count-1]) `
-        -userDisplayName $($thisUser.FieldValues.Title) `
-        -userManagerSAM $($thisUser.FieldValues.Line_x0020_Manager.Email).Replace("@anthesisgroup.com","") `
-        -userCommunity $null `
-        -userPrimaryTeam $thisUser.FieldValues.Primary_x0020_Team.Email `
-        -userBusinessUnit $thisUser.FieldValues.Finance_x0020_Cost_x0020_Attribu.Label `
-        -userJobTitle $thisUser.FieldValues.Job_x0020_title `
-        -plaintextPassword "Anthesis123" `
-        -adCredentials $adCredentials `
-        -restCredentials $restCredentials `
-        -newUserListItem $_ `
-    }
 
 
 
