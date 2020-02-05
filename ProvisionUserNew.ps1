@@ -5,13 +5,6 @@
 #                                                                                                        #
 ##########################################################################################################
 
-            $office = Get-MsolUser -UserPrincipalName "emily.pressey@anthesisgroup.com" | select-object -Property "Office"
-            write-host "$($office)"
-            $office = ($office.office)
-            write-host "$($office)"
-            $office = $office.Trim()
-            write-host "$($office)"
-            $officeterm = Get-PnPTerm -Identity $office -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
 
 
 
