@@ -461,12 +461,18 @@ Param (
             }
         }
         #If we've gotten this far, the profile has default settings or we are interactively telling the script to update
-
+        If(("True" -eq $($SPOUserProfileProperties.UserProfileProperties.'SPS-RegionalSettings-FollowWeb') -and ("True" -ne ([Environment]::UserInteractive)))){
+            Write-Host "It looks like they are using the default settings and you are a robot, continuing...." -ForegroundColor Yellow
+        }
+        Else{
+            Write-Host "It looks like they have unique settings already, meaning they are following their current offices timezone and locale settings (unless this has changed in 365)...stopping" -ForegroundColor Yellow
+            break
+        }
         #If office is missing, get the MSOL User object and office from there, Get secondary geographic information for office from term store
         if([string]::IsNullOrWhiteSpace($office)){
         write-host "It looks like an office wasn't provided, so we'll try to retrieve it from 365" -ForegroundColor Yellow 
-        [string]$office = Get-MsolUser -UserPrincipalName $upn | select-object -Property "Office" | Out-String -Stream
-        $termtofind = $office.Trim(" Office       ------       ")
+       $office = Get-MsolUser -UserPrincipalName $upn | select-object -Property "Office"
+       $termtofind = ($office.split("=").Replace("}",""))[1]
         Write-Host "I'm in $($termtofind) according to 365"
         $officeterm = Get-PnPTerm -Identity $($termtofind) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
         Write-Host "Here is the term I tried to get: $($officeterm.Name)" -ForegroundColor Yellow
@@ -530,6 +536,11 @@ Param (
 
 }
 }
+<#
+.SYNOPSIS
+Updates SPO User profile with correct details according to 365 msol office details or provided office. Must be connected via Kimblebot for automation and to the main "https://anthesisllc.sharepoint.com/" site (NOT the admin site)
+#>
+
 
 <#Still to do
 The three letter bu string is a question, as is the manager access?
