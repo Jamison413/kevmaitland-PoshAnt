@@ -221,7 +221,7 @@ function add-netsuiteProjectToSqlCache{
     if((remove-diacritics $nsNetsuiteProject.companyName) -eq (remove-diacritics $alreadyPresent.ProjectName)){
         if($(Get-Date $nsNetsuiteProject.lastModifiedDate) -ne $(Get-Date $alreadyPresent.LastModified)){
             Write-Verbose "`tNsInternalId [$($nsNetsuiteProject.Id)] has been updated, but the name has not changed. Updating LastModified for existing record and flagging as IsDirty = $false."
-            #update-netSuiteProjectInSqlCache -nsNetsuiteProject $nsNetsuiteProject -dbConnection $dbConnection -isNotDirty
+            update-netSuiteProjectInSqlCache -nsNetsuiteProject $nsNetsuiteProject -dbConnection $dbConnection -isNotDirty
             }
         else{
             Write-Verbose "`tNsInternalId [$($nsNetsuiteProject.Id)] doesn't seem to have changed (probably caused by a lack of granularity in NetSuite's REST WHERE clauses). Not updating anything."
@@ -251,6 +251,60 @@ function add-netsuiteProjectToSqlCache{
         $sql += ","+$(sanitise-forSqlValue -value $true -dataType Boolean)
         $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
         $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
+        $sql += ")"
+        Write-Verbose "`t$sql"
+        $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
+        if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
+        else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
+        $result
+        }
+    }
+function add-netsuiteOpportunityToSqlCache{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [PSCustomObject]$nsNetsuiteOpportunity 
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$dbConnection
+        )
+    Write-Verbose "add-netsuiteOpportunityToSqlCache [$($nsNetsuiteOpportunity.title)]"
+    $sql = "SELECT TOP 1 OpportunityName, NsInternalId, LastModified FROM t_OPPORTUNITIES WHERE NsInternalId = '$($nsNetsuiteOpportunity.Id)' ORDER BY LastModified Desc"
+    Write-Verbose "`t$sql"
+    $alreadyPresent = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
+    if((remove-diacritics $nsNetsuiteOpportunity.title) -eq (remove-diacritics $alreadyPresent.OpportunityName) -and $alreadyPresent){
+        if($(Get-Date $nsNetsuiteOpportunity.lastModifiedDate) -ne $(Get-Date $alreadyPresent.LastModified)){
+            Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] has been updated, but the name has not changed. Updating LastModified for existing record and flagging as IsDirty = $false."
+            update-netSuiteOpportunityInSqlCache -nsNetsuiteProject $nsNetsuiteOpportunity -dbConnection $dbConnection -isNotDirty
+            }
+        else{
+            Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] doesn't seem to have changed (probably caused by a lack of granularity in NetSuite's REST WHERE clauses). Not updating anything."
+            }
+        }
+    else{
+        if(!$alreadyPresent){Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] not present in SQL, adding to [t_OPPORTUNITIES]"}
+        else{Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] Title has changed from [$($alreadyPresent.ProjectName)] to [$($nsNetsuiteOpportunity.companyName)], adding new record to [t_PROJECTS]"}
+        $now = $(Get-Date)
+        $sql = "INSERT INTO t_OPPORTUNITIES (NsInternalId, NsExternalId, AccountNsInternalId, OpportunityName, OpportunityNumber, entityId, entityStatus, entityNexus, custbody_project_template, tranId, status, probability, custbody_industry, subsidiary, DateCreated, LastModified, DateCreatedInSql, DateModifiedInSql, IsDirty) VALUES ("
+                                             
+        $sql += $(sanitise-forSqlValue -value $nsNetsuiteOpportunity.id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.entity.id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.title -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.tranId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value "$($nsNetsuiteOpportunity.tranId) $($nsNetsuiteOpportunity.title)" -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.entityStatus.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.entityNexus.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.custbody_project_template.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.tranId -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.status -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.probability -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.custbody_industry -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.subsidiary.refName -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.createdDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.lastModifiedDate -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $now -dataType Date)
+        $sql += ","+$(sanitise-forSqlValue -value $true -dataType Boolean)
         $sql += ")"
         Write-Verbose "`t$sql"
         $result = Execute-SQLQueryOnSQLDB -query $sql -queryType nonquery -sqlServerConnection $dbConnection
