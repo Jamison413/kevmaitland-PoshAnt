@@ -424,10 +424,19 @@ function new-365Group(){
 
     if($365Group){ #If we now have a 365 UG, set the CustomAttributes, and create a Shared Mailbox (if required) and configure it
         Write-Verbose "`tSet-UnifiedGroup -Identity [$($365Group.ExternalDirectoryObjectId)] -HiddenFromAddressListsEnabled [$true] -CustomAttribute1 [$($365Group.ExternalDirectoryObjectId)] -CustomAttribute2 [$($managersSg.ExternalDirectoryObjectId)] -CustomAttribute3 [$($membersSg.ExternalDirectoryObjectId)] -CustomAttribute4 [$($combinedSg.ExternalDirectoryObjectId)] -CustomAttribute6 [$($membershipmanagedBy)] -CustomAttribute7 [$($groupClassification)] -CustomAttribute8 [$($accessType)] -WhatIf:[$($WhatIfPreference)] -AccessType [$($accessType)] -RequireSenderAuthenticationEnabled [$($blockExternalMail)] -AutoSubscribeNewMembers:[$($autoSubscribe)] -AlwaysSubscribeMembersToCalendarEvents:[$($autoSubscribe)] -Classification [$($groupClassification)]"
-        Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -CustomAttribute1 $365Group.ExternalDirectoryObjectId -CustomAttribute2 $managersSg.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId -CustomAttribute6 $membershipmanagedBy -CustomAttribute7 $groupClassification -CustomAttribute8 $accessType -WhatIf:$WhatIfPreference -AccessType $accessType -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Classification $groupClassification
+        $customAttribsSet = $false
+        do{
+            try{
+                Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -CustomAttribute1 $365Group.ExternalDirectoryObjectId -CustomAttribute2 $managersSg.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId -CustomAttribute6 $membershipmanagedBy -CustomAttribute7 $groupClassification -CustomAttribute8 $accessType -WhatIf:$WhatIfPreference -AccessType $accessType -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Classification $groupClassification -ErrorAction Stop
+                $customAttribsSet = $true
+                }
+            catch{
+                Start-Sleep -Seconds 10
+                $customAttribsSet = $false
+                }
+            }
+        while($customAttribsSet -eq $false)    
         $365Group = Get-UnifiedGroup $365Group.ExternalDirectoryObjectId
-        #Set the standard sharing permissions for the Site
-        set-standardTeamPermissions -UnifiedGroupObject $365Group
         
         if(!$sharedMailbox){
             Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference "
@@ -782,6 +791,83 @@ function send-noOwnersForGroupAlertToAdmins(){
         Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
         }
     
+    }
+function set-unifiedGroupCustomAttributes(){
+    param(
+        [Parameter(Mandatory=$true)]
+        [PSObject]$unifiedGroup
+        ,[Parameter(Mandatory=$true)]
+        [ValidateSet ("Internal","Confidential","External","Sym")]
+        [string]$groupType
+        ,[Parameter(Mandatory=$true)]
+        [ValidateSet ("AAD","365")]
+        [string]$masterMembership
+        )
+
+    $sgs = Get-AzureADGroup -SearchString $unifiedGroup.DisplayName
+
+    $dataManagerSG = @()
+    $membersSG = @()
+    $combinedSG = @()
+    $smb = @()
+
+    $dataManagerSG += $sgs | ? {$_.DisplayName -match "data managers"}
+    $membersSG += $sgs | ? {$_.DisplayName -match "members"}
+    $combinedSG += $sgs | ? {$_.DisplayName -eq $unifiedGroup.DisplayName -and $_.ObjectId -ne $ug.ExternalDirectoryObjectId}
+    $smb += Get-Mailbox -Filter "DisplayName -like `'*$unifiedGroup.DisplayName*`'"
+
+    switch($groupType){
+        "Internal" {
+            $pubPriv = "Private"
+            $inEx = "Internal"
+            }
+        "Confidential" {
+            $pubPriv = "Private"
+            $inEx = "Internal"
+            }
+        "External" {
+            $pubPriv = "Private"
+            $inEx = "External"
+            }
+        "Sym" {
+            $pubPriv = "Public"
+            $inEx = "Internal"
+            }
+        }
+
+    if(!$ug){
+        Write-Warning "Unified Group not found - cannot continue"
+        break
+        }
+    if($dataManagerSG.Count -ne 1){
+        Write-Warning "[$($dataManagerSG.Count)] Potential Data Manager groups identified [$($dataManagerSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($membersSG.Count -ne 1){
+        Write-Warning "[$($membersSG.Count)] Potential Member groups identified [$($membersSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($combinedSG.Count -ne 1){
+        Write-Warning "[$($combinedSG.Count)] Potential Combined groups identified [$($combinedSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($smb.Count -ne 1){
+        Write-Warning "[$($smb.Count)] Potential Shared Mailboxes identified [$($smb.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        }
+
+    if($bigProblem){
+        Write-Error "Couldn't automatically identify the required groups to fix this. Cannot continue"
+        break
+        }
+
+    if($smb.Count -eq 1){
+        Write-Verbose "Set-UnifiedGroup -Identity [$($unifiedGroup.ExternalDirectoryObjectId)] -CustomAttribute1 [$($unifiedGroup.CustomAttribute1)] -CustomAttribute2 [$($dataManagerSG[0].ObjectId)] -CustomAttribute3)] [$($membersSG[0].ObjectId)] -CustomAttribute4 [$($combinedSG[0].ObjectId)] -CustomAttribute5 [$($smb.ExternalDirectoryObjectId)] -CustomAttribute6 [$($pubPriv)] -CustomAttribute7 [$($groupType)] -CustomAttribute8 [$($masterMembership)]"
+        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute5 $smb.ExternalDirectoryObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
+        }
+    else{
+        Write-Verbose "Set-UnifiedGroup -Identity [$($unifiedGroup.ExternalDirectoryObjectId)] -CustomAttribute1 [$($unifiedGroup.CustomAttribute1)] -CustomAttribute2 [$($dataManagerSG[0].ObjectId)] -CustomAttribute3)] [$($membersSG[0].ObjectId)] -CustomAttribute4 [$($combinedSG[0].ObjectId)] -CustomAttribute6 [$($pubPriv)] -CustomAttribute7 [$($groupType)] -CustomAttribute8 [$($masterMembership)]"
+        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
+        }
     }
 function sync-groupMemberships(){
     [CmdletBinding(SupportsShouldProcess=$true )]
