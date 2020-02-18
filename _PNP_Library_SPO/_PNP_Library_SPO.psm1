@@ -762,6 +762,7 @@ function set-standardSitePermissions(){
             }
 
         Write-Verbose "Now set the Classification-specific Sharing settings"
+        $newGuestSettings = set-guestAccessForUnifiedGroup -unifiedGroup $unifiedGroupObject -Verbose:$VerbosePreference
         switch($unifiedGroupObject.CustomAttribute7){
             "External" {
                 #Allow external sharing
@@ -896,10 +897,9 @@ function test-isUserSiteCollectionAdmin(){
             }
         else{
             Write-Verbose "`tNo - user is not a Site Collection Admin"
-            $false
             if($addPermissionsIfMissing){
                 Write-Verbose "`t`tTemporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
-                Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName
+                Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
                 }
             }
         }

@@ -228,18 +228,110 @@ function connect-to365(){
     #$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
     $credential
     }
+function get-graphAuthCode() {
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [string]$clientID
+        ,[parameter(Mandatory = $true)]
+            [string]$redirectUri
+        ,[parameter(Mandatory = $false)]
+            [string]$scope
+        )
+
+    $clientIDEncoded = [System.Web.HttpUtility]::UrlEncode($clientID)
+    $redirectUriEncoded =  [System.Web.HttpUtility]::UrlEncode($redirectUri)
+    $resourceEncoded = [System.Web.HttpUtility]::UrlEncode("https://graph.microsoft.com")
+    $scopeEncoded = [System.Web.HttpUtility]::UrlEncode($scope) #"https://outlook.office.com/user.readwrite.all" "https://outlook.office.com/Directory.AccessAsUser.All"
+
+    Add-Type -AssemblyName System.Windows.Forms
+    if($scope){$url = "https://login.microsoftonline.com/common/oauth2/authorize?response_type=code&redirect_uri=$redirectUriEncoded&client_id=$clientID&resource=$resourceEncoded&prompt=admin_consent&scope=$scopeEncoded"}
+    else{$url = "https://login.microsoftonline.com/common/oauth2/authorize?response_type=code&redirect_uri=$redirectUriEncoded&client_id=$clientID&resource=$resourceEncoded&prompt=admin_consent"}
+    $form = New-Object -TypeName System.Windows.Forms.Form -Property @{Width=440;Height=640}
+    $web  = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{Width=420;Height=600;Url=($url -f ($Scope -join "%20")) }
+    $docComp  = {
+        $uri = $web.Url.AbsoluteUri        
+        if ($uri -match "error=[^&]*|code=[^&]*") {$form.Close() }
+        }
+    $web.ScriptErrorsSuppressed = $true
+    $web.Add_DocumentCompleted($docComp)
+    $form.Controls.Add($web)
+    $form.Add_Shown({$form.Activate()})
+    $form.ShowDialog() | Out-Null
+    $queryOutput = [System.Web.HttpUtility]::ParseQueryString($web.Url.Query)
+    $output = @{}
+    foreach($key in $queryOutput.Keys){
+        $output["$key"] = $queryOutput[$key]
+        }
+    $output
+    }
 function get-graphTokenResponse{
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-        [PSCustomObject]$aadAppCreds 
+            [PSCustomObject]$aadAppCreds
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet(“client_credentials”,”authorization_code”,"device_code")]
+            [string]$grant_type = "client_credentials"
+        ,[parameter(Mandatory = $false)]
+            [string]$scope = "https://graph.microsoft.com/.default"
         )
-    $ReqTokenBody = @{
-        Grant_Type    = "client_credentials"
-        Scope         = "https://graph.microsoft.com/.default"
-        client_Id     = $aadAppCreds.ClientID
-        Client_Secret = $aadAppCreds.Secret
+    switch($grant_type){
+        "authorization_code" {if(!$scope){$scope = "https://graph.microsoft.com/.default"}
+            $authCode = get-graphAuthCode -clientID $aadAppCreds.ClientID -redirectUri $aadAppCreds.RedirectUri -scope $scope
+            $ReqTokenBody = @{
+                Grant_Type    = "authorization_code"
+                Scope         = $scope
+                client_Id     = $aadAppCreds.ClientID
+                Client_Secret = $aadAppCreds.Secret
+                redirect_uri  = $aadAppCreds.RedirectUri
+                code          = $authCode
+                #resource      = "https://graph.microsoft.com"
+                }
+            }
+        "client_credentials" {
+            $ReqTokenBody = @{
+                Grant_Type    = "client_credentials"
+                Scope         = "https://graph.microsoft.com/.default"
+                client_Id     = $aadAppCreds.ClientID
+                Client_Secret = $aadAppCreds.Secret
+                }
+            }
+        "device_code" {
+            $tenant = "anthesisllc.onmicrosoft.com"
+            $authUrl = "https://login.microsoftonline.com/$tenant"
+            $postParams = @{
+                resource = "https://graph.microsoft.com/"
+                client_id = $aadAppCreds.ClientId
+                }
+            $response = Invoke-RestMethod -Method POST -Uri "$authurl/oauth2/devicecode" -Body $postParams
+            $code = ($response.message -split "code " | Select-Object -Last 1) -split " to authenticate."
+            Set-Clipboard -Value $code
+
+            Add-Type -AssemblyName System.Windows.Forms
+            $form = New-Object -TypeName System.Windows.Forms.Form -Property @{ Width = 440; Height = 640 }
+            $web = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{ Width = 440; Height = 600; Url = "https://www.microsoft.com/devicelogin" }
+            $web.Add_DocumentCompleted($DocComp)
+            $web.DocumentText
+            $form.Controls.Add($web)
+            $form.Add_Shown({ $form.Activate() })
+            $web.ScriptErrorsSuppressed = $true
+            $form.AutoScaleMode = 'Dpi'
+            $form.text = "Graph API Authentication"
+            $form.ShowIcon = $False
+            $form.AutoSizeMode = 'GrowAndShrink'
+            $Form.StartPosition = 'CenterScreen'
+            $form.ShowDialog() | Out-Null     
+
+            $ReqTokenBody = @{
+                grant_type    = "device_code"
+                client_Id     = $aadAppCreds.ClientID
+                code          = $response.device_code
+                }
+
+            }
         }
+
     $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$($aadAppCreds.TenantId)/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
     $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
     $tokenResponse
