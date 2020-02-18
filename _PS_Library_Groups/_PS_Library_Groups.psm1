@@ -792,6 +792,41 @@ function send-noOwnersForGroupAlertToAdmins(){
         }
     
     }
+function set-guestAccessForUnifiedGroup(){
+    param(
+        [Parameter(Mandatory=$true)]
+        [PSObject]$unifiedGroup
+        )
+    Write-Verbose "set-guestAccessForUnifiedGroup ([$($unifiedGroup.DisplayName)])"
+    switch($unifiedGroup.CustomAttribute7){
+        "External" {
+            #Allow external sharing
+            $allowToAddGuests = $true
+            }
+        "Internal" {
+            #Block all external sharing
+            $allowToAddGuests = $false
+            }
+        "Confidential" {
+            #Block all external sharing
+            $allowToAddGuests = $false
+            }
+        default {
+            $allowToAddGuests = $false
+            }
+        }
+    $preExistingSettings = Get-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId
+    $template = Get-AzureADDirectorySettingTemplate | ? {$_.displayname -eq "group.unified.guest"}
+    $settingsCopy = $template.CreateDirectorySetting()
+    $settingsCopy["AllowToAddGuests"]=$allowToAddGuests
+    
+    if($preExistingSettings){
+        Set-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId -DirectorySetting $settingsCopy
+        }
+    else{
+        New-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId -DirectorySetting $settingsCopy
+        }
+    }
 function set-unifiedGroupCustomAttributes(){
     param(
         [Parameter(Mandatory=$true)]
