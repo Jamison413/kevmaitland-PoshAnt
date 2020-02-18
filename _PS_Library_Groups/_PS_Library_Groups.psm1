@@ -821,9 +821,11 @@ function set-guestAccessForUnifiedGroup(){
     $settingsCopy["AllowToAddGuests"]=$allowToAddGuests
     
     if($preExistingSettings){
-        Set-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId -DirectorySetting $settingsCopy
+        Write-Verbose "Set-AzureADObjectSetting -TargetType Groups -TargetObjectId $($unifiedGroup.ExternalDirectoryObjectId) -DirectorySetting $settingsCopy"
+        Set-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId -DirectorySetting $settingsCopy -Id $preExistingSettings.Id
         }
     else{
+        Write-Verbose "New-AzureADObjectSetting -TargetType Groups -TargetObjectId $($unifiedGroup.ExternalDirectoryObjectId) -DirectorySetting $settingsCopy"
         New-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId -DirectorySetting $settingsCopy
         }
     }
