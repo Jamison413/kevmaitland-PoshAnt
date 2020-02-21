@@ -274,7 +274,7 @@ function add-netsuiteOpportunityToSqlCache{
     if((remove-diacritics $nsNetsuiteOpportunity.title) -eq (remove-diacritics $alreadyPresent.OpportunityName) -and $alreadyPresent){
         if($(Get-Date $nsNetsuiteOpportunity.lastModifiedDate) -ne $(Get-Date $alreadyPresent.LastModified)){
             Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] has been updated, but the name has not changed. Updating LastModified for existing record and flagging as IsDirty = $false."
-            update-netSuiteOpportunityInSqlCache -nsNetsuiteProject $nsNetsuiteOpportunity -dbConnection $dbConnection -isNotDirty
+            update-netSuiteOpportunityInSqlCache -nsNetSuiteOpportunity $nsNetsuiteOpportunity -dbConnection $dbConnection -isNotDirty
             }
         else{
             Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] doesn't seem to have changed (probably caused by a lack of granularity in NetSuite's REST WHERE clauses). Not updating anything."
@@ -284,11 +284,12 @@ function add-netsuiteOpportunityToSqlCache{
         if(!$alreadyPresent){Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] not present in SQL, adding to [t_OPPORTUNITIES]"}
         else{Write-Verbose "`tNsInternalId [$($nsNetsuiteOpportunity.Id)] Title has changed from [$($alreadyPresent.ProjectName)] to [$($nsNetsuiteOpportunity.companyName)], adding new record to [t_PROJECTS]"}
         $now = $(Get-Date)
-        $sql = "INSERT INTO t_OPPORTUNITIES (NsInternalId, NsExternalId, AccountNsInternalId, OpportunityName, OpportunityNumber, entityId, entityStatus, entityNexus, custbody_project_template, tranId, status, probability, custbody_industry, subsidiary, DateCreated, LastModified, DateCreatedInSql, DateModifiedInSql, IsDirty) VALUES ("
+        $sql = "INSERT INTO t_OPPORTUNITIES (NsInternalId, NsExternalId, AccountNsInternalId, ProjectNsInternalId, OpportunityName, OpportunityNumber, entityId, entityStatus, entityNexus, custbody_project_template, tranId, status, probability, custbody_industry, subsidiary, DateCreated, LastModified, DateCreatedInSql, DateModifiedInSql, IsDirty) VALUES ("
                                              
         $sql += $(sanitise-forSqlValue -value $nsNetsuiteOpportunity.id -dataType String)
         $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.id -dataType String)
         $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.entity.id -dataType String)
+        $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.custbody_project_created.id -dataType String)
         $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.title -dataType String)
         $sql += ","+$(sanitise-forSqlValue -value $nsNetsuiteOpportunity.tranId -dataType String)
         $sql += ","+$(sanitise-forSqlValue -value "$($nsNetsuiteOpportunity.tranId) $($nsNetsuiteOpportunity.title)" -dataType String)
@@ -354,6 +355,71 @@ function convert-nsNetSuiteAccountToSqlNetSuiteAccount(){
         "SharePointDocLibGraphDriveId" = $null    
         }
     $pretendSqlNetSuiteAccount
+    }
+function convert-nsNetSuiteOpportunityToSqlNetSuiteOpportunity(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [PSCustomObject]$nsNetsuiteOpportunity 
+        )
+
+    $pretendSqlNetSuiteOpportunity = New-Object psobject -Property @{
+        "NsInternalId"              = $nsNetsuiteOpportunity.id
+        "NsExternalId"              = $null
+        "AccountNsInternalId"       = $nsNetsuiteOpportunity.entity.id
+        "ProjectNsInternalId"       = $nsNetsuiteOpportunity.custbody_project_created.id
+        "OpportunityName"           = $nsNetsuiteOpportunity.title
+        "OpportunityNumber"         = $nsNetsuiteOpportunity.tranId
+        "entityId"                  = "$($nsNetsuiteOpportunity.tranId) $($nsNetsuiteOpportunity.title)"
+        "entityStatus"              = $nsNetsuiteOpportunity.entityStatus.refName
+        "entityNexus"               = $nsNetsuiteOpportunity.entityNexus.refName
+        "custbody_project_template" = $nsNetsuiteOpportunity.custbody_project_template.refName
+        "tranId"                    = $nsNetsuiteOpportunity.tranId
+        "status"                    = $nsNetsuiteOpportunity.status
+        "probability"               = $nsNetsuiteOpportunity.probability
+        "custbody_industry"         = $nsNetsuiteOpportunity.custbody_industry
+        "subsidiary"                = $nsNetsuiteOpportunity.subsidiary.refName
+        "DateCreated"               = $nsNetsuiteOpportunity.createdDate
+        "LastModified"              = $nsNetsuiteOpportunity.lastModifiedDate
+        "DateCreatedInSql"          = $null
+        "DateModifiedInSql"         = $null
+        "IsDirty"                   = $null
+        "SharePointDriveItemId"     = $null
+        }
+    $pretendSqlNetSuiteOpportunity
+    }
+function convert-nsNetSuiteProjectToSqlNetSuiteProject(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [PSCustomObject]$nsNetsuiteProject 
+        )
+
+    $pretendSqlNetSuiteProject = New-Object psobject -Property @{
+        "NsInternalId"                         = $nsNetsuiteProject.id
+        "NsExternalId"                         = $null
+        "AccountNsInternalId"                  = $null
+        "ProjectName"                          = $nsNetsuiteProject.companyName
+        "ProjectNumber"                        = $($nsNetsuiteProject.entityId.Split(" ")[0])
+        "entityId"                             = $nsNetsuiteProject.entityId
+        "custentity_atlas_svcs_mm_department"  = $nsNetsuiteProject.entityStatus.refName
+        "entityStatus"                         = $nsNetsuiteProject.entityStatus.refName
+        "custentity_ant_projectsector"         = $nsNetsuiteProject.custentity_atlas_svcs_mm_department.refName
+        "custentity_ant_projectsource"         = $nsNetsuiteProject.custentity_ant_projectsource.refName
+        "custentity_atlas_svcs_mm_location"    = $nsNetsuiteProject.custentity_atlas_svcs_mm_location.refName
+        "custentity_atlas_svcs_mm_projectmngr" = $nsNetsuiteProject.custentity_atlas_svcs_mm_projectmngr.refName
+        "jobType"                              = $nsNetsuiteProject.jobType.refName
+        "subsidiary"                           = $nsNetsuiteProject.subsidiary.refName
+        "DateCreated"                          = $nsNetsuiteProject.dateCreated
+        "LastModified"                         = $nsNetsuiteProject.lastModifiedDate
+        "DateCreatedInSql"                     = $null
+        "DateModifiedInSql"                    = $null
+        "IsDirty"                              = $null
+        "SharePointSiteId"                     = $null
+        "SharePointListId"                     = $null
+        "SharePointDriveItemId"                = $null
+        }
+    $pretendSqlNetSuiteProject
     }
 function get-netSuiteAuthHeaders(){
     [cmdletbinding()]
@@ -709,6 +775,126 @@ function invoke-netSuiteRestMethod(){
     $response = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
     $response            
     }
+function sync-netSuiteClientsFromNetSuiteToSql(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [PSCustomObject]$netSuiteParams 
+        ,[parameter(Mandatory = $true)]
+        [ValidateSet("Full","Delta")]
+        [string]$sync
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$sqlDbConn
+        )
+
+    if(!$netSuiteParams){$netSuiteParams = get-netsuiteParameters}
+
+    switch ($sync) {
+        "Delta" {
+            $sql = "SELECT MAX(LastModified) FROM v_ACCOUNTS_Current"
+            $mostRecentModifiedDateInSqlCache = Execute-SQLQueryOnSQLDB -query $sql -queryType Scalar -sqlServerConnection $sqlDbConn
+
+            $query = "?q=lastModifiedDate ON_OR_AFTER `"$(Get-Date -UFormat "%d/%m/%y" $mostRecentModifiedDateInSqlCache)`""
+            $nsClients = get-netSuiteClientsFromNetSuite -netsuiteParameters $netSuiteParams -query $query
+            }
+        "Full" {
+            $nsClients = get-netSuiteClientsFromNetSuite -netsuiteParameters $netSuiteParams 
+            }
+        }
+
+    $nsClients | % {
+        $thisClient = $_
+        try{
+            add-netsuiteAccountToSqlCache -nsNetsuiteAccount $_ -accountType Client -dbConnection $sqlDbConn
+            }
+        catch{
+            [array]$problemClients += $thisClient
+            }
+        }
+
+    #E-mail $problemClients to IT
+    $problemClients
+    }
+function sync-netSuiteOpportunitiesFromNetSuiteToSql(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [PSCustomObject]$netSuiteParams 
+        ,[parameter(Mandatory = $true)]
+        [ValidateSet("Full","Delta")]
+        [string]$sync
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$sqlDbConn
+        )
+
+    if(!$netSuiteParams){$netSuiteParams = get-netsuiteParameters}
+
+    switch ($sync) {
+        "Delta" {
+            $sql = "SELECT MAX(LastModified) FROM v_OPPORTUNITIES_Current"
+            $mostRecentModifiedDateInSqlCache = Execute-SQLQueryOnSQLDB -query $sql -queryType Scalar -sqlServerConnection $sqlDbConn
+
+            $query = "?q=lastModifiedDate ON_OR_AFTER `"$(Get-Date -UFormat "%d/%m/%y" $mostRecentModifiedDateInSqlCache)`""
+            $nsOpps = get-netSuiteOpportunityFromNetSuite -netsuiteParameters $netSuiteParams -query $query
+            }
+        "Full" {
+            $nsOpps = get-netSuiteOpportunityFromNetSuite -netsuiteParameters $netSuiteParams
+            }
+        }
+
+    $nsOpps | % {
+        $thisOpp = $_
+        try{
+            add-netsuiteOpportunityToSqlCache -nsNetsuiteOpportunity $_ -dbConnection $sqlDbConn
+            }
+        catch{
+            [array]$problemOpps += @($thisOpp,$_)
+            }
+        }
+
+    #E-mail $problemClients to IT
+    $problemOpps
+    }
+function sync-netSuiteProjectsFromNetSuiteToSql(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [PSCustomObject]$netSuiteParams 
+        ,[parameter(Mandatory = $true)]
+        [ValidateSet("Full","Delta")]
+        [string]$sync
+        ,[parameter(Mandatory = $true)]
+        [System.Data.Common.DbConnection]$sqlDbConn
+        )
+    
+    if(!$netSuiteParams){$netSuiteParams = get-netsuiteParameters}
+
+    switch ($sync) {
+        "Delta" {
+            $sql = "SELECT MAX(LastModified) FROM v_PROJECTS_Current"
+            $mostRecentModifiedDateInSqlCache = Execute-SQLQueryOnSQLDB -query $sql -queryType Scalar -sqlServerConnection $sqlDbConn
+
+            $query = "?q=lastModifiedDate ON_OR_AFTER `"$(Get-Date -UFormat "%d/%m/%y" $mostRecentModifiedDateInSqlCache)`""
+            $nsProjects = get-netSuiteProjectFromNetSuite -netsuiteParameters $netSuiteParams -query $query
+            }
+        "Full" {
+            $nsProjects = get-netSuiteProjectFromNetSuite -netsuiteParameters $netSuiteParams
+            }
+        }
+
+    $nsProjects | % {
+        $thisProject = $_
+        try{
+            add-netsuiteProjectToSqlCache -nsNetsuiteProject $thisProject -dbConnection $sqlDbConn
+            }
+        catch{
+            [array]$problemProjects += @($thisProject,$_)
+            }
+        }
+
+    #E-mail $problemClients to IT
+    $problemProjects
+    }
 function update-netSuiteAccountInSqlCache(){
     [cmdletbinding()]
     Param (
@@ -800,7 +986,7 @@ function update-netSuiteOpportunityInSqlCache(){
 
     Write-Verbose "update-netSuiteOpportunityInSqlCache [$($sqlNetSuiteOpportunity.entityId)]"
     #Check record exists in SQL
-    $sql = "SELECT TOP 1 OpportunityName, NsInternalId, LastModified FROM t_OpportunityS WHERE NsInternalId = '$($sqlNetSuiteOpportunity.NsInternalId)' ORDER BY LastModified Desc"
+    $sql = "SELECT TOP 1 OpportunityName, NsInternalId, LastModified FROM t_OPPORTUNITIES WHERE NsInternalId = '$($sqlNetSuiteOpportunity.NsInternalId)' ORDER BY LastModified Desc"
     $preExistingRecord = Execute-SQLQueryOnSQLDB -query $sql -queryType Reader -sqlServerConnection $dbConnection
     
     if($preExistingRecord){
@@ -812,7 +998,7 @@ function update-netSuiteOpportunityInSqlCache(){
             #Generate SQL statement
             $fieldsToUpdate = $sqlNetSuiteOpportunity.PSObject.Properties | ? {$_.Value -ne $null}
             if($fieldsToUpdate){
-                $sql = "UPDATE t_OpportunityS "
+                $sql = "UPDATE t_OPPORTUNITIES "
                 $sql += "SET "
                 $fieldsToUpdate | % {
                     $thisField = $_
