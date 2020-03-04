@@ -415,9 +415,10 @@ function get-netSuiteClientsFromNetSuite(){
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
 
     $customers = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $customers.items.links.href | out-file "C:\Users\Emily.Pressey\customers.txt"
     $customersEnumerated = [psobject[]]::new($customers.count)
     for ($i=0; $i -lt $customers.count;$i++) {
-        $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $customers.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+        $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($customers.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
         }
     $customersEnumerated
     }
@@ -461,7 +462,9 @@ function get-netSuiteContactFromNetSuite(){
     $contacts = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/contact$query" -netsuiteParameters $netsuiteParameters #-Verbose 
     $contactsEnumerated = [psobject[]]::new($contacts.count)
     for ($i=0; $i -lt $contacts.count;$i++) {
-        $contactsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $contacts.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+    $url = "$($contacts.items[$i].links[0].href)" + "/?expandSubResources=True"
+    write-host $url -ForegroundColor white
+        $contactsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $url -netsuiteParameters $netsuiteParameters 
         }
     $contactsEnumerated
     }
@@ -833,4 +836,25 @@ function update-netSuiteProjectInSqlCache(){
             }
         }
     else{Write-Error "Record with NsInsternalId [$($sqlNetSuiteProject.NsExternalId)] does not exist in database. Cannot UPDATE.";break}
+    }
+function get-netSuiteEmployeesFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^?[\w+][=][\w+]')]
+        [string]$query
+
+        ,[parameter(Mandatory=$false)]
+        [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/employee/" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $projects.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+        }
+    $employeesEnumerated
     }
