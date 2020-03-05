@@ -135,7 +135,7 @@ foreach ($currentRequest in $selectedRequests){
                 an external version</a> you can send to $externalPartyType`s if they get stuck.</p>
 
                 <p>There are also some additional guides to get you started if
-                you want to do anything fancier that simply sharing files:</p>
+                you want to do anything fancier than simply sharing files:</p>
 
                 <UL><LI><a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-62`">Changing
                 the logo for your Site</a></LI>

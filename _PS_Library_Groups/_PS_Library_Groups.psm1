@@ -308,10 +308,7 @@ function new-365Group(){
             $sharedMailbox = Get-Mailbox -Filter "ExternalDirectoryObjectId -eq '$($365Group.CustomAttribute5)'"
             if(!$sharedMailbox){Write-Warning "Shared Mailbox [$($365Group.CustomAttribute5)] for UG [$($365Group.DisplayName)] could not be retrieved"}
             }
-        else{
-            Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute5 (Shared Mailbox) property set!"
-            $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
-            }
+        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute5 (Shared Mailbox) property set!"}
         }
     else{
         Write-Verbose "No pre-existing 365 group found - checking for AAD Groups."
@@ -442,7 +439,7 @@ function new-365Group(){
         $365Group = Get-UnifiedGroup $365Group.ExternalDirectoryObjectId
         
         if(!$sharedMailbox){
-            Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName -displayName $sharedMailboxDisplayName) -ErrorAction Continue -WhatIf:$WhatIfPreference "
+            Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference "
             try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference }
             catch{$Error}
             }
@@ -587,11 +584,13 @@ function new-mailEnabledSecurityGroup(){
         }
     else{ #If the group doesn't exist, try creating it
         try{
+            write-host "Blurble"
             $mailAlias = $(guess-aliasFromDisplayName $dgDisplayName)
             Write-Verbose "New-DistributionGroup -Name [$mailName] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes [$description] -Alias [$mailAlias] -WhatIf:$WhatIfPreference"
             $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $fixedSuffix)+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference -ErrorAction Stop
             }
         catch{
+            write-host "Blurble2"
             if($_ -match "is already being used by the proxy addresses or LegacyExchangeDN of"){ #Name collision, but no DisplayName collision
                 #Create the DG with a temporary Guid in the Name/Alias to eliminate the collision
                 $tempGuid = $([guid]::NewGuid().Guid)
@@ -792,43 +791,6 @@ function send-noOwnersForGroupAlertToAdmins(){
         Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
         }
     
-    }
-function set-guestAccessForUnifiedGroup(){
-    param(
-        [Parameter(Mandatory=$true)]
-        [PSObject]$unifiedGroup
-        )
-    Write-Verbose "set-guestAccessForUnifiedGroup ([$($unifiedGroup.DisplayName)])"
-    switch($unifiedGroup.CustomAttribute7){
-        "External" {
-            #Allow external sharing
-            $allowToAddGuests = $true
-            }
-        "Internal" {
-            #Block all external sharing
-            $allowToAddGuests = $false
-            }
-        "Confidential" {
-            #Block all external sharing
-            $allowToAddGuests = $false
-            }
-        default {
-            $allowToAddGuests = $false
-            }
-        }
-    $preExistingSettings = Get-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId
-    $template = Get-AzureADDirectorySettingTemplate | ? {$_.displayname -eq "group.unified.guest"}
-    $settingsCopy = $template.CreateDirectorySetting()
-    $settingsCopy["AllowToAddGuests"]=$allowToAddGuests
-    
-    if($preExistingSettings){
-        Write-Verbose "Set-AzureADObjectSetting -TargetType Groups -TargetObjectId $($unifiedGroup.ExternalDirectoryObjectId) -DirectorySetting $settingsCopy"
-        Set-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId -DirectorySetting $settingsCopy -Id $preExistingSettings.Id
-        }
-    else{
-        Write-Verbose "New-AzureADObjectSetting -TargetType Groups -TargetObjectId $($unifiedGroup.ExternalDirectoryObjectId) -DirectorySetting $settingsCopy"
-        New-AzureADObjectSetting -TargetType Groups -TargetObjectId $unifiedGroup.ExternalDirectoryObjectId -DirectorySetting $settingsCopy
-        }
     }
 function set-unifiedGroupCustomAttributes(){
     param(
