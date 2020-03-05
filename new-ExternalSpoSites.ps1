@@ -61,10 +61,10 @@ foreach ($currentRequest in $selectedRequests){
 
     
     try{
-        $new365Group = new-365Group -displayName $("External - $($fullRequest.FieldValues.Title)").Trim(" ") -managerUpns $managers -teamMemberUpns $members -memberOf $null -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType Private -autoSubscribe $autoSubscribe -groupClassification $groupClassification -membershipManagedBy 365 -tokenResponse $tokenResponse -pnpCreds $365creds -ownersAreRealManagers $false -alsoCreateTeam $alsoCreateTeam -Verbose
+        $new365Group = new-365Group -displayName $("External - $($fullRequest.FieldValues.Title)".Trim(" ")) -managerUpns $managers -teamMemberUpns $members -memberOf $null -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType Private -autoSubscribe $autoSubscribe -groupClassification $groupClassification -membershipManagedBy 365 -tokenResponse $tokenResponse -pnpCreds $365creds -ownersAreRealManagers $false -alsoCreateTeam $alsoCreateTeam -Verbose
         Write-Host -ForegroundColor Yellow "Site Admin is : [$($fullRequest.FieldValues.Site_x0020_Admin.LookupValue)]"
         
-        Write-Verbose "Getting PnPUnifiedGroup [$displayName] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
+        Write-Verbose "Getting PnPUnifiedGroup [$($new365Group.displayName)] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
         Connect-PnPOnline -AccessToken $tokenResponse.access_token
         $newPnpTeam = Get-PnPUnifiedGroup -Identity $new365Group.ExternalDirectoryObjectId
 
@@ -142,11 +142,12 @@ foreach ($currentRequest in $selectedRequests){
                 external users get access, which should make them significantly simpler to use
                 (particularly where $externalPartyType`s don&#39;t use 365 themselves). There is <a 
                 href=`"https://anthesisllc.sharepoint.com/:w:/r/sites/Resources-IT/Shared%20Documents/Guides/Guide%20to%20sharing%20Modern%20External%20Sites.docx?d=w00ab51f7f8d243ada762abef1a7d3a55&amp;csf=1&amp;e=LlJKZO&amp;web=1`">a
-                new Sharing Guide available</a> too - it&#39;s internal documentation, but it&#39;s not
-                sensitive, so feel free to forward it on to your $externalPartyType`s if they get stuck.</p>
+                new Sharing Guide available</a> and <a 
+                href=`"https://anthesisllc.sharepoint.com/:w:/r/sites/Resources-IT/Shared%20Documents/Guides/Guide%20for%20External%20Users%20to%20access%20Anthesis%20External%20Sharing%20Sites.docx?d=w0e63dc2ec7b3483da8913a9124945e49&csf=1&e=0YKVyT`">
+                an external version</a> you can send to $externalPartyType`s if they get stuck.</p>
 
                 <p>There are also some additional guides to get you started if
-                you want to do anything fancier that simply sharing files:</p>
+                you want to do anything fancier than simply sharing files:</p>
 
                 <UL><LI><a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-62`">Changing
                 the logo for your Site</a></LI>
