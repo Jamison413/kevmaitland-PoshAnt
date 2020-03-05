@@ -669,21 +669,10 @@ function invoke-graphGet(){
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true)]
             [string]$graphQuery
-        ,[parameter(Mandatory = $false)]
-            [switch]$firstPageOnly
         )
     $sanitisedGraphQuery = $graphQuery.Trim("/")
-    do{
-        Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
-        Write-Verbose "[$($response.value.count)] results returned on this cycle, [$($results.count)] in total"
-        $results += $response.value
-        if($firstPageOnly){break}
-        if(![string]::IsNullOrWhiteSpace($response.'@odata.nextLink')){$sanitisedGraphQuery = $response.'@odata.nextLink'.Replace("https://graph.microsoft.com/v1.0/","")}
-        }
-    #while($response.value.count -gt 0)
-    while($response.'@odata.nextLink')
-    $results
+    Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
     }
 function invoke-graphPatch(){
     [cmdletbinding()]
