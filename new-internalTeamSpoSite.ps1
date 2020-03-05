@@ -1,18 +1,18 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-$displayName = "Climate & Decarbonisation Strategy Team (GBR)"
-$areDataManagersLineManagers = $false
+$displayName = "Food Waste Team (GBR)"
+$areDataManagersLineManagers = $true
 $managedBy = "365"
 #$memberOf = ??
 $hideFromGal = $false
 $blockExternalMail = $true
-$accessType = "Private"
+$accessType = "Public"
 $autoSubscribe = $true
 $groupClassification = "Internal"
 $alsoCreateTeam = $false
-$horriblyUnformattedStringOfManagers = "jono.adams@anthesisgroup.com"
-$horriblyUnformattedStringOfMembers = "Ellen Upton <Ellen.Upton@anthesisgroup.com>; Matt Rooney <Matt.Rooney@anthesisgroup.com>; Jono Adams <Jono.Adams@anthesisgroup.com>,Stewart Pickering <Stewart.Pickering@anthesisgroup.com>; Tecla Castella <Tecla.Castella@anthesisgroup.com>; Alan Spray <Alan.Spray@anthesisgroup.com>"
+$horriblyUnformattedStringOfManagers = "groupbot@anthesisgroup.com"
+$horriblyUnformattedStringOfMembers = "kevin.maitland@anthesisgroup.com"
     
 
 $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
