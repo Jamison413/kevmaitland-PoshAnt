@@ -63,6 +63,7 @@ ForEach($Item in $AllNewStartersitems){
 $NewStarterInformation = @()
 
 If("1" -eq $Item.FieldValues.PowershellTrigger){
+
             
             
             write-host "An item has been added, and needs processing! Let's send an email to IT and People Services" -ForegroundColor Yellow
@@ -312,6 +313,9 @@ catch{
         If($Startdatecomparison){
         Write-host "There has been a change to the Start Date: '$($Item.FieldValues.Employee_x0020_Preferred_x0020_N)'" -ForegroundColor Yellow
 
+            $htmlfriendlytitle = $List -replace " ",'%20'
+            $StarterItemLink = $SiteURL + "/Lists" + "/$($htmlfriendlytitle)" +  "/DispForm.aspx?" + "ID=$($Item.FieldValues.ID)"
+
         #Send email letting people know
                     $subject = "New Starters Update: The Start Date for $($Item.FieldValues.Employee_x0020_Preferred_x0020_N) has been changed!"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello People Services & IT Teams,`r`n`r`n<BR><BR>"
@@ -327,8 +331,10 @@ catch{
             Send-MailMessage -To "wai.cheung@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "greg.francis@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
-            
-            
+
+            Connect-PnPOnline -Credentials $adminCreds -Url $SiteURL
+            $context = Get-PnPContext
+
             Set-PnPListItem -List $List -Identity $Item.ID -Values @{"PowershellTrigger" = "0"}
             Set-PnPListItem -List $List -Identity $item.ID -Values @{"Last_StartDate" = "$startdateformat"}
             Set-PnPListItem -List $List -Identity $item.ID -Values @{"FlowTrigger" = "Change"}
@@ -653,3 +659,6 @@ ForEach($Item in $AllMatPatItems){
 
 
 }
+
+
+

@@ -792,6 +792,83 @@ function send-noOwnersForGroupAlertToAdmins(){
         }
     
     }
+function set-unifiedGroupCustomAttributes(){
+    param(
+        [Parameter(Mandatory=$true)]
+        [PSObject]$unifiedGroup
+        ,[Parameter(Mandatory=$true)]
+        [ValidateSet ("Internal","Confidential","External","Sym")]
+        [string]$groupType
+        ,[Parameter(Mandatory=$true)]
+        [ValidateSet ("AAD","365")]
+        [string]$masterMembership
+        )
+
+    $sgs = Get-AzureADGroup -SearchString $unifiedGroup.DisplayName
+
+    $dataManagerSG = @()
+    $membersSG = @()
+    $combinedSG = @()
+    $smb = @()
+
+    $dataManagerSG += $sgs | ? {$_.DisplayName -match "data managers"}
+    $membersSG += $sgs | ? {$_.DisplayName -match "members"}
+    $combinedSG += $sgs | ? {$_.DisplayName -eq $unifiedGroup.DisplayName -and $_.ObjectId -ne $ug.ExternalDirectoryObjectId}
+    $smb += Get-Mailbox -Filter "DisplayName -like `'*$unifiedGroup.DisplayName*`'"
+
+    switch($groupType){
+        "Internal" {
+            $pubPriv = "Private"
+            $inEx = "Internal"
+            }
+        "Confidential" {
+            $pubPriv = "Private"
+            $inEx = "Internal"
+            }
+        "External" {
+            $pubPriv = "Private"
+            $inEx = "External"
+            }
+        "Sym" {
+            $pubPriv = "Public"
+            $inEx = "Internal"
+            }
+        }
+
+    if(!$ug){
+        Write-Warning "Unified Group not found - cannot continue"
+        break
+        }
+    if($dataManagerSG.Count -ne 1){
+        Write-Warning "[$($dataManagerSG.Count)] Potential Data Manager groups identified [$($dataManagerSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($membersSG.Count -ne 1){
+        Write-Warning "[$($membersSG.Count)] Potential Member groups identified [$($membersSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($combinedSG.Count -ne 1){
+        Write-Warning "[$($combinedSG.Count)] Potential Combined groups identified [$($combinedSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($smb.Count -ne 1){
+        Write-Warning "[$($smb.Count)] Potential Shared Mailboxes identified [$($smb.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        }
+
+    if($bigProblem){
+        Write-Error "Couldn't automatically identify the required groups to fix this. Cannot continue"
+        break
+        }
+
+    if($smb.Count -eq 1){
+        Write-Verbose "Set-UnifiedGroup -Identity [$($unifiedGroup.ExternalDirectoryObjectId)] -CustomAttribute1 [$($unifiedGroup.CustomAttribute1)] -CustomAttribute2 [$($dataManagerSG[0].ObjectId)] -CustomAttribute3)] [$($membersSG[0].ObjectId)] -CustomAttribute4 [$($combinedSG[0].ObjectId)] -CustomAttribute5 [$($smb.ExternalDirectoryObjectId)] -CustomAttribute6 [$($pubPriv)] -CustomAttribute7 [$($groupType)] -CustomAttribute8 [$($masterMembership)]"
+        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute5 $smb.ExternalDirectoryObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
+        }
+    else{
+        Write-Verbose "Set-UnifiedGroup -Identity [$($unifiedGroup.ExternalDirectoryObjectId)] -CustomAttribute1 [$($unifiedGroup.CustomAttribute1)] -CustomAttribute2 [$($dataManagerSG[0].ObjectId)] -CustomAttribute3)] [$($membersSG[0].ObjectId)] -CustomAttribute4 [$($combinedSG[0].ObjectId)] -CustomAttribute6 [$($pubPriv)] -CustomAttribute7 [$($groupType)] -CustomAttribute8 [$($masterMembership)]"
+        Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute1 $unifiedGroup.CustomAttribute1 -CustomAttribute2 $dataManagerSG[0].ObjectId -CustomAttribute3 $membersSG[0].ObjectId -CustomAttribute4 $combinedSG[0].ObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
+        }
+    }
 function sync-groupMemberships(){
     [CmdletBinding(SupportsShouldProcess=$true )]
     param(
