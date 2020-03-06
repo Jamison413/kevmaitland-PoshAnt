@@ -1,4 +1,5 @@
-﻿function add-graphArrayOfFoldersToDrive(){
+﻿
+function add-graphArrayOfFoldersToDrive(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true,ParameterSetName="DriveId")]
@@ -669,10 +670,21 @@ function invoke-graphGet(){
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true)]
             [string]$graphQuery
+        ,[parameter(Mandatory = $false)]
+            [switch]$firstPageOnly
         )
     $sanitisedGraphQuery = $graphQuery.Trim("/")
-    Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
-    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
+    do{
+        Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
+        Write-Verbose "[$($response.value.count)] results returned on this cycle, [$($results.count)] in total"
+        $results += $response.value
+        if($firstPageOnly){break}
+        if(![string]::IsNullOrWhiteSpace($response.'@odata.nextLink')){$sanitisedGraphQuery = $response.'@odata.nextLink'.Replace("https://graph.microsoft.com/v1.0/","")}
+        }
+    #while($response.value.count -gt 0)
+    while($response.'@odata.nextLink')
+    $results
     }
 function invoke-graphPatch(){
     [cmdletbinding()]
@@ -844,7 +856,7 @@ function sanitise-forSharePointFolderPath($dirtyString){
     }
 function sanitise-forSharePointUrl($dirtyString){ 
     $dirtyString = $dirtyString.Trim()
-    $dirtyString = $dirtyString.Replace(" "," ") #Weird instance where a space character is not a space character...
+    $dirtyString = $dirtyString.Replace(" "," ") #Weird instance where a space character is not a space character...
     $dirtyString = $dirtyString -creplace '[^a-zA-Z0-9 _/]+', ''
     #$dirtyString = $dirtyString.Replace("`"","").Replace("#","").Replace("%","").Replace("?","").Replace("<","").Replace(">","").Replace("\","/").Replace("//","/").Replace(":","")
     #$dirtyString = $dirtyString.Replace("$","`$").Replace("``$","`$").Replace("(","").Replace(")","").Replace("-","").Replace(".","").Replace("&","").Replace(",","").Replace("'","").Replace("!","")
@@ -897,7 +909,7 @@ function sanitise-forSqlValue{
     }
 function sanitise-forTermStore($dirtyString){
     #$dirtyString.Replace("\t", " ").Replace(";", ",").Replace("\", "\uFF02").Replace("<", "\uFF1C").Replace(">", "\uFF1E").Replace("|", "\uFF5C")
-    $cleanerString = $dirtyString.Replace("`t", "").Replace(";", "").Replace("\", "").Replace("<", "").Replace(">", "").Replace("|", "").Replace("＆","&").Replace(" "," ").Trim()
+    $cleanerString = $dirtyString.Replace("`t", "").Replace(";", "").Replace("\", "").Replace("<", "").Replace(">", "").Replace("|", "").Replace("＆","&").Replace(" "," ").Trim()
     if($cleanerString.Length -gt 255){$cleanerString.Substring(0,254)}
     else{$cleanerString}
     }
@@ -938,5 +950,3 @@ function stringify-hashTable($hashtable,$interlimiter,$delimiter){
         }
     }
 #endregion
-
-#[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR([securestring]"01000000d08c9ddf0115d1118c7a00c04fc297eb0100000098686d30eb8df74dbe30d227c42550070000000002000000000003660000c000000010000000965452f3921e8bfddd5b92b77cf97f330000000004800000a0000000100000006f2548d0c1ddd768f970c367f0e751ce880000004b4f456962e2b3bb513df1ad7cefb48d5ce77f1be8641e7209d76277c6d596c475357995b7e235b3aaaa8cce021ed11c6dece0dc167ce9305f6aa4b91e502b5663867e53dcf003ecf79d4786bc70554cac9056612d3b7a39e493c671dd3d718b1cd5029bc345fea86317420731aa6376bcc93ecb2f8d34812d1337c4bb6400f20d52149c5cb1d857140000006852086fdb72daaf6654933d29d87a521401e1f9")
