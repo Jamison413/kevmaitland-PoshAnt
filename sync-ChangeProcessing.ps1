@@ -206,7 +206,7 @@ $body = "{
     `"@microsoft.graph.conflictBehavior`": `"rename`"
 }"
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
-$CandidateNameResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01LLWAYUILOIXGORD4QBFYI6MMKVPW4HZI/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+$CandidateNameResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,59b145c5-52e5-44c6-8412-5159377be199,bc79b416-4459-4aa3-bc49-e4e54203dcea/drives/b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1/items/01OPJBCWBHL45XROQTUBAYLV2QIFFCZRQJ/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 
 
 <#--------create the subfolders within the parent folder created above--------#>
@@ -219,14 +219,15 @@ $body = "{
     `"@microsoft.graph.conflictBehavior`": `"rename`"
 }"
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
-$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,59b145c5-52e5-44c6-8412-5159377be199,bc79b416-4459-4aa3-bc49-e4e54203dcea/drives/b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 
 #Place new Onboarding folder ID into variable to use next
 $OnboardingfolderID = $response.id
 $ParentFolderID = $CandidateNameResponse.id
-$PSConfidentialDriveID = "b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY"
+$PSConfidentialDriveID = "b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1"
 
-#Create New Starter Checklist template in the Onboarding folder we created above
+
+#Create New Starter Checklist template in the Onboarding folder we created above (this is saved in the IT Site as a bodge, not PS Portal Site)
 write-host "Copying New Starter Checklist file into 1. Onboarding" -ForegroundColor Yellow
 $body = "{
     `"parentReference`": {
@@ -250,7 +251,7 @@ $body = "{
     `"@microsoft.graph.conflictBehavior`": `"rename`"
 }"
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
-$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,59b145c5-52e5-44c6-8412-5159377be199,bc79b416-4459-4aa3-bc49-e4e54203dcea/drives/b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 
 
 #Check the last subfolder was created, this won't create if the parent folder creation was not successful. Send an email if there are any problems.
@@ -264,7 +265,7 @@ $body = "{
     `"@microsoft.graph.conflictBehavior`": `"rename`"
 }"
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
-$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,e43ccfa7-1258-4a83-a6a9-483577275b99,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!p8885FgSg0qmqUg1dydbmYHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,59b145c5-52e5-44c6-8412-5159377be199,bc79b416-4459-4aa3-bc49-e4e54203dcea/drives/b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1/items/$($CandidateNameResponse.Id)/children" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 }
 catch{
 
@@ -281,7 +282,97 @@ catch{
 
 }
 
+<#--------------Move Employee Folder from Future Employees to Current Employees on New Starter start date---------------#>
 
+ForEach($item in $AllNewStartersitems){
+    
+#Format the relevant fields - Sharepoint gets confused with DateTime
+[datetime]$startdateformat = $($item.FieldValues.StartDate)
+$todaysdate = get-date
+        
+If($startdateformat -eq $todaysdate){
+
+Write-Host "It looks like $($item.FieldValues.Employee_x0020_Preferred_x0020_N) starts today ($($startdateformat)), let's try and move their Employee Folder from Future Employees to the Current Employees folder" -ForegroundColor Yellow
+
+$subject = "Heads Up: Netmon is doing stuff :o "
+$body = "<HTML><FONT FACE=`"Calibri`">Heads up! Netmon is trying to move an Employee Folder for $($item.FieldValues.Employee_x0020_Preferred_x0020_N) - start date ($($startdateformat))`r`n`r`n<BR><BR>"
+$body += "<b>Timestamp: </b>$(get-date)`r`n`r`n<BR><BR>"
+$body += "Love,`r`n`r`n<BR><BR>"
+$body += "The People Services Robot"
+
+Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+
+            #Get salted credentials and get an Accesstoken
+            $teamBotDetails = Import-Csv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+            $resource = "https://graph.microsoft.com"
+            $tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
+            $clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
+            $redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
+            $secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
+
+            $ReqTokenBody = @{
+                Grant_Type    = "client_credentials"
+                Scope         = "https://graph.microsoft.com/.default"
+                client_Id     = $clientID
+                Client_Secret = $secret
+                } 
+            $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+            #Connnect to sharepoint via Graph
+            Connect-PnPOnline -AccessToken $tokenResponse.access_token
+
+            #Try to find employee folder
+            $FutureEmployeeFoldersAPIResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,59b145c5-52e5-44c6-8412-5159377be199,bc79b416-4459-4aa3-bc49-e4e54203dcea/drive/items/01OPJBCWBHL45XROQTUBAYLV2QIFFCZRQJ/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+            $FutureEmployeeFolders = $FutureEmployeeFoldersAPIResponse.value
+            $employee = $($Item.FieldValues.Employee_x0020_Preferred_x0020_N.trim())
+            $selectedFolder = $FutureEmployeeFolders | Where-Object {$_.Name -eq $employee}
+            
+            #If we find a folder in the Future Employees folder matching the Employee name, move it
+            If($selectedFolder){
+            Try{
+            #Create the copy request, we want to fail the request if the folder already exists. We'll delete the original folder after copy is confirmed.
+            $selectedFolderid = $($selectedFolder.id)
+            $body = "{
+            `"parentReference`": {
+                `"driveId`": `"b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1`",
+                `"id`": `"01OPJBCWBTGPP2XNHNENCY7NF4ODIX3QEG`"
+                },
+            `"name`": `"[FOLDERNAME]`",
+            `"@microsoft.graph.conflictBehavior`": `"rename`"
+            }"
+            $body = $body.Replace("[FOLDERNAME]","$($selectedFolder.name)")#Replace with Employee Name
+            $body = [System.Text.Encoding]::UTF8.GetBytes($body)
+            $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1/items/$selectedFolderid/copy" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+            
+            #Check it created
+            $currentEmployeeslist = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,59b145c5-52e5-44c6-8412-5159377be199,bc79b416-4459-4aa3-bc49-e4e54203dcea/drive/items/01OPJBCWBTGPP2XNHNENCY7NF4ODIX3QEG/children" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+            $outcome2 = $currentEmployeeslist.value | Where-Object {$_.name -eq $foldername}
+            
+            }
+            Catch{
+            $outcome = "I've failed"
+            $subject = "Employee Folder Copy: Woops, something went wrong..."
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
+            $body += "Something went wrong when trying to copy an employee folder from Future Employees to Current Employees for <b>$($selectedFolder.name)</b>. Should probably take a look and see what's gone wrong.`r`n`r`n<BR><BR>"
+            $body += "<b>Timestamp: </b>$(get-date)`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+
+            Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
+            }
+            If(($outcome) -and (!$outcome2)){
+            write-host "It looks like something went wrong when copying the employee folder across above, so we won't delete the folder for now" -ForegroundColor Red
+            }
+            Else{
+            #Looks like the folder was moved successfully, we'll try and delete it from the Future Employees folder
+            write-host "Attempting to delete folder with ID: $($selectedFolderid)" -ForegroundColor Yellow
+            $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!xUWxWeVSxkSEElFZN3vhmRa0ebxZRKNKvEnk5UID3Oo207ZokYNOQZjQOEb4FRp1/items/$selectedFolderid" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Delete
+            }
+            
+
+
+}
+}
+}
 
 <#--------------Start Date Change Processing---------------#>
 
@@ -661,4 +752,47 @@ ForEach($Item in $AllMatPatItems){
 }
 
 
+#######################################################################################
+#                                                                                     #
+#                              Automated Profile Processing                           #
+#                                                                                     #
+#######################################################################################
 
+
+<#--------------------------Sharepoint Configuration Process--------------------------#>
+<#
+#I run through all live 365 profiles and check if they have unique Sharepoint settings, if they don't then we try to set them (using the update-sharePointConfig function in the User Management module)
+
+
+
+#Get all user accounts (that are licensed)
+$allAccounts = Get-MsolUser -MaxResults 5000 | Where-Object {$_.IsLicensed -eq $True}
+
+#Remove any we don't want, grab the UPN for each user
+$finallist = @()
+Foreach($account in $allAccounts){
+
+If(($account.UserPrincipalName -notmatch "conflictminerals@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "VarexConflictMinerals@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "ACSSupport@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "Microsoft.ECM@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "qwest_ga@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "info@umr-gmbh.com") -and ($account.UserPrincipalName -notmatch "Anthesis Energy UK Mailbox Robot") -and ($account.UserPrincipalName -notmatch "Varex.PEC@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "UKcareers@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch"acsmailboxaccess@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "Diana.Correal@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch"groupbot@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "groupbot@anthesisgroup.com") -and ($account.UserPrincipalName -notmatch "SustainMailboxAccess@anthesisgroup.com")){
+    $finallist += $account.UserPrincipalName
+}
+Else{
+write-host "Nope, not a real person: $($account.UserPrincipalName)" -ForegroundColor Yellow
+}
+}
+
+#Get each SPO user profile and properties
+$spouserprofiles = @()
+foreach($upn in $finallist){
+
+            $profilename = ("i:0#.f|membership|" + "$($upn)").Trim()
+            Write-Host "$($profilename)" -ForegroundColor Yellow
+            $SPOUserProfile = Get-PnPUser -Identity $profilename
+            $spouserprofiles += $SPOUserProfile
+            If($SPOUserProfile){write-host "Success! SPOUserProfile retrieved for $($upn)"}
+            Else{write-host "Failure! SPOUserProfile could not be retrieved for $($upn)"
+            break}
+
+
+}
+
+#>
