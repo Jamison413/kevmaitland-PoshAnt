@@ -466,7 +466,6 @@ Param (
         }
         Else{
             Write-Host "It looks like they have unique settings already, meaning they are following their current offices timezone and locale settings (unless this has changed in 365)...stopping" -ForegroundColor Yellow
-            break
         }
         #If office is missing, get the MSOL User object and office from there, Get secondary geographic information for office from term store
         if([string]::IsNullOrWhiteSpace($office)){

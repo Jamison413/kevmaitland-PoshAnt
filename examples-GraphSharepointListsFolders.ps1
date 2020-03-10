@@ -101,3 +101,37 @@ $body = "{
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
 $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,1ead4d00-2e2e-421e-9176-15287b5c22ce,d21ddf81-fcef-4e36-94e6-edd6fb487a31/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVFEUVDEF5VSBRFLKMCSRJZZOCK6/copy" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
 #More MS help: https://docs.microsoft.com/en-us/graph/api/driveitem-copy?view=graph-rest-1.0&tabs=http
+
+
+
+#Handy function for getting site and DocLib info
+function get-teamsiteviaGraph(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$siteurl
+        )
+
+write-host "Siteurl: $($siteurl)"
+$sitename = ($siteurl -split ".com")[1].Trim("/")
+
+
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com:/$sitename" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+$response
+write-host "The ID string for $($response.displayname) is: `
+$($response.id)" -ForegroundColor Yellow
+
+$siteid = $($response.id)
+
+$DocumentLibraryconfirmation = Read-Host "Would you like to see a list of Document Libraries for $($sitename)? (y/n)"
+
+If("y" -eq $DocumentLibraryconfirmation){
+$response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/$($siteid)/drives" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+$response.value
+$doclibs = $response.value
+}
+}
+
+
