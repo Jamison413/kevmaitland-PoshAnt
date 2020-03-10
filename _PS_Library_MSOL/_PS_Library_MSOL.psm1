@@ -228,19 +228,3 @@ function connect-to365(){
     #$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
     $credential
     }
-function get-graphTokenResponse{
-     [cmdletbinding()]
-    param(
-        [parameter(Mandatory = $true)]
-        [PSCustomObject]$aadAppCreds 
-        )
-    $ReqTokenBody = @{
-        Grant_Type    = "client_credentials"
-        Scope         = "https://graph.microsoft.com/.default"
-        client_Id     = $aadAppCreds.ClientID
-        Client_Secret = $aadAppCreds.Secret
-        }
-    $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$($aadAppCreds.TenantId)/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
-    $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
-    $tokenResponse
-    }
