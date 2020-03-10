@@ -1,5 +1,8 @@
-﻿$displayName = "Analysts Team (GBR)"
-$areDataManagersLineManagers = $false
+﻿$365creds = set-MsolCredentials
+connect-to365 -credential $365creds
+
+$displayName = "Sustainable Chemistry Team (GBR)"
+$areDataManagersLineManagers = $true
 $managedBy = "365"
 #$memberOf = ??
 $hideFromGal = $false
@@ -8,29 +11,16 @@ $accessType = "Private"
 $autoSubscribe = $true
 $groupClassification = "Internal"
 $alsoCreateTeam = $false
-$horriblyUnformattedStringOfManagers = "Alan.Spray@anthesisgroup.com, Tecla.Castella@anthesisgroup.com"
-$horriblyUnformattedStringOfMembers = "AnalystsTeam@anthesisgroup.com
+$horriblyUnformattedStringOfManagers = "groupbot@anthesisgroup.com, kevin.maitland@anthesisgroup.com"
+$horriblyUnformattedStringOfMembers = "andrew.noone@anthesisgroup.com
+ben.tuxworth@anthesisgroup.com
+sarah.gilby@anthesisgroup.com
+alex.mckay@anthesisgroup.com
 "
     
-$365creds = set-MsolCredentials
-connect-to365 -credential $365creds
 
-Import-Module _PS_Library_Groups
-
-$teamBotDetails = Import-Csv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
-$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
-$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
-$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
-$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
-
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $clientID
-    Client_Secret = $secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #region Get the Managers and Members in the right formats
 $managers = @()
