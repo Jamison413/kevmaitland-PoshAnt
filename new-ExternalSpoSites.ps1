@@ -1,20 +1,8 @@
-﻿$365creds = set-MsolCredentials
+﻿$365creds = set-MsolCredentials 
 connect-to365 -credential $365creds
 
-$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
-$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
-$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
-$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
-$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
-
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $clientID
-    Client_Secret = $secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $requests = @()
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients" -Credentials $365creds
@@ -62,7 +50,6 @@ foreach ($currentRequest in $selectedRequests){
     
     try{
         $new365Group = new-365Group -displayName $("External - $($fullRequest.FieldValues.Title)".Trim(" ")) -managerUpns $managers -teamMemberUpns $members -memberOf $null -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType Private -autoSubscribe $autoSubscribe -groupClassification $groupClassification -membershipManagedBy 365 -tokenResponse $tokenResponse -pnpCreds $365creds -ownersAreRealManagers $false -alsoCreateTeam $alsoCreateTeam -Verbose
-        Write-Host -ForegroundColor Yellow "Site Admin is : [$($fullRequest.FieldValues.Site_x0020_Admin.LookupValue)]"
         
         Write-Verbose "Getting PnPUnifiedGroup [$($new365Group.displayName)] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
         Connect-PnPOnline -AccessToken $tokenResponse.access_token
@@ -86,6 +73,7 @@ foreach ($currentRequest in $selectedRequests){
         Write-Verbose "Setting Hub Site association"
         Add-PnPHubSiteAssociation -Site $newPnpTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub" | Out-Null
         Write-Verbose "Opening in browser"
+        Write-Host -ForegroundColor Yellow "Site Admin is : [$($fullRequest.FieldValues.Site_x0020_Admin.LookupValue)]"
         start-Process $newPnpTeam.SiteUrl
 
         if($addExecutingUserAsTemporaryOwner){
@@ -147,7 +135,7 @@ foreach ($currentRequest in $selectedRequests){
                 an external version</a> you can send to $externalPartyType`s if they get stuck.</p>
 
                 <p>There are also some additional guides to get you started if
-                you want to do anything fancier that simply sharing files:</p>
+                you want to do anything fancier than simply sharing files:</p>
 
                 <UL><LI><a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-62`">Changing
                 the logo for your Site</a></LI>
@@ -172,7 +160,7 @@ foreach ($currentRequest in $selectedRequests){
                 Write-Verbose "E-mail sent"
                 }
             else{
-                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $((Get-PnPConnection).PSCredential.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Credential $365creds
                 Write-Verbose "E-mail sent"
                 } #Send-MailMessage doesn't support Empty CC option
             }

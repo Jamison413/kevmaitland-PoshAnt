@@ -1,6 +1,9 @@
-﻿$displayName = "Analysts Team (GBR)"
-$areDataManagersLineManagers = $false
-$managedBy = "365"
+﻿$365creds = set-MsolCredentials
+connect-to365 -credential $365creds
+
+$displayName = "Information Solutions Team (All)"
+$areDataManagersLineManagers = $true
+$managedBy = "AAD"
 #$memberOf = ??
 $hideFromGal = $false
 $blockExternalMail = $true
@@ -8,29 +11,14 @@ $accessType = "Private"
 $autoSubscribe = $true
 $groupClassification = "Internal"
 $alsoCreateTeam = $false
-$horriblyUnformattedStringOfManagers = "Alan.Spray@anthesisgroup.com, Tecla.Castella@anthesisgroup.com"
-$horriblyUnformattedStringOfMembers = "AnalystsTeam@anthesisgroup.com
-"
-    
-$365creds = set-MsolCredentials
-connect-to365 -credential $365creds
+$horriblyUnformattedStringOfManagers = "groupbot@anthesisgroup.com, kevin.maitland@anthesisgroup.com"
+$horriblyUnformattedStringOfMembers = ""
 
-Import-Module _PS_Library_Groups
 
-$teamBotDetails = Import-Csv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
-$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
-$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
-$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
-$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
-
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $clientID
-    Client_Secret = $secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+#Connect-PnPOnline –Url https://anthesisllc.sharepoint.com -Credentials $365creds
+#$verbosePreference = "Continue"
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #region Get the Managers and Members in the right formats
 $managers = @()
