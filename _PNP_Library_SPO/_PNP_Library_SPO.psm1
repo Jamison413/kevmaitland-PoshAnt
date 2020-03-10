@@ -762,7 +762,6 @@ function set-standardSitePermissions(){
             }
 
         Write-Verbose "Now set the Classification-specific Sharing settings"
-        $newGuestSettings = set-guestAccessForUnifiedGroup -unifiedGroup $unifiedGroupObject -Verbose:$VerbosePreference
         switch($unifiedGroupObject.CustomAttribute7){
             "External" {
                 #Allow external sharing
