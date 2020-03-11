@@ -169,6 +169,31 @@ function get-graphAuthCode() {
         }
     $output
     }
+function get-graphteamsitedetails(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$siteurl
+        )
+    write-host "Siteurl: $($siteurl)"
+    $sitename = ($siteurl -split ".com")[1].Trim("/")
+    $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com:/$sitename" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+    $response
+    write-host "The ID string for $($response.displayname) is: `
+    $($response.id)" -ForegroundColor Yellow
+    $siteid = $($response.id)
+    $DocumentLibraryconfirmation = Read-Host "Would you like to see a list of Document Libraries for $($sitename)? (y/n)"
+    If("y" -eq $DocumentLibraryconfirmation){
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/sites/$($siteid)/drives" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Get
+        $response.value
+        }
+    <#
+    .SYNOPSIS
+    Find id's of Sharepoint sites and Document Libraries easily to save a few clicks
+    #>
+    }
 function get-graphTokenResponse{
      [cmdletbinding()]
     param(
