@@ -240,6 +240,46 @@ function get-graphTokenResponse{
     $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
     $tokenResponse
     }
+function get-graphGroupFromUpn(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "GraphOnly")]
+            [parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "GraphOnly")]
+            [parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
+            [ValidatePattern("@")]
+            [string]$groupUpn
+        ,[parameter(Mandatory = $false,ParameterSetName = "Graph&Exchange")]
+            [switch]$returnCustomAttributes
+        ,[parameter(Mandatory = $false,ParameterSetName = "Graph&Exchange")]
+            [pscredential]$exoCreds
+        )
+
+    try{
+        $graphGroup = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/?`$filter=mail+eq+'$groupUpn'"
+        }
+    catch{
+        Write-Error "Error retrieving Graph Group by UPN in get-graphUsersFromGroup()"
+        Throw $_ #Terminate on this error
+        }
+    if(!$graphGroup){
+        Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
+        break
+        }
+    if($returnCustomAttributes){ #The CustomAttribute properties aren't exposed by the Graph API, so we need to revert to the EXO Cmdlets if they are required
+        if($graphGroup.groupTypes -contains "Unified"){ #This will only work for a UnifiedGroup, so there's no point in trying with AAD/Exchange groups
+            connect-ToExo -credential $exoCreds
+            $ug = Get-UnifiedGroup -Identity $groupUpn
+            $ug.psobject.Properties | ? {$_.Name -match "CustomAttribute"} | % {
+                $graphGroup | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Value
+                }
+            }
+        else{Write-Warning "[$groupUpn] is not a Unified Group - cannot return CustomAttributes for it."}
+        }
+
+    $graphGroup
+    }
 function get-graphUsersFromGroup(){
     [cmdletbinding()]
     param(
@@ -266,18 +306,13 @@ function get-graphUsersFromGroup(){
     switch ($PsCmdlet.ParameterSetName){
         “groupUpn”  {
             Write-Verbose "We've been given a GroupUPN, so we need the GroupId"
-            try{
-                $graphGroup = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/?`$filter=mail+eq+'$groupUpn'"
-                }
-            catch{
-                Write-Error "Error retrieving Graph Group by UPN in get-graphUsersFromGroup()"
-                Throw $_ #Terminate on this error
-                }
+            $graphGroup = get-graphGroupFromUpn -tokenResponse $tokenResponse -groupUpn $groupUpn -Verbose:$VerbosePreference
             if(!$graphGroup){
                 Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
                 break
                 }
             $groupId = $graphGroup.id
+            Write-Verbose "[$groupUpn] Id is [$groupId]"
             }
         }
     if($includeTransitiveMembers){$memberType = "transitiveMembers"}
@@ -374,4 +409,119 @@ function invoke-graphPost(){
     $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
     
     Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+    }
+function set-graphGroupSharedMailboxAccess(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "groupObject")]
+            [parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupObject")]
+            [psobject]$graphGroup
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [ValidatePattern("@")]
+            [string]$groupUpn
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupObject")]
+            [parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [pscredential]$exoCreds
+        ,[parameter(Mandatory = $false,ParameterSetName = "groupObject")]
+            [parameter(Mandatory = $false,ParameterSetName = "groupUpn")]
+            [switch]$reconcileFullAccessPermissions
+        ,[parameter(Mandatory = $false,ParameterSetName = "groupObject")]
+            [parameter(Mandatory = $false,ParameterSetName = "groupUpn")]
+            [switch]$reconcileSendAsPermissions
+        )
+
+    if(!$reconcileFullAccessPermissions -and !$reconcileSendAsPermissions){
+        Write-Warning "Neither `$reconcileFullAccessPermissions nor `$reconcileSendAsPermissions was set. Nothing to process."
+        break
+        }
+
+    switch ($PsCmdlet.ParameterSetName){
+        “groupUpn”  {
+            Write-Verbose "We've been given a GroupUPN, so we need the Group object"
+            $graphGroup = get-graphGroupFromUpn -tokenResponse $tokenResponse -groupUpn $groupUpn -Verbose:$VerbosePreference -returnCustomAttributes -exoCreds $exoCreds
+            if(!$graphGroup){
+                Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
+                break
+                }
+            }
+        "groupObject" {
+            if($graphGroup.psobject.Properties.Name -notcontains "CustomAttribute1"){
+                Write-Verbose "We've been given a Group object, but it's missing the CustomAttributes"
+                $graphGroup = get-graphGroupFromUpn -tokenResponse $tokenResponse -groupUpn $groupUpn -Verbose:$VerbosePreference -returnCustomAttributes -exoCreds $exoCreds
+                if(!$graphGroup){
+                    Write-Error "Could not retrieve CustomAttributes of Graph Group [$($graphGroup.displayName)][$($graphGroup.id)]. Cannot identify linked Shared Mailbox without these."
+                    break
+                    }
+                }
+            }
+        }
+
+    if($graphGroup.groupTypes -notcontains "Unified"){
+        Write-Error "Graph Group [$($graphGroup.displayName)][$($graphGroup.id)] is not a Unified Group, so has no Shared Mailbox associated with it"
+        break
+        }
+    
+    if([string]::IsNullOrWhiteSpace($graphGroup.CustomAttribute5)){
+        Write-Error "Graph Group [$($graphGroup.displayName)][$($graphGroup.id)] has no associated Shared Mailbox (CustomAttribute5 is not set). Cannot set Members' permissions."
+        break
+        }
+    
+    $sharedMailbox = Get-Mailbox -Identity $graphGroup.CustomAttribute5
+    if(!$sharedMailbox){
+        Write-Error "Shared Mailbox with Id [$($graphGroup.CustomAttribute5)] for [$($graphGroup.displayName)][$($graphGroup.id)] cannot be retrieved. Check that the mailbox has not been deleted."
+        break
+        }
+
+    #Get the list of users who should have 
+    $usersToSet = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphGroup.id -includeTransitiveMembers -returnOnlyLicensedUsers -Verbose:$VerbosePreference
+    
+    if($reconcileFullAccessPermissions){
+        Write-Verbose "Reconciling FullAccess permissions on Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
+        #Get the current list of permissions
+        $mailboxPermissions = Get-MailboxPermission -Identity $sharedMailbox.ExternalDirectoryObjectId | ? {$_.User -match "@"}
+
+        #Compare what's there with what *should* be there
+        if([string]::IsNullOrWhiteSpace($mailboxPermissions)){$mailboxPermissions = @()} #Prevent $null handling errors in Compare-Object
+        $mailboxPermissions | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "userPrincipalName" -Value $_.User}
+        $comparison = Compare-Object -ReferenceObject $mailboxPermissions -DifferenceObject $usersToSet -Property userPrincipalName
+        $comparison | ? {$_.SideIndicator -eq "=>"} | % {
+            Write-Verbose "Adding FullAccess permission for [$($_.userPrincipalName)] to [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
+            Add-MailboxPermission -Identity $sharedMailbox.ExternalDirectoryObjectId -AccessRights FullAccess -User $_.userPrincipalName 
+            }
+        $comparison | ? {$_.SideIndicator -eq "<="} | % {
+            Write-Verbose "Removing FullAccess permission for [$($_.userPrincipalName)] from [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
+            Remove-MailboxPermission -Identity $sharedMailbox.ExternalDirectoryObjectId -AccessRights FullAccess -User $_.userPrincipalName
+            }
+        }
+    if($reconcileSendAsPermissions){
+        Write-Verbose "Reconciling SendAs permissions on Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
+        #Get the current list of permissions
+        $recipientPermissions = Get-RecipientPermission -Identity $sharedMailbox.ExternalDirectoryObjectId | ? {$_.Trustee -match "@"}
+
+        #Compare what's there with what *should* be there
+        if([string]::IsNullOrWhiteSpace($recipientPermissions)){$recipientPermissions = @()} #Prevent $null handling errors in Compare-Object
+        $recipientPermissions | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "userPrincipalName" -Value $_.Trustee}
+        $comparison = Compare-Object -ReferenceObject $recipientPermissions -DifferenceObject $usersToSet -Property userPrincipalName
+        $comparison | ? {$_.SideIndicator -eq "=>"} | % {
+            Write-Verbose "Adding SendAs permission for [$($_.userPrincipalName)] to [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
+            Add-RecipientPermission -Identity $sharedMailbox.ExternalDirectoryObjectId -AccessRights SendAs -Trustee $_.userPrincipalName -Confirm:$false
+            }
+        $comparison | ? {$_.SideIndicator -eq "<="} | % {
+            Write-Verbose "Removing FullAccess permission for [$($_.userPrincipalName)] from [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
+            Remove-RecipientPermission -Identity $sharedMailbox.ExternalDirectoryObjectId -AccessRights FullAccess -User $_.userPrincipalName
+            }
+
+        #If Users have SendAs permissions, the SharedMailbox needs to be visible in the Global Address List. Otherwise, we should hide it.
+        $recipientPermissions = Get-RecipientPermission -Identity $sharedMailbox.ExternalDirectoryObjectId | ? {$_.Trustee -match "@"}
+        if([string]::IsNullOrWhiteSpace($recipientPermissions)){
+            Write-Verbose "Hiding Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] from the Global Address List"
+            Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled:$true
+            }
+        else{
+            Write-Verbose "Showing Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] in the Global Address List"
+            Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled:$false
+            }
+        }
     }
