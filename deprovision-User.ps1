@@ -1,4 +1,5 @@
-﻿param(
+﻿#Param function to place UPN string into - who do you want to deactivate? Place their name in the prompt in the terminal
+param(
     [CmdletBinding()]
     [parameter(Mandatory = $true)]
     [ValidateNotNull()]
@@ -6,11 +7,13 @@
     [string]$upnsString
     )
 
+#Import other code we need - modules contain useful functions to make tasks consistent    
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Databases.psm1
 Import-Module _PS_Library_MSOL.psm1
 Import-Module _REST_Library-SPO.psm1
 
+#Some functions are just needed for this script, so we put them here and load them
 #region functions
 function add-emailAddressesToPublicFolder($publicFolder, $emailAddressArray){
     $tempPF = $publicFolder #Bodge to get [Microsoft.Exchange.Data.ProxyAddressCollection] without Library
@@ -136,6 +139,7 @@ function delete-userAccounts($userSAM){
     }
 #endregion
 
+#Set logging so we have more details if something goes wrong - we print the output of the terminal to the log.txt file
 $logFileLocation = "C:\ScriptLogs\"
 $scriptName = "deprovision-user"
 $fullLogPathAndName = $logFileLocation+$scriptName+".ps1_FullLog_$(Get-Date -Format "yyMMdd").log"
@@ -146,19 +150,27 @@ if($PSCommandPath){
     }
 
 
+#/Ignore if running manually
 $userAdmin = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString "IntuneAdminPasswordHere"
 $userAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Groupbot.txt) 
 #$adminCreds = set-MsolCredentials -username $intuneAdmin
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $userAdmin, $userAdminPass
+#/
+
+#Create a secure credential object
+$adminCreds = get-credential
+#Connect to services by passing in secure credential object we set above
 connect-ToMsol -Credential $adminCreds
 connect-toAAD -Credential $adminCreds
 connect-ToExo -credential $adminCreds
 
+#Create an array of email address so we can iterate through them
 $upnsToDeactivate = convertTo-arrayOfEmailAddresses $upnsString
-#region deprovision
 
+#region deprovision - now go through each email address in the array and deactivate them
 foreach($user in $upnsToDeactivate){
+
     if($user){
         $userExoObject = Get-User -Identity $user
         $userAadObject = Get-AzureADUser -SearchString $user.Replace("@anthesisgroup.com","")
