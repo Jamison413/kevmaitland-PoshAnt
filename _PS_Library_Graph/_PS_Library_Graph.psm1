@@ -275,7 +275,7 @@ function get-graphGroupFromUpn(){
             [parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
             [ValidatePattern("@")]
             [string]$groupUpn
-        ,[parameter(Mandatory = $false,ParameterSetName = "Graph&Exchange")]
+        ,[parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
             [switch]$returnCustomAttributes
         ,[parameter(Mandatory = $false,ParameterSetName = "Graph&Exchange")]
             [pscredential]$exoCreds
@@ -304,6 +304,73 @@ function get-graphGroupFromUpn(){
         }
 
     $graphGroup
+    }
+function get-graphUsers(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $false)]
+            #[ValidateSet("AD","AE","AF","AG","AI","AL","AM","AO","AQ","AR","AS","AT","AU","AW","AX","AZ","BA","BB","BD","BE","BF","BG","BH","BI","BJ","BL","BM","BN","BO","BQ","BR","BS","BT","BV","BW","BY","BZ","CA","CC","CD","CF","CG","CH","CI","CK","CL","CM","CN","CO","CR","CU","CV","CW","CX","CY","CZ","DE","DJ","DK","DM","DO","DZ","EC","EE","EG","EH","ER","ES","ET","FI","FJ","FK","FM","FO","FR","GA","GB","GD","GE","GF","GG","GH","GI","GL","GM","GN","GP","GQ","GR","GS","GT","GU","GW","GY","HK","HM","HN","HR","HT","HU","ID","IE","IL","IM","IN","IO","IQ","IR","IS","IT","JE","JM","JO","JP","KE","KG","KH","KI","KM","KN","KP","KR","KW","KY","KZ","LA","LB","LC","LI","LK","LR","LS","LT","LU","LV","LY","MA","MC","MD","ME","MF","MG","MH","MK","ML","MM","MN","MO","MP","MQ","MR","MS","MT","MU","MV","MW","MX","MY","MZ","NA","NC","NE","NF","NG","NI","NL","NO","NP","NR","NU","NZ","OM","PA","PE","PF","PG","PH","PK","PL","PM","PN","PR","PS","PT","PW","PY","QA","RE","RO","RS","RU","RW","SA","SB","SC","SD","SE","SG","SH","SI","SJ","SK","SL","SM","SN","SO","SR","SS","ST","SV","SX","SY","SZ","TC","TD","TF","TG","TH","TJ","TK","TL","TM","TN","TO","TR","TT","TV","TW","TZ","UA","UG","UM","US","UY","UZ","VA","VC","VE","VG","VI","VN","VU","WF","WS","YE","YT","ZA","ZM","ZW")]
+            [ValidateSet("AD","AE","CH","CN","CO","DE","ES","FI","FR","GB","IE","IT","KR","LK","PH","SE","US")]
+            [string]$filterUsageLocation
+        ,[parameter(Mandatory = $false)]
+            [ValidatePattern("@")]
+            [string]$filterUpn
+        ,[parameter(Mandatory = $false)]
+            [switch]$filterLicensedUsers = $false
+        ,[parameter(Mandatory = $false)]
+            [switch]$selectAllProperties = $false
+        )
+
+    #We need the GroupId, so if we were only given the UPN, we need to find the Id from that.
+    if($filterUsageLocation){
+        $filter += "and usageLocation eq '$filterUsageLocation'"
+        }
+    if($filterUpn){
+        $filter += "and userPrincipalName eq '$filterUpn'"
+        }
+    if($returnOnlyLicensedUsers){
+        $select = ",id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses"
+        }
+    if($selectAllProperties){
+        $select = ",id,id,displayName,givenName,surname,jobTitle,userPrincipalName,mail,mobilePhone,officeLocation,postalCode,usageLocation,preferredLanguage,assignedLicenses"
+        }
+
+    #Build the refiner based on the parameters supplied
+    if(![string]::IsNullOrWhiteSpace($select) -and $select.StartsWith(",")){$select = $select.Substring(1,$select.Length-1)}
+    if($select){$select = "`$select=$select"}
+    if(![string]::IsNullOrWhiteSpace($filter) -and $filter.StartsWith("and ")){$filter = $filter.Substring(4,$filter.Length-4)}
+    if($filter){$filter = "`$filter=$filter"}
+
+    $refiner = $null
+    if($filter -or $select){$refiner = "?"}
+    if($select){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"}
+        $refiner = $refiner+$select
+        }
+    if($filter){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"}
+        $refiner = $refiner+$filter
+        }
+
+    Write-Verbose "Graph Query = [users$refiner]"
+    try{
+        $allUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users$refiner" -Verbose:$VerbosePreference
+        }
+    catch{
+        Write-Error "Error retrieving Graph Users in get-graphUsers() using query [users$refiner]"
+        Throw $_ #Terminate on this error
+        }
+    
+    if($filterLicensedUsers){
+        Write-Verbose "Returning all Licensed Users"
+        $allUsers | ? {$_.assignedLicenses.Count -gt 0} | Sort-Object userPrincipalName -Unique
+        }
+    else{
+        Write-Verbose "Returning all Users"
+        $allUsers | Sort-Object userPrincipalName -Unique
+        }
     }
 function get-graphUsersFromGroup(){
     [cmdletbinding()]
@@ -343,7 +410,7 @@ function get-graphUsersFromGroup(){
     if($includeTransitiveMembers){$memberType = "transitiveMembers"}
     else{$memberType = "members"}
     if($returnOnlyLicensedUsers){
-        $refiner = "?`$select=id,displayName,jobTitle,mail,userPrincipalName,assignedLicenses"
+        $refiner = "?`$select=id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses"
         $returnOnlyUsers = $true #Licensed Users are a subset of Users, so $returnOnlyUsers = $true is implied if $returnOnlyLicensedUsers = $true
         }
     Write-Verbose "Graph Query = [groups/$($groupId)/$($memberType+$refiner)]"
@@ -358,13 +425,13 @@ function get-graphUsersFromGroup(){
     if($returnOnlyUsers){
         if($returnOnlyLicensedUsers){
             Write-Verbose "Returning all Licensed Users"
-            $allUsers = $allMembers | ? {$_.'@odata.type' -eq "#microsoft.graph.user"} | Sort-Object userPrincipalName -Unique
-            $allUsers
+            $allLicensedUsers = $allMembers | ? {$_.'@odata.type' -eq "#microsoft.graph.user" -and $_.assignedLicenses.Count -gt 0} | Sort-Object userPrincipalName -Unique
+            $allLicensedUsers
             }
         else{
             Write-Verbose "Returning all Users"
-            $allLicensedUsers | ? {$_.'@odata.type' -eq "#microsoft.graph.user" -and $_.assignedLicenses.Count -gt 0} | Sort-Object userPrincipalName -Unique
-            $allLicensedUsers
+            $allUsers = $allMembers | ? {$_.'@odata.type' -eq "#microsoft.graph.user"} | Sort-Object userPrincipalName -Unique
+            $allUsers
             }
         }
     else{
@@ -439,7 +506,7 @@ function set-graphGroupSharedMailboxAccess(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true,ParameterSetName = "groupObject")]
-            [parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [parameter(Mandatory = $true,ParameterSetName = "")]
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "groupObject")]
             [psobject]$graphGroup
@@ -499,8 +566,8 @@ function set-graphGroupSharedMailboxAccess(){
         break
         }
 
-    #Get the list of users who should have 
-    $usersToSet = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphGroup.id -includeTransitiveMembers -returnOnlyLicensedUsers -Verbose:$VerbosePreference
+    #Get the list of users who *should* have access, and get it via the associated Members Subgroup so that we can get the transitive members
+    $usersToSet = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphGroup.CustomAttribute3 -includeTransitiveMembers -returnOnlyLicensedUsers -Verbose:$VerbosePreference
     
     if($reconcileFullAccessPermissions){
         Write-Verbose "Reconciling FullAccess permissions on Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
