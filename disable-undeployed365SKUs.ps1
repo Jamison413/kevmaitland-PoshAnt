@@ -1,11 +1,25 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-$dg = Get-DistributionGroup -Identity teamspilot@anthesisgroup.com
-$teamsPilotUsers = $(enumerate-nestedDistributionGroups -distributionGroupObject $dg -Verbose).WindowsLiveId
 
-$dg = Get-DistributionGroup -Identity teamsusers@anthesisgroup.com
-$allTeamsUsers = $(enumerate-nestedDistributionGroups -distributionGroupObject $dg -Verbose).WindowsLiveId
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+
+$teamsPilotGroup = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/?`$filter=mail+eq+'teamspilot@anthesisgroup.com'"
+$teamsPilotUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/$($teamsPilotGroup.id)/transitiveMembers?`$select=id,displayName,jobTitle,mail,userPrincipalName,assignedLicenses"
+$teamsPilotUPNs = $teamsPilotUsers | ? {$_.'@odata.type' -eq "#microsoft.graph.user" -and $_.assignedLicenses.Count -gt 0} | select userPrincipalName -Unique | Sort-Object userPrincipalName | % {$_.userPrincipalName}
+
+$allTeamsGroup = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/?`$filter=mail+eq+'teamsusers@anthesisgroup.com'"
+$allTeamsUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/$($allTeamsGroup.id)/transitiveMembers?`$select=id,displayName,jobTitle,mail,userPrincipalName,assignedLicenses"
+$allTeamsUPNs = $allTeamsUsers | ? {$_.'@odata.type' -eq "#microsoft.graph.user" -and $_.assignedLicenses.Count -gt 0} | select userPrincipalName -Unique | Sort-Object userPrincipalName | % {$_.userPrincipalName}
+
+
+#$dg = Get-DistributionGroup -Identity teamspilot@anthesisgroup.com
+#$teamsPilotUsers = $(enumerate-nestedDistributionGroups -distributionGroupObject $dg -Verbose).WindowsLiveId
+
+#$dg = Get-DistributionGroup -Identity teamsusers@anthesisgroup.com
+#$allTeamsUsers = $(enumerate-nestedDistributionGroups -distributionGroupObject $dg -Verbose).WindowsLiveId
+
 
 $teamsPilotUsersDesiredState = [ordered]@{"TEAMS1"="Success";"YAMMER_ENTERPRISE"="Disabled";"AnthesisLLC:MCOMEETADV"="Add"} 
 $teamsUsersDesiredState = [ordered]@{"TEAMS1"="Success";"YAMMER_ENTERPRISE"="Disabled"}
@@ -14,20 +28,23 @@ $mostUsersDesiredState = [ordered]@{"TEAMS1"="Disabled";"YAMMER_ENTERPRISE"="Dis
 
 #Get All Licensed Users
 $users = Get-MsolUser -All | Where-Object {$_.isLicensed -eq $true}
+#$allUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users?`$select=id,displayName,jobTitle,mail,userPrincipalName,assignedLicenses"
+#$licensedUsers = $allUsers | ? {$_.assignedLicenses.Count -gt 0}
 
 foreach ($user in $users){
     #Set the apprporiate DesiredState
-    if($teamsPilotUsers -contains $user.UserPrincipalName){$desiredState = $teamsPilotUsersDesiredState}
-    elseif($allTeamsUsers -contains $user.UserPrincipalName){$desiredState = $teamsUsersDesiredState}
+    if($teamsPilotUPNs -contains $user.UserPrincipalName){$desiredState = $teamsPilotUsersDesiredState}
+    elseif($allTeamsUPNs -contains $user.UserPrincipalName){$desiredState = $teamsUsersDesiredState}
     else{$desiredState = $mostUsersDesiredState}
 
     #Add/remove any licenses before we check individual services
     $licensesToAdd = @()
     $licensesToAdd += $($desiredState.GetEnumerator() | ? {$_.Name -match "AnthesisLLC:" -and $_.Value -eq "Add"}).Name | ? {$_ -ne $null}
     $licensesToAdd = Compare-Object -ReferenceObject $licensesToAdd -DifferenceObject $user.Licenses.AccountSkuId -PassThru | ? {$_.SideIndicator -eq "<="} #Prevent re-adding licenses unnecessarily
+    #$licensesToAdd = Compare-Object -ReferenceObject $licensesToAdd -DifferenceObject $user.assignedLicenses.GetEnumerator().skuId -PassThru | ? {$_.SideIndicator -eq "<="} #Prevent re-adding licenses unnecessarily
     $licensesToRemove = @()
     $licensesToRemove += $($desiredState.GetEnumerator() | ? {$_.Name -match "AnthesisLLC:" -and $_.Value -eq "Remove"}).Name | ? {$_ -ne $null}
-    $licensesToRemove = Compare-Object -ReferenceObject $licensesToRemove -DifferenceObject $user.Licenses.AccountSkuId -PassThru -IncludeEqual | ? {$_.SideIndicator -eq "=="} #Prevent attempt to remove license that have already been removed
+    $licensesToRemove = Compare-Object -ReferenceObject $licensesToRemove -DifferenceObject  $user.Licenses.AccountSkuId -PassThru -IncludeEqual | ? {$_.SideIndicator -eq "=="} #Prevent attempt to remove license that have already been removed
     
     if($licensesToAdd.Count -gt 0 -or $licenseToRemove.Count -gt 0){
         Write-Host -ForegroundColor Yellow "Set-MsolUserLicense -UserPrincipalName $($user.UserPrincipalName) -AddLicenses [$($licensesToAdd -join ", ")] -RemoveLicenses [$($licensesToRemove -join ", ")]"
@@ -71,4 +88,3 @@ foreach ($user in $users){
     }
 
         
-
