@@ -12,7 +12,7 @@ $teamsPilotUPNs = $teamsPilotUsers | ? {$_.'@odata.type' -eq "#microsoft.graph.u
 $allTeamsGroup = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/?`$filter=mail+eq+'teamsusers@anthesisgroup.com'"
 $allTeamsUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/$($allTeamsGroup.id)/transitiveMembers?`$select=id,displayName,jobTitle,mail,userPrincipalName,assignedLicenses"
 $allTeamsUPNs = $allTeamsUsers | ? {$_.'@odata.type' -eq "#microsoft.graph.user" -and $_.assignedLicenses.Count -gt 0} | select userPrincipalName -Unique | Sort-Object userPrincipalName | % {$_.userPrincipalName}
-
+Write-host -fore Yellow "[$($teamsPilotUPNs.Count)] Audio Conferencing licenses required"
 
 #$dg = Get-DistributionGroup -Identity teamspilot@anthesisgroup.com
 #$teamsPilotUsers = $(enumerate-nestedDistributionGroups -distributionGroupObject $dg -Verbose).WindowsLiveId
