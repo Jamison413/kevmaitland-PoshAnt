@@ -1,9 +1,9 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-$displayName = "Sustainable Chemistry Team (GBR)"
-$areDataManagersLineManagers = $true
-$managedBy = "365"
+$displayName = "Sustainable Products, Circularity & Chemistry Community (GBR)"
+$areDataManagersLineManagers = $false
+$managedBy = "AAD"
 #$memberOf = ??
 $hideFromGal = $false
 $blockExternalMail = $true
@@ -11,11 +11,8 @@ $accessType = "Private"
 $autoSubscribe = $true
 $groupClassification = "Internal"
 $alsoCreateTeam = $false
-$horriblyUnformattedStringOfManagers = "groupbot@anthesisgroup.com, kevin.maitland@anthesisgroup.com"
-$horriblyUnformattedStringOfMembers = "andrew.noone@anthesisgroup.com
-ben.tuxworth@anthesisgroup.com
-sarah.gilby@anthesisgroup.com
-alex.mckay@anthesisgroup.com
+$horriblyUnformattedStringOfManagers = "kevin.maitland@anthesisgroup.com, groupbot@anthesisgroup.com"
+$horriblyUnformattedStringOfMembers = "
 "
     
 

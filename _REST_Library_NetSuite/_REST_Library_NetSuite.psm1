@@ -481,7 +481,6 @@ function get-netSuiteClientsFromNetSuite(){
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
 
     $customers = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $customers.items.links.href | out-file "C:\Users\Emily.Pressey\customers.txt"
     $customersEnumerated = [psobject[]]::new($customers.count)
     for ($i=0; $i -lt $customers.count;$i++) {
         $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($customers.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 

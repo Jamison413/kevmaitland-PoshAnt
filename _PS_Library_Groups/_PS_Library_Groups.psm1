@@ -485,7 +485,7 @@ function new-365Group(){
         Start-Sleep -Seconds 5
         }
     while([string]::IsNullOrWhiteSpace($pnp365Group.SiteUrl))
-    Write-Verbose "set-standardTeamSitePermissions -teamSiteAbsoluteUrl [$($pnp365Group.SiteUrl)]"
+    Write-Verbose "Calling set-standardSitePermissions -unifiedGroupObject [$($pnp365Group.SiteUrl)]"
     set-standardSitePermissions -unifiedGroupObject $365Group -tokenResponse $tokenResponse -pnpCreds $pnpCreds
     $365Group
 
@@ -700,6 +700,8 @@ function send-membershipChangeReportToManagers(){
     $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
     
     if($PSCmdlet.ShouldProcess($("$changesAreTo [$($UnifiedGroup.DisplayName)]"))){#Fudges -WhatIf as it's not suppoerted natively by Send-MailMessage
+        Write-verbose "To [$($ownersEmailAddresses -join "; ")]"
+        Write-verbose "CC [$($adminEmailAddresses -join "; ")]"
         Send-MailMessage -To $ownersEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc $adminEmailAddresses -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
     else{
