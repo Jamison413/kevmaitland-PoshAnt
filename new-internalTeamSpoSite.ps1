@@ -1,8 +1,8 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-$displayName = "Information Solutions Team (All)"
-$areDataManagersLineManagers = $true
+$displayName = "Sustainable Products, Circularity & Chemistry Community (GBR)"
+$areDataManagersLineManagers = $false
 $managedBy = "AAD"
 #$memberOf = ??
 $hideFromGal = $false
@@ -11,12 +11,11 @@ $accessType = "Private"
 $autoSubscribe = $true
 $groupClassification = "Internal"
 $alsoCreateTeam = $false
-$horriblyUnformattedStringOfManagers = "groupbot@anthesisgroup.com, kevin.maitland@anthesisgroup.com"
-$horriblyUnformattedStringOfMembers = ""
+$horriblyUnformattedStringOfManagers = "kevin.maitland@anthesisgroup.com, groupbot@anthesisgroup.com"
+$horriblyUnformattedStringOfMembers = "
+"
+    
 
-
-#Connect-PnPOnline –Url https://anthesisllc.sharepoint.com -Credentials $365creds
-#$verbosePreference = "Continue"
 $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
