@@ -6,7 +6,7 @@ Param ($displayName)
         Write-Host "This isn't a Sym or Working Group, adding to the Team Term Store" -ForegroundColor Magenta 
         New-PnPTerm -TermSet "Live Sharepoint Teams" -TermGroup "Anthesis" -Name $displayName -Lcid 1033
         }
-    }
+    } 
 function enumerate-groupMemberships(){
     Write-Host -ForegroundColor Magenta "enumerate-groupMemberships()"
     Get-AzureADMSGroup -All:$true | % {

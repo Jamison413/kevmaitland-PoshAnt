@@ -1,4 +1,4 @@
-﻿$365creds = set-MsolCredentials
+﻿$365creds = set-MsolCredentials 
 connect-to365 -credential $365creds
 
 $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
