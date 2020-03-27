@@ -1,17 +1,17 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-$displayName = "Sustainable Products, Circularity & Chemistry Community (GBR)"
+$displayName = "Waste Team (ESP)"
 $areDataManagersLineManagers = $false
-$managedBy = "AAD"
+$managedBy = "365"
 #$memberOf = ??
 $hideFromGal = $false
 $blockExternalMail = $true
 $accessType = "Private"
 $autoSubscribe = $true
 $groupClassification = "Internal"
-$alsoCreateTeam = $false
-$horriblyUnformattedStringOfManagers = "kevin.maitland@anthesisgroup.com, groupbot@anthesisgroup.com"
+$alsoCreateTeam = $true
+$horriblyUnformattedStringOfManagers = "kevin.maitland@anthesisgroup.com"
 $horriblyUnformattedStringOfMembers = "
 "
     
@@ -60,13 +60,71 @@ $newPnpTeam = Get-PnPUnifiedGroup -Identity $newTeam.ExternalDirectoryObjectId
 
 #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
 if($addExecutingUserAsTemporaryOwner){
-    $addExecutingUserAsTemporarySiteCollectionAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true
+    $userWasAlreadySiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $thisSite -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true
     }
 copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Candiate-Template-for-Team-Site-Landing-Page.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
-test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
+test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $365creds -connectIfDifferent $true | Out-Null
 if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
     Write-Verbose "Setting Homepage"
     Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
+    Write-Verbose "ReTitling Homepage"
+    $newHomepage = Get-PnPListItem -List "SitePages" -Query "<View><Query><Where><Eq><FieldRef Name='FileLeafRef'/><Value Type='Text'>LandingPage.aspx</Value></Eq></Where></Query></View>"
+    Set-PnPListItem -Values @{"Title"=$newPnpTeam.DisplayName} -List "SitePages" -Identity $newHomepage.Id
+
+    Write-Verbose "Create, Share and Delete a folder in the Documents Library to enable the SharedWithUsers metadata"
+    $docLibName = "Shared Documents"
+    $dummyFolderName = "DummyShareToDelete"
+    Write-Verbose "`tAdding Folder [$dummyFolderName] to [$docLibName]"
+    Add-PnPFolder -Name $dummyFolderName -Folder $docLibName
+    $dummyPnpFolderItem = Get-PnPFolderItem -FolderSiteRelativeUrl $docLibName -ItemType Folder -ItemName $dummyFolderName
+    [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing")  | Out-Null
+    [System.Reflection.Assembly]::LoadWithPartialName("System.Collections") | Out-Null
+    $roleAssignments = New-Object "System.Collections.Generic.List[Microsoft.SharePoint.Client.Sharing.UserRoleAssignment]"
+    $roleAssignment = New-Object Microsoft.SharePoint.Client.Sharing.UserRoleAssignment
+    $roleAssignment.UserId = $365creds.UserName
+    $roleAssignment.Role = [Microsoft.SharePoint.Client.Sharing.Role]::Edit
+    $roleAssignments.Add($roleAssignment)
+    [Microsoft.SharePoint.Client.Sharing.DocumentSharingManager]::UpdateDocumentSharingInfo($dummyPnpFolderItem.Context,"https://anthesisllc.sharepoint.com"+$dummyPnpFolderItem.ServerRelativeUrl,$roleAssignments,$false,$true,$false,"",$false,$false)
+    Write-Verbose "`tSharing Folder [$dummyFolderName] with [$($365creds.UserName)] via CSOM"
+    $dummyPnpFolderItem.Context.ExecuteQuery() 
+    Write-Verbose "`tRemoving Folder [$dummyFolderName]"
+    Remove-PnPFolder -Name $dummyFolderName -Folder $docLibName -Force
+
+
+    Write-Verbose "Setting default View in Documents Library"
+    $thisDocLib = Get-PnPList -Identity $docLibName -Includes Fields
+    $defaulDocLibPnpView = $thisDocLib | Get-PnPView | ? {$_.DefaultView -eq $true}
+    $defaulDocLibPnpView | Set-PnPView -Fields "DocIcon","LinkFilename","Modified","Editor","Created","Author","FileSizeDisplay","SharedWithUsers"
+
+
+
+    <#--
+    $ctx = (Get-PnPConnection).Context
+    Write-Verbose "Create, Share and Delete a folder in the Documents Library to enable the SharedWithUsers metadata"
+    $dummyFolderName = "DummyShareToDelete"
+    $defaultDocLib = Get-PnPList -Identity "Documents"
+    Write-Verbose "`tAdding Folder [$dummyFolderName]"
+    Add-PnPFolder -Name $dummyFolderName -Folder "Shared Documents"
+    $dummyPnpFolderItem = Get-PnPFolderItem -FolderSiteRelativeUrl "Shared Documents" -ItemType Folder -ItemName $dummyFolderName
+    #Set-PnPListItemPermission -List $defaultDocLib.Id -Identity $dummyPnpFolderItem.ListItemAllFields -AddRole Contribute -User $($pnpCreds.UserName) This sets the permissions, but doesn't trigger a SharedWith event
+    #[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing")  | Out-Null
+    #[System.Reflection.Assembly]::LoadWithPartialName("System.Collections") | Out-Null
+    [System.Reflection.Assembly]::LoadFile("C:\Program Files\WindowsPowerShell\Modules\SharePointPnPPowerShellOnline\3.17.2001.2\Microsoft.SharePoint.Client.dll")
+    $roleAssignments = New-Object "System.Collections.Generic.List[Microsoft.SharePoint.Client.Sharing.UserRoleAssignment]"
+    $roleAssignment = New-Object Microsoft.SharePoint.Client.Sharing.UserRoleAssignment
+    $roleAssignment.UserId = $pnpCreds.UserName
+    $roleAssignment.Role = [Microsoft.SharePoint.Client.Sharing.Role]::Edit
+    $roleAssignments.Add($roleAssignment)
+    [Microsoft.SharePoint.Client.Sharing.DocumentSharingManager]::UpdateDocumentSharingInfo($dummyPnpFolderItem.Context,"https://anthesisllc.sharepoint.com"+$dummyPnpFolderItem.ServerRelativeUrl,$roleAssignments,$false,$true,$false,"",$false,$false)
+    [Microsoft.SharePoint.Client.Sharing.DocumentSharingManager]::UpdateDocumentSharingInfo($dummyPnpFolderItem.Context.CastTo($_,[Microsoft.SharePoint.Client.ClientRuntimeContext]),"https://anthesisllc.sharepoint.com"+$dummyPnpFolderItem.ServerRelativeUrl,$roleAssignments,$false,$true,$false,"",$false,$false)
+    Write-Verbose "`tSharing Folder [$dummyFolderName] with [$($pnpCreds.UserName)] via CSOM"
+    $dummyPnpFolderItem.Context.ExecuteQuery() #This errors, but still adds the SharedWithUsers column to the Site
+    Remove-PnPFolder -Name $dummyFolderName -Folder "Shared Documents" -Force
+
+
+    Write-Verbose "Setting default View in Documents Library"
+    $defaulDocLibPnpView = $defaultDocLib | Get-PnPView | ? {$_.DefaultView -eq $true}
+    $defaulDocLibPnpView | Set-PnPView -Fields "DocIcon","LinkFilename","Modified","Editor","Created","Author","FileSizeDisplay","SharedWithUsers" --#>
     }
 
 Add-PnPHubSiteAssociation -Site $newPnpTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/TeamHub" | Out-Null

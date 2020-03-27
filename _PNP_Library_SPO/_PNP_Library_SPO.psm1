@@ -853,20 +853,30 @@ function test-isUserSiteCollectionAdmin(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
-        [OfficeDevPnP.Core.Entities.UnifiedGroupEntity]$pnpUnifiedGroupObject
+            [OfficeDevPnP.Core.Entities.UnifiedGroupEntity]$pnpUnifiedGroupObject
         ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [string]$unifiedGroupId
+            [string]$unifiedGroupId
+        ,[parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+            [Microsoft.SharePoint.Client.ClientObject]$pnpSiteObject
+        ,[parameter(Mandatory = $true,ParameterSetName="SiteId")]
+            [string]$pnpSiteId
 
         ,[parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
         [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
         [string]$accessToken = $true
 
         ,[parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
         [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
         [pscredential]$pnpCreds
 
         ,[parameter(Mandatory = $false,ParameterSetName="pnpGroupObject")]
         [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
         [bool]$addPermissionsIfMissing = $false
         )
 
@@ -885,28 +895,34 @@ function test-isUserSiteCollectionAdmin(){
                 return
                 }
             }
+        {$_ -match "Group"} { #Catches both pnpGroupObject & UnifiedGroupId
+             try{
+                Write-Verbose "Checking to see if the executing user already has admin permissions for the Site"
+                $pnpGroupAdmins = Get-PnPUnifiedGroupOwners -Identity $pnpUnifiedGroupObject.GroupId
+                if($pnpGroupAdmins.UserPrincipalName -contains $pnpCreds.UserName){
+                    $isAlreadyAnAdmin = $true
+                    Write-Verbose "`tYes - user already is a Site Collection Admin"
+                    return
+                    }
+                else{
+                    Write-Verbose "`tNo - user is not a Site Collection Admin"
+                    $isAlreadyAnAdmin = $false
+                    if($addPermissionsIfMissing){
+                        Write-Verbose "`t`tTemporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
+                        Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $pnpCreds
+                        Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
+                        }
+                    }
+                }
+            catch{
+                Write-Verbose "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
+                return
+                }            
+            }
         }
 
-     try{
-        Write-Verbose "Checking to see if the executing user already has admin permissions for the Site"
-        $pnpGroupAdmins = Get-PnPUnifiedGroupOwners -Identity $pnpUnifiedGroupObject.GroupId
-        if($pnpGroupAdmins.UserPrincipalName -contains $pnpCreds.UserName){
-            $true
-            Write-Verbose "`tYes - user already is a Site Collection Admin"
-            return
-            }
-        else{
-            Write-Verbose "`tNo - user is not a Site Collection Admin"
-            if($addPermissionsIfMissing){
-                Write-Verbose "`t`tTemporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
-                Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
-                }
-            }
-        }
-    catch{
-        Write-Verbose "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
-        return
-        }
+
+
     }
 function test-pnpConnectionMatchesResource(){
     [cmdletbinding()]
