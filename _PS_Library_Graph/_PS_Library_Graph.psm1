@@ -132,6 +132,55 @@ function add-graphFolderToDrive(){
     Write-Verbose $graphQuery
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery $graphQuery -graphBodyHashtable $folderHash -Verbose:$VerbosePreference
     }
+function add-graphUsersToGroup(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="UserIds")]
+            [parameter(Mandatory = $true,ParameterSetName="UserUpns")]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserIds")]
+            [parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
+            [string]$graphGroupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserIds")]
+            [parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
+            [ValidateSet("Members","Owners")]
+            [string]$memberType 
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
+            [string[]]$graphUserUpns
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserIds")]
+            [string[]]$graphUserIds
+        )
+    
+    switch ($PsCmdlet.ParameterSetName){
+        "UserUpns" {$graphUserIds = $graphUserUpns} #UPNs work natively in place of Ids for this endpoint, so no need to handle them differrently after all! 
+        }
+
+    $graphUserIds | % {
+        $bodyHash = @{"@odata.id"="https://graph.microsoft.com/v1.0/users/$_"}
+        invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/`$ref" -graphBodyHashtable $bodyHash -Verbose:$VerbosePreference
+        }
+    }
+function delete-graphDriveItem(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true)]
+            [string]$graphDriveId 
+        ,[parameter(Mandatory = $true)]
+            [string]$graphDriveItemId
+        ,[parameter(Mandatory = $false)]
+            [string]$eTag
+        )
+    
+    if($eTag){
+        $deleteBody = @{"if-match"=$eTag}
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/items/$graphDriveItemId" -graphBodyHashtable $deleteBody -Verbose:$VerbosePreference
+        }
+    else{
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/items/$graphDriveItemId"  -Verbose:$VerbosePreference
+        }
+    }
 function get-graphAuthCode() {
      [cmdletbinding()]
     param(
@@ -168,6 +217,118 @@ function get-graphAuthCode() {
         $output["$key"] = $queryOutput[$key]
         }
     $output
+    }
+function get-graphDrives(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "fromUrl")]
+            [parameter(Mandatory = $true,ParameterSetName = "fromId")]
+            [parameter(Mandatory = $true,ParameterSetName = "fromUpn")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "fromUrl")]
+            [string]$siteUrl
+        ,[parameter(Mandatory = $true,ParameterSetName = "fromId")]
+            [string]$siteGraphId
+        ,[parameter(Mandatory = $true,ParameterSetName = "fromUpn")]
+            [ValidatePattern("@")]
+            [string]$teamUpn
+        ,[parameter(Mandatory = $false,ParameterSetName = "fromUrl")]
+            [parameter(Mandatory = $false,ParameterSetName = "fromId")]
+            [parameter(Mandatory = $false,ParameterSetName = "fromUpn")]
+            [switch]$returnOnlyDefaultDocumentsLibrary
+        )
+    
+    switch ($PsCmdlet.ParameterSetName){ #We need $siteGraphId, so get it from any other parameter supplied
+        "fromUpn" {
+            Write-Verbose "get-graphDrives | Getting from Team UPN"
+            $groupId = (get-graphGroupFromUpn -tokenResponse $tokenResponse -groupUpn $teamUpn).id
+            $drives = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$groupId/drives"
+            }
+        {@("fromUrl","fromId") -contains $_} {
+            Write-Verbose "get-graphDrives | Getting from $_"
+            if([string]::IsNullOrWhiteSpace($siteGraphId)){
+                if($siteUrl -match "anthesisllc.sharepoint.com"){$siteUrl = ($siteUrl -Split "anthesisllc.sharepoint.com")[1].Trim("/")} #Get the serverRelativeUrl
+                $siteGraphId = (invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/anthesisllc.sharepoint.com:/$siteUrl").id
+                if([string]::IsNullOrWhiteSpace($siteGraphId)){ #Weirdly this doesn't seem to work, despite the same query being submitted to graph.
+                    Write-Verbose "Weird, that should have worked. trying again"
+                    $siteGraphId = (Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0//sites/anthesisllc.sharepoint.com:/$siteUrl" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET).id
+                    }
+                }
+            $drives = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$($siteGraphId)/drives"
+            }
+        }
+
+    if($returnOnlyDefaultDocumentsLibrary){
+        $drives | Sort-Object -Property createdDateTime | Select-Object -First 1 #Select the oldest DocLib, regardless of Name
+        }
+    else{$drives}
+
+    }
+function get-graphGroupFromUpn(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "GraphOnly")]
+            [parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "GraphOnly")]
+            [parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
+            [ValidatePattern("@")]
+            [string]$groupUpn
+        ,[parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
+            [switch]$returnCustomAttributes
+        ,[parameter(Mandatory = $false,ParameterSetName = "Graph&Exchange")]
+            [pscredential]$exoCreds
+        )
+
+    try{
+        $graphGroup = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/?`$filter=mail+eq+'$groupUpn'"
+        }
+    catch{
+        Write-Error "Error retrieving Graph Group by UPN in get-graphUsersFromGroup()"
+        Throw $_ #Terminate on this error
+        }
+    if(!$graphGroup){
+        Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
+        break
+        }
+    if($returnCustomAttributes){ #The CustomAttribute properties aren't exposed by the Graph API, so we need to revert to the EXO Cmdlets if they are required
+        if($graphGroup.groupTypes -contains "Unified"){ #This will only work for a UnifiedGroup, so there's no point in trying with AAD/Exchange groups
+            connect-ToExo -credential $exoCreds
+            $ug = Get-UnifiedGroup -Identity $groupUpn
+            $ug.psobject.Properties | ? {$_.Name -match "CustomAttribute"} | % {
+                $graphGroup | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Value
+                }
+            }
+        else{Write-Warning "[$groupUpn] is not a Unified Group - cannot return CustomAttributes for it."}
+        }
+
+    $graphGroup
+    }
+function get-graphOwnersFromGroup(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "groupId")]
+            [parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupId")]
+            [string]$groupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [ValidatePattern("@")]
+            [string]$groupUpn
+        )
+    switch ($PsCmdlet.ParameterSetName){
+        “groupUpn”  {
+            Write-Verbose "We've been given a GroupUPN, so we need the GroupId"
+            $graphGroup = get-graphGroupFromUpn -tokenResponse $tokenResponse -groupUpn $groupUpn -Verbose:$VerbosePreference
+            if(!$graphGroup){
+                Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
+                break
+                }
+            $groupId = $graphGroup.id
+            Write-Verbose "[$groupUpn] Id is [$groupId]"
+            }
+        }
+    
     }
 function get-graphteamsitedetails(){
     [cmdletbinding()]
@@ -265,46 +426,6 @@ function get-graphTokenResponse{
     $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
     $tokenResponse
     }
-function get-graphGroupFromUpn(){
-    [cmdletbinding()]
-    param(
-        [parameter(Mandatory = $true,ParameterSetName = "GraphOnly")]
-            [parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
-            [psobject]$tokenResponse        
-        ,[parameter(Mandatory = $true,ParameterSetName = "GraphOnly")]
-            [parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
-            [ValidatePattern("@")]
-            [string]$groupUpn
-        ,[parameter(Mandatory = $true,ParameterSetName = "Graph&Exchange")]
-            [switch]$returnCustomAttributes
-        ,[parameter(Mandatory = $false,ParameterSetName = "Graph&Exchange")]
-            [pscredential]$exoCreds
-        )
-
-    try{
-        $graphGroup = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/?`$filter=mail+eq+'$groupUpn'"
-        }
-    catch{
-        Write-Error "Error retrieving Graph Group by UPN in get-graphUsersFromGroup()"
-        Throw $_ #Terminate on this error
-        }
-    if(!$graphGroup){
-        Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
-        break
-        }
-    if($returnCustomAttributes){ #The CustomAttribute properties aren't exposed by the Graph API, so we need to revert to the EXO Cmdlets if they are required
-        if($graphGroup.groupTypes -contains "Unified"){ #This will only work for a UnifiedGroup, so there's no point in trying with AAD/Exchange groups
-            connect-ToExo -credential $exoCreds
-            $ug = Get-UnifiedGroup -Identity $groupUpn
-            $ug.psobject.Properties | ? {$_.Name -match "CustomAttribute"} | % {
-                $graphGroup | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Value
-                }
-            }
-        else{Write-Warning "[$groupUpn] is not a Unified Group - cannot return CustomAttributes for it."}
-        }
-
-    $graphGroup
-    }
 function get-graphUsers(){
     [cmdletbinding()]
     param(
@@ -383,9 +504,10 @@ function get-graphUsersFromGroup(){
         ,[parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
             [ValidatePattern("@")]
             [string]$groupUpn
-        ,[parameter(Mandatory = $false,ParameterSetName = "groupId")]
-            [parameter(Mandatory = $false,ParameterSetName = "groupUpn")]
-            [switch]$includeTransitiveMembers = $false
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupId")]
+            [parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [ValidateSet("Members","TransitiveMembers","Owners")]
+            [string]$memberType 
         ,[parameter(Mandatory = $false,ParameterSetName = "groupId")]
             [parameter(Mandatory = $false,ParameterSetName = "groupUpn")]
             [switch]$returnOnlyUsers = $false
@@ -407,8 +529,6 @@ function get-graphUsersFromGroup(){
             Write-Verbose "[$groupUpn] Id is [$groupId]"
             }
         }
-    if($includeTransitiveMembers){$memberType = "transitiveMembers"}
-    else{$memberType = "members"}
     if($returnOnlyLicensedUsers){
         $refiner = "?`$select=id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses"
         $returnOnlyUsers = $true #Licensed Users are a subset of Users, so $returnOnlyUsers = $true is implied if $returnOnlyLicensedUsers = $true
@@ -439,6 +559,78 @@ function get-graphUsersFromGroup(){
         $allMembers
         }
     }
+function grant-graphSharing(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $true,ParameterSetName = "withoutInvitation")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $true,ParameterSetName = "withoutInvitation")]
+            [string]$driveId
+        ,[parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $true,ParameterSetName = "withoutInvitation")]
+            [string]$itemId
+        ,[parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $true,ParameterSetName = "withoutInvitation")]
+            [array]$sharingRecipientsUpns
+        ,[parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $true,ParameterSetName = "withoutInvitation")]
+            [bool]$requireSignIn = $true
+        ,[parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $true,ParameterSetName = "withoutInvitation")]
+            [bool]$sendInvitation
+        ,[parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $false,ParameterSetName = "withoutInvitation")]
+            [string]$sharingMessage = $false
+        ,[parameter(Mandatory = $true,ParameterSetName = "withInvitation")]
+            [parameter(Mandatory = $true,ParameterSetName = "withoutInvitation")]
+            [ValidateSet("Read","Write")]
+            [string]$role
+        )
+    <#--$formattedRecipients = @{}
+    $sharingRecipientsUpns | % {
+        $formattedRecipients.Add("email",$_)
+        }--#>
+    $formattedRecipients = @()
+    $sharingRecipientsUpns | % {
+        $formattedRecipients += @{"email"=$_}
+        }
+
+    $graphParams =@{
+        "requireSignIn"=$requireSignIn
+        "sendInvitation"=$sendInvitation
+        "roles"=@($role)
+        "recipients"=$formattedRecipients
+        "message"=$sharingMessage
+        }
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/drives/$driveId/items/$itemId/invite" -graphBodyHashtable $graphParams
+    }
+function invoke-graphDelete(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$graphQuery
+        ,[parameter(Mandatory = $false)]
+            [string]$graphBodyHashtable
+        )
+    $sanitisedGraphQuery = $graphQuery.Trim("/")
+    Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+
+    if($graphBodyHashtable){
+        $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable
+        Write-Verbose $graphBodyJson
+        $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method DELETE -Body $graphBodyJsonEncoded
+        }
+    else{
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method DELETE
+        }
+    if($response.value){$response.value}
+    else{$response}
+    }
 function invoke-graphGet(){
     [cmdletbinding()]
     param(
@@ -448,19 +640,32 @@ function invoke-graphGet(){
             [string]$graphQuery
         ,[parameter(Mandatory = $false)]
             [switch]$firstPageOnly
+        ,[parameter(Mandatory = $false)]
+            [switch]$returnEntireResponse
         )
     $sanitisedGraphQuery = $graphQuery.Trim("/")
     do{
         Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
         $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
-        Write-Verbose "[$($response.value.count)] results returned on this cycle, [$($results.count)] in total"
-        $results += $response.value
+        if($response.value){
+            $results += $response.value
+            Write-Verbose "[$([int]$response.value.count)] results returned on this cycle, [$([int]$results.count)] in total"
+            }
+        elseif([string]::IsNullOrWhiteSpace($response)){
+            Write-Verbose "[0] results returned on this cycle, [$([int]$results.count)] in total"
+            }
+        else{
+            $results += $response
+            Write-Verbose "[1] results returned on this cycle, [$([int]$results.count)] in total"
+            }
+        
         if($firstPageOnly){break}
         if(![string]::IsNullOrWhiteSpace($response.'@odata.nextLink')){$sanitisedGraphQuery = $response.'@odata.nextLink'.Replace("https://graph.microsoft.com/v1.0/","")}
         }
     #while($response.value.count -gt 0)
     while($response.'@odata.nextLink')
-    $results
+    if($returnEntireResponse){$response}
+    else{$results}
     }
 function invoke-graphPatch(){
     [cmdletbinding()]
@@ -502,11 +707,127 @@ function invoke-graphPost(){
     
     Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
     }
+function invoke-graphPut(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "BinaryFileStream")]
+            [parameter(Mandatory = $true,ParameterSetName = "NormalRequest")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "BinaryFileStream")]
+            [parameter(Mandatory = $true,ParameterSetName = "NormalRequest")]
+            [string]$graphQuery
+        ,[parameter(Mandatory = $true,ParameterSetName = "BinaryFileStream")]
+            $binaryFileStream
+        ,[parameter(Mandatory = $true,ParameterSetName = "NormalRequest")]
+            [Hashtable]$graphBodyHashtable
+        )
+
+    $sanitisedGraphQuery = $graphQuery.Trim("/")
+    Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+        
+    if($binaryFileStream){
+        $contentType = "text/plain"
+        $bodyData = $binaryFileStream
+        }
+    elseif($graphBodyHashtable){
+        $contentType = "application/json; charset=utf-8"
+        $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable
+        Write-Verbose $graphBodyJson
+        $bodyData = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
+        }
+
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $bodyData -ContentType $contentType -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put
+    }
+function new-graphTeam(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$groupId
+        ,[parameter(Mandatory = $true)]
+            [bool]$allowMemberCreateUpdateChannels
+        ,[parameter(Mandatory = $true)]
+            [bool]$allowMemberDeleteChannels
+        ,[parameter(Mandatory = $false)]
+            [bool]$allowGuestCreateUpdateChannels = $false
+        ,[parameter(Mandatory = $false)]
+            [bool]$allowGuestDeleteChannels = $false
+        )
+    try{$prexistingTeam = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$groupId"}
+    catch{<#--Meh.--#>}
+    if($prexistingTeam){
+        $prexistingTeam
+        return #If the Team already exists, just return it
+        }
+
+    $memberSettings = @{
+        "allowCreateUpdateChannels"=$allowMemberCreateUpdateChannels
+        "allowDeleteChannels"=$allowMemberDeleteChannels
+        }
+    $guestSettings = @{
+        "allowCreateUpdateChannels"=$allowGuestCreateUpdateChannels
+        "allowDeleteChannels"=$allowGuestDeleteChannels
+        }
+    $newTeamBody = @{
+        "memberSettings"=$memberSettings
+        "guestSettings"=$guestSettings
+        }
+    try{$attempt = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "groups/$groupId/team" -graphBodyHashtable $newTeamBody}
+    catch{
+        #https://docs.microsoft.com/en-us/graph/api/team-put-teams?view=graph-rest-1.0&tabs=http
+        #If the group was created less than 15 minutes ago, it's possible for the Create team call to fail with a 404 error code due to replication delays. The recommended pattern is to retry the Create team call three times, with a 10 second delay between calls.
+        Start-Sleep -Seconds 10
+        try{$attempt = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "groups/$groupId/team" -graphBodyHashtable $newTeamBody}
+        catch{
+            Start-Sleep -Seconds 10
+            try{$attempt = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "groups/$groupId/team" -graphBodyHashtable $newTeamBody}
+            catch{
+                Write-error "Failed to add Team component to Group [$groupId] after 3 attempts"
+                break
+                }
+            }
+        }
+    $attempt
+    }
+function remove-graphUsersFromGroup(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="UserIds")]
+            [parameter(Mandatory = $true,ParameterSetName="UserUpns")]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserIds")]
+            [parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
+            [string]$graphGroupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserIds")]
+            [parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
+            [ValidateSet("Members","Owners")]
+            [string]$memberType 
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
+            [string[]]$graphUserUpns
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserIds")]
+            [string[]]$graphUserIds
+        )
+    
+    switch ($PsCmdlet.ParameterSetName){
+        "UserUpns" {
+            $graphUserUpns | % {
+                [array]$graphUserIds += $(get-graphUsers -tokenResponse $tokenResponse -filterUpn $_).id
+                }
+            
+            } 
+        }
+
+    $graphUserIds | % {
+        #$bodyHash = @{"@odata.id"="https://graph.microsoft.com/v1.0/users/$_"}
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/$_/`$ref" -Verbose:$VerbosePreference
+        }
+    }
 function set-graphGroupSharedMailboxAccess(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true,ParameterSetName = "groupObject")]
-            [parameter(Mandatory = $true,ParameterSetName = "")]
+            [parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "groupObject")]
             [psobject]$graphGroup
@@ -567,7 +888,7 @@ function set-graphGroupSharedMailboxAccess(){
         }
 
     #Get the list of users who *should* have access, and get it via the associated Members Subgroup so that we can get the transitive members
-    $usersToSet = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphGroup.CustomAttribute3 -includeTransitiveMembers -returnOnlyLicensedUsers -Verbose:$VerbosePreference
+    $usersToSet = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphGroup.CustomAttribute3 -memberType TransitiveMembers -returnOnlyLicensedUsers -Verbose:$VerbosePreference
     
     if($reconcileFullAccessPermissions){
         Write-Verbose "Reconciling FullAccess permissions on Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
@@ -615,5 +936,24 @@ function set-graphGroupSharedMailboxAccess(){
             Write-Verbose "Showing Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] in the Global Address List"
             Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled:$false
             }
+        }
+    }
+function test-graphBearerAccessTokenStillValid(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "TestAndRenew")]
+            [parameter(Mandatory = $true,ParameterSetName = "JustTest")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $false,ParameterSetName = "TestAndRenew")]
+            [int]$renewTokenExpiringInSeconds
+        ,[parameter(Mandatory = $true,ParameterSetName = "TestAndRenew")]
+            [PSCustomObject]$aadAppCreds
+        )
+    if($tokenResponse.OriginalExpiryTime -ge $(Get-Date).AddSeconds($renewTokenExpiringInSeconds)){$tokenResponse} #If the token  is still valid, just return it
+    else{
+        if($renewTokenExpiringInSeconds){
+            get-graphTokenResponse -aadAppCreds $aadAppCreds -grant_type client_credentials #If it's expired (or will expire within the supplied limit), renew it
+            }
+        else{$false}#Otherwise return False
         }
     }

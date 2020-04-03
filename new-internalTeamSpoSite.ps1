@@ -1,9 +1,11 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-$displayName = "Waste Team (ESP)"
+foreach($team in @("Wellbeing Working Group")){
+
+$displayName = $team
 $areDataManagersLineManagers = $false
-$managedBy = "365"
+$managedBy = "AAD"
 #$memberOf = ??
 $hideFromGal = $false
 $blockExternalMail = $true
@@ -182,3 +184,5 @@ $originalManagers | % {
         }
     catch{$_}
     }
+
+}
