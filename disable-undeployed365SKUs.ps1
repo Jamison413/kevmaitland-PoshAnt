@@ -23,7 +23,7 @@ Write-host -fore Yellow "[$($teamsPilotUPNs.Count)] Audio Conferencing licenses 
 
 $teamsPilotUsersDesiredState = [ordered]@{"TEAMS1"="Success";"YAMMER_ENTERPRISE"="Disabled";"AnthesisLLC:MCOMEETADV"="Add"} 
 $teamsUsersDesiredState = [ordered]@{"TEAMS1"="Success";"YAMMER_ENTERPRISE"="Disabled"}
-$mostUsersDesiredState = [ordered]@{"TEAMS1"="Disabled";"YAMMER_ENTERPRISE"="Disabled"}
+$mostUsersDesiredState = [ordered]@{"TEAMS1"="Success";"YAMMER_ENTERPRISE"="Disabled"}
 
 
 #Get All Licensed Users

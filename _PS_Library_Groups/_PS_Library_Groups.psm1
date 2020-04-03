@@ -828,13 +828,15 @@ function set-guestAccessForUnifiedGroup(){
 function set-unifiedGroupCustomAttributes(){
     param(
         [Parameter(Mandatory=$true)]
-        [PSObject]$unifiedGroup
+            [PSObject]$unifiedGroup
         ,[Parameter(Mandatory=$true)]
-        [ValidateSet ("Internal","Confidential","External","Sym")]
-        [string]$groupType
+            [ValidateSet ("Internal","Confidential","External","Sym")]
+            [string]$groupType
         ,[Parameter(Mandatory=$true)]
-        [ValidateSet ("AAD","365")]
-        [string]$masterMembership
+            [ValidateSet ("AAD","365")]
+            [string]$masterMembership
+        ,[Parameter(Mandatory=$false)]
+            [switch]$createGroupsIfMissing
         )
 
     $sgs = Get-AzureADGroup -SearchString $unifiedGroup.DisplayName
@@ -868,7 +870,7 @@ function set-unifiedGroupCustomAttributes(){
             }
         }
 
-    if(!$ug){
+    if(!$unifiedGroup){
         Write-Warning "Unified Group not found - cannot continue"
         break
         }
@@ -889,8 +891,39 @@ function set-unifiedGroupCustomAttributes(){
         }
 
     if($bigProblem){
-        Write-Error "Couldn't automatically identify the required groups to fix this. Cannot continue"
-        break
+        if($createGroupsIfMissing){
+            Write-Warning "Couldn't automatically identify the required groups to fix this. Will attempt to create missing groups"
+            if(!$combinedSG){
+                Write-Verbose "`tCreating Combined Security Group [$($unifiedGroup.DisplayName)]"
+                try{
+                    $combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $unifiedGroup.DisplayName -membersUpns $null -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $($unifiedGroup.DisplayName)" -WhatIf:$WhatIfPreference
+                    }
+                catch{Write-Error $_}
+                }
+            if($combinedSG){#Dont try creating the subgroups if the Combined Group isn't available
+                Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId
+                if(!$dataManagerSG){ #Create a Managers SG if required
+                    Write-Verbose "Creating Data Managers Security Group [$($unifiedGroup.DisplayName) - Data Managers Subgroup]"
+                    try{$dataManagerSG = new-mailEnabledSecurityGroup -dgDisplayName "$($unifiedGroup.DisplayName) - Data Managers Subgroup" -fixedSuffix " - Data Managers Subgroup" -membersUpns $null -memberOf @($combinedSg.ExternalDirectoryObjectId,$combinedSG[0].ObjectId)-hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $($unifiedGroup.DisplayName) Data Managers" -WhatIf:$WhatIfPreference -Verbose}
+                    catch{Write-Error $_}
+                    }
+                if($dataManagerSG){Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute2 $dataManagerSG.ExternalDirectoryObjectId}
+
+                if(!$membersSg){ #And create a Members SG if required
+                    Write-Verbose "Creating Members Security Group [$($unifiedGroup.DisplayName) - Members Subgroup]"
+                    try{$membersSg = new-mailEnabledSecurityGroup -dgDisplayName "$($unifiedGroup.DisplayName) - Members Subgroup" -fixedSuffix " - Members Subgroup" -membersUpns $null -memberOf @($combinedSg.ExternalDirectoryObjectId,$combinedSG[0].ObjectId) -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $($unifiedGroup.DisplayName) Unified Group" -WhatIf:$WhatIfPreference -Verbose}
+                    catch{Write-Error $_}
+                    }
+                if($membersSG){Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId}
+                
+                }
+            break
+            }
+        else{
+            Write-Warning "Couldn't automatically identify the required groups to fix this. Will attempt to set remaining CustomAttributes then exit"
+            Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
+            break
+            }
         }
 
     if($smb.Count -eq 1){
@@ -1032,12 +1065,15 @@ function sync-groupMemberships(){
         switch ($syncWhat){
             "Members" {
                 Get-AzureADGroupMember -All:$true -ObjectId $UnifiedGroup.ExternalDirectoryObjectId | %{[array]$ugUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
+                if($sourceGroup -eq "AAD"){Get-AzureADGroupMember -All:$true -ObjectId $UnifiedGroup.CustomAttribute2 | %{[array]$aadgUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}} #Add DataManagers too (to fix issue with Communities)
                 }
             "Owners" {
                 Get-AzureADGroupOwner -All:$true -ObjectId $UnifiedGroup.ExternalDirectoryObjectId | %{[array]$ugUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
                 }
             }
-
+        #We didn't used to need this -unique step, but smoehow duplicates were appearing:
+        $ugUsersBeforeChanges = $ugUsersBeforeChanges | Sort-Object  -Property objectId -Unique
+        $aadgUsersBeforeChanges = $aadgUsersBeforeChanges | Sort-Object  -Property objectId -Unique
         $usersDelta = Compare-Object -ReferenceObject $ugUsersBeforeChanges -DifferenceObject $aadgUsersBeforeChanges -Property userPrincipalName -PassThru -IncludeEqual
          $($usersDelta | % {Write-Verbose "$_"})
 

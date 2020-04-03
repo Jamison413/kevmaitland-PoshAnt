@@ -26,14 +26,14 @@ connect-toAAD -credential $adminCreds
 connect-ToExo -credential $adminCreds
 
 $all365Groups = Get-UnifiedGroup
-$toExclude = @("Sym - Supply Chain","Apparel Team (All)","All North America","Business Development Team (GBR)","Pre Sales Team (All)","Teams Testing Team", "Finance Team (North America)","Finance Team (North America)")
-$365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential"}
+$toExclude = @("Sym - Supply Chain","Apparel Team (All)","All North America","Business Development Team (GBR)","Pre Sales Team (All)","Teams Testing Team", "Finance Team (North America)","Finance Team (North America)", "All London (GBR)")
+$365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential" -and $_.DisplayName -notmatch "All "}
 
 $adminEmailAddresses = get-groupAdminRoleEmailAddresses
 
 $365GroupsToProcess | % {
     $365Group = $_
-    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true } #-Verbose }
+    try{sync-groupMemberships -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true}# -Verbose }
     catch{
         $_
         Send-MailMessage -To $adminEmailAddresses  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnfiedGroupMembership [$($365Group.DisplayName)]" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members" -From "$env:COMPUTERNAME@anthesisgroup.com"

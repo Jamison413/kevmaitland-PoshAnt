@@ -110,13 +110,37 @@ function cache-spoKimbleAccountsList($pnpList, $kimbleListCachePathAndFileName, 
     $listCache = Import-Csv $kimbleListCachePathAndFileName
     $listCache
     }
-function copy-spoFile($fromList,$from,$to,$spoCredentials){
-    if($verboseLogging){Write-Host -ForegroundColor Magenta "copy-spoFile($fromList,$from,$to"}
-    if($fromList.Substring(0,1) -ne "/"){$fromList = "/"+$fromList}
-    if($(Split-Path $from -Leaf) -eq $(Split-Path $to -Leaf)){$to = $to.SubString(0,$($to.Length - $(split-path $to -leaf).Length) -1)} #Specififying a file name is broken for (presumably) Sites with large numbers of Libraries/Files
-    if($verboseLogging){Write-Host -ForegroundColor DarkMagenta "Copy-PnPFile -SourceUrl $from -TargetUrl $to -Force (but not -OverwriteIfAlreadyExists)"}
-    Copy-PnPFile -SourceUrl $from -TargetUrl $to -Force
-    Get-PnPFile -Url "$to$(Split-Path $from -Leaf)"
+function copy-spoFile(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [System.Uri]$sourceUrl
+        ,[parameter(Mandatory = $true)]
+            [System.Uri]$destinationSite
+        ,[parameter(Mandatory = $false)]
+            [System.Uri]$destinationFolder
+        ,[parameter(Mandatory = $true)]
+            [pscredential]$pnpCreds
+        ,[parameter(Mandatory = $false)]
+            [switch]$overwriteDestinationFile
+        ,[parameter(Mandatory = $false)]
+            [string]$renameFileAs
+        )
+    
+    Write-Verbose "Downloading source file [$($sourceUrl.LocalPath)]"
+    try{Get-PnPFile -Url $sourceUrl.LocalPath -Path "$env:TEMP" -Filename $([uri]::UnescapeDataString($(Split-Path $sourceUrl.AbsoluteUri -Leaf))) -AsFile -Force}
+    catch{Write-Error "Error retrieving file [$($sourceUrl.LocalPath)] using Get-PnpFile in copy-spoFile";break}
+    try{Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Credentials $pnpCreds}
+    catch{Write-Error "Error connecting to Site [$($destinationSite.AbsoluteUri)] using Connect-PnPOnline in copy-spoFile";break}
+    if(test-pnpConnectionMatchesResource -resourceUrl $destinationSite.AbsoluteUri){
+        try{
+            if([string]::IsNullOrWhiteSpace($renameFileAs)){
+                $file = Add-PnPFile -Path "$env:TEMP\$([uri]::UnescapeDataString($(Split-Path $sourceUrl.AbsoluteUri -Leaf)))" -Folder $destinationFolder -ErrorAction Stop #Added '$file = ' to avoid https://github.com/SharePoint/PnP-PowerShell/issues/722
+                }
+            else{$file = Add-PnPFile -Path "$env:TEMP\$([uri]::UnescapeDataString($(Split-Path $sourceUrl.AbsoluteUri -Leaf)))" -Folder $destinationFolder -ErrorAction Stop -NewFileName $renameFileAs} #Added '$file = ' to avoid https://github.com/SharePoint/PnP-PowerShell/issues/722
+            }
+        catch{Write-Error "Error uploading file [$([uri]::UnescapeDataString($(Split-Path $sourceUrl.AbsoluteUri -Leaf)))] to Site [$($destinationSite.AbsoluteUri)] using Add-PnPFile in copy-spoFile";break}
+        }
     }
 function copy-spoPage(){
     [cmdletbinding()]
@@ -157,7 +181,7 @@ function copy-spoPage(){
         if (test-pnpConnectionMatchesResource -resourceUrl $dirtyBodgeToGetSourceSite -connectIfDifferent $true -pnpCreds $pnpCreds){Write-Verbose "Already connected to source Site [$($dirtyBodgeToGetSourceSite)]"}
         try{
             Write-Verbose "Downloading source Page file [$($sourceUrl.LocalPath)]"
-            Get-PnPFile -Url $sourceUrl.LocalPath -Path "$env:TEMP" -Filename $(Split-Path $sourceUrl.AbsoluteUri -Leaf) -AsFile -Force
+            Get-PnPFile -Url $sourceUrl.LocalPath -Path "$env:TEMP" -Filename $([uri]::UnescapeDataString($(Split-Path $sourceUrl.AbsoluteUri -Leaf))) -AsFile -Force
             try{
                 Write-Verbose "Connecting to SPO Admin [https://anthesisllc-admin.sharepoint.com/] (same creds [$($pnpCreds.UserName)], but different permissions required)"
                 Connect-SPOService -Url https://anthesisllc-admin.sharepoint.com/ -Credential $pnpCreds
@@ -853,20 +877,30 @@ function test-isUserSiteCollectionAdmin(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
-        [OfficeDevPnP.Core.Entities.UnifiedGroupEntity]$pnpUnifiedGroupObject
+            [OfficeDevPnP.Core.Entities.UnifiedGroupEntity]$pnpUnifiedGroupObject
         ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [string]$unifiedGroupId
+            [string]$unifiedGroupId
+        ,[parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+            [Microsoft.SharePoint.Client.ClientObject]$pnpSiteObject
+        ,[parameter(Mandatory = $true,ParameterSetName="SiteId")]
+            [string]$pnpSiteId
 
         ,[parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
         [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
         [string]$accessToken = $true
 
         ,[parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
         [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
         [pscredential]$pnpCreds
 
         ,[parameter(Mandatory = $false,ParameterSetName="pnpGroupObject")]
         [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
         [bool]$addPermissionsIfMissing = $false
         )
 
@@ -885,28 +919,34 @@ function test-isUserSiteCollectionAdmin(){
                 return
                 }
             }
+        {$_ -match "Group"} { #Catches both pnpGroupObject & UnifiedGroupId
+             try{
+                Write-Verbose "Checking to see if the executing user already has admin permissions for the Site"
+                $pnpGroupAdmins = Get-PnPUnifiedGroupOwners -Identity $pnpUnifiedGroupObject.GroupId
+                if($pnpGroupAdmins.UserPrincipalName -contains $pnpCreds.UserName){
+                    $isAlreadyAnAdmin = $true
+                    Write-Verbose "`tYes - user already is a Site Collection Admin"
+                    return
+                    }
+                else{
+                    Write-Verbose "`tNo - user is not a Site Collection Admin"
+                    $isAlreadyAnAdmin = $false
+                    if($addPermissionsIfMissing){
+                        Write-Verbose "`t`tTemporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
+                        Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $pnpCreds
+                        Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
+                        }
+                    }
+                }
+            catch{
+                Write-Error "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
+                return
+                }            
+            }
         }
 
-     try{
-        Write-Verbose "Checking to see if the executing user already has admin permissions for the Site"
-        $pnpGroupAdmins = Get-PnPUnifiedGroupOwners -Identity $pnpUnifiedGroupObject.GroupId
-        if($pnpGroupAdmins.UserPrincipalName -contains $pnpCreds.UserName){
-            $true
-            Write-Verbose "`tYes - user already is a Site Collection Admin"
-            return
-            }
-        else{
-            Write-Verbose "`tNo - user is not a Site Collection Admin"
-            if($addPermissionsIfMissing){
-                Write-Verbose "`t`tTemporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
-                Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
-                }
-            }
-        }
-    catch{
-        Write-Verbose "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
-        return
-        }
+
+
     }
 function test-pnpConnectionMatchesResource(){
     [cmdletbinding()]

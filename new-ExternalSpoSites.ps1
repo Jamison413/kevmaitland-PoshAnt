@@ -68,6 +68,32 @@ foreach ($currentRequest in $selectedRequests){
         if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
             Write-Verbose "Setting Homepage"
             Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
+
+            Write-Verbose "Create, Share and Delete a folder in the Documents Library to enable the SharedWithUsers metadata"
+            $docLibName = "Shared Documents"
+            $dummyFolderName = "DummyShareToDelete"
+            Write-Verbose "`tAdding Folder [$dummyFolderName] to [$docLibName]"
+            Add-PnPFolder -Name $dummyFolderName -Folder $docLibName
+            $dummyPnpFolderItem = Get-PnPFolderItem -FolderSiteRelativeUrl $docLibName -ItemType Folder -ItemName $dummyFolderName
+            [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing")  | Out-Null
+            [System.Reflection.Assembly]::LoadWithPartialName("System.Collections") | Out-Null
+            $roleAssignments = New-Object "System.Collections.Generic.List[Microsoft.SharePoint.Client.Sharing.UserRoleAssignment]"
+            $roleAssignment = New-Object Microsoft.SharePoint.Client.Sharing.UserRoleAssignment
+            $roleAssignment.UserId = $365creds.UserName
+            $roleAssignment.Role = [Microsoft.SharePoint.Client.Sharing.Role]::Edit
+            $roleAssignments.Add($roleAssignment)
+            [Microsoft.SharePoint.Client.Sharing.DocumentSharingManager]::UpdateDocumentSharingInfo($dummyPnpFolderItem.Context,"https://anthesisllc.sharepoint.com"+$dummyPnpFolderItem.ServerRelativeUrl,$roleAssignments,$false,$true,$false,"",$false,$false)
+            Write-Verbose "`tSharing Folder [$dummyFolderName] with [$($365creds.UserName)] via CSOM"
+            $dummyPnpFolderItem.Context.ExecuteQuery() 
+            Write-Verbose "`tRemoving Folder [$dummyFolderName]"
+            Remove-PnPFolder -Name $dummyFolderName -Folder $docLibName -Force
+
+
+            Write-Verbose "Setting default View in Documents Library"
+            $thisDocLib = Get-PnPList -Identity $docLibName -Includes Fields
+            $defaulDocLibPnpView = $thisDocLib | Get-PnPView | ? {$_.DefaultView -eq $true}
+            $defaulDocLibPnpView | Set-PnPView -Fields "DocIcon","LinkFilename","Modified","Editor","Created","Author","FileSizeDisplay","SharedWithUsers"
+
             }
 
         Write-Verbose "Setting Hub Site association"
