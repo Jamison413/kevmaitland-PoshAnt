@@ -8,7 +8,9 @@ $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 30 -aadAppCreds $teamBotDetails
 
 
-foreach($team in @("All London (GBR)")){
+foreach($team in @("All Homeworkers (North America)","All Homeworkers (PHL)","All Madrid (ESP)","All Manchester (GBR)","All Manlleu (ESP)")){
+    $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails
+
     $displayName = $team
     $areDataManagersLineManagers = $false
     $managedBy = "AAD"
@@ -44,13 +46,13 @@ foreach($team in @("All London (GBR)")){
     $members = $members | Sort-Object | select -Unique
 
     #See if we need to temporarily add the executing user as 
-    if($managers -notcontains ((Get-PnPConnection).PSCredential.UserName)){
+    if($managers -notcontains ($365creds.UserName)){
         $addExecutingUserAsTemporaryOwner = $true
-        [array]$managers += ((Get-PnPConnection).PSCredential.UserName)
+        [array]$managers += ($365creds.UserName)
         }
-    if($members -notcontains ((Get-PnPConnection).PSCredential.UserName)){
+    if($members -notcontains ($365creds.UserName)){
         $addExecutingUserAsTemporaryMember = $true
-        [array]$members += ((Get-PnPConnection).PSCredential.UserName)
+        [array]$members += ($365creds.UserName)
         }
 
     if($managedBy -eq "AAD"){$managers = "groupbot@anthesisgroup.com"} #Override the ownership of any aggregated / Parent Functional Teams as these are automated separately
@@ -85,18 +87,26 @@ foreach($team in @("All London (GBR)")){
 
     #Create corresponding Regional Folder in associated regional Administration Team site
     $currentRegion = get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $newGroup.DisplayName
-    if([string]::IsNullOrWhiteSpace($currentRegion) -and $newGroup.DisplayName -match "(North America)"){
-        $currentRegion = "North America"
+    $associatedRegionalAdminTeam = $allAdminUGs | ? {$_.DisplayName -match $currentRegion}
+    if([string]::IsNullOrWhiteSpace($associatedRegionalAdminTeam)){
+        switch($newGroup.DisplayName){
+            {$_ -match "(North America)" -or $_ -match "(CAN)" -or $_ -match "(USA)"}{
+                $associatedRegionalAdminTeam = $allAdminUGs | ? {$_.DisplayName -match "North America"}
+                }
+            {$_ -match "(COL)" -or $_ -match "(AND)"}{
+                $associatedRegionalAdminTeam = $allAdminUGs | ? {$_.DisplayName -match "ESP"}
+                }
+            }
         }
     if([string]::IsNullOrWhiteSpace($currentRegion)){
         Write-Error "Could not identify regional Administration Team. Cannot proceed with configuring the rest of the Site & Team." ;break
         }
-    $associatedRegionalAdminTeam = $allAdminUGs | ? {$_.DisplayName -match $currentRegion}
+
     $associatedRegionalAdminDrive = get-graphDrives -tokenResponse $tokenResponse -teamUpn $associatedRegionalAdminTeam.PrimarySmtpAddress -returnOnlyDefaultDocumentsLibrary
     $newRegionalFolder = add-graphArrayOfFoldersToDrive -graphDriveId $associatedRegionalAdminDrive.id -foldersAndSubfoldersArray @($newGroup.DisplayName) -tokenResponse $tokenResponse -conflictResolution Fail
 
     #Set Edit permissions for this Team on new folder
-    grant-graphSharing -tokenResponse $tokenResponse -driveId $associatedRegionalAdminDrive.id -itemId $newRegionalFolder.id -sharingRecipientsUpns @($newGroup.PrimarySmtpAddress) -requireSignIn $true -sendInvitation $false -role Write -Verbose
+    grant-graphSharing -tokenResponse $tokenResponse -driveId $associatedRegionalAdminDrive.id -itemId $newRegionalFolder.id -sharingRecipientsUpns @($newGroup.PrimarySmtpAddress) -requireSignIn $true -sendInvitation $false -role Write
 
     #Create text file explaining how this works / links to new folder from this Site
     $textFileTemplateContent = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVCXN7JPPNRJXBB3TPRS34DU3FA3/content" #This is the content of https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/Shared%20Documents/File%20storage%20is%20disabled%20for%20this%20geographic%20team.txt
@@ -107,10 +117,14 @@ foreach($team in @("All London (GBR)")){
     URL=$($associatedRegionalAdminDrive.webUrl+"/"+[uri]::EscapeDataString($newGroup.DisplayName))
     "
     $newHyperlink = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/Link to storage manged by $($associatedRegionalAdminTeam.DisplayName).url:/content" -binaryFileStream $newHyperlinkContent
-    $anotherNewHyperlink = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/General/Link to storage manged by $($associatedRegionalAdminTeam.DisplayName).url:/content" -binaryFileStream $newHyperlinkContent
+    #$anotherNewHyperlink = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/General/Link to storage manged by $($associatedRegionalAdminTeam.DisplayName).url:/content" -binaryFileStream $newHyperlinkContent #This doesn;t work so well in Teams, but we'll keep the first link as it's only really visible from SharePoint
 
     #Create new Tab in Teams linking to this location
     $newGraphTeamGeneralChannel = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$($newGraphGroup.id)/channels"
+    $newGraphTeamGeneralChannelTabs = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs"
+    $newGraphTeamGeneralChannelTabs | ? {$_.displayName -eq "Managed Files"} | % {
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs/$($_.id)" 
+        }
     $tabConfiguration = @{
         "entityId"=$null
         "contentUrl"=$newRegionalFolder.webUrl
@@ -162,6 +176,7 @@ foreach($team in @("All London (GBR)")){
     Write-Verbose "Opening in browser - don't forget to edit the page to make the last few changes."
     Write-Host -f Yellow "TeamName:`t$($newGroup.DisplayName)"
     Write-Host -f Yellow "TeamLink:`t$($newGraphTeamGeneralChannel.webUrl)"
+    Set-Clipboard -Value $newGraphTeamGeneralChannel.webUrl
 
     start-Process $newPnpTeam.SiteUrl
 
@@ -171,11 +186,11 @@ foreach($team in @("All London (GBR)")){
 
     if($addExecutingUserAsTemporaryOwner){
         test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $365creds -connectIfDifferent $true | Out-Null
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-DistributionGroupMember -Identity $new365Group.CustomAttribute2 -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
-        Remove-PnPSiteCollectionAdmin -Owners $((Get-PnPConnection).PSCredential.UserName)
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $($365creds.UserName) -Confirm:$false
+        Remove-DistributionGroupMember -Identity $new365Group.CustomAttribute2 -Member $($365creds.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        Remove-PnPSiteCollectionAdmin -Owners $($365creds.UserName)
         }
     if($addExecutingUserAsTemporaryMember){
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $($365creds.UserName) -Confirm:$false
         }
     }
