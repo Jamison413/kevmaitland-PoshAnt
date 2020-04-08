@@ -1,5 +1,5 @@
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
-$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$schemaBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\SchemaBot.txt"
+$tokenResponse = get-graphTokenResponse -grant_type device_code -aadAppCreds $schemaBotDetails
 
 $newSchemaDefinition = @{
     id = "anthesisgroup_employeeInfo"
@@ -28,22 +28,47 @@ $newSchemaDefinition2 = @{
         )
     }
 $newSchemaDefinition3 = @{
-    id = "anthesisgroup_trainingRecord"
-    description = "Employee training record data"
-    targetTypes = @("User")
+    id = "anthesisgroup_UGSync"
+    description = "Properties to manange synchronsiation between Unified Groups"
+    targetTypes = @("Group")
     properties=@(
         @{
-            name = "ITUserTraining"
-            type = "DateTime"
+            name = "extensionType"
+            type = "String"
             },
         @{
-            "name" = "ITDataManagerTraining"
-            "type" = "DateTime"
+            name = "dataManagerGroupId"
+            type = "String"
+            },
+        @{
+            "name" = "memberGroupId"
+            "type" = "String"
+            },
+        @{
+            "name" = "combinedGroupId"
+            "type" = "String"
+            },
+        @{
+            "name" = "sharedMailboxId"
+            "type" = "String"
+            },
+        @{
+            "name" = "masterMembershipList"
+            "type" = "String"
+            },
+        @{
+            "name" = "classification"
+            "type" = "String"
+            },
+        @{
+            "name" = "privacy"
+            "type" = "String"
             }
         )
     }
 invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/schemaExtensions" -graphBodyHashtable $newSchemaDefinition -Verbose
-invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/schemaExtensions" -graphBodyHashtable $newSchemaDefinition2 -Verbose
+invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/schemaExtensions" -graphBodyHashtable $newSchemaDefinition3 -Verbose
+invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/schemaExtensions/anthesisgroup_UGSync" -graphBodyHashtable $newSchemaDefinition3 -Verbose
 invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/schemaExtensions/anthesisgroup_trainingRecord" -graphBodyHashtable $newSchemaDefinition3 -Verbose
 $schemaExtension = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/schemaExtensions?`$filter=id eq 'anthesisgroup_trainingRecord'" -Verbose
 $schemaExtensions = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/schemaExtensions" -Verbose
