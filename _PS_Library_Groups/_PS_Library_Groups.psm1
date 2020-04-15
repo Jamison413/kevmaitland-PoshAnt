@@ -226,13 +226,13 @@ function new-365Group(){
     # [Dummy Team (All)] - Unified Group (DisplayName)
     # [Shared Mailbox - Dummy Team (All)] - Shared Mailbox (for bodging DG membership)
     #$UnifiedGroupObject.CustomAttribute1 = Own ExternalDirectoryObjectId
-    #$UnifiedGroupObject.CustomAttribute2 = Data Managers Subgroup ExternalDirectoryObjectId
-    #$UnifiedGroupObject.CustomAttribute3 = Members Subgroup ExternalDirectoryObjectId
-    #$UnifiedGroupObject.CustomAttribute4 = Combined Mail-Enabled Security Group ExternalDirectoryObjectId
-    #$UnifiedGroupObject.CustomAttribute5 = Shared Mailbox ExternalDirectoryObjectId
-    #$UnifiedGroupObject.CustomAttribute6 = [string] "365"|"AAD" Is membership driven by the 365 Group or the associated AAD group?
-    #$UnifiedGroupObject.CustomAttribute7 = [string] "Internal"|"External"|"Confidential" Intended Site Classification (used to reset in the event of unauthorised change)
-    #$UnifiedGroupObject.CustomAttribute8 = [string] "Public"|"Private" Intended Site Privacy (used to reset in the event of unauthorised change)
+    #$UnifiedGroupObject.anthesisgroup_UGSync.dataManagerGroupId = Data Managers Subgroup ExternalDirectoryObjectId
+    #$UnifiedGroupObject.anthesisgroup_UGSync.memberGroupId = Members Subgroup ExternalDirectoryObjectId
+    #$UnifiedGroupObject.anthesisgroup_UGSync.combinedGroupId = Combined Mail-Enabled Security Group ExternalDirectoryObjectId
+    #$UnifiedGroupObject.anthesisgroup_UGSync.sharedMailboxId = Shared Mailbox ExternalDirectoryObjectId
+    #$UnifiedGroupObject.anthesisgroup_UGSync.masterMembershipList = [string] "365"|"AAD" Is membership driven by the 365 Group or the associated AAD group?
+    #$UnifiedGroupObject.anthesisgroup_UGSync.classification = [string] "Internal"|"External"|"Confidential" Intended Site Classification (used to reset in the event of unauthorised change)
+    #$UnifiedGroupObject.anthesisgroup_UGSync.privacy = [string] "Public"|"Private" Intended Site Privacy (used to reset in the event of unauthorised change)
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
         [Parameter(Mandatory=$true)]
@@ -274,53 +274,60 @@ function new-365Group(){
     Write-Verbose "new-365Group($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $hideFromGal, $blockExternalMail, $isPublic, $autoSubscribe, $additionalEmailAddresses, $groupClassification, $ownersAreRealManagers,$membershipmanagedBy)"
     $shortName = $displayName.Replace(" (All)","")
     $365MailAlias = $(guess-aliasFromDisplayName "$displayName 365")
+    $combinedSgDisplayName = $displayName
+    $managersSgDisplayNameSuffix = " - Data Managers Subgroup"
+    $managersSgDisplayName = "$displayName$managersSgDisplayNameSuffix"
+    $membersSgDisplayNameSuffix = " - Members Subgroup"
+    $membersSgDisplayName = "$displayName$membersSgDisplayNameSuffix"
+    $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
 
     #Firstly, check whether we have already created a Unified Group for this DisplayName
-    $365Group = Get-UnifiedGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
-    if(!$365Group){$365Group = Get-UnifiedGroup -Filter "Alias -eq `'$365MailAlias`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
+    $graphGroupExtended = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName $(sanitise-forSql $displayName)
+    #$365Group = Get-UnifiedGroup -Filter "DisplayName -eq `'$(sanitise-forSql $displayName)`'"
+    if(!$graphGroupExtended){
+        #$365Group = Get-UnifiedGroup -Filter "Alias -eq `'$365MailAlias`'" #If we can't find it by the DisplayName, check the Alias as this is less mutable
+        $graphGroupExtended = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn "$365MailAlias@anthesisgroup.com"
+        } 
 
-    #If we have a UG, check whether we can find the associated groups (we certainly should be able to!)
-    if($365Group){
-        Write-Verbose "Pre-existing 365 Group found [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)], CA6=[$($365Group.CustomAttribute6)]"
-        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute2)){
-            $managersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq `'$($365Group.CustomAttribute2)`'"
-            if(!$managersSg){Write-Warning "Data Managers Group [$($365Group.CustomAttribute2)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+    #If we have a UG, check whether we can find the associated groups 
+    if($graphGroupExtended){
+        Write-Verbose "Pre-existing 365 Group found [$($graphGroupExtended.DisplayName)] with id=[$($graphGroupExtended.id)], dataManagerGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)], memberGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)], combinedGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)], sharedMailboxId=[$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)], masterMembershipList=[$($graphGroupExtended.anthesisgroup_UGSync.masterMembershipList)]"
+        if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)){
+            #$managersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq `'$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)`'"
+            $managersSg = get-graphGroups -tokenResponse $tokenResponse -filterId $graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId 
+            if(!$managersSg){Write-Warning "Data Managers Group [$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
             }
-        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute2 (Data Managers Subgroup) property set!"}
-        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute3)){
-            $membersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($365Group.CustomAttribute3)'"
-            if(!$membersSg){Write-Warning "Members Group [$($365Group.CustomAttribute3)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+        else{Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.dataManagerGroupId (Data Managers Subgroup) property set!"}
+        if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)){
+            #$membersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)'"
+            $membersSg = get-graphGroups -tokenResponse $tokenResponse -filterId $graphGroupExtended.anthesisgroup_UGSync.memberGroupId 
+            if(!$membersSg){Write-Warning "Members Group [$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
             }
-        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute3 (Members Subgroup) property set!"}
-        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute4)){
-            $combinedSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($365Group.CustomAttribute4)'"
-            if(!$combinedSg){Write-Warning "Combined Group [$($365Group.CustomAttribute4)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+        else{Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.memberGroupId (Members Subgroup) property set!"}
+        if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)){
+            #$combinedSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)'"
+            $combinedSg = get-graphGroups -tokenResponse $tokenResponse -filterId $graphGroupExtended.anthesisgroup_UGSync.combinedGroupId 
+            if(!$combinedSg){Write-Warning "Combined Group [$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
             }
-        else{Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute4 (Combined Subgroup) property set!"}
-        if(![string]::IsNullOrWhiteSpace($365Group.CustomAttribute5)){
-            $sharedMailbox = Get-Mailbox -Filter "ExternalDirectoryObjectId -eq '$($365Group.CustomAttribute5)'"
-            if(!$sharedMailbox){Write-Warning "Shared Mailbox [$($365Group.CustomAttribute5)] for UG [$($365Group.DisplayName)] could not be retrieved"}
+        else{Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.combinedGroupId (Combined Subgroup) property set!"}
+        if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)){
+            $sharedMailbox = Get-Mailbox -Filter "ExternalDirectoryObjectId -eq '$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)'"
+            if(!$sharedMailbox){Write-Warning "Shared Mailbox [$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
             }
         else{
-            Write-Warning "365 Group [$($365Group.DisplayName)] found, but no CustomAttribute5 (Shared Mailbox) property set!"
+            Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.sharedMailboxId (Shared Mailbox) property set!"
             $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
             }
         }
     else{
         Write-Verbose "No pre-existing 365 group found - checking for AAD Groups."
-        $combinedSgDisplayName = $displayName
-        $managersSgDisplayNameSuffix = " - Data Managers Subgroup"
-        $managersSgDisplayName = "$displayName$managersSgDisplayNameSuffix"
-        $membersSgDisplayNameSuffix = " - Members Subgroup"
-        $membersSgDisplayName = "$displayName$membersSgDisplayNameSuffix"
-        $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
 
         #Check whether any of these MESG exist based on names (just in case we're re-creating a 365 group and want to retain the AAD Groups)
-        $combinedSg = rummage-forDistributionGroup -displayName $combinedSgDisplayName
+        $combinedSg = get-graphGroups -tokenResponse $tokenResponse -filterDisplayName $combinedSgDisplayName
         if($combinedSg){Write-Verbose "Combined Group [$($combinedSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
-        $managersSg = rummage-forDistributionGroup -displayName $managersSgDisplayName 
+        $managersSg = get-graphGroups -tokenResponse $tokenResponse -filterDisplayName $managersSgDisplayName 
         if($managersSg){Write-Verbose "Managers Group [$($managersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
-        $membersSg  = rummage-forDistributionGroup -displayName $membersSgDisplayName 
+        $membersSg  = get-graphGroups -tokenResponse $tokenResponse -filterDisplayName $membersSgDisplayName 
         if($membersSg){Write-Verbose "Members Group [$($membersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
         $sharedMailbox = Get-Mailbox -Filter "DisplayName -eq `'$(sanitise-forSql $sharedMailboxDisplayName)`'"
         if(!$sharedMailbox){$sharedMailbox = Get-Mailbox -Filter "Alias -eq `'$(guess-aliasFromDisplayName $sharedMailboxDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
@@ -329,7 +336,11 @@ function new-365Group(){
         #Create any groups that don't already exist
         if(!$combinedSg){
             Write-Verbose "Creating Combined Security Group [$combinedSgDisplayName]"
-            try{$combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $combinedSgDisplayName -membersUpns $null -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName" -WhatIf:$WhatIfPreference}
+            try{
+                $combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $combinedSgDisplayName -membersUpns $null -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $displayName" -WhatIf:$WhatIfPreference
+                #Sadly, EXO is just too slow to replicate to Graph
+                #$combinedSg = get-graphGroups -tokenResponse $tokenResponse -filterId $combinedSg.ExternalDirectoryObjectId -retryCount 5 #We can't create MESGs with Graph, but we can switch to Graph objects to simplify things later 
+                }
             catch{Write-Error $_}
             }
 
@@ -338,7 +349,11 @@ function new-365Group(){
                 Write-Verbose "Creating Data Managers Security Group [$managersSgDisplayName]"
                 $managersMemberOf = @($combinedSg.ExternalDirectoryObjectId)
                 if($ownersAreRealManagers){$managersMemberOf += "Managers (All)"}
-                try{$managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -fixedSuffix $managersSgDisplayNameSuffix -membersUpns $managerUpns -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers" -WhatIf:$WhatIfPreference -Verbose}
+                try{
+                    $managersSg = new-mailEnabledSecurityGroup -dgDisplayName $managersSgDisplayName -fixedSuffix $managersSgDisplayNameSuffix -membersUpns $managerUpns -memberOf $managersMemberOf -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $shortName Data Managers" -WhatIf:$WhatIfPreference -Verbose
+                    #Sadly, EXO is just too slow to replicate to Graph
+                    #$managersSg = get-graphGroups -tokenResponse $tokenResponse -filterId $managersSg.ExternalDirectoryObjectId -retryCount 5 #We can't create MESGs with Graph, but we can switch to Graph objects to simplify things later 
+                    }
                 catch{Write-Error $_}
                 }
 
@@ -346,10 +361,15 @@ function new-365Group(){
                 Write-Verbose "Creating Members Security Group [$membersSgDisplayName]"
                 try{
                     $membersSg = new-mailEnabledSecurityGroup -dgDisplayName $membersSgDisplayName -fixedSuffix $membersSgDisplayNameSuffix -membersUpns $teamMemberUpns -memberOf $combinedSg.ExternalDirectoryObjectId -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $shortName Unified Group" -WhatIf:$WhatIfPreference
+                    #Sadly, EXO is just too slow to replicate to Graph
+                    #$membersSg = get-graphGroups -tokenResponse $tokenResponse -filterId $membersSg.ExternalDirectoryObjectId -retryCount 5 #We can't create MESGs with Graph, but we can switch to Graph objects to simplify things later 
                     if(![string]::IsNullOrWhiteSpace($memberOf)){
                         $memberOf | % { #We now nest membership via Members groups, rather than Combined Groups, so this is a little more complicated now.
                             $parentGroup = get-membersGroup -groupName $_
-                            Add-DistributionGroupMember -Identity $parentGroup.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck:$true -Member $membersSg.ExternalDirectoryObjectId -Confirm:$false
+                            #Sadly, EXO is just too slow to replicate to Graph
+                            $parentGroup = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName $_
+                            Add-DistributionGroupMember -Identity $parentGroup.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck:$true -Member $membersSg.id -Confirm:$false
+                            #Add-DistributionGroupMember -Identity $parentGroup.anthesisgroup_UGSync.memberGroupId -BypassSecurityGroupManagerCheck:$true -Member $membersSg.id -Confirm:$false
                             }
                         }
                     }
@@ -369,7 +389,7 @@ function new-365Group(){
     if(!$membersSg){
         if($WhatIfPreference){Write-Verbose "Members Security Group [$combinedSgDisplayName] not created because we're only pretending."}
         else{Write-Error "Members Security Group [$membersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}}
-    if(!$365Group -or $WhatIfPreference){
+    if(!$graphGroupExtended -or $WhatIfPreference){
         if(($combinedSg -and $managersSg -and $membersSg)){#If we now have all the prerequisite groups, create a UG
             try{
                 $groupIsNew = $true
@@ -384,56 +404,45 @@ function new-365Group(){
                 $teamMemberUpns | % {[string[]]$members += ("https://graph.microsoft.com/v1.0/users/$_").ToLower()}
                 $members = $($members+$owners) | Sort-Object | Get-Unique -AsString 
 
-                $creategroup = "{`
-                    `"displayName`": `"$(sanitise-forJson $displayName)`",
-                    `"groupTypes`": [
-                      `"Unified`"
-                    ],
-                    `"mailEnabled`": true,
-                    `"mailNickname`": `"$365MailAlias`",
-                    `"securityEnabled`": true,
-                    `"owners@odata.bind`": [
-                        `"$($owners -join "``",`r`n``"")`"
-                      ],
-                    `"members@odata.bind`": [
-                        `"$($members -join "``",`r`n``"")`"
-                      ]
-                    }"
-                Write-Verbose $creategroup
-                $creategroup = [System.Text.Encoding]::UTF8.GetBytes($creategroup)
-                $response = Invoke-RestMethod -Uri https://graph.microsoft.com/v1.0/groups -Body $creategroup -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
-                
-                Connect-PnPOnline -AccessToken $tokenResponse.access_token
-                Set-PnPUnifiedGroup -Identity $response.id -DisplayName $displayName <# Graph API doesn't handle accents/diacritics properly and replaces them with �, so we have to set the DisplayName again via Pnp #>
-                do{
-                    Write-Verbose "Waiting for Unified Group to provision..."
-                    $pnp365Group = Get-PnPUnifiedGroup -Identity $response.id -ErrorAction SilentlyContinue -WarningAction SilentlyContinue #This is (allegedly) the bit that triggers Site Collection creation
-                    $365Group = Get-UnifiedGroup -Identity $response.id -ErrorAction SilentlyContinue -WarningAction SilentlyContinue 
-                    Start-Sleep -Seconds 5
+                $ugSyncExtensionHash = @{
+                    "extensionType" = "UGSync"
+                    "dataManagerGroupId" = $managersSg.ExternalDirectoryObjectId 
+                    "memberGroupId" = $membersSg.ExternalDirectoryObjectId
+                    "combinedGroupId" = $combinedSg.ExternalDirectoryObjectId
+                    #"sharedMailboxId" = $unifiedGroup.anthesisgroup_UGSync.sharedMailboxId
+                    "masterMembershipList" = $membershipManagedBy
+                    "classification" = $groupClassification
+                    "privacy" = $accessType
                     }
-                while([string]::IsNullOrWhiteSpace($365Group))
+
+                $groupHash = @{
+                    "displayName"          = "$(sanitise-forJson $displayName)"
+                    "groupTypes"           = @("Unified")
+                    "mailNickname"         = $365MailAlias
+                    "mailEnabled"          = $true
+                    "securityEnabled"      = $true
+                    "owners@odata.bind"    = $owners
+                    "members@odata.bind"   = $members
+                    "classification"       = $groupClassification
+                    "visibility"           = $accessType
+                    "anthesisgroup_UGSync" = $ugSyncExtensionHash
+                    }
+
+                $graphGroup = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups" -graphBodyHashtable $groupHash
+                $graphGroupExtended = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId $graphGroup.id 
+                Write-Verbose $graphGroupExtended
+
+                #Set Invite Guests for Unified Group (SharePoint Site sharing needs handling separately)
+                set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended -classificationOverride $groupClassification | Out-Null #Set and forget
+
                 }
             catch{Write-Error $_}
             }
         else{Write-Error "Combined/Managers/Members Security Group [$combinedSgDisplayName]/[$managersSgDisplayName]/[$membersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}
         }
 
-    if($365Group){ #If we now have a 365 UG, set the CustomAttributes, and create a Shared Mailbox (if required) and configure it
-        Write-Verbose "`tSet-UnifiedGroup -Identity [$($365Group.ExternalDirectoryObjectId)] -HiddenFromAddressListsEnabled [$true] -CustomAttribute1 [$($365Group.ExternalDirectoryObjectId)] -CustomAttribute2 [$($managersSg.ExternalDirectoryObjectId)] -CustomAttribute3 [$($membersSg.ExternalDirectoryObjectId)] -CustomAttribute4 [$($combinedSg.ExternalDirectoryObjectId)] -CustomAttribute6 [$($membershipmanagedBy)] -CustomAttribute7 [$($groupClassification)] -CustomAttribute8 [$($accessType)] -WhatIf:[$($WhatIfPreference)] -AccessType [$($accessType)] -RequireSenderAuthenticationEnabled [$($blockExternalMail)] -AutoSubscribeNewMembers:[$($autoSubscribe)] -AlwaysSubscribeMembersToCalendarEvents:[$($autoSubscribe)] -Classification [$($groupClassification)]"
-        $customAttribsSet = $false
-        do{
-            try{
-                Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -CustomAttribute1 $365Group.ExternalDirectoryObjectId -CustomAttribute2 $managersSg.ExternalDirectoryObjectId -CustomAttribute3 $membersSg.ExternalDirectoryObjectId -CustomAttribute4 $combinedSg.ExternalDirectoryObjectId -CustomAttribute6 $membershipmanagedBy -CustomAttribute7 $groupClassification -CustomAttribute8 $accessType -WhatIf:$WhatIfPreference -AccessType $accessType -RequireSenderAuthenticationEnabled $blockExternalMail -AutoSubscribeNewMembers:$autoSubscribe -AlwaysSubscribeMembersToCalendarEvents:$autoSubscribe -Classification $groupClassification -ErrorAction Stop
-                $customAttribsSet = $true
-                }
-            catch{
-                Start-Sleep -Seconds 10
-                $customAttribsSet = $false
-                }
-            }
-        while($customAttribsSet -eq $false)    
-        $365Group = Get-UnifiedGroup $365Group.ExternalDirectoryObjectId
-        
+    if($graphGroupExtended){ #If we now have a 365 UG, create a Shared Mailbox (if required) and configure it
+        Write-Verbose ""
         if(!$sharedMailbox){
             Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName -displayName $sharedMailboxDisplayName) -ErrorAction Continue -WhatIf:$WhatIfPreference "
             try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference }
@@ -441,111 +450,50 @@ function new-365Group(){
             }
 
         if($sharedMailbox){
-            Write-Verbose "Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] found: Set-Mailbox -Identity $($sharedMailbox.ExternalDirectoryObjectId) -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $($365Group.PrimarySmtpAddress) -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $$365Group.PrimarySmtpAddress) -Confirm:$false -WhatIf:$WhatIfPreference"
-            Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $365Group.PrimarySmtpAddress -DeliverToMailboxAndForward $true  -Confirm:$false -WhatIf:$WhatIfPreference 
-            Set-user -Identity $sharedMailbox.ExternalDirectoryObjectId -Manager kevin.maitland -WhatIf:$WhatIfPreference  #For want of someone better....
+            Write-Verbose "Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] found: Set-Mailbox -Identity $($sharedMailbox.ExternalDirectoryObjectId) -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $($graphGroupExtended.Mail) -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $($graphGroupExtended.Mail) -Confirm:$false -WhatIf:$WhatIfPreference"
+            Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -Confirm:$false -WhatIf:$WhatIfPreference #-ForwardingAddress $graphGroupExtended.Mail -DeliverToMailboxAndForward $true  #I don't think we want to forward from the Shared Mailbox to the 365 group. If anything, we want the forwarding to work in reverse, and with the advent of Teams, Shared Mailboxes are liekly to be become less useful.
+            Set-user -Identity $sharedMailbox.ExternalDirectoryObjectId -Manager groupbot -WhatIf:$WhatIfPreference  #For want of someone better....
             #Assign the Shared Mailbox as a member of the Security Group
             try{Add-DistributionGroupMember -Identity $combinedSg.ExternalDirectoryObjectId -Member $sharedMailbox.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck -WhatIf:$WhatIfPreference -ErrorAction Stop}
             catch{
-                if('-2146233087' -eq $_.Exception.HResult){Write-Verbose "Shared Mailbox [$($sharedMailbox.DisplayName)] is already a member of [$($combinedSg.DisplayName)]"}
+                if('-2146233087' -eq $_.Exception.HResult){Write-Warning "Shared Mailbox [$($sharedMailbox.DisplayName)] is already a member of [$($combinedSg.DisplayName)]"}
                 else{Write-Error $_}
                 }
-            Set-UnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -CustomAttribute5 $sharedMailbox.ExternalDirectoryObjectId -WhatIf:$WhatIfPreference 
+            set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroupExtended.id -sharedMailboxId $sharedMailbox.ExternalDirectoryObjectId  | Out-Null
             }
         else{Write-Error "Shared Mailbox not available. Cannot complete UG setup."}
         }
     else{Write-Error "Unified Group [$displayName] not available. Cannot proceed with Shared Mailbox creation."}
 
-    if($groupIsNew){Write-Verbose "New 365 Group created: [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)], CA6=[$($365Group.CustomAttribute6)]"}
-    elseif($365Group){Write-Verbose "Pre-existing 365 Group found: [$($365Group.DisplayName)] with CA1=[$($365Group.CustomAttribute1)], CA2=[$($365Group.CustomAttribute2)], CA3=[$($365Group.CustomAttribute3)], CA4=[$($365Group.CustomAttribute4)], CA5=[$($365Group.CustomAttribute5)], CA6=[$($365Group.CustomAttribute6)]"}
+    if($groupIsNew){Write-Verbose "New 365 Group created: [$($graphGroupExtended.DisplayName)] with id=[$($graphGroupExtended.id)], dataManagerGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)], memberGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)], combinedGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)], sharedMailboxId=[$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)], masterMembershipList=[$($graphGroupExtended.anthesisgroup_UGSync.masterMembershipList)]"}
+    elseif($graphGroupExtended){Write-Verbose "Pre-existing 365 Group found: [$($graphGroupExtended.DisplayName)]  with id=[$($graphGroupExtended.id)], dataManagerGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)], memberGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)], combinedGroupId=[$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)], sharedMailboxId=[$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)], masterMembershipList=[$($graphGroupExtended.anthesisgroup_UGSync.masterMembershipList)]"}
     else{Write-Verbose "It doesn't look like there's a [$displayName] 365 Group available..."}
 
     #Provision MS Team if requested
-    if($alsoCreateTeam -and $365Group){
+    if($alsoCreateTeam -and $graphGroupExtended){
         Write-Verbose "Provisioning new MS Team (as requested)"
-        if(Get-Team -GroupId $365Group.ExternalDirectoryObjectId){
-            Write-Verbose "Existing Team found - not attempting to reprovision"
-            }
-        else{New-Team -GroupId $365Group.ExternalDirectoryObjectId -AllowGuestCreateUpdateChannels $false -AllowGuestDeleteChannels $false}
+        $graphTeam = new-graphTeam -tokenResponse $tokenResponse -groupId $graphGroupExtended.id -allowMemberCreateUpdateChannels $true -allowMemberDeleteChannels $false -Verbose:$VerbosePreference #Create the Team if it doesn't already exist
         }
     else{Write-Verbose "_NOT_ attempting to provision new MS Team"}
 
+
+    $graphGroupExtended
+
+    #Shifted to the end to minimise a race condition where delays in provisioning speed were causing failures.    
+    Write-Host -f DarkYellow "`tCreate, share and delete a dummy folder in this Site to trigger the SharedWith Site Column (this can fail if there is a delay provisioning the Drive)"
     do{
-        Write-Verbose "Waiting for Unified Group Site to provision..."
-        Connect-PnPOnline -AccessToken $tokenResponse.access_token
-        if($response){
-            Write-Verbose "Get-PnPUnifiedGroup -Identity [$($response.id)] (`$GraphResponse)"
-            $pnp365Group = Get-PnPUnifiedGroup -Identity $response.id -ErrorAction SilentlyContinue -WarningAction SilentlyContinue <#This is (allegedly) the bit that triggers Site Collection creation#>
-            }
-        elseif($365Group){
-            Write-Verbose "Get-PnPUnifiedGroup -Identity [$($365Group.ExternalDirectoryObjectId)] (`$365Group)"
-            $pnp365Group = Get-PnPUnifiedGroup -Identity $365Group.ExternalDirectoryObjectId -ErrorAction SilentlyContinue -WarningAction SilentlyContinue <#This is (allegedly) the bit that triggers Site Collection creation#>
-            }
-        else{Write-Warning "I haven't got a `$response or `$365Group object, so I can't check whether the Site has been provisioned!"}
+        $i++
         Start-Sleep -Seconds 5
+        Write-Verbose "Drive not available. Retry in 5 seconds. ($i/50)"
+        try{$graphDrive = get-graphDrives -tokenResponse $tokenResponse -groupGraphId $graphGroupExtended.id -returnOnlyDefaultDocumentsLibrary}# -Verbose:$VerbosePreference}
+        catch{if($_.Exception -match "Couldn't find object" -or $_.Exception -match "Resource provisioning is in progress"){<#Do nothing - object not provisioned yet#>}}
+        if($i -eq 50){break}
         }
-    while([string]::IsNullOrWhiteSpace($pnp365Group.SiteUrl))
-    Write-Verbose "Calling set-standardSitePermissions -unifiedGroupObject [$($pnp365Group.SiteUrl)]"
-    set-standardSitePermissions -unifiedGroupObject $365Group -tokenResponse $tokenResponse -pnpCreds $pnpCreds
-    $365Group
+    while($graphDrive -eq $null)
+    $dummyFolder = add-graphArrayOfFoldersToDrive -graphDriveId $graphDrive.id -foldersAndSubfoldersArray "DummyFolder" -tokenResponse $tokenResponse -conflictResolution Replace
+    grant-graphSharing -tokenResponse $tokenResponse -driveId $graphDrive.id -itemId $dummyFolder.id -sharingRecipientsUpns @($managerUpns[0]) -requireSignIn $true -sendInvitation $false -role Write -Verbose | Out-Null
+    delete-graphDriveItem -tokenResponse $tokenResponse -graphDriveId $graphDrive.id -graphDriveItemId $dummyFolder.id -eTag $dummyFolder.eTag | Out-Null
 
-    }
-function new-externalGroup(){
-    [CmdletBinding(SupportsShouldProcess=$true)]
-    param(
-        [Parameter(Mandatory=$true)]
-            [string]$displayName
-        ,[Parameter(Mandatory=$false)]
-            [string]$description
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$managerUpns
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$teamMemberUpns
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$memberOf
-        ,[Parameter(Mandatory=$false)]
-            [string[]]$additionalEmailAddresses
-        ,[Parameter(Mandatory=$true)]
-            [string]$membershipManagedBy
-        ,[Parameter(Mandatory=$true)]
-            [PSCustomObject]$tokenResponse
-        ,[Parameter(Mandatory=$true)]
-            [bool]$alsoCreateTeam = $false
-        ,[Parameter(Mandatory=$true)]
-            [PSCredential]$pnpCreds
-        )
-    Write-Verbose "new-externalGroup($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $additionalEmailAddress, $membershipManagedBy)"
-    $hideFromGal = $false
-    $blockExternalMail = $false
-    $accessType = "Private"
-    $autoSubscribe = $true
-    $groupClassification = "External"
-
-    if($managerUpns -notcontains ((Get-PnPConnection).PSCredential.UserName)){
-        $addExecutingUserAsTemporaryAdmin = $true
-        [array]$managerUpns += ((Get-PnPConnection).PSCredential.UserName)
-        }
-
-    $newTeam = new-365Group -displayName $displayName -description $description -managerUpns $managerUpns -teamMemberUpns $teamMemberUpns -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $true -membershipmanagedBy $membershipManagedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $pnpCreds
-    Connect-PnPOnline -AccessToken $tokenResponse.access_token
-    Write-Verbose "`$newTeam = Get-PnPUnifiedGroup -Identity [$displayName]"
-    $newPnpTeam = Get-PnPUnifiedGroup -Identity $displayName
-    
-    #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
-    copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
-    test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $pnpCreds -connectIfDifferent $true | Out-Null
-    if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
-        Write-Verbose "Setting Homepage"
-        Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
-        }
-    Add-PnPHubSiteAssociation -Site $newPnpTeam.SiteUrl -HubSite "https://anthesisllc.sharepoint.com/sites/ExternalHub" | Out-Null
-    start-Process $newPnpTeam.SiteUrl
-    if($addExecutingUserAsTemporaryAdmin){
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-DistributionGroupMember -Identity $newTeam.CustomAttribute2 -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
-        }
-    $newPnpTeam
     }
 function new-mailEnabledSecurityGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]
@@ -769,11 +717,11 @@ function send-noOwnersForGroupAlertToAdmins(){
 
     $subject = "Unowned 365 Group found: [$($UnifiedGroup.DisplayName)]"
     $body = "<HTML><FONT FACE=`"Calibri`">Hello 365 Group Admins,`r`n`r`n<BR><BR>"
-    $body += "365 Group [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.ExternalDirectoryObjectId)] has no active owners:`r`n`t<BR><PRE>&#9;"
+    $body += "365 Group [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.id)] has no active owners:`r`n`t<BR><PRE>&#9;"
 
     if($currentOwners.Count -gt 0){
         $currentOwners = $currentOwners | Sort-Object DisplayName
-        $body += "The full list of 365 group Owners looks like this:`r`n`t<BR><PRE>&#9;$($usersIn365GroupAfterChanges.DisplayName -join "`r`n`t")</PRE>`r`n`r`n<BR>"
+        $body += "The full list of 365 group Owners looks like this:`r`n`t<BR><PRE>&#9;$($currentOwners.DisplayName -join "`r`n`t")</PRE>`r`n`r`n<BR>"
         }
     else{$body += "It looks like the Owners group is now empty...`r`n`r`n<BR><BR>"}
     $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"    
@@ -939,6 +887,259 @@ function sync-groupMemberships(){
     [CmdletBinding(SupportsShouldProcess=$true )]
     param(
         [Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
+            [PSObject]$graphExtendedUG
+        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
+            [PSObject]$graphMesg
+        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+            [string]$graphExtendedUGUpn
+        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
+            [string]$graphMesgUpn
+        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
+            [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
+            [ValidateSet("Members", "Owners")]
+            [string]$syncWhat
+        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
+            [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
+            [psobject]$tokenResponse
+        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
+            [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
+            [ValidateSet("365", "AAD")]
+            [string]$sourceGroup
+        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+            [bool]$dontSendEmailReport = $false
+        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+            [string[]]$adminEmailAddresses
+        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+            [bool]$enumerateSubgroups = $false
+        )
+
+    #region Get $graphExtendedUG and $graphMesg, regardless of which parameters we've been given
+    switch ($PsCmdlet.ParameterSetName){
+        “365GroupIdOnly”  {
+            Write-Verbose "We've been given a 365 UPN, so we need the Group objects"
+            $graphExtendedUG = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $graphExtendedUGUpn 
+            if(!$graphExtendedUG){
+                Write-Error "Could not retrieve Unified Group from UPN [$graphExtendedUGUpn]"
+                break
+                }
+            }
+        “AADGroupIdOnly”  {
+            Write-Verbose "We've been given an AAD UPN, so we need the Group objects"
+            $graphMesg = get-graphGroups -tokenResponse $tokenResponse -filterUpn $graphMesgUpn
+            if(!$graphMesg){
+                Write-Error "Could not retrieve AAD Group from UPN [$graphMesgUpn]. Cannot continue."
+                break
+                }
+            }
+        #Now we've definitely got either $graphExtendedUG or $graphMesg, get the other one if it hasn't been supplied as a parameter
+        {$_ -in "365GroupIdOnly","365GroupObjectSupplied"}  {
+            if([string]::IsNullOrWhiteSpace($graphMesg)){
+                switch ($syncWhat){
+                    "Members" {
+                        Write-Verbose "No `$graphMesg or `$graphMesgUpn provided - looking for Members group with Id [$($graphExtendedUG.anthesisgroup_UGSync.memberGroupId)] linked to UG [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.id)]"
+                        $graphMesg = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$($graphExtendedUG.anthesisgroup_UGSync.memberGroupId)"
+                        if(!$graphMesg){
+                            Write-Error "Could not retrieve AAD Members Group from ID [$($graphExtendedUG.anthesisgroup_UGSync.memberGroupId)]. Cannot continue."
+                            break
+                            }
+                        }
+                    "Owners"  {
+                        Write-Verbose "No `$graphMesg or `$graphMesgUpn provided - looking for Owners group with Id [$($graphExtendedUG.anthesisgroup_UGSync.dataManagerGroupId)] linked to UG [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.ExternalDirectoryObjectId)]"
+                        $graphMesg = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$($graphExtendedUG.anthesisgroup_UGSync.dataManagerGroupId)"
+                        if(!$graphMesg){
+                            Write-Error "Could not retrieve AAD Owners Group from ID [$($graphExtendedUG.anthesisgroup_UGSync.dataManagerGroupId)]. Cannot continue."
+                            break
+                            }
+                        }
+                    }
+                }            
+            }
+        {$_ -in "AADGroupIdOnly","AADGroupObjectSupplied"}  {
+            if([string]::IsNullOrWhiteSpace($graphExtendedUG)){
+                switch($syncWhat){
+                    "Members" {
+                        Write-Verbose "No `$graphExtendedUG or `$graphExtendedUGUpn provided - looking for associated 365 Group with `$graphExtendedUG.anthesisgroup_UGSync.memberGroupId -eq [$($graphMesg.Id)]"
+                        $graphExtendedUG = Get-UnifiedGroup -Filter "anthesisgroup_UGSync.memberGroupId -eq '$($graphMesg.Id)'"
+                        }
+                    "Owners" {
+                        Write-Verbose "No `$graphExtendedUG or `$graphExtendedUGUpn provided - looking for associated 365 Group with `$graphExtendedUG.anthesisgroup_UGSync.dataManagerGroupId -eq [$($graphMesg.Id)]"
+                        $graphExtendedUG = Get-UnifiedGroup  -Filter "anthesisgroup_UGSync.dataManagerGroupId -eq '$($graphMesg.Id)'"
+                        }
+                    }
+                if(!$graphExtendedUG){
+                    Write-Error "Could not retrieve 365 Group based on $syncWhat AADGroupID [$($graphMesg.Id)]. Cannot continue."
+                    break
+                    }
+                }
+            
+            }
+        }
+    #endregion
+    
+    if($graphMesg -and $graphExtendedUG){ #If we've got an AAD and a 365 Group to compare...
+        $ugUsersBeforeChanges = @()
+        $aadgUsersBeforeChanges = @()
+        if($enumerateSubgroups){
+            get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphMesg.Id -memberType TransitiveMembers -returnOnlyUsers | %{[array]$aadgUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.Id})}
+            }
+        else{get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphMesg.Id -memberType Members -returnOnlyUsers | %{[array]$aadgUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.Id})}}
+        switch ($syncWhat){
+            "Members" {
+                get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.Id -memberType Members -returnOnlyUsers | %{[array]$ugUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.Id})}
+                #if($sourceGroup -eq "AAD"){Get-AzureADGroupMember -All:$true -ObjectId $graphExtendedUG.anthesisgroup_UGSync.dataManagerGroupId | %{[array]$aadgUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}} #Add DataManagers too (to fix issue with Communities)
+                }
+            "Owners" {
+                get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.Id -memberType Owners -returnOnlyUsers | %{[array]$ugUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.Id})}
+                }
+            }
+
+        if($ugUsersBeforeChanges.Count -lt 1){$ugUsersBeforeChanges = @()}
+        if($aadgUsersBeforeChanges.Count -lt 1){$aadgUsersBeforeChanges = @()}
+        $usersDelta = Compare-Object -ReferenceObject $ugUsersBeforeChanges -DifferenceObject $aadgUsersBeforeChanges -Property userPrincipalName -PassThru -IncludeEqual
+         $($usersDelta | % {Write-Verbose "$_"})
+
+        $usersAdded = @()
+        $usersRemoved = @()
+        $usersFailed = @()
+
+        switch($sourceGroup){
+            "365" {
+                #Add extra users from UG to MESG
+                $usersDelta | ?{$_.SideIndicator -eq "<="} | %{
+                    $userToBeChanged = $_
+                    Write-Verbose "`tAdding [$($userToBeChanged.userPrincipalName)] to [$($graphMesg.DisplayName)][$($graphMesg.Id)] MESG"
+                    try{
+                        #Unbelievbly, you still can't manage MESGs via Graph.
+                        #add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphMesg.Id -memberType Members -graphUserIds $userToBeChanged.objectId -WhatIf:$WhatIfPreference -ErrorAction Stop #We always add to members regardless of $syncWhat because we're dealing with the MESGs. $syncWhat will already have set either the Data Managers MESG or Members MESG as $graphMesg
+                        Add-DistributionGroupMember -Identity $graphMesg.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck:$true -WhatIf:$WhatIfPreference -ErrorAction Stop
+                        [array]$usersAdded += (New-Object psobject -Property $([ordered]@{"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
+                        }
+                    catch{
+                        Write-Warning "Failed to add [$($userToBeChanged.userPrincipalName)] to MESG [$($graphMesg.DisplayName)][$($graphMesg.Id)]" 
+                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Added";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
+                        }
+                    }
+
+                #Remove "removed" users from MESG
+                $usersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
+                    $userToBeChanged = $_
+                    Write-Verbose "`tRemoving [$($userToBeChanged.userPrincipalName)] from [$($graphMesg.DisplayName)][$($graphMesg.Id)] MESG"
+                    try{
+                        #Unbelievbly, you still can't manage MESGs via Graph.
+                        #remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $graphMesg.Id -memberType Members -graphUserIds $userToBeChanged.objectId -WhatIf:$WhatIfPreference -ErrorAction Stop
+                        Remove-DistributionGroupMember -Identity $graphMesg.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck:$true -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
+                         [array]$usersRemoved += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
+                        }
+                    catch{
+                        Write-Warning "Failed to remove [$($userToBeChanged.userPrincipalName)] from MESG [$($graphMesg.DisplayName)][$($graphMesg.Id)]"
+                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
+                        }
+                    }                
+                }
+            "AAD" {
+                #Add extra users from MESG to UG
+                $usersDelta | ?{$_.SideIndicator -eq "=>" -and $_.DisplayName -notmatch "Shared Mailbox"} | %{
+                    $userToBeChanged = $_
+                    Write-Verbose "`tAdding [$($userToBeChanged.userPrincipalName)] to [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.Id)] UG $syncWhat"
+                    try{
+                        #We want to add Data Managers as Members too, so we add to Members regardless of $syncWhat. However, we don't really need GroupBot as a Member, so we exclude this one exception
+                        if($userToBeChanged.objectId -ne "00aa81e4-2e8f-4170-bc24-843b917fd7cf"){
+                            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType Members -graphUserIds $userToBeChanged.objectId -ErrorAction Stop
+                            }
+                        if($syncWhat -eq "Owners"){ #If we are syncing Owners, we _don't_ want to exclude GroupBot (or anyone else)
+                            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType Owners -graphUserIds $userToBeChanged.objectId -ErrorAction Stop
+                            }
+                        [array]$usersAdded += (New-Object psobject -Property $([ordered]@{"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
+                        }
+                    catch{
+                        Write-Warning "Failed to add [$($userToBeChanged.userPrincipalName)] to UG $syncWhat [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.Id)]" 
+                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Added";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
+                        }
+                    }
+
+                #Remove "removed" users from UG
+                $usersDelta | ?{$_.SideIndicator -eq "<="} | %{ 
+                    $userToBeChanged = $_
+                    Write-Verbose "`tRemoving [$($userToBeChanged.userPrincipalName)] from [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.Id)] UG $syncWhat"
+                    try{
+                        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType $syncWhat -graphUserIds $userToBeChanged.objectId -WhatIf:$WhatIfPreference -ErrorAction Stop 
+                        [array]$usersRemoved += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
+                        }
+                    catch{
+                        Write-Warning "Failed to remove [$($userToBeChanged.userPrincipalName)] from UG $syncWhat [$($graphMesg.DisplayName)][$($graphMesg.Id)]"
+                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
+                        }
+                    }                
+                }
+            }
+
+        #Now report any problems/changes    
+        if(!$dontSendEmailReport){
+            Write-Verbose "Preparing 365 to MESG $syncWhat sync report to send to Admins & Owners"
+            if($usersFailed.Count -ne 0){
+                Write-Verbose "Found [$($usersFailed.Count)] problems - notifying 365 Group Admins"
+                $ugUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType $syncWhat -returnOnlyUsers
+                $aadgUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphMesg.id -memberType $syncWhat -returnOnlyUsers
+                send-membershipChangeProblemReportToAdmins -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                }
+            else{Write-Verbose "No problems adding/removing users, not sending problem report e-mail to Admins"}
+
+            $ownersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType Owners -returnOnlyUsers
+            if($($ownersAfterChanges.DisplayName | ? {$_ -notmatch "Ω"}).Count -eq 0){
+                Write-Verbose "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Admins so that this doesn't get auto-deleted"
+                send-noOwnersForGroupAlertToAdmins -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                }
+            else{Write-Verbose "Owners look normal, not sending problem report e-mail to Admins"}
+
+            if($usersAdded.Count -ne 0 -or $usersRemoved.Count -ne 0){
+                Write-Verbose "[$($usersAdded.Count + $usersRemoved.Count)] changes made - sending the change report to managers and admins"
+                $ownersEmailAddresses = $ownersAfterChanges.UserPrincipalName
+                if($syncWhat -eq "Owners"){
+                    Write-Verbose "Getting all group Owners (both added and removed) for [$($graphExtendedUG.DisplayName)]"
+                    $ownersEmailAddresses += $usersAdded.UPN
+                    $ownersEmailAddresses += $usersRemoved.UPN
+                    $ownersEmailAddresses = $ownersEmailAddresses | Select-Object -Unique
+                    }
+                $ugUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType $syncWhat -returnOnlyUsers
+                send-membershipChangeReportToManagers -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersAddedArray $usersAdded -usersRemovedArray $usersRemoved -usersWithProblemsArray $usersFailed -usersInGroupAfterChanges $ugUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -ownersEmailAddresses $ownersEmailAddresses -WhatIf:$WhatIfPreference
+                }
+            else{Write-Verbose "No membership changes - not sending report to Mangers & Admins"}
+            }
+        }
+    else{
+        if(!$graphMesg){
+            Write-Error "No AAD group found for UG [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.ExternalDirectoryObjectId)]"
+            break
+            }
+        elseif(!$graphExtendedUG){
+            Write-Error "No 365 group found for AAD Group [$($graphMesg.DisplayName)][$($graphMesg.Id)]"
+            break
+            }
+        }
+    }
+function sync-groupMemberships_deprecated(){
+    [CmdletBinding(SupportsShouldProcess=$true )]
+    param(
+        [Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
         [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
         [PSObject]$UnifiedGroup
         ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
@@ -1073,7 +1274,9 @@ function sync-groupMemberships(){
             }
         #We didn't used to need this -unique step, but smoehow duplicates were appearing:
         $ugUsersBeforeChanges = $ugUsersBeforeChanges | Sort-Object  -Property objectId -Unique
+        if($ugUsersBeforeChanges.Count -lt 1){$ugUsersBeforeChanges = @()}
         $aadgUsersBeforeChanges = $aadgUsersBeforeChanges | Sort-Object  -Property objectId -Unique
+        if($aadgUsersBeforeChanges.Count -lt 1){$aadgUsersBeforeChanges = @()}
         $usersDelta = Compare-Object -ReferenceObject $ugUsersBeforeChanges -DifferenceObject $aadgUsersBeforeChanges -Property userPrincipalName -PassThru -IncludeEqual
          $($usersDelta | % {Write-Verbose "$_"})
 

@@ -394,7 +394,7 @@ function get-azureAdBitLockerKeysForUser {
 
      $bitLockerKeys
     }
-function get-groupAdminRoleEmailAddresses(){
+function get-groupAdminRoleEmailAddresses_deprecated(){
     [CmdletBinding()]
     param()
     $admins = @()

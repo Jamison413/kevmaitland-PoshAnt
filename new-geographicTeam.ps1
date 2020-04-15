@@ -8,7 +8,7 @@ $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 30 -aadAppCreds $teamBotDetails
 
 
-foreach($team in @("All Homeworkers (North America)","All Homeworkers (PHL)","All Madrid (ESP)","All Manchester (GBR)","All Manlleu (ESP)")){
+foreach($team in @("All (Europe)","All Homeworkers (CAN)")){
     $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails
 
     $displayName = $team
@@ -64,7 +64,7 @@ foreach($team in @("All Homeworkers (North America)","All Homeworkers (PHL)","Al
     Write-Verbose "Getting associated PnP and Graph objects for [$($newGroup.DisplayName)] - this is a faster way to do stuff than using the UnifiedGroup object"
     Connect-PnPOnline -AccessToken $tokenResponse.access_token
     $newPnpTeam = Get-PnPUnifiedGroup -Identity $newGroup.ExternalDirectoryObjectId
-    $newGraphGroup = get-graphGroupFromUpn -tokenResponse $tokenResponse -groupUpn $newGroup.PrimarySmtpAddress
+    $newGraphGroup = get-graphGroups -tokenResponse $tokenResponse -filterUpn $newGroup.PrimarySmtpAddress
     $newGraphGroupDrive = get-graphDrives -tokenResponse $tokenResponse -teamUpn $newGroup.PrimarySmtpAddress -returnOnlyDefaultDocumentsLibrary
 
     #Remove GroupBot if required
@@ -98,7 +98,7 @@ foreach($team in @("All Homeworkers (North America)","All Homeworkers (PHL)","Al
                 }
             }
         }
-    if([string]::IsNullOrWhiteSpace($currentRegion)){
+    if([string]::IsNullOrWhiteSpace($associatedRegionalAdminTeam)){
         Write-Error "Could not identify regional Administration Team. Cannot proceed with configuring the rest of the Site & Team." ;break
         }
 

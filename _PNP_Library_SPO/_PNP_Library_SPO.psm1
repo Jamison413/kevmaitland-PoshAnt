@@ -724,56 +724,52 @@ function set-standardSitePermissions(){
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
-        [PSObject]$unifiedGroupObject
-        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [string]$unifiedGroupId
-
-        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+            [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
             [PSCustomObject]$tokenResponse
         ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [pscredential]$pnpCreds
-
+            [PSCustomObject]$graphGroupExtended
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+            [string]$groupId
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
+            [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+            [pscredential]$pnpCreds
         ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [string]$fullLogPathAndName
-        ,[parameter(Mandatory = $false,ParameterSetName="UnifiedGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [string]$errorLogPathAndName
+            [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+            [switch]$suppressEmailNotifications
         )
-    Write-Verbose "set-standardSitePermissions([$($unifiedGroupObject.Id)$unifiedGroupId])"
+    Write-Verbose "set-standardSitePermissions([$($graphGroupExtended.Id)$unifiedGroupId])"
 
-    #Get $unifiedGroupObject, regardless of which parameters we've been given
+    #Get $graphGroupExtended, regardless of which parameters we've been given
     switch ($PsCmdlet.ParameterSetName){
         “UnifiedGroupId”  {
             Write-Verbose "We've been given a 365 Id, so we need the Group object"
-            $unifiedGroupObject = Get-UnifiedGroup -Identity $unifiedGroupId
-            if(!$unifiedGroupObject){
+            $graphGroupExtended = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId $unifiedGroupId
+            if(!$graphGroupExtended){
                 Write-Error "Could not retrieve Unified Group from ID [$unifiedGroupId]"
                 break
                 }
             }
         }
     
-    try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupObject.ExternalDirectoryObjectId -ErrorAction Stop -WarningAction Stop}
+    try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $graphGroupExtended.id -ErrorAction Stop -WarningAction Stop}
     catch{#Connect to the root site if we're not connected to anything
         Write-Verbose "Connecting to Graph"
         Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
-        $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupObject.ExternalDirectoryObjectId
+        $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $graphGroupExtended.id
         }
 
     if([string]::IsNullOrWhiteSpace($pnpUnifiedGroupObject.SiteUrl)){ #This is a more reliable test than the UnifiedGroup.SharePointSiteUrl property as it populates /much/ faster
-        Write-Error "Could not retrieve 365 Group URL from Group [$($unifiedGroupObject.DisplayName)][$($unifiedGroupObject.ExternalDirectoryObjectId)]. Exiting without attempting to check/set permissions"
+        Write-Error "Could not retrieve 365 Group URL from Group [$($graphGroupExtended.DisplayName)][$($graphGroupExtended.id)]. Exiting without attempting to check/set permissions"
         break
         }
 
     #region Get connected to the Site
     try{
-        test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -accessToken $tokenResponse.access_token -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose
+        $userWasAlreadyASiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -accessToken $tokenResponse.access_token -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose
         }
     catch{
         Write-Verbose "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
+        $_
         break
         }
     #endregion
@@ -786,19 +782,18 @@ function set-standardSitePermissions(){
             }
 
         Write-Verbose "Now set the Classification-specific Sharing settings"
-        $newGuestSettings = set-guestAccessForUnifiedGroup -unifiedGroup $unifiedGroupObject -Verbose:$VerbosePreference
-        switch($unifiedGroupObject.CustomAttribute7){
+        #First, set the UnifiedGroup Guest access settings
+        set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended
+        #Then set the corresponding SharePoint Site sharing settings
+        switch($graphGroupExtended.anthesisgroup_UGSync.classification){
             "External" {
-                #Allow external sharing
-                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing ExternalUserAndGuestSharing
+                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing ExternalUserAndGuestSharing #Allow external sharing
                 }
             "Internal" {
-                #Block all external sharing
-                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled
+                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled #Block all external sharing
                 }
             "Confidential" {
-                #Block all external sharing
-                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled
+                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled #Block all external sharing
                 }
             }
 
@@ -807,44 +802,9 @@ function set-standardSitePermissions(){
         $pnpWeb.Context.Web.SetUseAccessRequestDefaultAndUpdate($true)
         $pnpWeb.Context.ExecuteQuery()
 
-        Write-Verbose "Now check the classification is correct, try to fix it, and alert the Owners and Admins"
-        if($UnifiedGroupObject.Classification -ne $UnifiedGroupObject.CustomAttribute7){
-            $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was misclassified as [$($UnifiedGroupObject.Classification)] instead of [$($UnifiedGroupObject.CustomAttribute7)]"
-            Write-Verbose $warningMessage
-            try{
-                Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -Classification $UnifiedGroupObject.CustomAttribute7 -ErrorAction Stop
-                $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute7)]"
-                $priorty = "Normal"
-                }
-            catch{
-                $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
-                $priorty = "High"
-                }
-
-            if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
-            $groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID
-            Write-Verbose `t$result
-            Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
-            }
-
-        Write-Verbose "Now check the privacy setting is correct, try to fix it, and alert the Owners and Admins"
-        if($UnifiedGroupObject.AccessType -ne $UnifiedGroupObject.CustomAttribute8){
-            $warningMessage = "Unified Group [$($UnifiedGroupObject.DisplayName)][$($UnifiedGroupObject.ExternalDirectoryObjectId)] was mis-privacy-ed as [$($UnifiedGroupObject.AccessType)] instead of [$($UnifiedGroupObject.CustomAttribute8)]"
-            Write-Verbose $warningMessage
-            try{
-                Set-UnifiedGroup -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -AccessType $UnifiedGroupObject.CustomAttribute8 -ErrorAction Stop
-                $result = "Don't worry - I've fixed it now and set it back to [$($UnifiedGroupObject.CustomAttribute8)]"
-                $priorty = "Normal"
-                }
-            catch{
-                $result = "Unfortunately, I couldn't fix this automatically and it'll need a human to look at it"
-                $priorty = "High"
-                }
-            if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
-            if([string]::IsNullOrWhiteSpace($groupOwners)){$groupOwners = (Get-UnifiedGroupLinks -Identity $UnifiedGroupObject.ExternalDirectoryObjectId -LinkType Owners).WindowsLiveID}
-            Write-Verbose `t$result
-            Send-MailMessage -to $groupOwners -Cc $adminEmailAddresses -Subject $warningMessage -Body "$warningMessage`r`n`r`n$result`r`n`r`nLove,`r`n`r`nThe Helpful Groups Robot" -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Priority $priorty
-            }
+        #Reset any changes made to managed properties
+        if($suppressEmailNotifications){reset-graphUnifiedGroupSettingsToOriginals -tokenResponse $tokenResponse -graphGroupExtended $graphGroupExtended -Verbose:$VerbosePreference -suppressEmailNotification}
+        else{reset-graphUnifiedGroupSettingsToOriginals -tokenResponse $tokenResponse -graphGroupExtended $graphGroupExtended -Verbose:$VerbosePreference}
 
         Write-Verbose "Remove everything that isn't the 365 Group Owners object from Site Owners (it looks like adding the Data Managers AAD group has been deprecated to match the user-only membership behaviour of 365 Groups)"
         $spoOwnersGroup = Get-PnPGroup -AssociatedOwnerGroup
@@ -869,8 +829,8 @@ function set-standardSitePermissions(){
         }
 
     Write-Verbose "Finally, remove any owner/memberships we've temporarily granted ourselves"
-    if($requiresTemporaryAdminRights){
-        Remove-PnPSiteCollectionAdmin -Owners $($pnpCreds.UserName)
+    if(!$userWasAlreadyASiteAdmin){
+        Remove-PnPSiteCollectionAdmin -Owners $($pnpCreds.UserName) -Verbose:$VerbosePreference
         }
     }
 function test-isUserSiteCollectionAdmin(){
@@ -908,38 +868,54 @@ function test-isUserSiteCollectionAdmin(){
     #Get $unifiedGroupObject, regardless of which parameters we've been given
     switch ($PsCmdlet.ParameterSetName){
         “UnifiedGroupId”  {
-            Write-Verbose "`tWe've been given a 365 Id, so we need the PnPUnifiedGroup object"
+            Write-Verbose "`ttest-isUserSiteCollectionAdmin | We've been given a 365 Id, so we need the PnPUnifiedGroup object"
             try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupId -ErrorAction Stop -WarningAction Stop}
             catch{#Connect to the root site if we're not connected to anything
                 Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
                 $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupId
                 }
             if(!$pnpUnifiedGroupObject){
-                Write-Error "Could not retrieve Unified Group from ID [$unifiedGroupId]"
+                Write-Error "`ttest-isUserSiteCollectionAdmin | Could not retrieve Unified Group from ID [$unifiedGroupId]"
                 return
                 }
             }
         {$_ -match "Group"} { #Catches both pnpGroupObject & UnifiedGroupId
              try{
-                Write-Verbose "Checking to see if the executing user already has admin permissions for the Site"
+                Write-Verbose "`ttest-isUserSiteCollectionAdmin | Checking to see if the executing user already has admin permissions for the Site"
                 $pnpGroupAdmins = Get-PnPUnifiedGroupOwners -Identity $pnpUnifiedGroupObject.GroupId
                 if($pnpGroupAdmins.UserPrincipalName -contains $pnpCreds.UserName){
                     $isAlreadyAnAdmin = $true
-                    Write-Verbose "`tYes - user already is a Site Collection Admin"
+                    $isAlreadyAnAdmin
+                    Write-Verbose "`ttest-isUserSiteCollectionAdmin | Yes - [$($pnpCreds.UserName)] is already an Owner, and therefore a Site Collection Admin"
                     return
                     }
                 else{
-                    Write-Verbose "`tNo - user is not a Site Collection Admin"
-                    $isAlreadyAnAdmin = $false
-                    if($addPermissionsIfMissing){
-                        Write-Verbose "`t`tTemporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
-                        Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $pnpCreds
-                        Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
+                    Write-Warning "`ttest-isUserSiteCollectionAdmin | [$($pnpCreds.UserName)] is not an Owner, checking to see whether they are a Site Collection Admin ***This will break any existing Connect-PnPOnline sessions***"
+                    #Bizarrely, there doesn;t seem to be a way of finding Site Collection Administrators without connecting to a Site within a Site Collection (which requires you to be a Site Collection Admin). You clearly /can/ do this because we can access this information via the Classic and Modern SharePoint 365 consoles (presumably via the -admin.sharepoint.com Site). Can't figure this out programatically though >:(
+                    try{
+                        Connect-PnPOnline -Url $pnpUnifiedGroupObject.SiteUrl -Credentials $pnpCreds -ErrorAction Stop -Verbose
+                        $currentAdmins = Get-PnPSiteCollectionAdmin -ErrorAction Stop -Verbose
+                        $isAlreadyAnAdmin = $true
+                        $isAlreadyAnAdmin
+                        Write-Verbose "`ttest-isUserSiteCollectionAdmin | Yes - [$($pnpCreds.UserName)] is already a Site Collection Admin, and this has been set explicitly"
+                        return
+                        }
+                    catch{
+                        #If the user is not a Site Collection Admin, Connect-PnPOnline will throw an error to here
+                        Write-Verbose "`ttest-isUserSiteCollectionAdmin | No - [$($pnpCreds.UserName)] is not a Site Collection Admin"
+                        $isAlreadyAnAdmin = $false
+                        $isAlreadyAnAdmin
+                        if($addPermissionsIfMissing){
+                            Write-Verbose "`t`ttest-isUserSiteCollectionAdmin | Temporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
+                            Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $pnpCreds
+                            Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
+                            }
                         }
                     }
                 }
             catch{
                 Write-Error "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
+                $_
                 return
                 }            
             }
