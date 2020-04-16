@@ -112,21 +112,61 @@ $mismatchedDataManagers = Compare-Object -ReferenceObject $allCurrentDataManager
 $unauthorisedDataManagers = $mismatchedDataManagers  | ? {$_.SideIndicator -eq "<="}
 $authorisedButUnassignedDataManagers = $mismatchedDataManagers | ? {$_.SideIndicator -eq "=>"}
 
-$welcomeBodyTrunk = ""
-$warningBodyTrunk = ""
-$removedBodyTrunk = ""
+
+#Welcome new Data Managers
+$newauthorisedDataManagers | % {
+    $thisUser = $_
+    $welcomeBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
+    $welcomeBodyTrunk += "I'm sure you remember from your recent Data Manager training session on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy") that we tell our clients that we train all Data Managers annually (to help us comply with their demands about how we manage their data). We will remind you 2 months in advance to ensure that you have time to join a refresher course.<BR><BR>`r`n`r`n"
+    $welcomeBodyTrunk += "Just as a quick reminder, <A HREF='https://anthesisllc.sharepoint.com/:p:/r/teams/Working_Group_-_Collaboration_Improvement_365/Training%20Slides%20Shared/Data%20Management%20Training.pptx?d=wc75ff51e0236403b905979e34d5a1bdd&csf=1&e=FrfOxz'>the slides from the training session</A> are available for you to revist, and we have <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/SharePoint-Training-Guides.aspx#data-managers-guides'>a series of Data Manager self-help guides</A> available too.<BR><BR>`r`n`r`n"
+    $welcomeBodyTrunk += "If you have any more questions about Data Management, you can always ask the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A>,<BR><BR>`r`n`r`n"
+    $welcomeBodyTrunk += "Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
+    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    }
+
+
+#Warn users that they will need to book onto a refresher course int he next two months
+$expiringSoonDataManagers | % {
+    $thisUser = $_
+    $warningBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
+    $warningBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. Your last recorded Data Manager training session was on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy"), so it's about time to <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
+    $warningBodyTrunk += "A lot has changed in the past year. You can sign up for any session that is convenient for you and we'll go through some of the improvements that we've introduced, which will help you to work <I>even more</I> efficiently. <BR><BR>`r`n`r`n"
+    $warningBodyTrunk += "If there aren't any suitable sessions available for you, please contact the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> and they will arrange more. <BR><BR>`r`n`r`n"
+    $warningBodyTrunk += "If you don't renew your training, you will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
+    $whoOwnsWhatHash[$thisUser.FieldValues.User.Email] | Sort-Object {$_[0]} | % {
+        $warningBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
+        }
+    $warningBodyTrunk += "</UL><BR><BR>`r`n`r`nLove,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
+    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    }
+
+
+#Warn users that they have/will be automatically removed from Data Manager groups
+$unauthorisedDataManagers | %{
+    $thisUser = $_
+    $removedBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.givenName),<BR><BR>`r`n`r`n"
+    $removedBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. We don't have a record of you attending a training session in the past year, so it's about time to <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
+    $removedBodyTrunk += "A lot has changed in the past year. You can sign up for any session that is convenient for you and we'll go through some of the improvements that we've introduced, which will help you to work <I>even more</I> efficiently. <BR><BR>`r`n`r`n"
+    $removedBodyTrunk += "If there aren't any suitable sessions available for you, please contact the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> and they will arrange more. <BR><BR>`r`n`r`n"
+    $removedBodyTrunk += "If you don't renew your training by 2020-07-01, you will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
+    $whoOwnsWhatHash[$thisUser.mail] | Sort-Object {$_[0]} | % {
+        $removedBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
+        }
+    $removedBodyTrunk += "</UL>Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
+    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before 2020-07-01" -BodyAsHtml $removedBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    }
 
 #region Overview report
-$overviewBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello User/Exchange 365 Admins,`r`n`r`n<BR><BR>"
-$overviewBodyTrunk += "This report combines information in <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>User Training Records</A>, membership in [Data Managers - Authorised (All)] and membership in the individual [XYZ Team - Data Manager Subgroup] groups to ensure that all Data Managers have received training within the past 12 months. This will allow us to embed best practices within the business, meet client security requirements more easily and prepare for 3rd party accreditation (like ISO27001).<BR><BR>`r`n"
-$overviewBodyTrunk += "<A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>User Training Records</A> must be completed for all people who attend a <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>.<BR><BR>`r`n"
+$overviewBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello User/Exchange 365 Admins,<BR><BR>`r`n`r`n"
+$overviewBodyTrunk += "This report combines information in <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>User Training Records</A>, membership in [Data Managers - Authorised (All)] and membership in the individual [XYZ Team - Data Manager Subgroup] groups to ensure that all Data Managers have received training within the past 12 months. This will allow us to embed best practices within the business, meet client security requirements more easily and prepare for 3rd party accreditation (like ISO27001). <A HREF='https://github.com/kevmaitland/PoshAnt/blob/master/report-dataManagers.ps1'>GitCode</A><BR><BR>`r`n"
+$overviewBodyTrunk += "<A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>User Training Records</A> must be completed for all people who attend a <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>. The least-unreliable approach is for the person leading the training session to add these records on behalf of the attendees.<BR><BR>`r`n"
 $overviewBodyTrunk += "Weekly nofitications are sent to users whose training will expire in the next 2 months prompting them to join a <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>.<BR><BR>`r`n"
 $overviewBodyTrunk += "Beginning 2020-07-01, users who have no valid <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>Data Manager training record</A> will be automatically removed from all Data Manager groups (and replaced with GroupBot if they were the last Data Manager).<BR><BR>`r`n"
-$overviewBodyTrunk += "The following users have recently been added as Data Managers:<BR><BR>`r`n<UL>"
+$overviewBodyTrunk += "The following users have recently had training records created and have been re/added into [Data Managers - Authorised (All)]:<BR><BR>`r`n<UL>"
 $newauthorisedDataManagers | Sort-Object {$_.FieldValues.User.Email} | % {
     $overviewBodyTrunk += "<LI>$($_.FieldValues.User.Email)</LI>`r`n"
     }
-$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users will expire in the next 2 months:<BR><BR>`r`n<UL>"
+$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users' training will expire in the next 2 months:<BR><BR>`r`n<UL>"
 $expiringSoonDataManagers | Sort-Object {$_.FieldValues.User.Email} | % {
     $overviewBodyTrunk += "<LI>$($_.FieldValues.User.Email)</LI>`r`n"
     }
@@ -134,7 +174,7 @@ $overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users have not renewe
 $deauthorisedDataManagers | Sort-Object {$_.FieldValues.User.Email} | % {
     $overviewBodyTrunk += "<LI>$($_.FieldValues.User.Email)</LI>`r`n"
     }
-$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users are unauthorised Data Managers:<BR><BR>`r`n<UL>"
+$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users are unauthorised Data Managers (they are currently members of a [XYZ Team - Data Manager Subgroup], but have no valid training record):<BR><BR>`r`n<UL>"
 $unauthorisedDataManagers | Sort-Object {$_.mail} | % {
     $thisManager = $_
     $overviewBodyTrunk += "`r`n<LI><B>$($thisManager.mail)</B><UL>" #List the Managers alphabetically
@@ -175,11 +215,5 @@ $groupAndExchangeAdmins = $groupAndExchangeAdmins | Sort-Object userPrincipalNam
 Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Data Manager Summary $(Get-Date -f "yyyy-MM-dd")" -BodyAsHtml $overviewBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
 #endregion
 
-$bodyHead = "<HTML><FONT FACE=`"Calibri`">Hello $groupOwnersFirstNames,`r`n`r`n<BR><BR>"
 
 
-
-
-
-            $body += "</UL> Our Team names adhere to our <A HREF=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-11`">Naming Conventions</A> to ensure everyone in Anthesis is talking a common language, and we rely on Team Classification and Privacy/Visibilty settings to ensure robust and scalable access to data.`r`n`r`n<BR><BR>"
-            $body += "If you think that these settings are wrong, you'll need to speak with one of the humans in the IT Team.`r`n`r`n<BR><BR>"
