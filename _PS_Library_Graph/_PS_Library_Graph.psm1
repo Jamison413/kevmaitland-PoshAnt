@@ -803,7 +803,14 @@ function get-graphUsers(){
     
     if($filterLicensedUsers){
         Write-Verbose "Returning all Licensed Users"
-        $allUsers | ? {$_.assignedLicenses.Count -gt 0} | Sort-Object userPrincipalName -Unique
+        #$allUsers | ? {$_.assignedLicenses.Count -gt 0} | Sort-Object userPrincipalName -Unique
+        #Query the license details for each user, return if not null
+            ForEach($user in $allUsers){
+            $graphQuery = "/users/$($user.id)/licenseDetails"
+            $licenses = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graphQuery -Verbose
+            If($($licenses.value)){$user}
+            }
+
         }
     else{
         Write-Verbose "Returning all Users"
@@ -1405,6 +1412,27 @@ function set-graphUnifiedGroupGuestSettings(){
         }
 
     }
+function set-graphUserManager(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+         [ValidatePattern("@")]
+            [string]$userUPN
+        ,[parameter(Mandatory = $true)]
+         [ValidatePattern("@")]
+            [string]$managerUPN
+        )
+
+$employeeid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($userUPN) | Select-Object -Property "id"
+$managerid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($managerUPN) | Select-Object -Property "id"
+$body = "{
+  `"@odata.id`": `"https://graph.microsoft.com/v1.0/users/$($managerid.id)`"
+}"
+$graphQuery = "users/$($employeeid.id)" + '/manager/' + "`$ref"
+Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put -Verbose
+}
 function test-graphBearerAccessTokenStillValid(){
     [cmdletbinding()]
     param(
