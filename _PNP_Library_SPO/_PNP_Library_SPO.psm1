@@ -750,7 +750,6 @@ function set-standardSitePermissions(){
                 }
             }
         }
-    
     try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $graphGroupExtended.id -ErrorAction Stop -WarningAction Stop}
     catch{#Connect to the root site if we're not connected to anything
         Write-Verbose "Connecting to Graph"
@@ -758,44 +757,53 @@ function set-standardSitePermissions(){
         $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $graphGroupExtended.id
         }
 
-    if([string]::IsNullOrWhiteSpace($pnpUnifiedGroupObject.SiteUrl)){ #This is a more reliable test than the UnifiedGroup.SharePointSiteUrl property as it populates /much/ faster
+    if([string]::IsNullOrWhiteSpace([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))){ #This is a more reliable test than the UnifiedGroup.SharePointSiteUrl property as it populates /much/ faster
         Write-Error "Could not retrieve 365 Group URL from Group [$($graphGroupExtended.DisplayName)][$($graphGroupExtended.id)]. Exiting without attempting to check/set permissions"
         break
         }
+    else{Write-Verbose "SiteUrl for [$($graphGroupExtended.DisplayName)] is [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))] via Get-PnpUnifiedGroup"}
 
     #region Get connected to the Site
     try{
-        $userWasAlreadyASiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -accessToken $tokenResponse.access_token -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose
+        $userWasAlreadyASiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -accessToken $tokenResponse.access_token -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose:$VerbosePreference
         }
     catch{
-        Write-Verbose "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
+        Write-Verbose "Error connecting to [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))] - cannot continue"
         $_
         break
         }
     #endregion
 
-    Connect-PnPOnline -Url $pnpUnifiedGroupObject.SiteUrl -Credentials $pnpCreds -ErrorAction Stop -WarningAction Stop
-    if(test-pnpConnectionMatchesResource -resourceUrl $pnpUnifiedGroupObject.SiteUrl){
+    Connect-PnPOnline -Url $([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl)) -Credentials $pnpCreds -ErrorAction Stop -WarningAction Stop
+    if(test-pnpConnectionMatchesResource -resourceUrl $([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))){
         if([string]::IsNullOrWhiteSpace((Get-PnPFeature -Scope Site -Identity "b50e3104-6812-424f-a011-cc90e6327318"))){
             Write-Verbose "Enabling the DocID service"
-            Enable-PnPFeature -Identity "b50e3104-6812-424f-a011-cc90e6327318" -Scope Site -Verbose
+            Enable-PnPFeature -Identity "b50e3104-6812-424f-a011-cc90e6327318" -Scope Site -Verbose:$VerbosePreference
             }
 
         Write-Verbose "Now set the Classification-specific Sharing settings"
         #First, set the UnifiedGroup Guest access settings
-        set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended
+        set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended -Verbose:$VerbosePreference
         #Then set the corresponding SharePoint Site sharing settings
-        switch($graphGroupExtended.anthesisgroup_UGSync.classification){
-            "External" {
-                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing ExternalUserAndGuestSharing #Allow external sharing
-                }
-            "Internal" {
-                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled #Block all external sharing
-                }
-            "Confidential" {
-                Set-PnPSite -Identity $pnpUnifiedGroupObject.SiteUrl -DisableSharingForNonOwners:$true -Sharing Disabled #Block all external sharing
-                }
-            }
+        Write-Verbose "`[uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl) = [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))]"
+        Write-Verbose "`$graphGroupExtended.anthesisgroup_UGSync.classification = [$($graphGroupExtended.anthesisgroup_UGSync.classification)]"
+        Write-Verbose Get-PnPConnection
+#        if([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl) -notmatch "&" -and [uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl) -notmatch "%26"){ #There's a bug where URLs containing ampersands don't process correctly via a Scheduled Task. Must be something to do with encoding, but can't figure it out and have run out of time :'(
+            switch($graphGroupExtended.anthesisgroup_UGSync.classification){
+                    "External" {
+                        Write-Verbose "Set-PnPSite -DisableSharingForNonOwners:$true -Sharing ExternalUserAndGuestSharing -Verbose:$VerbosePreference"
+                        Set-PnPSite -DisableSharingForNonOwners:$true -Sharing ExternalUserAndGuestSharing -Verbose:$VerbosePreference #Allow external sharing #Unescape because Set-PnPSite doesn't like %26 in place of &
+                        }
+                    "Internal" {
+                        Write-Verbose "Set-PnPSite -DisableSharingForNonOwners:$true -Sharing Disabled -Verbose:$VerbosePreference"
+                        Set-PnPSite -DisableSharingForNonOwners:$true -Sharing Disabled -Verbose # :$VerbosePreference #Block all external sharing
+                        }
+                    "Confidential" {
+                        Write-Verbose "Set-PnPSite -DisableSharingForNonOwners:$true -Sharing Disabled -Verbose:$VerbosePreference"
+                        Set-PnPSite -DisableSharingForNonOwners:$true -Sharing Disabled -Verbose:$VerbosePreference #Block all external sharing
+                        }
+                    }
+ #           }
 
         Write-Verbose "Now set Access Requests to go to default Owners Group (Set-PnPSite above seems to break this)"
         $pnpWeb = Get-PnPWeb -Includes RequestAccessEmail
@@ -827,7 +835,7 @@ function set-standardSitePermissions(){
                 }
             }
         }
-
+    else{Write-Warning "Cannot set security: Connected to incorrect Site [$((Get-PnPConnection).Url)]; expecting [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))]"}
     Write-Verbose "Finally, remove any owner/memberships we've temporarily granted ourselves"
     if(!$userWasAlreadyASiteAdmin){
         Remove-PnPSiteCollectionAdmin -Owners $($pnpCreds.UserName) -Verbose:$VerbosePreference
@@ -893,7 +901,7 @@ function test-isUserSiteCollectionAdmin(){
                     Write-Warning "`ttest-isUserSiteCollectionAdmin | [$($pnpCreds.UserName)] is not an Owner, checking to see whether they are a Site Collection Admin ***This will break any existing Connect-PnPOnline sessions***"
                     #Bizarrely, there doesn;t seem to be a way of finding Site Collection Administrators without connecting to a Site within a Site Collection (which requires you to be a Site Collection Admin). You clearly /can/ do this because we can access this information via the Classic and Modern SharePoint 365 consoles (presumably via the -admin.sharepoint.com Site). Can't figure this out programatically though >:(
                     try{
-                        Connect-PnPOnline -Url $pnpUnifiedGroupObject.SiteUrl -Credentials $pnpCreds -ErrorAction Stop -Verbose
+                        Connect-PnPOnline -Url $([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl)) -Credentials $pnpCreds -ErrorAction Stop -Verbose
                         $currentAdmins = Get-PnPSiteCollectionAdmin -ErrorAction Stop -Verbose
                         $isAlreadyAnAdmin = $true
                         $isAlreadyAnAdmin
@@ -906,15 +914,15 @@ function test-isUserSiteCollectionAdmin(){
                         $isAlreadyAnAdmin = $false
                         $isAlreadyAnAdmin
                         if($addPermissionsIfMissing){
-                            Write-Verbose "`t`ttest-isUserSiteCollectionAdmin | Temporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$($pnpUnifiedGroupObject.SiteUrl)]"
+                            Write-Verbose "`t`ttest-isUserSiteCollectionAdmin | Temporarily granting Site Collection Admin rights now for [$($pnpCreds.UserName)] to [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))]"
                             Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $pnpCreds
-                            Set-PnPTenantSite -Url $pnpUnifiedGroupObject.SiteUrl -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
+                            Set-PnPTenantSite -Url $([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl)) -Owners $pnpCreds.UserName -Verbose:$VerbosePreference
                             }
                         }
                     }
                 }
             catch{
-                Write-Error "Error connecting to [$($pnpUnifiedGroupObject.SiteUrl)] - cannot continue"
+                Write-Error "Error connecting to [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))] - cannot continue"
                 $_
                 return
                 }            
@@ -939,7 +947,7 @@ function test-pnpConnectionMatchesResource(){
     Write-Verbose "test-pnpConnectionMatchesResource($resourceUrl, $($pnpCreds.UserName)"
     try{
         Get-PnPConnection | Out-Null
-        if((split-path ([System.Uri](Get-PnPConnection).Url).LocalPath -Leaf) -eq (Split-Path $resourceUrl -Leaf)){
+        if((Get-PnPConnection).Url -eq $resourceUrl){
             Write-Verbose "Connect-PnPOnline connection matches [$resourceUrl]"
             return $true
             break #To avoid reconnecting and changing context later
