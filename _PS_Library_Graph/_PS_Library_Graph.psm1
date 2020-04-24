@@ -803,14 +803,7 @@ function get-graphUsers(){
     
     if($filterLicensedUsers){
         Write-Verbose "Returning all Licensed Users"
-        #$allUsers | ? {$_.assignedLicenses.Count -gt 0} | Sort-Object userPrincipalName -Unique
-        #Query the license details for each user, return if not null
-            ForEach($user in $allUsers){
-            $graphQuery = "/users/$($user.id)/licenseDetails"
-            $licenses = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graphQuery -Verbose
-            If($($licenses.value)){$user}
-            }
-
+        $allUsers | ? {$_.assignedLicenses.Count -gt 0} | Sort-Object userPrincipalName -Unique
         }
     else{
         Write-Verbose "Returning all Users"
