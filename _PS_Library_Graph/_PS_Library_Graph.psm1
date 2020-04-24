@@ -392,7 +392,7 @@ function get-graphDrives(){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
         $refiner = $refiner+$filter
         }    
-    if($refiner.Length -gt 1){$query = $query+$refiner}
+    if($refiner.Length -gt 1){$query = $query+[uri]::EscapeDataString($refiner)}
 
     #Finally, submit the query and return the results
     $drives = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $query
@@ -413,6 +413,8 @@ function get-graphGroups(){
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [string]$filterDisplayName
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterDisplayNameStartsWith
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [ValidateSet("Unified","Security","MailEnabledSecurity","Distribution")]
             [string]$filterGroupType
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
@@ -420,7 +422,7 @@ function get-graphGroups(){
             [switch]$selectAllProperties = $false
         )
     if($selectAllProperties){ #We're only dealing with one select option (all or default)
-        $select  = "?`$select=displayName,id,description,mail,anthesisgroup_UGSync,deletedDateTime,classification,createdDateTime,creationOptions,groupTypes,isAssignableToRole,mailEnabled,mailNickname,onPremisesDomainName,onPremisesLastSyncDateTime,onPremisesNetBiosName,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,preferredDataLocation,proxyAddresses,renewedDateTime,resourceBehaviorOptions,resourceProvisioningOptions,securityEnabled,securityIdentifier,visibility,onPremisesProvisioningErrors"
+        $select  = "`$select=displayName,id,description,mail,anthesisgroup_UGSync,deletedDateTime,classification,createdDateTime,creationOptions,groupTypes,isAssignableToRole,mailEnabled,mailNickname,onPremisesDomainName,onPremisesLastSyncDateTime,onPremisesNetBiosName,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,preferredDataLocation,proxyAddresses,renewedDateTime,resourceBehaviorOptions,resourceProvisioningOptions,securityEnabled,securityIdentifier,visibility,onPremisesProvisioningErrors"
         }
 
     switch ($PsCmdlet.ParameterSetName){
@@ -432,7 +434,8 @@ function get-graphGroups(){
     
     #Build up the filter & select conditions into a refiner we can append to the query string
     if($filterUpn){$filter += " and mail eq '$filterUpn'"}
-    if($filterDisplayName){$filter += " and displayName eq '$filterDisplayName'"}
+    if($filterDisplayName){$filter += " and displayName eq '$([uri]::EscapeDataString($filterDisplayName))'"}
+    if($filterDisplayNameStartsWith){$filter += " and startswith(displayName,'$([uri]::EscapeDataString($filterDisplayNameStartsWith))')"}
     switch($filterGroupType){
         "Unified" {$filter += " and groupTypes/any(a:a eq 'Unified')"}
         "Security" {$filter += " and mailEnabled eq 'false'"}
@@ -462,6 +465,7 @@ function get-graphGroups(){
 
     if($filterGroupType -eq "MailEnabledSecurity" -or $filterGroupType -eq "Distribution"){
         $results | ? {$_.groupTypes -notcontains "Unified"} | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name ExternalDirectoryObjectId -Value $_.id}
+        $results 
         }
     else{$results}
 
@@ -501,7 +505,7 @@ function get-graphGroupWithUGSyncExtensions(){
     #Add $filters for the various properties
     if($filterUpn){$additionalFilters += " and mail eq '$filterUpn'"}
     if($filterId){$additionalFilters += " and id eq '$filterId'"}
-    if($filterDisplayName){$additionalFilters += " and displayName eq '$filterDisplayName'"}
+    if($filterDisplayName){$additionalFilters += " and displayName eq '$([uri]::EscapeDataString($filterDisplayName))'"}
     if($filterDataManagersGroupId){$additionalFilters += " and anthesisgroup_UGSync/dataManagerGroupId eq '$filterDataManagersGroupId'"}
     if($filterMembersGroupId){$additionalFilters += " and anthesisgroup_UGSync/memberGroupId eq '$filterMembersGroupId'"}
     if($filterCombinedGroupId){$additionalFilters += " and anthesisgroup_UGSync/combinedGroupId eq '$filterCombinedGroupId'"}
@@ -773,8 +777,8 @@ function get-graphUsers(){
         $select = ",id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses"
         }
     if($selectAllProperties){
-        $select = ",id,id,displayName,givenName,surname,jobTitle,userPrincipalName,mail,mobilePhone,officeLocation,postalCode,usageLocation,preferredLanguage,assignedLicenses"
-        }
+        $select = ",accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"
+        } #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
 
     #Build the refiner based on the parameters supplied
     if(![string]::IsNullOrWhiteSpace($select)){
@@ -875,6 +879,41 @@ function get-graphUsersFromGroup(){
         Write-Verbose "Returning all Members"
         $allMembers
         }
+    }
+function get-graphUsersWithUGSyncExtensions(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $false)]
+            [ValidatePattern("@")]
+            [string]$filterUpn
+        ,[parameter(Mandatory = $false)]
+            [string]$filterId
+        ,[parameter(Mandatory = $false)]
+            [string]$filterDisplayName
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet("Employee","Subcontractor","Associate")]
+            [string]$filterContractType
+        ,[parameter(Mandatory = $false)]
+            [string]$filterEmployeeId
+        ,[parameter(Mandatory = $false)]
+            [string]$filterBusinessUnit
+        ,[parameter(Mandatory = $false)]
+            [switch]$selectAllProperties
+        )
+    #Add $filters for the various properties
+    if($filterUpn){$additionalFilters += " and mail eq '$filterUpn'"}
+    if($filterId){$additionalFilters += " and id eq '$filterId'"}
+    if($filterDisplayName){$additionalFilters += " and displayName eq '$([uri]::EscapeDataString($filterDisplayName))'"}
+    if($filterContractType){$additionalFilters += " and anthesisgroup_employeeInfo/contractType eq '$filterContractType'"}
+    if($filterContractType){$additionalFilters += " and anthesisgroup_employeeInfo/employeeId eq '$filterEmployeeId'"}
+    if($filterContractType){$additionalFilters += " and anthesisgroup_employeeInfo/businessUnit eq '$filterBusinessUnit'"}
+
+    if($selectAllProperties){$lotsOfProperties = ",accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"}
+         #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/users?`$filter=anthesisgroup_employeeInfo/extensionType eq 'employeeInfo'$additionalFilters&`$select=displayName,id,description,mail,anthesisgroup_employeeInfo$lotsOfProperties" -Verbose:$VerbosePreference
+            
     }
 function grant-graphSharing(){
     [cmdletbinding()]
@@ -1142,6 +1181,105 @@ function remove-graphUsersFromGroup(){
         invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/$_/`$ref" -Verbose:$VerbosePreference
         }
     }
+function repair-graphGroupUGSyncSchemaExtensions(){
+    param(
+        [parameter(Mandatory = $true)]
+            [PSCustomObject]$tokenResponse
+        ,[parameter(Mandatory = $true)]
+            [PSCustomObject]$graphGroup
+        ,[Parameter(Mandatory=$true)]
+            [ValidateSet ("Internal","Confidential","External","Sym")]
+            [string]$groupClassifcation
+        ,[Parameter(Mandatory=$true)]
+            [ValidateSet ("AAD","365")]
+            [string]$masterMembership
+        ,[Parameter(Mandatory=$false)]
+            [switch]$createGroupsIfMissing
+        )
+
+    
+    $possibleSecurityGroupMatches = get-graphGroups -tokenResponse $tokenResponse -filterDisplayNameStartsWith $graphGroup.DisplayName -filterGroupType MailEnabledSecurity
+
+    $dataManagerSG = @()
+    $membersSG = @()
+    $combinedSG = @()
+    $smb = @()
+
+    $dataManagerSG += $possibleSecurityGroupMatches | ? {$_.DisplayName -match "data managers"}
+    $membersSG += $possibleSecurityGroupMatches | ? {$_.DisplayName -match "members"}
+    $combinedSG += $possibleSecurityGroupMatches | ? {$_.DisplayName -eq $graphGroup.DisplayName -and $_.ExternalDirectoryObjectId -ne $graphGroup.id}
+    $smb += Get-Mailbox -Filter "DisplayName -like `'*$graphGroup.DisplayName*`'"
+
+    switch($groupClassifcation){
+        "Internal" {$pubPriv = "Private"}
+        "Confidential" {$pubPriv = "Private"}
+        "External" {$pubPriv = "Private"}
+        "Sym" {$pubPriv = "Public"}
+        }
+
+
+    if($dataManagerSG.Count -ne 1){
+        Write-Warning "[$($dataManagerSG.Count)] Potential Data Manager groups identified [$($dataManagerSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($membersSG.Count -ne 1){
+        Write-Warning "[$($membersSG.Count)] Potential Member groups identified [$($membersSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($combinedSG.Count -ne 1){
+        Write-Warning "[$($combinedSG.Count)] Potential Combined groups identified [$($combinedSG.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        $bigProblem = $true
+        }
+    if($smb.Count -ne 1){
+        Write-Warning "[$($smb.Count)] Potential Shared Mailboxes identified [$($smb.DisplayName -join ",")]. Cannot automatically resolve this problem."
+        }
+
+    if($bigProblem){
+        if($createGroupsIfMissing){
+            Write-Warning "Couldn't automatically identify the required groups to fix this. Will attempt to create missing groups"
+            if(!$combinedSG){
+                Write-Verbose "`tCreating Combined Security Group [$($graphGroup.DisplayName)]"
+                try{
+                    $combinedSg = new-mailEnabledSecurityGroup -dgDisplayName $graphGroup.DisplayName -membersUpns $null -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $($graphGroup.DisplayName)" -WhatIf:$WhatIfPreference
+                    }
+                catch{Write-Error $_}
+                }
+            if($combinedSG){#Dont try creating the subgroups if the Combined Group isn't available
+                set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -combinedGroupId $combinedSg.ExternalDirectoryObjectId 
+                if(!$dataManagerSG){ #Create a Managers SG if required
+                    Write-Verbose "Creating Data Managers Security Group [$($graphGroup.DisplayName) - Data Managers Subgroup]"
+                    try{$dataManagerSG = new-mailEnabledSecurityGroup -dgDisplayName "$($graphGroup.DisplayName) - Data Managers Subgroup" -fixedSuffix " - Data Managers Subgroup" -membersUpns $null -memberOf @($combinedSg.ExternalDirectoryObjectId,$combinedSG[0].ObjectId)-hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for $($graphGroup.DisplayName) Data Managers" -WhatIf:$WhatIfPreference -Verbose}
+                    catch{Write-Error $_}
+                    }
+                if($dataManagerSG){set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -dataManagerGroupId $dataManagerSG.ExternalDirectoryObjectId}
+
+                if(!$membersSg){ #And create a Members SG if required
+                    Write-Verbose "Creating Members Security Group [$($graphGroup.DisplayName) - Members Subgroup]"
+                    try{$membersSg = new-mailEnabledSecurityGroup -dgDisplayName "$($graphGroup.DisplayName) - Members Subgroup" -fixedSuffix " - Members Subgroup" -membersUpns $null -memberOf @($combinedSg.ExternalDirectoryObjectId,$combinedSG[0].ObjectId) -hideFromGal $false -blockExternalMail $true -ownersUpns "ITTeamAll@anthesisgroup.com" -description "Mail-enabled Security Group for mirroring membership of $($graphGroup.DisplayName) Unified Group" -WhatIf:$WhatIfPreference -Verbose}
+                    catch{Write-Error $_}
+                    }
+                if($membersSG){set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -memberGroupId $membersSG.ExternalDirectoryObjectId}
+                
+                }
+            break
+            }
+        else{
+            Write-Warning "Couldn't automatically identify the required groups to fix this. Will attempt to set remaining CustomAttributes then exit"
+            set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -masterMembershipList $masterMembership -classification $groupClassifcation -privacy $pubPriv
+            Set-UnifiedGroup -Identity $unifiedGroup.ExternalDirectoryObjectId -CustomAttribute6 $masterMembership -CustomAttribute7 $groupType -CustomAttribute8 $pubPriv
+            break
+            }
+        }
+
+    if($smb.Count -eq 1){
+        Write-Verbose "set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId [$($graphGroup.id)] -sharedMailboxId [$($smb.ExternalDirectoryObjectId)] -dataManagerGroupId [$($dataManagerSG.ExternalDirectoryObjectId)] -memberGroupId [$($membersSG.ExternalDirectoryObjectId)] -combinedGroupId [$($combinedSg.ExternalDirectoryObjectId)] -masterMembershipList [$masterMembership] -classification [$groupClassifcation] -privacy [$pubPriv]"
+        set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -sharedMailboxId $smb.ExternalDirectoryObjectId -dataManagerGroupId $dataManagerSG.ExternalDirectoryObjectId -memberGroupId $membersSG.ExternalDirectoryObjectId -combinedGroupId $combinedSg.ExternalDirectoryObjectId -masterMembershipList $masterMembership -classification $groupClassifcation -privacy $pubPriv
+        }
+    else{
+        Write-Verbose "set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId [$($graphGroup.id)]  -dataManagerGroupId [$($dataManagerSG.ExternalDirectoryObjectId)] -memberGroupId [$($membersSG.ExternalDirectoryObjectId)] -combinedGroupId [$($combinedSg.ExternalDirectoryObjectId)] -masterMembershipList [$masterMembership] -classification [$groupClassifcation] -privacy [$pubPriv]"
+        set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -dataManagerGroupId $dataManagerSG.ExternalDirectoryObjectId -memberGroupId $membersSG.ExternalDirectoryObjectId -combinedGroupId $combinedSg.ExternalDirectoryObjectId -masterMembershipList $masterMembership -classification $groupClassifcation -privacy $pubPriv
+        }
+    }
 function reset-graphUnifiedGroupSettingsToOriginals(){
     [cmdletbinding()]
     param(
@@ -1316,7 +1454,7 @@ function set-graphGroupUGSyncSchemaExtensions(){
     param(
         [parameter(Mandatory = $true)]
             [psobject]$tokenResponse        
-        ,[parameter(Mandatory = $false)]
+        ,[parameter(Mandatory = $true)]
             [string]$groupId        
         ,[parameter(Mandatory = $false)]
             [string]$dataManagerGroupId        
@@ -1405,27 +1543,6 @@ function set-graphUnifiedGroupGuestSettings(){
         }
 
     }
-function set-graphUserManager(){
-    [cmdletbinding()]
-    param(
-        [parameter(Mandatory = $true)]
-            [psobject]$tokenResponse        
-        ,[parameter(Mandatory = $true)]
-         [ValidatePattern("@")]
-            [string]$userUPN
-        ,[parameter(Mandatory = $true)]
-         [ValidatePattern("@")]
-            [string]$managerUPN
-        )
-
-$employeeid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($userUPN) | Select-Object -Property "id"
-$managerid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($managerUPN) | Select-Object -Property "id"
-$body = "{
-  `"@odata.id`": `"https://graph.microsoft.com/v1.0/users/$($managerid.id)`"
-}"
-$graphQuery = "users/$($employeeid.id)" + '/manager/' + "`$ref"
-Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put -Verbose
-}
 function test-graphBearerAccessTokenStillValid(){
     [cmdletbinding()]
     param(
@@ -1444,6 +1561,28 @@ function test-graphBearerAccessTokenStillValid(){
             }
         else{$false}#Otherwise return False
         }
+    }
+function update-mailboxCustomAttibutesToGraphSchemaExtensions(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [psobject]$mailbox
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet("Employee","Subcontractor","Associate")]
+            [string]$contractType
+        )
+    
+    $bodyHash = @{
+        "anthesisgroup_employeeInfo" = @{
+            "extensionType" = "employeeInfo"
+            "contractType" = "Employee"
+            "employeeId" = $null
+            "businessUnit" = $mailbox.CustomAttribute1
+            }
+        }
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/users/$($mailbox.ExternalDirectoryObjectId)" -graphBodyHashtable $bodyHash
     }
 function update-unifiedGroupCustomAttibutesToGraphSchemaExtensions(){
     [cmdletbinding()]

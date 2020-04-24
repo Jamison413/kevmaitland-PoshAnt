@@ -1,7 +1,7 @@
 ﻿$365creds = set-MsolCredentials
 connect-ToExo -credential $365creds
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 

@@ -272,6 +272,7 @@ function new-365Group(){
         )
 
     Write-Verbose "new-365Group($displayName, $description, $managerUpns, $teamMemberUpns, $memberOf, $hideFromGal, $blockExternalMail, $isPublic, $autoSubscribe, $additionalEmailAddresses, $groupClassification, $ownersAreRealManagers,$membershipmanagedBy)"
+    $displayName = $displayName.Replace("&","and") #Having ampersands in URLs causes problems, so the simplest option is to prevent them entirely.
     $shortName = $displayName.Replace(" (All)","")
     $365MailAlias = $(guess-aliasFromDisplayName "$displayName 365")
     $combinedSgDisplayName = $displayName

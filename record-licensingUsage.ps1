@@ -49,7 +49,7 @@ $mailUsers | % {$userHash[$_.MicrosoftOnlineServicesID][1] = $_}
 
 $targetList = get-list -serverUrl $sharePointServerUrl -sitePath $ITSite -listName $licensingListName -restCreds $restCredentials -verboseLogging $verboseLogging -logFile $logFile
 $timeStamp = Get-Date
-$prettyLicenseNames = @{"AnthesisLLC:ENTERPRISEPACK" = "E3";"AnthesisLLC:EXCHANGEDESKLESS"="Kiosk";"AnthesisLLC:PROJECTPROFESSIONAL"="Project";"AnthesisLLC:STANDARDPACK"="E1";"AnthesisLLC:VISIOCLIENT"="Visio";"AnthesisLLC:WACONEDRIVESTANDARD"="OneDrive";"AnthesisLLC:ATP_ENTERPRISE"="AdvancedSpam";"AnthesisLLC:POWER_BI_STANDARD"="PowerBI";"AnthesisLLC:EMS"="Security"}
+$prettyLicenseNames = @{"AnthesisLLC:ENTERPRISEPACK" = "E3";"AnthesisLLC:EXCHANGEDESKLESS"="Kiosk";"AnthesisLLC:PROJECTPROFESSIONAL"="Project";"AnthesisLLC:STANDARDPACK"="E1";"AnthesisLLC:VISIOCLIENT"="Visio";"AnthesisLLC:WACONEDRIVESTANDARD"="OneDrive";"AnthesisLLC:ATP_ENTERPRISE"="AdvancedSpam";"AnthesisLLC:POWER_BI_STANDARD"="PowerBI";"AnthesisLLC:EMS"="Security";"AnthesisLLC:ENTERPRISEPREMIUM"="E5";"AnthesisLLC:MCOMEETADV"="AudioConferencing";"AnthesisLLC:MCOPSTN1"="DomesticCalling";"AnthesisLLC:MCOPSTN2"="InternationalCalling";"AnthesisLLC:FLOW_FREE"="PowerAutomateFree"}
 
 foreach($upn in $userHash.Keys){
     foreach($license in $userHash[$upn][0].Licenses){
