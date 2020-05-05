@@ -1142,7 +1142,7 @@ function new-graphTeam(){
             try{$attempt = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "groups/$groupId/team" -graphBodyHashtable $newTeamBody}
             catch{
                 Write-error "Failed to add Team component to Group [$groupId] after 3 attempts"
-                break
+                return
                 }
             }
         }
@@ -1272,12 +1272,12 @@ function repair-graphGroupUGSyncSchemaExtensions(){
         }
 
     if($smb.Count -eq 1){
-        Write-Verbose "set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId [$($graphGroup.id)] -sharedMailboxId [$($smb.ExternalDirectoryObjectId)] -dataManagerGroupId [$($dataManagerSG.ExternalDirectoryObjectId)] -memberGroupId [$($membersSG.ExternalDirectoryObjectId)] -combinedGroupId [$($combinedSg.ExternalDirectoryObjectId)] -masterMembershipList [$masterMembership] -classification [$groupClassifcation] -privacy [$pubPriv]"
-        set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -sharedMailboxId $smb.ExternalDirectoryObjectId -dataManagerGroupId $dataManagerSG.ExternalDirectoryObjectId -memberGroupId $membersSG.ExternalDirectoryObjectId -combinedGroupId $combinedSg.ExternalDirectoryObjectId -masterMembershipList $masterMembership -classification $groupClassifcation -privacy $pubPriv
+        Write-Verbose "set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId [$($graphGroup.id)] -sharedMailboxId [$($smb.id)] -dataManagerGroupId [$($dataManagerSG.id)] -memberGroupId [$($membersSG.id)] -combinedGroupId [$($combinedSg.id)] -masterMembershipList [$masterMembership] -classification [$groupClassifcation] -privacy [$pubPriv]"
+        set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -sharedMailboxId $smb.id -dataManagerGroupId $dataManagerSG.id -memberGroupId $membersSG.id -combinedGroupId $combinedSg.id -masterMembershipList $masterMembership -classification $groupClassifcation -privacy $pubPriv
         }
     else{
-        Write-Verbose "set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId [$($graphGroup.id)]  -dataManagerGroupId [$($dataManagerSG.ExternalDirectoryObjectId)] -memberGroupId [$($membersSG.ExternalDirectoryObjectId)] -combinedGroupId [$($combinedSg.ExternalDirectoryObjectId)] -masterMembershipList [$masterMembership] -classification [$groupClassifcation] -privacy [$pubPriv]"
-        set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -dataManagerGroupId $dataManagerSG.ExternalDirectoryObjectId -memberGroupId $membersSG.ExternalDirectoryObjectId -combinedGroupId $combinedSg.ExternalDirectoryObjectId -masterMembershipList $masterMembership -classification $groupClassifcation -privacy $pubPriv
+        Write-Verbose "set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId [$($graphGroup.id)]  -dataManagerGroupId [$($dataManagerSG.id)] -memberGroupId [$($membersSG.id)] -combinedGroupId [$($combinedSg.id)] -masterMembershipList [$masterMembership] -classification [$groupClassifcation] -privacy [$pubPriv]"
+        set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $graphGroup.id -dataManagerGroupId $dataManagerSG.id -memberGroupId $membersSG.id -combinedGroupId $combinedSg.id -masterMembershipList $masterMembership -classification $groupClassifcation -privacy $pubPriv
         }
     }
 function reset-graphUnifiedGroupSettingsToOriginals(){

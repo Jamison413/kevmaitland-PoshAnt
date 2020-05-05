@@ -51,7 +51,7 @@ for($i=0;$i -lt $dataManagerTrainingRecords.Count;$i++){
         }
     $lastEmail = $dataManagerTrainingRecords[$i].FieldValues.User.Email
     }
-$authorisedDataManagers = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddYears(-1)}
+$validTrainedDataManagers = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddYears(-1)}
 $expiringSoonDataManagers = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddYears(-1) -and $_.FieldValues.Date_x0020_of_x0020_training -lt $(Get-Date).AddMonths(-10)}
 #$deauthorisedDataManagers = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -lt $(Get-Date).AddYears(-1)}
 
@@ -62,10 +62,10 @@ $currentDataManagerGroup =  get-graphGroups -tokenResponse $tokenResponse -filte
 $allCurrentDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $currentDataManagerGroup.id -memberType TransitiveMembers -returnOnlyUsers
 
 #Compare who is currently in the [Data Managers - Authorised (All)] group with who *should* be in there, and make any changes
-if($authorisedDataManagers -eq $null){$authorisedDataManagers = @()}
+if($validTrainedDataManagers -eq $null){$validTrainedDataManagers = @()}
 if($allAuthorisedDataManagers -eq $null){$allAuthorisedDataManagers = @()}
-$mismatchedAuthorisedDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $allAuthorisedDataManagers -Property mail -PassThru -IncludeEqual
-$deauthorisedDataManagers = $mismatchedAuthorisedDataManagers | ? {$_.SideIndicator -eq "=>"}
+$mismatchedAuthorisedDataManagers = Compare-Object -ReferenceObject $validTrainedDataManagers -DifferenceObject $allAuthorisedDataManagers -Property mail -PassThru -IncludeEqual
+#$deauthorisedDataManagers = $mismatchedAuthorisedDataManagers | ? {$_.SideIndicator -eq "=>"}
 $deauthorisedDataManagers | % { #Remove anyone who's training has lapsed
     Write-Verbose "Removing [$( $_.mail)] from [$($authorisedDataManagerGroup.displayName)]"
     Remove-DistributionGroupMember -Identity $authorisedDataManagerGroup.id -Member $_.mail -Confirm:$false -BypassSecurityGroupManagerCheck:$true 
@@ -121,7 +121,8 @@ $newauthorisedDataManagers | % {
     $welcomeBodyTrunk += "Just as a quick reminder, <A HREF='https://anthesisllc.sharepoint.com/:p:/r/teams/Working_Group_-_Collaboration_Improvement_365/Training%20Slides%20Shared/Data%20Management%20Training.pptx?d=wc75ff51e0236403b905979e34d5a1bdd&csf=1&e=FrfOxz'>the slides from the training session</A> are available for you to revist, and we have <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/SharePoint-Training-Guides.aspx#data-managers-guides'>a series of Data Manager self-help guides</A> available too.<BR><BR>`r`n`r`n"
     $welcomeBodyTrunk += "If you have any more questions about Data Management, you can always ask the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A>,<BR><BR>`r`n`r`n"
     $welcomeBodyTrunk += "Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To $thisUser.FieldValues.User.Email -Encoding UTF8
     }
 
 
@@ -137,7 +138,8 @@ $expiringSoonDataManagers | % {
         $warningBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
         }
     $warningBodyTrunk += "</UL><BR><BR>`r`n`r`nLove,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To $thisUser.FieldValues.User.Email  -Encoding UTF8
     }
 
 
@@ -153,7 +155,8 @@ $unauthorisedDataManagers | %{
         $removedBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
         }
     $removedBodyTrunk += "</UL>Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before 2020-07-01" -BodyAsHtml $removedBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+    #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before 2020-07-01" -BodyAsHtml $removedBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8;break
+    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before 2020-07-01" -BodyAsHtml $removedBodyTrunk -To $thisUser.userPrincipalName  -Encoding UTF8
     }
 
 #region Overview report
@@ -183,7 +186,7 @@ $unauthorisedDataManagers | Sort-Object {$_.mail} | % {
         }
     $overviewBodyTrunk += "</UL>" 
     }
-$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>All Data Managers and the groups they manage:<BR><BR>`r`n<UL>"
+$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR><B>All</B> Data Managers and the groups they manage (unauthorised Data Managers are in <I>italics</I>):<BR><BR>`r`n<UL>"
 $allCurrentDataManagers | Sort-Object {$_.mail} | % {
     $thisManager = $_
     if($unauthorisedDataManagers.mail -contains $thisManager.mail){
@@ -212,7 +215,8 @@ $groupAndExchangeAdmins = get-graphAdministrativeRoleMembers -tokenResponse $tok
 $groupAndExchangeAdmins += get-graphAdministrativeRoleMembers -tokenResponse $tokenResponse -roleName 'User Account Administrator' 
 $groupAndExchangeAdmins = $groupAndExchangeAdmins | Sort-Object userPrincipalName -Unique
 
-Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Data Manager Summary $(Get-Date -f "yyyy-MM-dd")" -BodyAsHtml $overviewBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+#Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Data Manager Summary $(Get-Date -f "yyyy-MM-dd")" -BodyAsHtml $overviewBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Data Manager Summary $(Get-Date -f "yyyy-MM-dd")" -BodyAsHtml $overviewBodyTrunk -To $groupAndExchangeAdmins.userPrincipalName  -Encoding UTF8
 #endregion
 
 

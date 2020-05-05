@@ -189,6 +189,10 @@ Catch{
 #send-mailmessage does not return anything if it fails oddly enough, so have captured the Powershell error to test instead
 [string]$test = $Error[0].CategoryInfo.Activity
 }
+}
+
+
+
 #Check for success
 If($test -eq "Send-MailMessage"){
     $subject = "Buddy System: something went wrong at the last stage sending the emails out"
@@ -197,7 +201,7 @@ If($test -eq "Send-MailMessage"){
     Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
     } 
 Else{
-#If emails are successful we can update the intemediary Waiting List ready for Thursday - we need to clear out the main list to allow new submissions in the meantime
+#If emails are successful we can update the intemediary Waiting List ready for Thursday - we need to clear out the main list to allow new submissions in the meantime - THIS BIT DOESNT WORK ONLY SENDS ONE EMAIL
     write-host "False - the emails did send"
     ForEach($person in $thisweekslist){
     Add-PnPListItem -List "Buddy System Waiting List" -Values @{"Yourname" = $($person.name); "Yourcommunity_x0028_ifapplicable" = $($person.community); "Youtimezone" = $($person.timezone); "Yourcountry" = $($person.country)} 
@@ -219,7 +223,8 @@ Connect-PnPOnline -url "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365
 $allwaiting = Get-PnPListItem -List "Buddy System Waiting List"
 
 ForEach($person in $allwaiting){
-Add-PnPListItem -List "Buddy System Repeat Sign Up" -Values @{"Yourname" = $($person.FieldValues.Yourname.LookupValue); "Yourcommunity_x0028_ifapplicable" = $($person.FieldValues.Yourcommunity_x0028_ifapplicable); "Youtimezone" = $($person.FieldValues.Youtimezone)} 
+
+Add-PnPListItem -List "Buddy System Repeat Sign Up" -Values @{"Yourname" = $($person.FieldValues.Yourname.LookupValue); "Yourcommunity_x0028_ifapplicable" = $($person.FieldValues.Yourcommunity_x0028_ifapplicable); "Youtimezone" = $($person.FieldValues.Youtimezone); "Yourcountry" = $($person.FieldValues.Yourcountry)} 
 Remove-PnPListItem -List "Buddy System Waiting List" -Identity $($person.Id) -Force
 }
 }

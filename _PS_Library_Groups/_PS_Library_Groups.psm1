@@ -296,40 +296,69 @@ function new-365Group(){
         if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)){
             #$managersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq `'$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)`'"
             $managersSg = get-graphGroups -tokenResponse $tokenResponse -filterId $graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId 
-            if(!$managersSg){Write-Warning "Data Managers Group [$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
+            if(!$managersSg){
+                Write-Warning "Data Managers Group [$($graphGroupExtended.anthesisgroup_UGSync.dataManagerGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"
+                $missingGroupId = $true
+                }
             }
         else{Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.dataManagerGroupId (Data Managers Subgroup) property set!"}
         if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)){
             #$membersSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)'"
             $membersSg = get-graphGroups -tokenResponse $tokenResponse -filterId $graphGroupExtended.anthesisgroup_UGSync.memberGroupId 
-            if(!$membersSg){Write-Warning "Members Group [$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
+            if(!$membersSg){
+                Write-Warning "Members Group [$($graphGroupExtended.anthesisgroup_UGSync.memberGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
+                $missingGroupId = $true
             }
         else{Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.memberGroupId (Members Subgroup) property set!"}
         if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)){
             #$combinedSg = Get-DistributionGroup -Filter "ExternalDirectoryObjectId -eq '$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)'"
             $combinedSg = get-graphGroups -tokenResponse $tokenResponse -filterId $graphGroupExtended.anthesisgroup_UGSync.combinedGroupId 
-            if(!$combinedSg){Write-Warning "Combined Group [$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
+            if(!$combinedSg){
+                Write-Warning "Combined Group [$($graphGroupExtended.anthesisgroup_UGSync.combinedGroupId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"
+                $missingGroupId = $true
+                }
             }
         else{Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.combinedGroupId (Combined Subgroup) property set!"}
         if(![string]::IsNullOrWhiteSpace($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)){
             $sharedMailbox = Get-Mailbox -Filter "ExternalDirectoryObjectId -eq '$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)'"
-            if(!$sharedMailbox){Write-Warning "Shared Mailbox [$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"}
+            if(!$sharedMailbox){
+                Write-Warning "Shared Mailbox [$($graphGroupExtended.anthesisgroup_UGSync.sharedMailboxId)] for UG [$($graphGroupExtended.DisplayName)] could not be retrieved"
+                $missingGroupId = $true
+                }
             }
         else{
             Write-Warning "365 Group [$($graphGroupExtended.DisplayName)] found, but no anthesisgroup_UGSync.sharedMailboxId (Shared Mailbox) property set!"
             $sharedMailboxDisplayName = "Shared Mailbox - $displayName"
             }
+        if($missingGroupId -eq $true){
+            repair-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -graphGroup $graphGroupExtended -groupClassifcation $graphGroupExtended.anthesisgroup_UGSync.classification -masterMembership $graphGroupExtended.anthesisgroup_UGSync.masterMembershipList -createGroupsIfMissing -Verbose
+            }
         }
     else{
         Write-Verbose "No pre-existing 365 group found - checking for AAD Groups."
 
-        #Check whether any of these MESG exist based on names (just in case we're re-creating a 365 group and want to retain the AAD Groups)
+        #Check whether any of these MESG exist based on names (just in case we're re-creating a 365 group and want to retain the AAD Groups, or something failed in the original creation and EXO hasn't syncronised with AAD yet)
         $combinedSg = get-graphGroups -tokenResponse $tokenResponse -filterDisplayName $combinedSgDisplayName
-        if($combinedSg){Write-Verbose "Combined Group [$($combinedSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
+        if($combinedSg){Write-Verbose "Combined Group [$($combinedSg.DisplayName)] found"}
+        else{
+            $combinedSg = rummage-forDistributionGroup -displayName $combinedSgDisplayName
+            if($combinedSg){Write-Verbose "Combined Group [$($combinedSg.DisplayName)] found"}
+            else{Write-Warning "Combined Group [$($combinedSgDisplayName)] not found"}
+            }
         $managersSg = get-graphGroups -tokenResponse $tokenResponse -filterDisplayName $managersSgDisplayName 
-        if($managersSg){Write-Verbose "Managers Group [$($managersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
+        if($managersSg){Write-Verbose "Managers Group [$($managersSg.DisplayName)] found"}
+        else{
+            $managersSg = rummage-forDistributionGroup -displayName $managersSgDisplayName
+            if($managersSg){Write-Verbose "Managers Group [$($managersSg.DisplayName)] found"}
+            else{Write-Warning "Managers Group [$($managersSgDisplayName)] not found"}
+            }
         $membersSg  = get-graphGroups -tokenResponse $tokenResponse -filterDisplayName $membersSgDisplayName 
-        if($membersSg){Write-Verbose "Members Group [$($membersSg.DisplayName)] found"}else{Write-Verbose "Group not found"}
+        if($membersSg){Write-Verbose "Members Group [$($membersSg.DisplayName)] found"}
+        else{
+            $membersSg = rummage-forDistributionGroup -displayName $membersSgDisplayName
+            if($membersSg){Write-Verbose "Members Group [$($membersSg.DisplayName)] found"}
+            else{Write-Warning "Members Group [$($membersSgDisplayName)] not found"}
+            }
         $sharedMailbox = Get-Mailbox -Filter "DisplayName -eq `'$(sanitise-forSql $sharedMailboxDisplayName)`'"
         if(!$sharedMailbox){$sharedMailbox = Get-Mailbox -Filter "Alias -eq `'$(guess-aliasFromDisplayName $sharedMailboxDisplayName)`'"} #If we can't find it by the DisplayName, check the Alias as this is less mutable
         if($sharedMailbox){Write-Verbose "Shared Mailbox [$($sharedMailbox.DisplayName)] found"}else{Write-Verbose "Mailbox not found"}
@@ -473,7 +502,8 @@ function new-365Group(){
     #Provision MS Team if requested
     if($alsoCreateTeam -and $graphGroupExtended){
         Write-Verbose "Provisioning new MS Team (as requested)"
-        $graphTeam = new-graphTeam -tokenResponse $tokenResponse -groupId $graphGroupExtended.id -allowMemberCreateUpdateChannels $true -allowMemberDeleteChannels $false -Verbose:$VerbosePreference #Create the Team if it doesn't already exist
+        $graphTeam = new-graphTeam -tokenResponse $tokenResponse -groupId $graphGroupExtended.id -allowMemberCreateUpdateChannels $true -allowMemberDeleteChannels $false -Verbose:$VerbosePreference -ErrorAction Continue #Create the Team if it doesn't already exist
+        if(!$graphTeam){write-warning "Failed to provision Team [$($graphGroupExtended.DisplayName)] via Graph after 3 attempts. Try again later."}
         }
     else{Write-Verbose "_NOT_ attempting to provision new MS Team"}
 

@@ -1,7 +1,7 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
-foreach($team in @("Wellbeing Working Group")){
+foreach($team in @("Administration Team (All)")){
 
 $displayName = $team
 $areDataManagersLineManagers = $false
@@ -58,11 +58,11 @@ if($managedBy -eq "AAD"){$managers = "groupbot@anthesisgroup.com"} #Override the
 $newTeam = new-365Group -displayName $displayName -managerUpns $managers -teamMemberUpns $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $areDataManagersLineManagers -membershipmanagedBy $managedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $365creds
 Write-Verbose "Getting PnPUnifiedGroup [$displayName] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
 Connect-PnPOnline -AccessToken $tokenResponse.access_token
-$newPnpTeam = Get-PnPUnifiedGroup -Identity $newTeam.ExternalDirectoryObjectId
+$newPnpTeam = Get-PnPUnifiedGroup -Identity $newTeam.id
 
 #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
 if($addExecutingUserAsTemporaryOwner){
-    $userWasAlreadySiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $thisSite -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true
+    $userWasAlreadySiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true
     }
 copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Candiate-Template-for-Team-Site-Landing-Page.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
 test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $365creds -connectIfDifferent $true | Out-Null
