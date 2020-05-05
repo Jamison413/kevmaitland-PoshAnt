@@ -132,6 +132,59 @@ function add-graphFolderToDrive(){
     Write-Verbose $graphQuery
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery $graphQuery -graphBodyHashtable $folderHash -Verbose:$VerbosePreference
     }
+function add-graphLicenseToUser(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="Friendly")]
+            [parameter(Mandatory = $true,ParameterSetName="Guid")]
+            [parameter(Mandatory = $true,ParameterSetName="Guids")]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+            [parameter(Mandatory = $true,ParameterSetName="Guid")]
+            [parameter(Mandatory = $true,ParameterSetName="Guids")]
+            [string]$userIdOrUpn
+        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+            [ValidateSet("K1","E1","E3","E5","EMS","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio")]
+            [string]$licenseFriendlyName 
+        ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
+            [string]$licenseGuid
+        ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
+            [string[]]$disabledPlansGuids = @()
+        ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
+            [string[]]$licenseGuids
+        )
+    $licensesToRemove = @()
+    if(<#Licenses contain K1/E1/E3/E5#>$false){
+        #We have to remove any conflicting licenses at the same time
+        #get user licesnses
+        #build appropriate remove hash
+        #$licensesToRemove = @("guidToRemove")
+        }
+
+    switch ($PsCmdlet.ParameterSetName){
+        "Friendly" {
+            [string[]]$licenseGuids = get-microsoftProductInfo -getType GUID -fromType FriendlyName -fromValue $licenseFriendlyName
+            }
+        "Guid" {
+            [string[]]$licenseGuids = $licenseGuid
+            }
+
+        }
+
+    #Iterate through the supplied/derived licenseGuids
+    $licenseGuids | % {
+        $thisLicenseDefinition = @{"skuId"=$_}
+        $thisLicenseDefinition.Add("disabledPlans",$disabledPlansGuids) #This cannot proc if $PsCmdlet.ParameterSetName -eq "Guids", so we don't need to worry about which disabledPlans belong to which licenseGuid
+        [array]$licenseArray += $thisLicenseDefinition
+        }
+    
+    $graphBodyHashtable = @{
+        "addLicenses"=$licenseArray
+        "removeLicenses"=$licensesToRemove
+        }
+
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable -Verbose:$VerbosePreference
+    }
 function add-graphUsersToGroup(){
     [cmdletbinding()]
     Param (
@@ -761,7 +814,11 @@ function get-graphUsers(){
             [ValidatePattern("@")]
             [string]$filterUpn
         ,[parameter(Mandatory = $false)]
+            [hashtable]$filterCustomEq = @{}
+        ,[parameter(Mandatory = $false)]
             [switch]$filterLicensedUsers = $false
+        ,[parameter(Mandatory = $false)]
+            [string[]]$selectCustomProperties
         ,[parameter(Mandatory = $false)]
             [switch]$selectAllProperties = $false
         )
@@ -773,12 +830,19 @@ function get-graphUsers(){
     if($filterUpn){
         $filter += " and userPrincipalName eq '$filterUpn'"
         }
-    if($returnOnlyLicensedUsers){
-        $select = ",id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses"
+    $filterCustomEq.Keys | % {
+        $filter += " and $_ eq '$($filterCustomEq[$_])'"
+        }
+
+    if($filterLicensedUsers){
+        $select = ",id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,companyName,country,department,anthesisgroup_employeeInfo"
         }
     if($selectAllProperties){
-        $select = ",accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"
+        $select = ",anthesisgroup_employeeInfo,accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"
         } #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
+    $selectCustomProperties | % {
+        $select += ",$_"
+        }
 
     #Build the refiner based on the parameters supplied
     if(![string]::IsNullOrWhiteSpace($select)){
@@ -851,7 +915,7 @@ function get-graphUsersFromGroup(){
             }
         }
     if($returnOnlyLicensedUsers){
-        $refiner = "?`$select=id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses"
+        $refiner = "?`$select=id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,anthesisgroup_employeeInfo"
         $returnOnlyUsers = $true #Licensed Users are a subset of Users, so $returnOnlyUsers = $true is implied if $returnOnlyLicensedUsers = $true
         }
     Write-Verbose "Graph Query = [groups/$($groupId)/$($memberType+$refiner)]"
@@ -880,39 +944,57 @@ function get-graphUsersFromGroup(){
         $allMembers
         }
     }
-function get-graphUsersWithUGSyncExtensions(){
+function get-graphUsersWithEmployeeInfoExtensions(){
     [cmdletbinding()]
     param(
-        [parameter(Mandatory = $true)]
+        [parameter(Mandatory = $true,ParameterSetName = "ambiguous")]
+            [parameter(Mandatory = $true,ParameterSetName = "explicitUpn")]
+            [parameter(Mandatory = $true,ParameterSetName = "explicitId")]
+            [parameter(Mandatory = $true,ParameterSetName = "explicitDisplayName")]
             [psobject]$tokenResponse        
-        ,[parameter(Mandatory = $false)]
+        ,[parameter(Mandatory = $true,ParameterSetName = "ambiguous")]
+            [switch]$filterNone
+        ,[parameter(Mandatory = $true,ParameterSetName = "explicitUpn")]
             [ValidatePattern("@")]
             [string]$filterUpn
-        ,[parameter(Mandatory = $false)]
+        ,[parameter(Mandatory = $true,ParameterSetName = "explicitId")]
             [string]$filterId
-        ,[parameter(Mandatory = $false)]
+        ,[parameter(Mandatory = $true,ParameterSetName = "explicitDisplayName")]
             [string]$filterDisplayName
-        ,[parameter(Mandatory = $false)]
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitUpn")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitId")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitDisplayName")]
             [ValidateSet("Employee","Subcontractor","Associate")]
             [string]$filterContractType
-        ,[parameter(Mandatory = $false)]
-            [string]$filterEmployeeId
-        ,[parameter(Mandatory = $false)]
-            [string]$filterBusinessUnit
-        ,[parameter(Mandatory = $false)]
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitUpn")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitId")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitDisplayName")]
             [switch]$selectAllProperties
         )
     #Add $filters for the various properties
-    if($filterUpn){$additionalFilters += " and mail eq '$filterUpn'"}
-    if($filterId){$additionalFilters += " and id eq '$filterId'"}
-    if($filterDisplayName){$additionalFilters += " and displayName eq '$([uri]::EscapeDataString($filterDisplayName))'"}
-    if($filterContractType){$additionalFilters += " and anthesisgroup_employeeInfo/contractType eq '$filterContractType'"}
-    if($filterContractType){$additionalFilters += " and anthesisgroup_employeeInfo/employeeId eq '$filterEmployeeId'"}
-    if($filterContractType){$additionalFilters += " and anthesisgroup_employeeInfo/businessUnit eq '$filterBusinessUnit'"}
+    $customFilter = @{
+        "anthesisgroup_employeeInfo/extensionType" = "employeeInfo"
+        }
+    if($filterContractType){
+        $customFilter.Add("anthesisgroup_employeeInfo/contractType",$filterContractType)
+        }
 
-    if($selectAllProperties){$lotsOfProperties = ",accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"}
-         #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
-    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/users?`$filter=anthesisgroup_employeeInfo/extensionType eq 'employeeInfo'$additionalFilters&`$select=displayName,id,description,mail,anthesisgroup_employeeInfo$lotsOfProperties" -Verbose:$VerbosePreference
+    switch ($PsCmdlet.ParameterSetName){
+        "ambiguous"           {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference}
+        "explicitUpn"         {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference -filterUpn $filterUpn}
+        "explicitDisplayName" {
+            $customFilter.Add("displayName",$filterDisplayName)
+            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference
+            }
+        "explicitId"          {
+            $customFilter.Add("id",$filterId)
+            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference
+            }
+        }
+
+    
             
     }
 function grant-graphSharing(){
@@ -1002,7 +1084,7 @@ function invoke-graphGet(){
     $sanitisedGraphQuery = $graphQuery.Trim("/")
     do{
         Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET -Verbose:$VerbosePreference
         if($response.value){
             $results += $response.value
             Write-Verbose "[$([int]$response.value.count)] results returned on this cycle, [$([int]$results.count)] in total"
@@ -1058,7 +1140,7 @@ function invoke-graphPost(){
     $sanitisedGraphQuery = $graphQuery.Trim("/")
     Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
         
-    $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable
+    $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable -Depth 10
     Write-Verbose $graphBodyJson
     $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
     
@@ -1094,6 +1176,46 @@ function invoke-graphPut(){
         }
 
     Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $bodyData -ContentType $contentType -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put
+    }
+function new-graphListItem(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [string]$serverRelativeSiteUrl
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [string]$listId
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [string]$listName
+        ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [hashtable]$listItemFieldValuesHash
+        )
+    switch ($PsCmdlet.ParameterSetName){
+        {$_ -match "URLAnd"} {
+            Write-Verbose "new-graphListItem | Getting SiteId"
+            $graphSiteId = $(get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl $serverRelativeSiteUrl -Verbose:$VerbosePreference).id
+            }
+        {$_ -match "AndName"} {
+            Write-Verbose "new-graphListItem | Getting ListId"
+            $listId = $(get-graphList -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listName $listName -Verbose:$VerbosePreference).id
+            }
+        }
+    $graphBodyHash = @{"fields"=$listItemFieldValuesHash}
+    Write-Verbose "new-graphListItem | $(stringify-hashTable $listItemFieldValuesHash)"
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items" -graphBodyHashtable $graphBodyHash -Verbose:$VerbosePreference
     }
 function new-graphTeam(){
     [cmdletbinding()]
@@ -1542,6 +1664,50 @@ function set-graphUnifiedGroupGuestSettings(){
         invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$($graphUnifiedGroupExtended.id)/settings" -graphBodyHashtable $sharingBody -Verbose:$VerbosePreference
         }
 
+    }
+function set-graphuser(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userIdOrUpn
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$userPropertyHash = @{}
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$userEmployeeInfoExtensionHash
+        )
+      
+    $validProperties = @("accountEnabled","assignedLicenses","assignedPlans","businessPhones","city","companyName","country","createdDateTime","creationType","deletedDateTime","department","displayName","employeeId","faxNumber","givenName","id","identities","imAddresses","isResourceAccount","jobTitle","lastPasswordChangeDateTime","legalAgeGroupClassification","licenseAssignmentStates","mail","mailNickname","mobilePhone","officeLocation","onPremisesDistinguishedName","onPremisesDomainName","onPremisesExtensionAttributes","onPremisesImmutableId","onPremisesLastSyncDateTime","onPremisesProvisioningErrors","onPremisesSamAccountName","onPremisesSecurityIdentifier","onPremisesSyncEnabled","onPremisesUserPrincipalName","otherMails","passwordPolicies","passwordProfile","postalCode","preferredDataLocation","preferredLanguage","provisionedPlans","proxyAddresses","refreshTokensValidFromDateTime","showInAddressList","signInSessionsValidFromDateTime","state","streetAddress","surname","usageLocation","userPrincipalName","userType")
+    $dubiousProperties = @("aboutMe","birthday","hireDate","interests","mailboxSettings","mySite","pastProjects","preferredName","responsibilities","schools","skills")
+    $validExtensionProperties = @("extensionType","businessUnit","employeeId","contractType")
+
+    $duffProperties = @()
+    $userPropertyHash.Keys | % { #Check the properties we're going to try and update the User with are valid:
+        if($validProperties -notcontains $_ ){
+            if($dubiousProperties -notcontains $_){
+                $duffProperties += $_
+                }
+            else{Write-Warning "Property [$_] isn't fully supported and might cause problems"}
+            }
+        }
+
+    if($userEmployeeInfoExtensionHash){
+        $userEmployeeInfoExtensionHash.Keys | % { #Check the properties we're going to try and update the User with are valid:
+            if($validExtensionProperties -notcontains $_){
+                $duffProperties += "anthesisgroup_employeeInfo/$_"
+                }
+            }
+        #Now add the Extension properties into the main hash in the correct format
+        $userPropertyHash.Add("anthesisgroup_employeeInfo",$userEmployeeInfoExtensionHash)
+        }
+
+    if($duffProperties.Count -gt 0){
+        Write-Error -Message "Property(s) [$($duffProperties -join ", ")] is invalild for Graph User object. Will not attempt to update."
+        break
+        }
+    
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn" -graphBodyHashtable $userPropertyHash -Verbose:$VerbosePreference
     }
 function test-graphBearerAccessTokenStillValid(){
     [cmdletbinding()]

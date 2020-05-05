@@ -7,11 +7,20 @@ $newSchemaDefinition = @{
     targetTypes = @('User')
     properties=@(
         @{
+            name = "extensionType"
+            type = "String"
+            },
+        @{
             "name" = "contractType"
             "type" = "String"
             },
         @{
             "name" = "employeeId"
+            "type" = "String"
+            }
+,
+        @{
+            "name" = "businessUnit"
             "type" = "String"
             }
         )
@@ -72,3 +81,5 @@ invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/schemaExtensions/a
 invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/schemaExtensions/anthesisgroup_trainingRecord" -graphBodyHashtable $newSchemaDefinition3 -Verbose
 $schemaExtension = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/schemaExtensions?`$filter=id eq 'anthesisgroup_trainingRecord'" -Verbose
 $schemaExtensions = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/schemaExtensions" -Verbose
+$schemaExtension = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/schemaExtensions?`$filter=id eq 'anthesisgroup_employeeInfo'" -Verbose
+invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/schemaExtensions/anthesisgroup_employeeInfo" -graphBodyHashtable $newSchemaDefinition -Verbose
