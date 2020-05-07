@@ -273,6 +273,23 @@ function delete-graphDriveItem(){
         invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/items/$graphDriveItemId"  -Verbose:$VerbosePreference
         }
     }
+function delete-graphListItem(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true)]
+            [string]$graphSiteId 
+        ,[parameter(Mandatory = $true)]
+            [string]$graphListId
+        ,[parameter(Mandatory = $true)]
+            [string]$graphItemId
+
+        )
+        #Need to expand to allow for ListName and SiteName as well as the Id's (to match other functions here)
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "sites/$graphSiteId/lists/$graphListId/items/$graphItemId"  -Verbose:$VerbosePreference
+        
+}
 function get-groupAdminRoleEmailAddresses(){
     [CmdletBinding()]
     param(
