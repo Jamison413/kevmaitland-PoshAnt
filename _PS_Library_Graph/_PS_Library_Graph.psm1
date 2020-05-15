@@ -1682,6 +1682,27 @@ function set-graphUnifiedGroupGuestSettings(){
         }
 
     }
+function set-graphuserManager(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+         [ValidatePattern("@")]
+            [string]$userUPN
+        ,[parameter(Mandatory = $true)]
+         [ValidatePattern("@")]
+            [string]$managerUPN
+        )
+
+$employeeid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($userUPN) | Select-Object -Property "id"
+$managerid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($managerUPN) | Select-Object -Property "id"
+$body = "{
+  `"@odata.id`": `"https://graph.microsoft.com/v1.0/users/$($managerid.id)`"
+}"
+$graphQuery = "users/$($employeeid.id)" + '/manager/' + "`$ref"
+Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put -Verbose
+}
 function set-graphuser(){
     [cmdletbinding()]
     param(
@@ -1695,7 +1716,7 @@ function set-graphuser(){
             [hashtable]$userEmployeeInfoExtensionHash
         )
       
-    $validProperties = @("accountEnabled","assignedLicenses","assignedPlans","businessPhones","city","companyName","country","createdDateTime","creationType","deletedDateTime","department","displayName","employeeId","faxNumber","givenName","id","identities","imAddresses","isResourceAccount","jobTitle","lastPasswordChangeDateTime","legalAgeGroupClassification","licenseAssignmentStates","mail","mailNickname","mobilePhone","officeLocation","onPremisesDistinguishedName","onPremisesDomainName","onPremisesExtensionAttributes","onPremisesImmutableId","onPremisesLastSyncDateTime","onPremisesProvisioningErrors","onPremisesSamAccountName","onPremisesSecurityIdentifier","onPremisesSyncEnabled","onPremisesUserPrincipalName","otherMails","passwordPolicies","passwordProfile","postalCode","preferredDataLocation","preferredLanguage","provisionedPlans","proxyAddresses","refreshTokensValidFromDateTime","showInAddressList","signInSessionsValidFromDateTime","state","streetAddress","surname","usageLocation","userPrincipalName","userType")
+    $validProperties = @("accountEnabled","assignedLicenses","assignedPlans","businessPhones","city","companyName","country","createdDateTime","creationType","deletedDateTime","department","displayName","employeeId","faxNumber","givenName","id","identities","imAddresses","isResourceAccount","jobTitle","lastPasswordChangeDateTime","legalAgeGroupClassification","licenseAssignmentStates","mail","mailNickname","manager","mobilePhone","officeLocation","onPremisesDistinguishedName","onPremisesDomainName","onPremisesExtensionAttributes","onPremisesImmutableId","onPremisesLastSyncDateTime","onPremisesProvisioningErrors","onPremisesSamAccountName","onPremisesSecurityIdentifier","onPremisesSyncEnabled","onPremisesUserPrincipalName","otherMails","passwordPolicies","passwordProfile","postalCode","preferredDataLocation","preferredLanguage","provisionedPlans","proxyAddresses","refreshTokensValidFromDateTime","showInAddressList","signInSessionsValidFromDateTime","state","streetAddress","surname","usageLocation","userPrincipalName","userType")
     $dubiousProperties = @("aboutMe","birthday","hireDate","interests","mailboxSettings","mySite","pastProjects","preferredName","responsibilities","schools","skills")
     $validExtensionProperties = @("extensionType","businessUnit","employeeId","contractType")
 
@@ -1745,6 +1766,50 @@ function test-graphBearerAccessTokenStillValid(){
         else{$false}#Otherwise return False
         }
     }
+function update-graphListItem(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [string]$serverRelativeSiteUrl
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [string]$listId
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [string]$listName
+        ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [string]$listitemId
+        ,[parameter(Mandatory = $true)]
+            [hashtable]$fieldHash = @{}
+
+        )
+
+    switch ($PsCmdlet.ParameterSetName){
+        {$_ -match "URL"} { #If we've got a URL to the Site, we'll need to get the Id
+            Write-Verbose "update-graphListItem | Getting Site from URL [$serverRelativeSiteUrl]"
+            $graphSiteId = $(get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl $serverRelativeSiteUrl).Id
+            }
+        {$_ -match "AndName"} { #If we've got a URL to the Site, we'll need to get the Id
+            $listId = $(get-graphList -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listName $listName).Id 
+            Write-Verbose "update-graphListItem | getting ListId from name [$listName]"
+            }
+        }
+    $graphBodyHashtable = $fieldHash
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose:$VerbosePreference
+
+}
 function update-mailboxCustomAttibutesToGraphSchemaExtensions(){
     [cmdletbinding()]
     param(
