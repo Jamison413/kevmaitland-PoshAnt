@@ -284,11 +284,9 @@ function delete-graphListItem(){
             [string]$graphListId
         ,[parameter(Mandatory = $true)]
             [string]$graphItemId
-
         )
         #Need to expand to allow for ListName and SiteName as well as the Id's (to match other functions here)
         invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "sites/$graphSiteId/lists/$graphListId/items/$graphItemId"  -Verbose:$VerbosePreference
-        
 }
 function get-groupAdminRoleEmailAddresses(){
     [CmdletBinding()]
@@ -1697,11 +1695,16 @@ function set-graphuserManager(){
 
 $employeeid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($userUPN) | Select-Object -Property "id"
 $managerid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($managerUPN) | Select-Object -Property "id"
+If(($employeeid) -and ($managerid)){
 $body = "{
   `"@odata.id`": `"https://graph.microsoft.com/v1.0/users/$($managerid.id)`"
 }"
 $graphQuery = "users/$($employeeid.id)" + '/manager/' + "`$ref"
 Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put -Verbose
+}
+Else{
+write-host "User or Manager ID missing" -ForegroundColor Red
+}
 }
 function set-graphuser(){
     [cmdletbinding()]
@@ -1794,6 +1797,7 @@ function update-graphListItem(){
         ,[parameter(Mandatory = $true)]
             [hashtable]$fieldHash = @{}
 
+
         )
 
     switch ($PsCmdlet.ParameterSetName){
@@ -1806,9 +1810,10 @@ function update-graphListItem(){
             Write-Verbose "update-graphListItem | getting ListId from name [$listName]"
             }
         }
+   
     $graphBodyHashtable = $fieldHash
-    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose:$VerbosePreference
-
+    $reponse = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose
+    $reponse
 }
 function update-mailboxCustomAttibutesToGraphSchemaExtensions(){
     [cmdletbinding()]
@@ -1855,3 +1860,8 @@ function update-unifiedGroupCustomAttibutesToGraphSchemaExtensions(){
         }
     invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($unifiedGroup.ExternalDirectoryObjectId)" -graphBodyHashtable $bodyHash
     }
+
+
+
+
+

@@ -127,7 +127,6 @@ Creates AD user object
 .EXAMPLE
   create-ADUser -upn $upn -managerSAM $managerSAM -primaryteam $primaryteam -plaintextpassword $plaintextpassword -adCredentials $adCredentials -office $office -DDI $DDI -ouDn $ouDn -website $website -receptionDDI $receptionDDI -Fax $twitteraccount -jobtitle $jobtitle -upnsuffix $upnsuffix
 #>
-
 function create-msolUser{
         [cmdletbinding()]
     Param (
@@ -153,7 +152,6 @@ Creates Msol User object by first creating a new mailbox, which will create an u
 .EXAMPLE
 create-msolUser -upn "jo.bloggs@anthesisgroup.com" -plaintextpassword $plaintextpassword
 #>
-
 function license-msolUser{
         [cmdletbinding()]
     Param (
@@ -212,7 +210,6 @@ license-msolUser -upn "jo.bloggs@anthesisgroup.com" -licensetype "E1" -usageloca
 #>
 
 }
-
 function update-msoluserdetails{
     [cmdletbinding()]
     Param (
@@ -324,7 +321,6 @@ Catch{
 .SYNOPSIS
 Updates Msol User object with correct details, such as first name, last name, etc.
 #>
-
 function update-msolusercoregroups{
     [cmdletbinding()]
     Param (
@@ -377,7 +373,6 @@ Try{
 Updates Msol User object with correct core groups, such as regional and MDM groups.
 #>
 }
-
 function update-msolMailboxViaUpn{
     [cmdletbinding()]
     Param (
@@ -428,7 +423,6 @@ function update-msolMailboxViaUpn{
         Write-Error $_
     }
 }    
-
 function update-sharePointConfig{
     [cmdletbinding()]
 Param (
@@ -540,8 +534,6 @@ Param (
 .SYNOPSIS
 Updates SPO User profile with correct details according to 365 msol office details or provided office. Must be connected via Kimblebot for automation and to the main "https://anthesisllc.sharepoint.com/" site (NOT the admin site)
 #>
-
-
 <#Still to do
 The three letter bu string is a question, as is the manager access?
 #>
@@ -568,14 +560,97 @@ function set-mailboxPermissions{
       }
 }
 }
+function remove-mailboxesandbots{
+        [cmdletbinding()]
+    Param (
+         [parameter(Mandatory = $true)]
+            [array]$usersarray
+            )
+
+#Remove licensed mailbox accounts and bots
+
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "conflictminerals@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "VarexConflictMinerals@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "ACSSupport@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "acsmailboxaccess@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "Microsoft.ECM@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "qwest_ga@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "info@umr-gmbh.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "Anthesis Energy UK Mailbox Robot"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "Varex.PEC@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "UKcareers@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "Diana.Correal@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "groupbot@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "SustainMailboxAccess@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "barry.holt@anthesisgroup.com"
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "AnthesisUKFinance@anthesisgroup.com"
 
 
 
+$usersarray
+}
+function set-SPOTimezone{
+    [cmdletbinding()]
+Param (
+     [parameter(Mandatory = $true,ParameterSetName="upn")]
+        [String]$upn
+    ,[parameter(Mandatory = $true,ParameterSetName="upn")]
+        [String]$office
+        )
+    
+   if(![string]::IsNullOrWhiteSpace($upn) -and ![string]::IsNullOrWhiteSpace($office)){
+        $officeterm = Get-PnPTerm -Identity $($office) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
+        Write-Host "$($officeterm.Name)"
+        Write-Host "$($upn)"
+        $timezoneID = $($officeterm.CustomProperties.'Sharepoint Timezone ID')
+        $countrylocale = $($officeterm.CustomProperties.'Locale')
+        $languagecode = $($officeterm.CustomProperties.'Language Code')
+        Try{
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-RegionalSettings-FollowWeb' -Value "False"
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-RegionalSettings-Initialized' -Value "True"
+        }
+        Catch{
+            Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: RegionalSettings"
+            Write-Error $_
+        }
+        if(![string]::IsNullOrWhiteSpace($timezoneID)){
+        Try{
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-timezone' -Value $($timezoneID)
+        }
+        Catch{
+            Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: TimezoneID"
+            Write-Error $_
+        }
+        }
+        if(![string]::IsNullOrWhiteSpace($countrylocale)){
+        Try{
+        if(![string]::IsNullOrWhiteSpace($countrylocale)){Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-Locale' -Value $($countrylocale)}
+        }
+        Catch{
+        Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: Country Locale"
+        Write-Error $_
+        }
+        }
+        if(![string]::IsNullOrWhiteSpace($languagecode)){
+        Try{
+        if(![string]::IsNullOrWhiteSpace($languagecode)){Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-MUILanguages' -Value $($languagecode)}
+        }
+        Catch{
+        Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: languagecode"
+        Write-Error $_
+        }
+        }
+        Try{
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-CalendarType' -Value "1"
+        Set-PnPUserProfileProperty -Account $upn -PropertyName 'SPS-AltCalendarType' -Value "1"
+        }
+        Catch{
+            Write-Error "Failed to update SPO user [$($upn)] in update-sharePointConfig: CalendarType"
+            Write-Error $_
+        }
 
-
-
-
-
+}
+}
 
 
 
