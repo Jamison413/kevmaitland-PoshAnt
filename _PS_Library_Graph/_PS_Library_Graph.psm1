@@ -1860,42 +1860,6 @@ function update-unifiedGroupCustomAttibutesToGraphSchemaExtensions(){
         }
     invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($unifiedGroup.ExternalDirectoryObjectId)" -graphBodyHashtable $bodyHash
     }
-function Send-TeamsMessage(){
-    [cmdletbinding()]
-    param(
-         [parameter(Mandatory = $true)]
-         [psobject]$tokenResponse        
-        ,[parameter(Mandatory = $true)]
-         [ValidatePattern("@")]
-         [string]$teamid
-        ,[parameter(Mandatory = $true)]
-         [ValidatePattern("@")]
-         [string]$channelid
-        ,[parameter(Mandatory = $true)]
-         [ValidatePattern("@")]
-         [string]$message
-
-    )
-If($teamid){
-        If($channelid){
-            If($message){
-            $graphQuery = "/teams/$($teamid)/channels/$($channelid)/messages"
-            $graphBodyHashtale = @{"content" = "$message"}
-            $response = invoke-graphPost -tokenResponse $tokenReposne -graphQuery $graphQuery -graphBodyHashtable $graphBodyHashtable -Verbose
-            }
-            Else{
-            Throw "No message provided"
-            }
-        }
-        Else{
-        Throw "No Channel Id provided"
-        }
-}
-Else{
-Throw "No Team Id provided"
-}
-$reponse
-}
 
 
 
