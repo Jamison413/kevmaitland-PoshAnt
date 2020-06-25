@@ -13,7 +13,7 @@ if($PSCommandPath){
     }
 
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #Unbelievbly, you still can't manage MESGs via Graph.

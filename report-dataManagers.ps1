@@ -9,7 +9,7 @@ $sharePointAdmin = "kimblebot@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
 $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #Make sure we've got all Data Manager Subgroups added into [Data Managers - Current (All)]
@@ -79,6 +79,8 @@ $newauthorisedDataManagers | % { #Add anyone new
     }
 
 if($userChangesWereMade){#Refresh $allAuthorisedDataManagers if it's changed
+    Write-Host -ForegroundColor Yellow "Giving EXO 20 minutes to sync to AAD"
+    Start-Sleep -Seconds 1200 #Give EXO 20 minutes to sync to AAD
     $allAuthorisedDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $authorisedDataManagerGroup.id -memberType Members -returnOnlyUsers
     }
 
@@ -113,7 +115,7 @@ $unauthorisedDataManagers = $mismatchedDataManagers  | ? {$_.SideIndicator -eq "
 $authorisedButUnassignedDataManagers = $mismatchedDataManagers | ? {$_.SideIndicator -eq "=>"}
 
 
-#Welcome new Data Managers
+#Welcome new Data Managers $newauthorisedDataManagers.FieldValues.User.LookupValue | sort 
 $newauthorisedDataManagers | % {
     $thisUser = $_
     $welcomeBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
@@ -125,8 +127,8 @@ $newauthorisedDataManagers | % {
     Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To $thisUser.FieldValues.User.Email -Encoding UTF8
     }
 
-
-#Warn users that they will need to book onto a refresher course int he next two months
+ 
+#Warn users that they will need to book onto a refresher course int he next two months $expiringSoonDataManagers.FieldValues.User.LookupValue | sort 
 $expiringSoonDataManagers | % {
     $thisUser = $_
     $warningBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
@@ -143,7 +145,7 @@ $expiringSoonDataManagers | % {
     }
 
 
-#Warn users that they have/will be automatically removed from Data Manager groups
+#Warn users that they have/will be automatically removed from Data Manager groups     $unauthorisedDataManagers.displayName | sort 
 $unauthorisedDataManagers | %{
     $thisUser = $_
     $removedBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.givenName),<BR><BR>`r`n`r`n"

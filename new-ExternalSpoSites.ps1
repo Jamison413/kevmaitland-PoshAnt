@@ -4,30 +4,35 @@ connect-ToExo -credential $365creds
 $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
+$allClientSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/clients" #-filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
+$allSupplierSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/subs" #-filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
 
 #$toDo = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99/Lists/06365ce6-07a5-41e9-b0aa-a90c9f1edc3f/items?expand=fields(select=ID,ClientName,Title,Site_x0020_Owners,Site_x0020_Members,Status,GuID)&filter=fields/Status eq 'Awaiting creation'"
 #$toDo += invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,9fb8ecd6-c87d-485d-a488-26fd18c62303/Lists/0c68ca6f-06fe-449b-8cf1-c0dbe7fddd5c/items?expand=fields(select=ID,Subcontractor_x002f_Supplier_x00,ClientNameTitle,Site_x0020_Owners,Site_x0020_Members,Status,GuID)&filter=fields/Status eq 'Awaiting creation'"
 #if($toDo){[array]$selectedRequests = $toDo | select {$_.Fields.Title},{$_.Fields.ClientName.Label},{$_.Fields.Site_x0020_Admin.LookupValue},{$_.Fields.Site_x0020_Owners.LookupValue -join ", "},{$_.Fields.Site_x0020_Members.LookupValue -join ", "},{$_.Fields.GUID} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
 
-
+#clients
 $requests = @()
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients" -Credentials $365creds
 $requests += Get-PnPListItem -List "External Client Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
+if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.ClientName.Label},{$_.FieldValues.Site_x0020_Admin.LookupValue},{$_.FieldValues.Site_x0020_Owners.LookupValue -join ", "},{$_.FieldValues.Site_x0020_Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
+#subs
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/subs" -Credentials $365creds
 $requests += Get-PnPListItem -List "External Subcontractor Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
-if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.ClientName.Label},{$_.FieldValues.Site_x0020_Admin.LookupValue},{$_.FieldValues.Site_x0020_Owners.LookupValue -join ", "},{$_.FieldValues.Site_x0020_Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
+if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.Subcontractor_x002f_Supplier_x00.Label},{$_.FieldValues.Site_x0020_Admin.LookupValue},{$_.FieldValues.Site_x0020_Owners.LookupValue -join ", "},{$_.FieldValues.Site_x0020_Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
 
     $hideFromGal = $false
     $blockExternalMail = $false
     $accessType = "Private"
     $autoSubscribe = $true
     $groupClassification = "External"
-    $alsoCreateTeam = $false
+
 
 
 foreach ($currentRequest in $selectedRequests){
     $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails
     $fullRequest = $requests | ? {$_.FieldValues.GUID.Guid -eq $currentRequest.'$_.FieldValues.GUID.Guid'}
+    $alsoCreateTeam = $($fullRequest.FieldValues.UpgradeToTeam)
     write-host -ForegroundColor Yellow "Creating External Sharing Site [$($fullRequest.FieldValues.Title)] for [$($fullRequest.FieldValues.ClientName.Label)]"
     $managers = convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Admin.Email) | sort | select -Unique
     $members = convertTo-arrayOfEmailAddresses ($managers + "," + $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique
@@ -73,11 +78,9 @@ foreach ($currentRequest in $selectedRequests){
         Write-Verbose "Getting Client DocLibs - this might take a while!"
         switch($fullRequest.FieldValues.FileDirRef.Split("/")[1]){
             "clients" {
-                $allClientSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/clients" -filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
                 $clientOrSupplierSiteDocLib = $allClientSiteDocLibs | ? {$_.Name -eq $($fullRequest.FieldValues.ClientName.Label)}
                 }
             "subs"    {
-                $allSupplierSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/subs" -filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
                 $clientOrSupplierSiteDocLib = $allSupplierSiteDocLibs | ? {$_.Name -eq $($fullRequest.FieldValues.ClientName.Label)}
                 }
             }
@@ -108,11 +111,8 @@ foreach ($currentRequest in $selectedRequests){
         if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
             Write-Host -f DarkYellow "`tSetting Homepage"
             Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
-            Write-Host -f DarkYellow "`tDisabling Comments"
-            Set-PnPClientSidePage -Identity "LandingPage.aspx" -CommentsEnabled:$false | Out-Null
-            Write-Host -f DarkYellow "`tReTitling Homepage"
-            $newHomepage = Get-PnPListItem -List "SitePages" -Query "<View><Query><Where><Eq><FieldRef Name='FileLeafRef'/><Value Type='Text'>LandingPage.aspx</Value></Eq></Where></Query></View>" -v
-            Set-PnPListItem -Values @{"Title"=$newPnpTeam.DisplayName} -List "SitePages" -Identity $newHomepage.Id
+            Write-Host -f DarkYellow "`tDisabling Comments & Retitling Page"
+            Set-PnPClientSidePage -Identity "LandingPage.aspx" -Title $newPnpTeam.DisplayName -CommentsEnabled:$false | Out-Null
 
             Write-Host -f DarkYellow "`tSetting default View in Documents Library"
             $thisDocLib = Get-PnPList -Identity "Documents" -Includes Fields
@@ -147,7 +147,7 @@ foreach ($currentRequest in $selectedRequests){
             "clients" {
                 Write-Host -f DarkYellow "`tUpdating Client Request: Status = [Created],Url=[$($newPnpTeam.SiteUrl)]"
                 test-pnpConnectionMatchesResource -resourceUrl "https://anthesisllc.sharepoint.com/clients" -connectIfDifferent $true -pnpCreds $365creds | Out-Null
-                Set-PnPListItem -List "External Client Site Requests" -Identity $fullRequest.Id -Values @{Status="Created";URL=$newPnpTeam.SiteUrl}
+                $dummy = Set-PnPListItem -List "External Client Site Requests" -Identity $fullRequest.Id -Values @{Status="Created";URL=$newPnpTeam.SiteUrl}
                 $externalParty = $fullRequest.FieldValues.ClientName.Label
                 $externalPartyType = "client"
                 Write-Host -f DarkYellow "`tGetting Managed MetaData term"
@@ -159,7 +159,7 @@ foreach ($currentRequest in $selectedRequests){
             "subs"    {
                 Write-Verbose "Updating Supplier Request: Status = [Created]"
                 test-pnpConnectionMatchesResource -resourceUrl "https://anthesisllc.sharepoint.com/subs" -connectIfDifferent $true -pnpCreds $365creds | Out-Null
-                Set-PnPListItem -List "0c68ca6f-06fe-449b-8cf1-c0dbe7fddd5c" -Identity $fullRequest.Id -Values @{Status="Created"} #"External Subcontractor Site Requests" List 
+                $dummy = Set-PnPListItem -List "0c68ca6f-06fe-449b-8cf1-c0dbe7fddd5c" -Identity $fullRequest.Id -Values @{Status="Created"} #"External Subcontractor Site Requests" List 
                 $externalParty = $fullRequest.FieldValues.Subcontractor_x002f_Supplier_x00.Label
                 $externalPartyType = "subcontractor"
                 }

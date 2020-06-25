@@ -811,6 +811,8 @@ function set-standardSitePermissions(){
         $pnpWeb.Context.ExecuteQuery()
 
         #Reset any changes made to managed properties
+        Write-Verbose "Reset any changes made to managed properties (pausing to allow AAD to catch up)"
+        Start-Sleep -Seconds 5
         if($suppressEmailNotifications){reset-graphUnifiedGroupSettingsToOriginals -tokenResponse $tokenResponse -graphGroupExtended $graphGroupExtended -Verbose:$VerbosePreference -suppressEmailNotification}
         else{reset-graphUnifiedGroupSettingsToOriginals -tokenResponse $tokenResponse -graphGroupExtended $graphGroupExtended -Verbose:$VerbosePreference}
 
@@ -821,7 +823,7 @@ function set-standardSitePermissions(){
             #Remove Unexpected Site Owners
             $unexpectedSiteOwners | % {
                 Write-Verbose "`tRemove-PnPUserFromGroup -LoginName $($_.LoginName) -Identity $($spoOwnersGroup.Id)"
-                Remove-PnPUserFromGroup -LoginName $_.LoginName -Identity $spoOwnersGroup.Id -Verbose:$VerbosePreference
+                $dummy = Remove-PnPUserFromGroup -LoginName $_.LoginName -Identity $spoOwnersGroup.Id -Verbose:$VerbosePreference
                 }
             }
 

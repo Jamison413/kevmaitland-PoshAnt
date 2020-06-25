@@ -533,7 +533,7 @@ function get-graphGroups(){
 
     if($filterGroupType -eq "MailEnabledSecurity" -or $filterGroupType -eq "Distribution"){
         $results | ? {$_.groupTypes -notcontains "Unified"} | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name ExternalDirectoryObjectId -Value $_.id}
-        $results 
+        $results | ? {$_.groupTypes -notcontains "Unified"}
         }
     else{$results}
 
@@ -1447,7 +1447,7 @@ function reset-graphUnifiedGroupSettingsToOriginals(){
         ,[parameter(Mandatory = $false)]
             [switch]$suppressEmailNotification
         )
-    #Compare current Unified Group settings against orginal settings and revert
+    Write-Verbose "`treset-graphUnifiedGroupSettingsToOriginals"    #Compare current Unified Group settings against orginal settings and revert
     if([string]::IsNullOrWhiteSpace($graphGroupExtended.classification)){$graphGroupExtended = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId $graphGroupExtended.id -selectAllProperties}
     [hashtable]$current = @{}
     [hashtable]$changes = @{}
