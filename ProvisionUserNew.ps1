@@ -186,6 +186,12 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
 
 #update employee extension info with graph (just business unit)
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
+
+#Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+$businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.WorkPhone).Trim())")}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.CellPhone).Trim())"}
+
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account
 If((![string]::IsNullOrWhiteSpace($upn)) -and (("Bristol, GBR" -eq $office) -or ("London, GBR" -eq $office))){
@@ -284,6 +290,11 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
 
 #update employee extension info with graph (just business unit)
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
+
+#Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+$businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0).Trim())"}
 
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account
