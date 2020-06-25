@@ -693,6 +693,24 @@ function get-graphListItems(){
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items$refiner" -Verbose:$VerbosePreference
 
     }
+function get-graphMailboxSettings(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$identity
+         )
+If(($identity -match "@anthesisgroup.com") -or ($identity.Length -eq 36)){
+#Identity contains a upn or looks like a guid
+$graphQuery = "users/$identity/mailboxSettings"
+$response = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graphQuery -returnEntireResponse -Verbose
+$response
+}
+Else{
+Write-Error "Please provide a valid upn or guid"
+}
+}
 function get-graphSite(){
     [cmdletbinding()]
     param(
@@ -1680,6 +1698,43 @@ function set-graphUnifiedGroupGuestSettings(){
         }
 
     }
+function set-graphMailboxSettings(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$identity
+       ,[parameter(Mandatory = $false)]
+            [string]$timeZone
+         )
+If(($identity -match "@anthesisgroup.com") -or ($identity.Length -eq 36)){
+#Identity contains a upn or looks like a guid
+    If($timeZone){
+        If((Get-TimeZone -ListAvailable | Select-Object -Property "Id") -match $timeZone){
+        #timezone is available in Windows
+        $graphQuery = "users/$identity/mailboxSettings"
+        #We set the mailbox timezone and meeting hours timezone the same
+        $graphBodyHashtable = [ordered]@{
+        workingHours = @{
+        timeZone=@{
+        "name"="$($timeZone)";
+        }      
+        }
+        "timeZone"= "$($timeZone)"
+        }
+        $response = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery  $graphQuery -graphBodyHashtable $graphBodyHashtable -Verbose
+        $response
+        }
+        Else{
+        Write-Error "Please provide a valid timezone available in Windows"
+        }
+    }
+}
+Else{
+Write-Error "Please provide a valid upn or guid"
+}
+}
 function set-graphuserManager(){
     [cmdletbinding()]
     param(

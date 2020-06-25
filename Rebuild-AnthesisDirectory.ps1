@@ -121,6 +121,10 @@ $graphmanager = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graph
     Write-Host "WARNING: No line manager for $($graphuser.userPrincipalName)" -ForegroundColor White
     }
 
+#EXO mailbox timezone
+$exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)" -Verbose
+$exoTimezone = Get-TimeZone $exoTimezone.timeZone
+
 #sharepoint timezone
 $spoTimezone =  Get-PnPUserProfileProperty -Account $($graphuser.userPrincipalName)
 
@@ -128,7 +132,7 @@ $spoTimezone =  Get-PnPUserProfileProperty -Account $($graphuser.userPrincipalNa
 $antUser = New-Object psobject -Property @{
     graphuser = $graphuser
     spouser = $spoUser
-    #exotimezone = $exoTimezone
+    exotimezone = $exoTimezone
     linemanager = $spomanager
     spotimezone = $spoTimezone
     teamslink = "https://teams.microsoft.com/l/chat/0/0?users=" + "$($graphuser.userPrincipalName)"
@@ -196,7 +200,7 @@ $body = "{
     `"City`": `"$($user.graphuser.city)`",
     `"Office`": `"$($user.graphuser.officeLocation)`",
     `"Country`": `"$($user.graphuser.country)`",
-    `"Timezone`": `"Pending`",
+    `"Timezone`": `"$($user.exotimezone.DisplayName)`",
     `"ManagerLookupId`": `"$($user.linemanager.Id)`",
     `"ManagerEmail`": `"$($user.linemanager.Email)`",
     `"BusinessUnit`": `"$($user.graphuser.anthesisgroup_employeeInfo.businessUnit)`",
@@ -220,7 +224,7 @@ $body = "{
     `"City`": `"$($user.graphuser.city)`",
     `"Office`": `"$($user.graphuser.officeLocation)`",
     `"Country`": `"$($user.graphuser.country)`",
-    `"Timezone`": `"Pending`",
+    `"Timezone`": `"$($user.exotimezone.DisplayName)`",
     `"BusinessUnit`": `"$($user.graphuser.anthesisgroup_employeeInfo.businessUnit)`",
     `"Email`": `"$($user.graphuser.userPrincipalName)`",
     `"TeamsLink`": `"$($user.teamslink)`",
@@ -236,42 +240,6 @@ $response = Invoke-RestMethod -Uri "$graphQuery" -Body $body -ContentType "appli
 }
 
 
-
-#Update the timezone AFTER the Directory is re-built or it causes issues because of EXO being extremely slow
-
-#Conn - Exchange Online Mailbox for Business Unit
-$exoAdmin = "groupbot@anthesisgroup.com"
-$exoAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\groupbot.txt) 
-$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $exoAdmin, $exoAdminPass
-connect-ToExo -credential $exoCreds
-
-$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
-$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
-$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
-$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
-$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
-
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $clientID
-    Client_Secret = $secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
-
-$allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId "anthesisllc.sharepoint.com,cd82f435-8404-4c16-9ef5-c1e357ac5b96,2373d950-6dea-4ed5-9224-dea4c41c7da3" -listId "009bb573-f305-402d-9b21-e6f597473256" -expandAllFields -verbose
-ForEach($entry in $allanthesians){
-
-    If($entry.fields.Timezone -eq "Pending"){
-    #Exchange timezone
-    $exoTimezone = Get-MailboxRegionalConfiguration -Identity $($entry.fields.Email) -Verbose
-    $exoTimezone = Get-TimeZone -Name $exoTimezone.TimeZone
-    write-host "$($entry.fields.Email) : $($exoTimezone.DisplayName)" -ForegroundColor Yellow
-
-    update-graphListItem -tokenResponse $tokenResponse -graphSiteId "anthesisllc.sharepoint.com,cd82f435-8404-4c16-9ef5-c1e357ac5b96,2373d950-6dea-4ed5-9224-dea4c41c7da3" -listId "009bb573-f305-402d-9b21-e6f597473256" -listitemId $entry.id -fieldHash @{"Timezone" = "$($exoTimezone.DisplayName)"} -verbose
-}
-}
 
 
 
