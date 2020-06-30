@@ -1,8 +1,7 @@
 ﻿#NOTE
 #This is the first half of the Anthesis Directory Sync Scripts. This handles most of the heavy listing around adding, removing and amending entries in the Anthesis Direcotry and Reporting Lists via changes in 365.
 
-
-$friendlyLogname = "C:\Scripts" + "\Logs" + "\friendlylogsync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
+$friendlyLogname = "C:\ScriptLogs" + "\friendlylogsync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
 function friendlyLogWrite(){
     [cmdletbinding()]
     param(
@@ -11,14 +10,29 @@ function friendlyLogWrite(){
        ,[parameter(Mandatory = $true)]
             [string]$logstring
        ,[parameter(Mandatory = $true)]
-            [validateset("WARNING","SUCCESS","ERROR","ERROR DETAILS","MESSAGE","Change in 365","Change by Request")]
+            [validateset("WARNING","SUCCESS","ERROR","ERROR DETAILS","MESSAGE","Change in 365","Change by Request","END","START")]
             [String]$messagetype
         )
 If($messagetype -eq "MESSAGE"){
-Add-content $friendlyLogname -value $("**************************************************************************************************************************************************************")
+Add-content $friendlyLogname -value $("*************************************************************************************************************************************************************")
 Add-content $friendlyLogname -value $("$(get-date)" + " MESSAGE: " + "$($logstring)")
-Add-content $friendlyLogname -value $("**************************************************************************************************************************************************************")
+Add-content $friendlyLogname -value $("*************************************************************************************************************************************************************")
 }
+
+If($messagetype -eq "START"){
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+Add-content $friendlyLogname -value $("$(get-date)" + " START: " + "$($logstring)")
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+}
+
+
+If($messagetype -eq "END"){
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+Add-content $friendlyLogname -value $("$(get-date)" + " END: " + "$($logstring)")
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+}
+
+
 If($messagetype -eq "WARNING"){
 Add-content $friendlyLogname -value $("$(get-date)" + "     WARNING: " + "$($logstring)")
 }
@@ -49,7 +63,7 @@ Add-content $friendlyLogname -value $value
 }
 $TeamsLog = @()
 
-$Logname = "C:\Scripts" + "\Logs" + "\sync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
+$Logname = "C:\ScriptLogs" + "\sync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
@@ -90,6 +104,8 @@ $ReqTokenBody = @{
     } 
 $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
 
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype START -logstring "Starting run for sync-Directory365Changes"
+
 #Set  Sharepoint list id's
 $graphSiteId = "anthesisllc.sharepoint.com,cd82f435-8404-4c16-9ef5-c1e357ac5b96,2373d950-6dea-4ed5-9224-dea4c41c7da3"
 $directoryListId = "009bb573-f305-402d-9b21-e6f597473256"
@@ -100,9 +116,6 @@ $reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
 #Get all licensed graph users
 $usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true -Verbose
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
-##################/////////////for testing
-$allgraphusers = $allgraphusers | Where-Object -Property "userPrincipalName" -EQ "testing.testing@anthesisgroup.com"
-##################////////////
 #Get all current Anthesians in the list
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
 $allanthesianGUIDS = $allanthesians | select -ExpandProperty "fields"
@@ -160,7 +173,17 @@ $graphmanager = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graph
 
 #Exchange timezone
 $exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)" -Verbose
+#Philippine's uses several timezone names
+If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
+$exoTimezone = New-Object -TypeName psobject @{
+"DisplayName" = "(UTC+08:00) $($graphuser.country) Standard Time"
+}
+}
+Else{
 $exoTimezone = Get-TimeZone $exoTimezone.timeZone
+}
+
+
 #sharepoint timezone
 $spoTimezone =  Get-PnPUserProfileProperty -Account $($graphuser.userPrincipalName)
 
@@ -318,11 +341,25 @@ ForEach($removedanthesian in $removedanthesians){
         }
 }
 
+If($TeamsReport){
+    $report = @()
+    $report += "***************Errors found in 365/Directory/Reporting List Sync***************" + "<br><br>"
+    $report += "*******************************365 add/remove users****************************************" + "<br><br>"
+        ForEach($t in $TeamsReport){
+        $report += "$($t.Keys)" + " - " + "$($t.Values)" + "<br><br>"
+}
+
+$report = $report | out-string
+
+Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+}
+
 
 
 <#------------------------------------------------------------------------------------Process Changes by 365 amend--------------------------------------------------------------------------------------------#>
 
 ForEach($graphuser in $allgraphusers){
+$TeamsReport = @()
 #Find the list entries for the staff list and POP Reporting list
 
 #Directory List
@@ -442,9 +479,19 @@ If($officeterm){
         $TeamsReport += @{"$(get-date) (365) ERROR - [Part of Office Location change]  Sharepoint timezone not changed to $($officeterm.CustomProperties.Timezone). Current mailbox timezone is: $($currentexoTimezone.Id)" = "[$($graphuser.userPrincipalName)]"}
         $timezonesync += 1
         }                 
-    #If all comes back okay, update the directory
-    If($timezonesync -eq 0){        
-    $officedirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office" = "$($graphuser.officeLocation)";"Timezone" = "$($officeterm.CustomProperties.Timezone)";"Country" = "$($officeterm.CustomProperties.Country)"} -Verbose    
+    If($timezonesync -eq 0){
+    #If all returns okay, update the Directory with the friendly utc timezone 
+    $exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)" -Verbose
+    #Philippine's uses several timezone names
+    If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
+    $exoTimezone = New-Object -TypeName psobject @{
+    "DisplayName" = "(UTC+08:00) $($graphuser.country) Standard Time"
+    }
+    }
+    Else{
+    $exoTimezone = Get-TimeZone $exoTimezone.timeZone
+    }
+    $officedirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office" = "$($graphuser.officeLocation)";"Timezone" = "$($exoTimezone.DisplayName)";"Country" = "$($officeterm.CustomProperties.Country)"} -Verbose    
             If($officedirectoryupdate.Office -eq  $($graphuser.officeLocation)){
             friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated Office for [$($graphuser.userPrincipalName)]: $($graphuser.officeLocation) to $($thisanthesian.fields.Office)"
             }
@@ -523,25 +570,81 @@ If($($thisanthesian.fields.BusinessUnit) -ne $($graphuser.anthesisgroup_employee
     $TeamsReport += @{"$(get-date) (Change in 365 > Directory List) ERROR - Business Unit not changed to $($graphuser.anthesisgroup_employeeInfo.businessUnit)" = "[$($graphuser.userPrincipalName)]"}
     }
 }
-
-#If there are ANY errors, don't update the change request so we have another chance to spot issues in the chain
-If(!$TeamsReport){update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $changeListId -listitemId "$($change.id)" -fieldHash @{"Status" = "Complete"} -Verbose}
-Else{update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $changeListId -listitemId "$($change.id)" -fieldHash @{"Status" = "Issue during update - IT have been notified"} -Verbose}
-
 }
 
 
 
 <#------------------------------------------------------------------------------------Something for Dupe Checking--------------------------------------------------------------------------------------------#>
 
-#######################
+#Get all current Anthesians in the list
+$allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
+$allanthesiansDetails = $allanthesians | select -ExpandProperty "fields"
 
-<#------------------------------------------------------------------------------------------Teams Report-----------------------------------------------------------------------------------------------------#>
+$dupecheck = $allanthesiansDetails
+$allanthesiansDetails = $allanthesiansDetails | sort email -Unique
+$dupestoremove = Compare-Object -ReferenceObject $dupecheck.email -DifferenceObject $allanthesiansDetails.email
+$dupeuniqueupns = $dupestoremove
+
+If($dupestoremove){
+    ForEach($dupe in $dupeuniqueupns){
+    
+        $dupecount = $dupecheck | Where-Object -property "email" -EQ  "$($dupe.InputObject)"
+        $totaltoremove = ($dupecount.count) - 1
+        If($dupecount.Count -gt 1){
+        Write-Host "Removing $($totaltoremove) dupes for $($dupe.InputObject)" -ForegroundColor Yellow
+        $removalIDs = $($dupecount | Select-Object -First $($totaltoremove)) | select -Property "ID"
+            foreach($removalID in $removalIDs){
+            delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $removalID.id
+        }
+}
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype ERROR -logstring "DUPLICATE REMOVED FROM DIRECTORY LIST: $($dupe.InputObject)"
+$TeamsReport += @{"DUPLICATE REMOVED FROM DIRECTORY LIST:" = $($dupe.InputObject)}
+}
+}
+Else{
+Write-Host "No dupes found in Directory List" -ForegroundColor Yellow
+}
+
+
+
+$dupestoremove = @()
+#Get all current Live Reporting Lines List
+$allPOPreports = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $reportinglinesListId -expandAllFields
+$allPOPreportsDetails = $allPOPreports | select -ExpandProperty "fields"
+
+$dupecheck = $allPOPreportsDetails
+$allPOPreportsDetails = $allPOPreportsDetails | sort email -Unique
+$dupestoremove = Compare-Object -ReferenceObject $dupecheck.email -DifferenceObject $allPOPreportsDetails.email
+$dupeuniqueupns = $dupestoremove 
+
+If($dupestoremove){
+    ForEach($dupe in $dupeuniqueupns){
+    
+        $dupecount = $dupecheck | Where-Object -property "email" -EQ  "$($dupe.InputObject)"
+        $totaltoremove = ($dupecount.count) - 1
+        If($dupecount.Count -gt 1){
+        Write-Host "Removing $($totaltoremove) dupes for $($dupe.InputObject)" -ForegroundColor Yellow
+        $removalIDs = $($dupecount | Select-Object -First $($totaltoremove)) | select -Property "ID"
+            foreach($removalID in $removalIDs){
+            delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $removalID.id
+        }
+}
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype ERROR -logstring "DUPLICATE REMOVED FROM REPORTING LIST: $($dupe.InputObject)"
+$TeamsReport += @{"DUPLICATE REMOVED FROM REPORTING LIST:" = $($dupe.InputObject)}
+}
+}
+Else{
+Write-Host "No dupes found in POP Reporting List" -ForegroundColor Yellow
+}
+
+
+
+<#------------------------------------------------------------------------------------------Teams Report for 365 amends-----------------------------------------------------------------------------------------------------#>
 
 If($TeamsReport){
     $report = @()
     $report += "***************Errors found in 365/Directory/Reporting List Sync***************" + "<br><br>"
-    $report += "*******************************365 Side****************************************" + "<br><br>"
+    $report += "*******************************365 Amends****************************************" + "<br><br>"
         ForEach($t in $TeamsReport){
         $report += "$($t.Keys)" + " - " + "$($t.Values)" + "<br><br>"
 }
@@ -552,4 +655,7 @@ Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 }
 
 
+
+#Finish run
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype END -logstring "End of run for sync-Directory365Changes"
 
