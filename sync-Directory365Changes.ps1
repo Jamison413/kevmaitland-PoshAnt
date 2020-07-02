@@ -116,6 +116,8 @@ $reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
 #Get all licensed graph users
 $usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true -Verbose
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
+#Remove Kiosk licensees
+$allgraphusers = $allgraphusers | Where-Object {$_.assignedLicenses.skuId -ne "80b2d799-d2ba-4d2a-8842-fb0d0f3a4b82"}
 #Get all current Anthesians in the list
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
 $allanthesianGUIDS = $allanthesians | select -ExpandProperty "fields"
