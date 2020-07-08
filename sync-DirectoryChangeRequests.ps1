@@ -160,7 +160,7 @@ friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype WARNING -logstri
 $changetable = $change | Format-Table JobTitle,CellPhone,Office_x0020_Number,Community,Office,City,ManagerEmail,Business_x0020_Unit
 $subject = "Woops! We tried to update 365 details for either an IT Admin"
 $body = "<HTML><FONT FACE=`"Calibri`">Hello there,`r`n`r`n<BR><BR>"
-$body += "You're receiving this email as someone has tried update your details in 365. this won't be possible as you are a 365 admin and will need to complete these changes yourself due to security.`r`n`r`n<BR><BR>"
+$body += "You're receiving this email as someone has tried update your details in 365. This won't be possible as you are a 365 admin and will need to complete these changes yourself due to security.`r`n`r`n<BR><BR>"
 $body += "Job title: $($change.JobTitle)`r`n<BR><BR>"
 $body += "Mobile number: $($change.CellPhone)`r`n<BR><BR>"
 $body += "Office number: $($change.Office_x0020_Number)`r`n<BR><BR>"
@@ -171,6 +171,7 @@ $body += "Business Unit: $($change.Business_x0020_Unit)`r`n`r`n<BR><BR><BR><BR>"
 $body += "Love,`r`n`r`n<BR><BR>"
 $body += "The People Services Robot"
 Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $changeListId -listitemId "$($change.id)" -fieldHash @{"Status" = "This Anthesian is in the IT Team - we'll let them know the changes"} -Verbose
 Break
 }
 
