@@ -1,64 +1,43 @@
-﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
-if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    $fullLogPathAndName = $logFileLocation+"record-licensingUsage_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = $logFileLocation+"record-licensingUsage_ErrorLog_$(Get-Date -Format "yyMMdd").log"
-    }
-else{
-    $fullLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_FullLog_$(Get-Date -Format "yyMMdd").log"
-    $errorLogPathAndName = "$($logFileLocation+$MyInvocation.MyCommand)_ErrorLog_$(Get-Date -Format "yyMMdd").log"
-    }
-Start-Transcript $transcriptLogName -Append
+﻿$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
-Import-Module _PS_Library_MSOL.psm1
-Import-Module _PS_Library_GeneralFunctionality
-Import-Module _REST_Library-SPO.psm1
+$itSite = get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl "/teams/IT_Team_All_365" -Verbose
+$licensingList = get-graphList -tokenResponse $tokenResponse -graphSiteId $itSite.id -listName "365 Licensing Logs" -Verbose
+$licensingListItem = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $itSite.id -listId $licensingList.id -expandAllFields -filterId 10000 -Verbose
 
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client") 
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime")
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing") 
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Taxonomy") 
-[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.UserProfiles")
+$allLicensedUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponse -selectAllProperties -filterNone
 
-$logFile = $fullLogPathAndName
-$errorLogFile = $errorLogPathAndName
-$smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 
-$upnSMA = "sustainmailboxaccess@anthesisgroup.com"
-#$passSMA = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
-$passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\SustainMailboxAccess.txt) 
-$msolCredentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $upnSMA, $passSMA
-$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
-#$csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
-connect-ToMsol -credential $msolCredentials
-connect-ToExo -credential $msolCredentials
-#connect-toAAD -credential $msolCredentials
-#connect-ToSpo -credential $msolCredentials
+$allLicensedUsers | % {
+    $thisUser = $_
+    write-host -f Yellow "[$($thisUser.displayName)]"
+    $thisUser.assignedLicenses | % {
+        $thisLicense = $_ #;break}}
+        write-host -f DarkYellow "[$(get-microsoftProductInfo -getType intY -fromType GUID -fromValue $thisLicense.skuId -Verbose:$VerbosePreference)]"
+        $licenseRecordHash = @{
+            Title=$thisUser.displayName
+            LicenseName=$(get-microsoftProductInfo -getType intY -fromType GUID -fromValue $thisLicense.skuId -Verbose:$VerbosePreference)
+            BusinessUnit=$thisUser.companyName
+            Country=$thisUser.country
+            UserPrincipalName=$thisUser.userPrincipalName
+            ContractType=$thisUser.anthesisgroup_employeeInfo.contractType
+            TimeStamp=$(Get-Date -Format "yyyy-MM-dd")
+            }
+        do{
+            try{
+                $newLicenseRecord = new-graphListItem -tokenResponse $tokenResponse -graphSiteId $itSite.id -listId $licensingList.id -listItemFieldValuesHash $licenseRecordHash -Verbose
+                $retry = $false
+                }
+            catch{
+                if($_.ErrorDetails.Message -match "TooManyRequests"){
+                    Write-Warning "TooManyRequests"
+                    $retry = $true
+                    Start-Sleep -Seconds 5
+                    }
+                }
+            }
+        while ($retry -eq $true)
 
-$sharePointServerUrl = "https://anthesisllc.sharepoint.com"
-$ITSite = "/teams/IT_Team_All_365"
-$licensingListName = "365 Licensing Logs"
-$itSiteDigest = new-spoDigest -serverUrl $sharePointServerUrl -sitePath $ITSite -restCreds $restCredentials -logFile $logFile -verboseLogging $true
-
-$msolUsers = Get-MsolUser -all | ?{$_.Licenses.Count -gt 0}
-$mailUsers = Get-Mailbox | ?{$msolUsers.UserPrincipalName -contains $_.MicrosoftOnlineServicesID}
-
-$userHash = [ordered]@{}
-$msolUsers | % {$userHash.Add($_.UserPrincipalName,@($_,$null))}
-$mailUsers | % {$userHash[$_.MicrosoftOnlineServicesID][1] = $_}
-
-$targetList = get-list -serverUrl $sharePointServerUrl -sitePath $ITSite -listName $licensingListName -restCreds $restCredentials -verboseLogging $verboseLogging -logFile $logFile
-$timeStamp = Get-Date
-$prettyLicenseNames = @{"AnthesisLLC:ENTERPRISEPACK" = "E3";"AnthesisLLC:EXCHANGEDESKLESS"="Kiosk";"AnthesisLLC:PROJECTPROFESSIONAL"="Project";"AnthesisLLC:STANDARDPACK"="E1";"AnthesisLLC:VISIOCLIENT"="Visio";"AnthesisLLC:WACONEDRIVESTANDARD"="OneDrive";"AnthesisLLC:ATP_ENTERPRISE"="AdvancedSpam";"AnthesisLLC:POWER_BI_STANDARD"="PowerBI";"AnthesisLLC:EMS"="Security";"AnthesisLLC:ENTERPRISEPREMIUM"="E5";"AnthesisLLC:MCOMEETADV"="AudioConferencing";"AnthesisLLC:MCOPSTN1"="DomesticCalling";"AnthesisLLC:MCOPSTN2"="InternationalCalling";"AnthesisLLC:FLOW_FREE"="PowerAutomateFree"}
-
-foreach($upn in $userHash.Keys){
-    foreach($license in $userHash[$upn][0].Licenses){
-        if($prettyLicenseNames.Keys -contains $license.AccountSkuId){$licenseName = $prettyLicenseNames[$license.AccountSkuId]}
-        else{$licenseName = $license.AccountSkuId}
-        if($userHash[$upn][1].CustomAttribute1 -ne ""){$businessEntity = $userHash[$upn][1].CustomAttribute1}
-        else{$businessEntity = "Unknown"}
-        $itemToAdd = @{Title=$userHash[$upn][0].DisplayName;UserPrincipalName=$upn;LicenseName=$licenseName;BusinessUnit=$businessEntity;TimeStamp=$timeStamp;Community=$userHash[$upn][0].Department;Country=$userHash[$upn][0].Country}
-        new-itemInList -serverUrl $sharePointServerUrl -sitePath $ITSite -listName $licensingListName -predeterminedItemType $targetList.ListItemEntityTypeFullName -hashTableOfItemData $itemToAdd -restCreds $restCredentials -digest $itSiteDigest -verboseLogging $verboseLogging -logFile $logFile
         }
+    
     }
-Stop-Transcript

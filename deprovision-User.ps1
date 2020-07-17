@@ -183,9 +183,17 @@ foreach($user in $upnsToDeactivate){
                 }
             Set-Mailbox $userExoObject.UserPrincipalName -HiddenFromAddressListsEnabled $true -Type Shared
             if($userExoObject.DisplayName.Substring(0,1) -ne "Ω"){Set-MsolUser -UserPrincipalName $userExoObject.UserPrincipalName -DisplayName $("Ω_"+$userExoObject.DisplayName)}
-            remove-msolLicenses -userSAM $($userExoObject.UserPrincipalName.Replace("@anthesisgroup.com",""))
-            #Potential fix for the above line: 
-            <#Set-MsolUserLicense -UserPrincipalName $($userExoObject.UserPrincipalName.Replace("@anthesisgroup.com","")) -RemoveLicenses "Anthesis LLC:ENTERPRISEPACK"#>
+            ForEach($license in $userAadObject.AssignedLicenses.SkuId){
+                Switch($license){
+                "18181a46-0d4e-45cd-891e-60aabd171b4e" {$licensetoremove = "AnthesisLLC:STANDARDPACK"}
+                "6fd2c87f-b296-42f0-b197-1e91e994b900" {$licensetoremove = "AnthesisLLC:ENTERPRISEPACK"}
+                "0c266dff-15dd-4b49-8397-2bb16070ed52" {$licensetoremove = "AnthesisLLC:MCOMEETADV"}
+                "efccb6f7-5641-4e0e-bd10-b4976e1bf68e" {$licensetoremove = "AnthesisLLC:EMS"}
+                "80b2d799-d2ba-4d2a-8842-fb0d0f3a4b82" {$licensetoremove = "AnthesisLLC:EXCHANGEDESKLESS"}
+                }
+            Write-Host "Removing license $($licensetoremove)"
+            Set-MsolUserLicense -UserPrincipalName $($userExoObject.UserPrincipalName) -RemoveLicenses "$($licensetoremove)"
+            }
             Revoke-AzureADUserAllRefreshToken -ObjectId $userAadObject.ObjectId
             #Initiate Retire on Intune devices
             #

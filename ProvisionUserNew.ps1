@@ -28,8 +28,9 @@
 <#--------Import Modules--------#>
 
 Import-Module -Name ActiveDirectory #Not compatible with pscore
-Import-Module -Name 'C:\Users\Emily.Pressey\Documents\WindowsPowerShell\Modules\_PS_Library_UserManagement\_PS_Library_UserManagement.psm1' #This has a compatibilty issue with core - something to dig into, shuld work in ISE?
-Import-Module -Name 'C:\Users\Emily.Pressey\Documents\WindowsPowerShell\Modules\_PS_Library_GeneralFunctionality\_PS_Library_GeneralFunctionality.psm1'
+Import-Module -Name _PS_Library_UserManagement.psm1 #This has a compatibilty issue with core - something to dig into, shuld work in ISE?
+Import-Module -Name _PS_Library_GeneralFunctionality.psm1
+Import-Module -Name _PS_Library_Graph
 
 
 <#--------Logging--------#>
@@ -48,6 +49,9 @@ connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
 connect-toAAD -credential $msolCredentials
 Connect-MsolService -credential $msolCredentials
+
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 
@@ -180,6 +184,14 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) `
 
+#update employee extension info with graph (just business unit)
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
+
+#Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+$businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.WorkPhone).Trim())")}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.CellPhone).Trim())"}
+
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account
 If((![string]::IsNullOrWhiteSpace($upn)) -and (("Bristol, GBR" -eq $office) -or ("London, GBR" -eq $office))){
@@ -275,6 +287,14 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -licensetype = ($licensetype = ($thisUser.FieldValues.Office_x0020_365_x0020_license.Split(" ").Trim())) `
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) 
+
+#update employee extension info with graph (just business unit)
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
+
+#Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+$businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0).Trim())"}
 
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account

@@ -284,11 +284,9 @@ function delete-graphListItem(){
             [string]$graphListId
         ,[parameter(Mandatory = $true)]
             [string]$graphItemId
-
         )
         #Need to expand to allow for ListName and SiteName as well as the Id's (to match other functions here)
         invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "sites/$graphSiteId/lists/$graphListId/items/$graphItemId"  -Verbose:$VerbosePreference
-        
 }
 function get-groupAdminRoleEmailAddresses(){
     [CmdletBinding()]
@@ -535,7 +533,7 @@ function get-graphGroups(){
 
     if($filterGroupType -eq "MailEnabledSecurity" -or $filterGroupType -eq "Distribution"){
         $results | ? {$_.groupTypes -notcontains "Unified"} | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name ExternalDirectoryObjectId -Value $_.id}
-        $results 
+        $results | ? {$_.groupTypes -notcontains "Unified"}
         }
     else{$results}
 
@@ -695,6 +693,24 @@ function get-graphListItems(){
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items$refiner" -Verbose:$VerbosePreference
 
     }
+function get-graphMailboxSettings(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$identity
+         )
+If(($identity -match "@anthesisgroup.com") -or ($identity.Length -eq 36)){
+#Identity contains a upn or looks like a guid
+$graphQuery = "users/$identity/mailboxSettings"
+$response = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graphQuery -returnEntireResponse -Verbose
+$response
+}
+Else{
+Write-Error "Please provide a valid upn or guid"
+}
+}
 function get-graphSite(){
     [cmdletbinding()]
     param(
@@ -1431,7 +1447,7 @@ function reset-graphUnifiedGroupSettingsToOriginals(){
         ,[parameter(Mandatory = $false)]
             [switch]$suppressEmailNotification
         )
-    #Compare current Unified Group settings against orginal settings and revert
+    Write-Verbose "`treset-graphUnifiedGroupSettingsToOriginals"    #Compare current Unified Group settings against orginal settings and revert
     if([string]::IsNullOrWhiteSpace($graphGroupExtended.classification)){$graphGroupExtended = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId $graphGroupExtended.id -selectAllProperties}
     [hashtable]$current = @{}
     [hashtable]$changes = @{}
@@ -1682,6 +1698,69 @@ function set-graphUnifiedGroupGuestSettings(){
         }
 
     }
+function set-graphMailboxSettings(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$identity
+       ,[parameter(Mandatory = $false)]
+            [string]$timeZone
+         )
+If(($identity -match "@anthesisgroup.com") -or ($identity.Length -eq 36)){
+#Identity contains a upn or looks like a guid
+    If($timeZone){
+        If((Get-TimeZone -ListAvailable | Select-Object -Property "Id") -match $timeZone){
+        #timezone is available in Windows
+        $graphQuery = "users/$identity/mailboxSettings"
+        #We set the mailbox timezone and meeting hours timezone the same
+        $graphBodyHashtable = [ordered]@{
+        workingHours = @{
+        timeZone=@{
+        "name"="$($timeZone)";
+        }      
+        }
+        "timeZone"= "$($timeZone)"
+        }
+        $response = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery  $graphQuery -graphBodyHashtable $graphBodyHashtable -Verbose
+        $response
+        }
+        Else{
+        Write-Error "Please provide a valid timezone available in Windows"
+        }
+    }
+}
+Else{
+Write-Error "Please provide a valid upn or guid"
+}
+}
+function set-graphuserManager(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+         [ValidatePattern("@")]
+            [string]$userUPN
+        ,[parameter(Mandatory = $true)]
+         [ValidatePattern("@")]
+            [string]$managerUPN
+        )
+
+$employeeid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($userUPN) | Select-Object -Property "id"
+$managerid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($managerUPN) | Select-Object -Property "id"
+If(($employeeid) -and ($managerid)){
+$body = "{
+  `"@odata.id`": `"https://graph.microsoft.com/v1.0/users/$($managerid.id)`"
+}"
+$graphQuery = "users/$($employeeid.id)" + '/manager/' + "`$ref"
+Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put -Verbose
+}
+Else{
+write-host "User or Manager ID missing" -ForegroundColor Red
+}
+}
 function set-graphuser(){
     [cmdletbinding()]
     param(
@@ -1695,7 +1774,7 @@ function set-graphuser(){
             [hashtable]$userEmployeeInfoExtensionHash
         )
       
-    $validProperties = @("accountEnabled","assignedLicenses","assignedPlans","businessPhones","city","companyName","country","createdDateTime","creationType","deletedDateTime","department","displayName","employeeId","faxNumber","givenName","id","identities","imAddresses","isResourceAccount","jobTitle","lastPasswordChangeDateTime","legalAgeGroupClassification","licenseAssignmentStates","mail","mailNickname","mobilePhone","officeLocation","onPremisesDistinguishedName","onPremisesDomainName","onPremisesExtensionAttributes","onPremisesImmutableId","onPremisesLastSyncDateTime","onPremisesProvisioningErrors","onPremisesSamAccountName","onPremisesSecurityIdentifier","onPremisesSyncEnabled","onPremisesUserPrincipalName","otherMails","passwordPolicies","passwordProfile","postalCode","preferredDataLocation","preferredLanguage","provisionedPlans","proxyAddresses","refreshTokensValidFromDateTime","showInAddressList","signInSessionsValidFromDateTime","state","streetAddress","surname","usageLocation","userPrincipalName","userType")
+    $validProperties = @("accountEnabled","assignedLicenses","assignedPlans","businessPhones","city","companyName","country","createdDateTime","creationType","deletedDateTime","department","displayName","employeeId","faxNumber","givenName","id","identities","imAddresses","isResourceAccount","jobTitle","lastPasswordChangeDateTime","legalAgeGroupClassification","licenseAssignmentStates","mail","mailNickname","manager","mobilePhone","officeLocation","onPremisesDistinguishedName","onPremisesDomainName","onPremisesExtensionAttributes","onPremisesImmutableId","onPremisesLastSyncDateTime","onPremisesProvisioningErrors","onPremisesSamAccountName","onPremisesSecurityIdentifier","onPremisesSyncEnabled","onPremisesUserPrincipalName","otherMails","passwordPolicies","passwordProfile","postalCode","preferredDataLocation","preferredLanguage","provisionedPlans","proxyAddresses","refreshTokensValidFromDateTime","showInAddressList","signInSessionsValidFromDateTime","state","streetAddress","surname","usageLocation","userPrincipalName","userType")
     $dubiousProperties = @("aboutMe","birthday","hireDate","interests","mailboxSettings","mySite","pastProjects","preferredName","responsibilities","schools","skills")
     $validExtensionProperties = @("extensionType","businessUnit","employeeId","contractType")
 
@@ -1745,6 +1824,52 @@ function test-graphBearerAccessTokenStillValid(){
         else{$false}#Otherwise return False
         }
     }
+function update-graphListItem(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [string]$serverRelativeSiteUrl
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [string]$listId
+        ,[parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [string]$listName
+        ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [string]$listitemId
+        ,[parameter(Mandatory = $true)]
+            [hashtable]$fieldHash = @{}
+
+
+        )
+
+    switch ($PsCmdlet.ParameterSetName){
+        {$_ -match "URL"} { #If we've got a URL to the Site, we'll need to get the Id
+            Write-Verbose "update-graphListItem | Getting Site from URL [$serverRelativeSiteUrl]"
+            $graphSiteId = $(get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl $serverRelativeSiteUrl).Id
+            }
+        {$_ -match "AndName"} { #If we've got a URL to the Site, we'll need to get the Id
+            $listId = $(get-graphList -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listName $listName).Id 
+            Write-Verbose "update-graphListItem | getting ListId from name [$listName]"
+            }
+        }
+   
+    $graphBodyHashtable = $fieldHash
+    $reponse = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose
+    $reponse
+}
 function update-mailboxCustomAttibutesToGraphSchemaExtensions(){
     [cmdletbinding()]
     param(
@@ -1790,3 +1915,7 @@ function update-unifiedGroupCustomAttibutesToGraphSchemaExtensions(){
         }
     invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($unifiedGroup.ExternalDirectoryObjectId)" -graphBodyHashtable $bodyHash
     }
+
+
+
+
