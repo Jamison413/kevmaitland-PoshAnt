@@ -225,6 +225,37 @@ function copy-spoPage(){
         }
     
     }
+function delete-versionHistory(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [System.Uri]$fileUrl = "https://anthesisllc.sharepoint.com/:p:/r/clients/Anthesis%20LLC/201908_Anthesis%20LLC_CE%20Centre%20CL%20Partners%20Chemical%20Recycling%20Screening%20(E005835)/Proposal/Archive/Anthesis%20Closed%20Loop%20RfP%20Addendum%20230919%20workstream%204.pptx?d=w3826c547c6db4e04bb6565b30b840395&csf=1&web=1&e=bg33ew"
+        ,[parameter(Mandatory = $true)]
+            [pscredential]$pnpCreds
+        ,[parameter(Mandatory = $true)]
+            [int]$numberOfPreviousVersionsToKeep = 100
+        )
+
+    Write-Verbose "delete-versionHistory($($fileUrl),$($numberOfPreviousVersionsToKeep))"
+    $file = Get-PnPFile -Url $([uri]::UnescapeDataString($fileUrl.AbsolutePath.Replace("/:p:/r","")))
+    $versions = $file.Versions
+    $file.Context.Load($versions)
+    $file.Context.ExecuteQuery()
+
+    $versionsToDelete = $versions.Count - $numberOfPreviousVersionsToKeep
+    Write-Verbose "`t[$($versions.Count)] versions exist, [$($numberOfPreviousVersionsToKeep)] to be retained .: deleting oldest [$($versionsToDelete)]"
+    for($i=0; $i -lt $versionsToDelete; $i++){
+        Write-Verbose "`tMarking version [$($versions[0].VersionLabel)] for deletion"
+        $versions[0].DeleteObject() #$versions[0] is always the oldest version, even before we .ExecuteQuery()
+        }
+    
+    try{
+        $file.Context.ExecuteQuery()
+        Write-Verbose "`t[$($versionsToDelete)] versions deleted successfully"
+        }
+    catch{$_}
+
+    }
 function format-asServerRelativeUrl($serverRelativeUrl,$stringToFormat){
     $formattedString = $stringToFormat
     if([string]::IsNullOrWhiteSpace($formattedString)){$formattedString = "/"}

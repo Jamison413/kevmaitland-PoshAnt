@@ -4,7 +4,7 @@ connect-ToExo
 $daysToLookBack = 90
 if(!$toDate){$toDate = $(Get-Date).AddDays(1)}
 $fromDate = $toDate.AddDays(-($daysToLookBack+1))
-[array]$arrayOfUsers = @("marina.clara@anthesisgroup.com")
+[array]$arrayOfUsers = @("charlie.walter@anthesisgroup.com")
 #[array]$operations = @("PasswordLogonInitialAuthUsingPassword","UserLoggedIn")
 $title = "$($arrayOfUsers[0])_$(Get-Date -Format yyyy-MM-dd)"
 

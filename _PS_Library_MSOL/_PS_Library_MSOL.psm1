@@ -132,6 +132,76 @@ function connect-ToExo($credential){
             }
         }
     }
+function connect-ToS4b($credential){
+    <#
+    .Synopsis
+        Provides a standardised (and simplifed) way to connect to MSOL services
+    .DESCRIPTION
+        Provides a standardised (and simplifed) way to connect to MSOL services.
+        If no credentials are supplied, set-MsolCredentials is called.
+    .EXAMPLE
+        connect-ToExo
+    .EXAMPLE
+        connect-ToExo -credential $creds
+    #>
+    switch ($(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}).Count){
+        0 {
+            Write-Host -f Yellow Connecting to S4B services
+            if ($credential -eq $null){$credential = set-MsolCredentials}
+            Import-Module SkypeOnlineConnector
+            Write-Host -f DarkYellow "Initiating New-PSSession"
+            try {
+                #bodge-exo 
+                $s4bSession = New-CsOnlineSession -Credential $credential
+                }
+            catch{
+                Write-Host -ForegroundColor DarkRed "MFA might be required"
+                $s4bSession = New-CsOnlineSession -UserName $Credential.Username
+                }
+            Write-Host -f DarkYellow "Importing New-PSSession"
+            Import-Module (Import-PSSession $s4bSession -AllowClobber) -Global            
+            }
+        1 {
+            if((Get-Module | ? {$_.ExportedCommands.Keys -contains "Get-CsAudioConferencingProvider"}).Count -gt 0)
+                {
+                Write-Host -f Yellow "Already connected to S4B services"
+                }
+            else{
+                Import-Module (Import-PSSession $(Get-PSSession | ? {$_.ComputerName -match "online.lync.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}) -AllowClobber) -Global
+                }
+            }
+        default {
+            Write-Host -f DarkRed "Something went wrong connecting to S4B :/"
+            }
+        }
+    }
+function connect-ToScc($credential){
+    <#
+    .Synopsis
+        Provides a standardised (and simplifed) way to connect to MSOL services
+    .DESCRIPTION
+        Provides a standardised (and simplifed) way to connect to MSOL services.
+        If no credentials are supplied, set-MsolCredentials is called.
+    .EXAMPLE
+        connect-ToScc
+    .EXAMPLE
+        connect-ToScc -credential $creds
+    #>
+    Write-Host -f Yellow Connecting to Scc services
+    if ($credential -eq $null){$credential = set-MsolCredentials}
+    Import-Module Microsoft.Exchange.Management.ExoPowershellModule
+    Write-Host -f DarkYellow "Initiating New-PSSession"
+    try {
+        #bodge-Scc 
+        $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://ps.compliance.protection.outlook.com/powershell-liveid' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+        }
+    catch{
+        Write-Host -ForegroundColor DarkRed "MFA might be required"
+        $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://ps.compliance.protection.outlook.com/powershell-liveid' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+        }
+    Write-Host -f DarkYellow "Importing New-PSSession"
+    Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global            
+    }
 function connect-ToSpo($credential){
     <#
     .Synopsis

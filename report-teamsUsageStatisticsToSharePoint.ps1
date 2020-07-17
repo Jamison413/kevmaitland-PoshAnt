@@ -1,15 +1,7 @@
 ﻿$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $teamBotDetails.ClientID
-    Client_Secret = $teamBotDetails.Secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
-
-$reportingPeriod = 7
+$reportingPeriod = 90
 
 $activityUserDetailReport = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/reports/getTeamsUserActivityUserDetail(period='D$reportingPeriod')" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET
 $tempFile = $("$env:TEMP\$([guid]::NewGuid().Guid).csv")
@@ -157,7 +149,9 @@ $pilotGroups.Keys | % {
 
 
 #Upload to SharePoint
-$comparison = Compare-Object -ReferenceObject $audReport -DifferenceObject $pilotGroupMembers["TeamsPilotTeam_All"] -Property 'User Principal Name' -IncludeEqual -ExcludeDifferent -PassThru
+$licensedUsers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupUpn All@anthesisgroup.com -memberType TransitiveMembers -returnOnlyLicensedUsers
+$licensedUsers | % {$_ | Add-Member -MemberType NoteProperty -Name 'User Principal Name' -Value $_.userPrincipalName -Force}
+$comparison = Compare-Object -ReferenceObject $audReport -DifferenceObject $licensedUsers -Property 'User Principal Name' -IncludeEqual -ExcludeDifferent -PassThru
 
 $comparison | %{
     $thisPilotUser = $_
