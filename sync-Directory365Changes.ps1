@@ -116,8 +116,6 @@ $reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
 #Get all licensed graph users
 $usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true -Verbose
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
-#Remove Kiosk licensees
-$allgraphusers = $allgraphusers | Where-Object {$_.assignedLicenses.skuId -ne "80b2d799-d2ba-4d2a-8842-fb0d0f3a4b82"}
 #Get all current Anthesians in the list
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
 $allanthesianGUIDS = $allanthesians | select -ExpandProperty "fields"
@@ -223,6 +221,7 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
+    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
 
   }
 }"
@@ -245,7 +244,7 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
-
+    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
   }
 }"
 }
@@ -262,6 +261,7 @@ $TeamsReport += @{"$(get-date) (365 > Directory) ERROR - New User not added" = "
 }
 
 #Add new entry to the POP Reporting List second
+Write-Host "Adding $($user.graphuser.userPrincipalName) to the Reporting list" -ForegroundColor Yellow
 If($user.linemanager.Id){
 #Line manager
 $body = "{
@@ -282,7 +282,7 @@ $body = "{
     `"AnthesianLookupId`": `"$($user.spouser.Id)`",
     `"Email`": `"$($user.graphuser.userPrincipalName)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
-    `"plaintextname`": `"$($user.graphuser.displayName)`"
+    `"plaintextname`": `"$($user.graphuser.displayName)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
   }
 }"
@@ -640,6 +640,32 @@ Write-Host "No dupes found in POP Reporting List" -ForegroundColor Yellow
 }
 
 
+<#------------------------------------------------------------------------------------------Sync checking between the two lists/Cleaning Up POP Reporting List for Mismatches-----------------------------------------------------------------------------------------------------#>
+
+#If graph is interrupted pulling graph users back, the lists can become misaligned.
+$unsyncedanthesians = Compare-Object -ReferenceObject $allanthesiansDetails.UserGUID -DifferenceObject $allPOPreportsDetails.UserGUID | where-object -Property "SideIndicator" -EQ "<="
+If($unsyncedanthesians){
+    ForEach($unsyncedanthesian in $unsyncedanthesians){
+    $idtoremove = $allanthesiansDetails | Where-Object -Property "UserGUID" -EQ "$($unsyncedanthesian.InputObject)" | Select-Object -Property "Id"
+    #Remove each entry in the main Directory
+    delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $idtoremove.id
+
+    #Kick the script off again via scheduled task so they will get created again without having to duplicate code
+    Start-ScheduledTask -TaskName "Ant - Sync Directory 365 Changes"
+    }
+}
+
+
+#Sometimes the system gets out of sync due to licensing (I think...not sure but the below will fix it), where deactivated users are in the POP list
+$missingpops = Compare-Object -ReferenceObject $allanthesiansDetails.UserGUID -DifferenceObject $allPOPreportsDetails.UserGUID | where-object -Property "SideIndicator" -EQ "=>"
+ForEach($missingpop in $missingpops){
+    $popidtoremove = $allPOPreportsDetails | Where-Object -Property "UserGUID" -EQ "$($missingpop.InputObject)" | Select-Object -Property "Id"
+    #Remove each entry in the pop list
+    delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $popidtoremove.id
+}
+
+
+
 
 <#------------------------------------------------------------------------------------------Teams Report for 365 amends-----------------------------------------------------------------------------------------------------#>
 
@@ -660,4 +686,8 @@ Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 
 #Finish run
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype END -logstring "End of run for sync-Directory365Changes"
+
+
+
+
 

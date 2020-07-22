@@ -327,9 +327,6 @@ function update-msolusercoregroups{
         [parameter(Mandatory = $true,ParameterSetName="UPN")]
         [PSObject]$upn
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-        [ValidateSet("Andorra, AND", "Barcelona, ESP", "Bogota, COL","Boulder, CO, USA","Bristol, GBR","Dubai, ARE","Emeryville, CA, USA","Frankfurt, DEU","Helsinki, FIN","London, GBR","Macclesfield, GBR","Madrid, ESP","Manchester, GBR","Manila, PHL","Manlleu, ESP","Nuremberg, DEU","Oxford, GBR","Rome, ITA","Stockholm, SWE","Tormarton, GBR")]
-        [string[]]$office
-        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$businessunit
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$regionalgroup
@@ -346,9 +343,9 @@ Try{
         Write-Error "Failed to update msoluser group membership for regional group [$($upn)] in update-msoluser"
         Write-Error $_
     }
-    #If they are in one of the GBR business units, add them to the MDM BYOD group
+    #If they are in one of the GBR business units or the USA (not Phillipines, so we can't use the BU for this area), add them to the MDM BYOD group
     try {
-    if(![string]::IsNullOrWhiteSpace($businessunit) -and (("Anthesis Energy UK Ltd (GBR)" -eq $businessunit) -or ("Anthesis (UK) Ltd (GBR)" -eq $businessunit) -or ("Anthesis Consulting Group Ltd (GBR)" -eq $businessunit))){
+    if(![string]::IsNullOrWhiteSpace($businessunit) -and (("Anthesis Energy UK Ltd (GBR)" -eq $businessunit) -or ("Anthesis (UK) Ltd (GBR)" -eq $businessunit) -or ("Anthesis Consulting Group Ltd (GBR)" -eq $businessunit) -or ("Boulder, CO, USA" -eq $office) -or ("Emeryville, CA, USA" -eq $office))){
     write-host "Adding to MDM BYOD Group"
         Add-DistributionGroupMember -Identity "b264f337-ef04-432e-a139-3574331a4d18" -Member $upn -BypassSecurityGroupManagerCheck
     }

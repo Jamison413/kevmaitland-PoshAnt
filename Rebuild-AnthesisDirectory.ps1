@@ -225,6 +225,7 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
+    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
 
   }
 }"
@@ -247,6 +248,7 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
+    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
 
   }
 }"
