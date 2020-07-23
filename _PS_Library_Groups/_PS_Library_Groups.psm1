@@ -428,9 +428,9 @@ function new-365Group(){
                 #Create the UG
                 # Example of json for POST https://graph.microsoft.com/v1.0/groups
                 # https://docs.microsoft.com/en-us/graph/api/group-post-groups?view=graph-rest-1.0
-                $owners = @()
+                [array]$owners = @()
                 $managerUpns | % {[string[]]$owners += ("https://graph.microsoft.com/v1.0/users/$_").ToLower()}
-                $members = @()
+                [array]$members = @()
                 $teamMemberUpns | % {[string[]]$members += ("https://graph.microsoft.com/v1.0/users/$_").ToLower()}
                 $members = $($members+$owners) | Sort-Object | Get-Unique -AsString 
 
@@ -605,6 +605,29 @@ function new-symGroup($displayName, $description, $managers, $teamMembers, $memb
     $autoSubscribe = $true
     $groupClassification = "Internal"
     new-365Group -displayName $displayName -description $description -managerUpns $managers -teamMemberUpns $teamMembers -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -isPublic $isPublic -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddress -groupClassification $groupClassification -ownersAreRealManagers $false
+    }
+function remove-DataManagerFromGroup(){
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    param(
+        [Parameter(Mandatory=$true)]
+            [string]$dataManagerGroupId
+        ,[Parameter(Mandatory=$true)]
+            [string]$upnToRemove
+        )
+    Write-Verbose "remove-DataManagerFromGroup([$dataManagerGroupId],[$upnToRemove])"
+    $dataManagerGroupMembers = Get-DistributionGroupMember -Identity $dataManagerGroupId
+
+    if($dataManagerGroupMembers.WindowsLiveID -notcontains $upnToRemove){
+        Write-Warning "remove-DataManagerFromGroup could not remove [$upnToRemove] from [$dataManagerGroupId] because it is not a member"
+        continue
+        }
+
+    Remove-DistributionGroupMember -Identity $dataManagerGroupId -Member $upnToRemove -BypassSecurityGroupManagerCheck:$true -Confirm:$false
+
+    ,[array]$otherDataManagers = $dataManagerGroupMembers | ? {$_.WindowsLiveID -ne $upnToRemove}
+    if($otherDataManagers.Count -eq 0){ #If this user is the last Data Manager, add GroupBot to prevent this Data Manager group from becoming empty
+        Add-DistributionGroupMember -Identity $dataManagerGroupId -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck:$true -Confirm:$false
+        }
     }
 function rummage-forDistributionGroup(){
     [CmdletBinding()]
@@ -1094,10 +1117,16 @@ function sync-groupMemberships(){
                     try{
                         #We want to add Data Managers as Members too, so we add to Members regardless of $syncWhat. However, we don't really need GroupBot as a Member, so we exclude this one exception
                         if($userToBeChanged.objectId -ne "00aa81e4-2e8f-4170-bc24-843b917fd7cf"){
-                            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType Members -graphUserIds $userToBeChanged.objectId -ErrorAction Stop
+                            try{
+                                add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType Members -graphUserIds $userToBeChanged.objectId -ErrorAction Stop -Verbose:$VerbosePreference
+                                }
+                            catch{
+                                if($_.Message -match "One or more added object references already exist for the following modified properties"){continue}
+                                else{$_}
+                                }
                             }
                         if($syncWhat -eq "Owners"){ #If we are syncing Owners, we _don't_ want to exclude GroupBot (or anyone else)
-                            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType Owners -graphUserIds $userToBeChanged.objectId -ErrorAction Stop
+                            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType Owners -graphUserIds $userToBeChanged.objectId -ErrorAction Stop -Verbose:$VerbosePreference
                             }
                         [array]$usersAdded += (New-Object psobject -Property $([ordered]@{"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
                         }
@@ -1112,11 +1141,12 @@ function sync-groupMemberships(){
                     $userToBeChanged = $_
                     Write-Verbose "`tRemoving [$($userToBeChanged.userPrincipalName)] from [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.Id)] UG $syncWhat"
                     try{
-                        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType $syncWhat -graphUserIds $userToBeChanged.objectId -WhatIf:$WhatIfPreference -ErrorAction Stop 
+                        #if($syncWhat -eq "Owners"){start-sleep -Seconds 2} #Pause briefly if we're removing Owners because we can't remove the last owner from a group, and it takes a moment for any new owners we've added above to filter through.
+                        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $graphExtendedUG.Id -memberType $syncWhat -graphUserIds $userToBeChanged.objectId -ErrorAction Stop  -Verbose:$VerbosePreference
                         [array]$usersRemoved += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
                         }
                     catch{
-                        Write-Warning "Failed to remove [$($userToBeChanged.userPrincipalName)] from UG $syncWhat [$($graphMesg.DisplayName)][$($graphMesg.Id)]"
+                        Write-Warning "Failed to remove [$($userToBeChanged.userPrincipalName)] from UG $syncWhat [$($graphExtendedUG.DisplayName)][$($graphExtendedUG.Id)]"
                         [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
                         }
                     }                

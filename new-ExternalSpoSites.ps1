@@ -1,7 +1,7 @@
 ﻿$365creds = set-MsolCredentials
 connect-ToExo -credential $365creds
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt" -Verbose
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $allClientSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/clients" #-filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
@@ -133,13 +133,15 @@ foreach ($currentRequest in $selectedRequests){
 
         if($addExecutingUserAsTemporaryOwner){
             Write-Host -f DarkYellow "`tRemoving temporary Admin role for [$($365creds.UserName)] from [$($new365Group.DisplayName)]"
-            remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $new365Group.id -memberType Owners -graphUserUpns $365creds.UserName
+            try{remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $new365Group.id -memberType Owners -graphUserUpns $365creds.UserName  -ErrorAction Continue}
+            catch{$_}
             #Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
             Remove-DistributionGroupMember -Identity $new365Group.anthesisgroup_UGSync.dataManagerGroupId -Member $365creds.UserName -Confirm:$false -BypassSecurityGroupManagerCheck:$true
             }
         if($addExecutingUserAsTemporaryMember){
             Write-Host -f DarkYellow "`tRemoving temporary Membership role for [$($365creds.UserName)] from [$($new365Group.DisplayName)]"
-            remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $new365Group.id -memberType Members -graphUserUpns $365creds.UserName
+            try{remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $new365Group.id -memberType Members -graphUserUpns $365creds.UserName -ErrorAction Continue}
+            catch{$_}
             #Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
             }
 

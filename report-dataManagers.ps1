@@ -38,6 +38,13 @@ if($groupChangesWereMade){#Refresh $allDataManagerSubGroups if it's changed
 #$dataManagerTrainingRecords = $trainingRecords | ? {$_.fields.Training_x0020_session.Label -eq "Data Manager"}
 #Graph doesn't expose SharePoint Users correctly, so it's much simpler to use PnP where PeoplePickers and Managed MetaData is used
 
+#$validTrainedDataManagers > The "real" list of users who have valid Data Manager training
+#$allAuthorisedDataManagers > Who had valid Data Manager training last time this script was run
+#$allCurrentDataManagers > All users who are currently Data Managers, regardless of whether they are trained
+#$newAuthorisedDataManagers = $validTrainedDataManagers - $allAuthorisedDataManagers
+#$unauthorisedDataManagers = $allCurrentDataManagers - $validTrainedDataManagers ***
+#$authorisedButUnassignedDataManagers = $validTrainedDataManagers -  $allCurrentDataManagers
+
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/Resources-HR" -Credentials $sharePointCreds
 $dataManagerTrainingRecords = Get-PnPListItem -List "User Training Records" -Query "<View><Query><Where><Eq><FieldRef Name='Training_x0020_session' Label='True'/><Value Type='String'>Data Manager</Value></Eq></Where></Query></View>" #Get the Data Manager Training records
 $dataManagerTrainingRecords | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name mail -Value $_.FieldValues.User.Email} #Add this property so we can compare-object with Graph Users later
@@ -53,7 +60,7 @@ for($i=0;$i -lt $dataManagerTrainingRecords.Count;$i++){
     }
 $validTrainedDataManagers = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddYears(-1)}
 $expiringSoonDataManagers = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddYears(-1) -and $_.FieldValues.Date_x0020_of_x0020_training -lt $(Get-Date).AddMonths(-10)}
-#$deauthorisedDataManagers = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -lt $(Get-Date).AddYears(-1)}
+$c = $mostRecentTrainingRecords | ? {$_.FieldValues.Date_x0020_of_x0020_training -lt $(Get-Date).AddYears(-1)}
 
 #Get the members of the relevant AAD groups
 $authorisedDataManagerGroup = get-graphGroups -tokenResponse $tokenResponse -filterUpn datamanagers@anthesisgroup.com
@@ -65,25 +72,29 @@ $allCurrentDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse 
 if($validTrainedDataManagers -eq $null){$validTrainedDataManagers = @()}
 if($allAuthorisedDataManagers -eq $null){$allAuthorisedDataManagers = @()}
 $mismatchedAuthorisedDataManagers = Compare-Object -ReferenceObject $validTrainedDataManagers -DifferenceObject $allAuthorisedDataManagers -Property mail -PassThru -IncludeEqual
-#$deauthorisedDataManagers = $mismatchedAuthorisedDataManagers | ? {$_.SideIndicator -eq "=>"}
-$deauthorisedDataManagers | % { #Remove anyone who's training has lapsed
+$expiredDataManagers | % { #Remove anyone who's training has lapsed from Data Managers (Authorised) - we'll remove them from the individual teams later once we've got the full list of unauthorised Data Managers
     Write-Verbose "Removing [$( $_.mail)] from [$($authorisedDataManagerGroup.displayName)]"
     Remove-DistributionGroupMember -Identity $authorisedDataManagerGroup.id -Member $_.mail -Confirm:$false -BypassSecurityGroupManagerCheck:$true 
-    $userChangesWereMade = $true
+    #$userChangesWereMade = $true
     }
-$newauthorisedDataManagers = $mismatchedAuthorisedDataManagers | ? {$_.SideIndicator -eq "<="} 
-$newauthorisedDataManagers | % { #Add anyone new
+$newAuthorisedDataManagers = $mismatchedAuthorisedDataManagers | ? {$_.SideIndicator -eq "<="} 
+$newAuthorisedDataManagers | % { #Add anyone new
     Write-Verbose "Adding [$( $_.mail)] to [$($authorisedDataManagerGroup.displayName)]"
     Add-DistributionGroupMember -Identity $authorisedDataManagerGroup.id -Member $_.mail -Confirm:$false -BypassSecurityGroupManagerCheck:$true 
-    $userChangesWereMade = $true
+    #$userChangesWereMade = $true
     }
 
-if($userChangesWereMade){#Refresh $allAuthorisedDataManagers if it's changed
-    Write-Host -ForegroundColor Yellow "Giving EXO 20 minutes to sync to AAD"
-    Start-Sleep -Seconds 1200 #Give EXO 20 minutes to sync to AAD
-    $allAuthorisedDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $authorisedDataManagerGroup.id -memberType Members -returnOnlyUsers
-    }
+#if($userChangesWereMade){#Refresh $allAuthorisedDataManagers if it's changed  #We don;t have to wait for this to refresh if we just re-use $validTrainedDataManagers
+#    $oldCount = $allAuthorisedDataManagers.Count
+#    do{
+#        Write-Host -ForegroundColor Yellow "Waiting for EXO to sync to AAD"
+#        Start-Sleep -Seconds 60
+#        $allAuthorisedDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $authorisedDataManagerGroup.id -memberType Members -returnOnlyUsers
+#        }
+#    while($allAuthorisedDataManagers.Count -eq $oldCount)
+#    }
 
+$tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 600 -aadAppCreds $teamBotDetails
 
 #Create a list of who-owns-what and what-is-owned-by-who
 $whoOwnsWhatHash = @{}
@@ -110,7 +121,7 @@ $allDataManagerSubGroups | % {
 #Compare-Object -ReferenceObject $whoOwnsWhatTest -DifferenceObject $allCurrentDataManagers -Property mail #This should output nothing if everything is correct
 
 #Find who hasn't completed Data Manager training in the past year, but is still currently a Data Manager
-$mismatchedDataManagers = Compare-Object -ReferenceObject $allCurrentDataManagers -DifferenceObject $allAuthorisedDataManagers -Property mail -PassThru -IncludeEqual
+$mismatchedDataManagers = Compare-Object -ReferenceObject $allCurrentDataManagers -DifferenceObject $validTrainedDataManagers -Property mail -PassThru -IncludeEqual
 $unauthorisedDataManagers = $mismatchedDataManagers  | ? {$_.SideIndicator -eq "<="}
 $authorisedButUnassignedDataManagers = $mismatchedDataManagers | ? {$_.SideIndicator -eq "=>"}
 
@@ -146,20 +157,42 @@ $expiringSoonDataManagers | % {
 
 
 #Warn users that they have/will be automatically removed from Data Manager groups     $unauthorisedDataManagers.displayName | sort 
-$unauthorisedDataManagers | %{
+$unauthorisedDataManagers | ? {$_.mail -ne "groupbot@anthesisgroup.com"} | % {
     $thisUser = $_
     $removedBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.givenName),<BR><BR>`r`n`r`n"
-    $removedBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. We don't have a record of you attending a training session in the past year, so it's about time to <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
+    $removedBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. We don't have a record of you attending a training session in the past year, so it's time to <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
     $removedBodyTrunk += "A lot has changed in the past year. You can sign up for any session that is convenient for you and we'll go through some of the improvements that we've introduced, which will help you to work <I>even more</I> efficiently. <BR><BR>`r`n`r`n"
     $removedBodyTrunk += "If there aren't any suitable sessions available for you, please contact the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> and they will arrange more. <BR><BR>`r`n`r`n"
-    $removedBodyTrunk += "If you don't renew your training by 2020-07-01, you will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
+    $removedBodyTrunk += "You will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
     $whoOwnsWhatHash[$thisUser.mail] | Sort-Object {$_[0]} | % {
         $removedBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
         }
     $removedBodyTrunk += "</UL>Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before 2020-07-01" -BodyAsHtml $removedBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8;break
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before 2020-07-01" -BodyAsHtml $removedBodyTrunk -To $thisUser.userPrincipalName  -Encoding UTF8
+    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -BodyAsHtml $removedBodyTrunk -To $thisUser.userPrincipalName  -Encoding UTF8 -Priority High
+    
+    #Now remove them from each of their groups (this will remove them from their "- Data Manager" groups, and the sync-UnifiedGroupMembership will then demote them on the next cycle). If they are the last Data Manager, they will be replaced with GroupBot
+    if($thisUser.mail -ne "groupbot@anthesisgroup.com"){
+        $whoOwnsWhatHash[$($thisUser.mail)] | % {
+            Write-Verbose "Removing [$($thisUser.mail)] from [$($_[0])]"
+            remove-DataManagerFromGroup -dataManagerGroupId $_[1] -upnToRemove $thisUser.mail -ErrorAction Stop
+            }
+        }
+    
     }
+
+$authorisedButUnassignedDataManagers | ? {$newAuthorisedDataManagers.mail -notcontains $_.mail} | % { #Don't double-message new recruits
+    $thisUser = $_
+    if($thisUser.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddMonths(-1)){ #Stop spamming users who trained > 1 month ago
+        $nudgeBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
+        $nudgeBodyTrunk += "It looks like you attended Data Manager training on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy") but you haven't been allocated as a Data Manager of any teams yet.<BR><BR>`r`n`r`n"
+        $nudgeBodyTrunk += "If this is an oversight, please let the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> know which teams you should be managing, and they will fix this.<BR><BR>`r`n`r`n"
+        $nudgeBodyTrunk += "Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
+        #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+        Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Data Managers status" -BodyAsHtml $nudgeBodyTrunk -To $thisUser.FieldValues.User.Email -Encoding UTF8
+        }
+    }
+
 
 #region Overview report
 $overviewBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello User/Exchange 365 Admins,<BR><BR>`r`n`r`n"
@@ -176,10 +209,10 @@ $expiringSoonDataManagers | Sort-Object {$_.FieldValues.User.Email} | % {
     $overviewBodyTrunk += "<LI>$($_.FieldValues.User.Email)</LI>`r`n"
     }
 $overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users have not renewed their training and have been removed from [Data Managers - Authorised (All)]:<BR><BR>`r`n<UL>"
-$deauthorisedDataManagers | Sort-Object {$_.FieldValues.User.Email} | % {
+$expiredDataManagers | Sort-Object {$_.FieldValues.User.Email} | % {
     $overviewBodyTrunk += "<LI>$($_.FieldValues.User.Email)</LI>`r`n"
     }
-$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users are unauthorised Data Managers (they are currently members of a [XYZ Team - Data Manager Subgroup], but have no valid training record):<BR><BR>`r`n<UL>"
+$overviewBodyTrunk +=  "</UL>`r`n`r`n<BR><BR>The following users have been removed as Data Managers (they are currently members of a [XYZ Team - Data Manager Subgroup], but have no valid training record):<BR><BR>`r`n<UL>"
 $unauthorisedDataManagers | Sort-Object {$_.mail} | % {
     $thisManager = $_
     $overviewBodyTrunk += "`r`n<LI><B>$($thisManager.mail)</B><UL>" #List the Managers alphabetically
