@@ -28,8 +28,9 @@
 <#--------Import Modules--------#>
 
 Import-Module -Name ActiveDirectory #Not compatible with pscore
-Import-Module -Name 'C:\Users\Emily.Pressey\Documents\WindowsPowerShell\Modules\_PS_Library_UserManagement\_PS_Library_UserManagement.psm1' #This has a compatibilty issue with core - something to dig into, shuld work in ISE?
-Import-Module -Name 'C:\Users\Emily.Pressey\Documents\WindowsPowerShell\Modules\_PS_Library_GeneralFunctionality\_PS_Library_GeneralFunctionality.psm1'
+Import-Module -Name _PS_Library_UserManagement.psm1
+Import-Module -Name _PS_Library_GeneralFunctionality.psm1
+Import-Module -Name _PS_Library_Graph.psm1
 
 
 <#--------Logging--------#>
@@ -48,6 +49,9 @@ connect-ToMsol -credential $msolCredentials
 connect-ToExo -credential $msolCredentials
 connect-toAAD -credential $msolCredentials
 Connect-MsolService -credential $msolCredentials
+
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 
@@ -87,7 +91,7 @@ If($msoluser){
         log-Error $Error
         }
         try{
-        update-msolusercoregroups -upn $upn -office $office -businessunit $businessunit -regionalgroup $regionalgroup #Need to add office option to figure this out just from the office location?
+        update-msolusercoregroups -upn $upn -businessunit $businessunit -regionalgroup $regionalgroup
         }
         catch{
         Write-host "Failed to update MSOL account core groups" -ForegroundColor Red
@@ -151,6 +155,17 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 ForEach($thisUser in $selectedRequests){
 
+#Before we start, check the contract type
+write-host "Before we start, what is the contract type?"
+write-host "A: Employee"
+write-host "B: Subcontractor"
+$selection = Read-Host "Type A or B"
+Switch($selection){
+"A" {$contracttype = "Employee"}
+"B" {$contracttype = "Subcontractor"}
+}
+
+
 #Get secondary geographic data from the term store
 $officeterm = Get-PnPTerm -Identity $($thisUser.FieldValues.Main_x0020_Office0.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
 $regionalgroup = (Get-DistributionGroup -Identity $officeterm.CustomProperties.'365 Regional Group').guid
@@ -179,6 +194,19 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -licensetype = ($licensetype = ($thisUser.FieldValues.Licensing.Split(" ")[1].Trim())) `
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) `
+
+#update employee extension info with graph
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
+
+#Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+$businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.WorkPhone).Trim())")}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.CellPhone).Trim())"}
+
+#Add users to any regional groups via stacking - this information is kept in the term store manually as we need to track how the geographic teams stack into eachother e.g. Bay Area > USA (All) > North America (All)
+$membersresult = add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $officeterm.CustomProperties.'Members Group GUID'
+$365result = add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $officeterm.CustomProperties.'365 Group GUID'
 
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account
@@ -246,6 +274,16 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 ForEach($thisUser in $selectedRequests){
 
+#Before we start, check the contract type
+write-host "Before we start, what is the contract type?"
+write-host "A: Employee"
+write-host "B: Subcontractor"
+$selection = Read-Host "Type A or B"
+Switch($selection){
+"A" {$contracttype = "Employee"}
+"B" {$contracttype = "Subcontractor"}
+}
+
 #Get secondary geographic data from the term store
 $officeterm = Get-PnPTerm -Identity $($thisUser.fieldvalues.Primary_x0020_Workplace.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
 $regionalgroup = (Get-DistributionGroup -Identity $officeterm.CustomProperties.'365 Regional Group').guid
@@ -257,7 +295,7 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     provision-365user -upn ($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) `
     -plaintextpassword ($plaintextpassword = "Anthesis123") `
     -firstname ($firstname = "$($thisUser.FieldValues.Title.Trim().Split(" ")[0].Trim())") `
-    -lastname = ($lastname = "$(($thisUser.FieldValues.Title.Trim().Split(" ")[$thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ").Count-1]).Trim())") `
+    -lastname = ($lastname = "$($thisUser.FieldValues.Title.Trim().Split(" ")[1].Trim())") `
     -displayname = ($displayname = "$(($thisUser.FieldValues.Title).Trim())") `
     -primaryteam = ($primaryteam = "$(($thisUser.FieldValues.Primary_x0020_Team.Label).Trim())") `
     -regionalgroup = $regionalgroup `
@@ -275,6 +313,15 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -licensetype = ($licensetype = ($thisUser.FieldValues.Office_x0020_365_x0020_license.Split(" ").Trim())) `
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) 
+
+#update employee extension info with graph
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
+
+#Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+$businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0).Trim())"}
 
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account

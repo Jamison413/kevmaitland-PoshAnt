@@ -2,7 +2,7 @@
 #This is the second half of the Anthesis Directory Sync Scripts. This just handles change requests via the People Services and Administration Teams, which writes back to 365 and to the Anthesis Directory and Reporting Lists.
 
 
-$friendlyLogname = "C:\Scripts" + "\Logs" + "\friendlylogsync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
+$friendlyLogname = "C:\ScriptLogs" + "\friendlylogsync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
 function friendlyLogWrite(){
     [cmdletbinding()]
     param(
@@ -11,14 +11,29 @@ function friendlyLogWrite(){
        ,[parameter(Mandatory = $true)]
             [string]$logstring
        ,[parameter(Mandatory = $true)]
-            [validateset("WARNING","SUCCESS","ERROR","ERROR DETAILS","MESSAGE","Change in 365","Change by Request")]
+            [validateset("WARNING","SUCCESS","ERROR","ERROR DETAILS","MESSAGE","Change in 365","Change by Request","END","START")]
             [String]$messagetype
         )
 If($messagetype -eq "MESSAGE"){
-Add-content $friendlyLogname -value $("**************************************************************************************************************************************************************")
+Add-content $friendlyLogname -value $("*************************************************************************************************************************************************************")
 Add-content $friendlyLogname -value $("$(get-date)" + " MESSAGE: " + "$($logstring)")
-Add-content $friendlyLogname -value $("**************************************************************************************************************************************************************")
+Add-content $friendlyLogname -value $("*************************************************************************************************************************************************************")
 }
+
+If($messagetype -eq "START"){
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+Add-content $friendlyLogname -value $("$(get-date)" + " START: " + "$($logstring)")
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+}
+
+
+If($messagetype -eq "END"){
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+Add-content $friendlyLogname -value $("$(get-date)" + " END: " + "$($logstring)")
+Add-content $friendlyLogname -value $("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+}
+
+
 If($messagetype -eq "WARNING"){
 Add-content $friendlyLogname -value $("$(get-date)" + "     WARNING: " + "$($logstring)")
 }
@@ -49,7 +64,7 @@ Add-content $friendlyLogname -value $value
 }
 $TeamsLog = @()
 
-$Logname = "C:\Scripts" + "\Logs" + "\sync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
+$Logname = "C:\ScriptLogs" + "\sync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
@@ -90,6 +105,8 @@ $ReqTokenBody = @{
     } 
 $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
 
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype START -logstring "Starting run for sync-DirectoryChangeRequests"
+
 #Set  Sharepoint list id's
 $graphSiteId = "anthesisllc.sharepoint.com,cd82f435-8404-4c16-9ef5-c1e357ac5b96,2373d950-6dea-4ed5-9224-dea4c41c7da3"
 $directoryListId = "009bb573-f305-402d-9b21-e6f597473256"
@@ -100,9 +117,6 @@ $reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
 #Get all licensed graph users
 $usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true -Verbose
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
-##################/////////////for testing
-$allgraphusers = $allgraphusers | Where-Object -Property "userPrincipalName" -EQ "testing.testing@anthesisgroup.com"
-##################////////////
 #Get all current Anthesians in the list
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
 $allanthesianGUIDS = $allanthesians | select -ExpandProperty "fields"
@@ -146,7 +160,7 @@ friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype WARNING -logstri
 $changetable = $change | Format-Table JobTitle,CellPhone,Office_x0020_Number,Community,Office,City,ManagerEmail,Business_x0020_Unit
 $subject = "Woops! We tried to update 365 details for either an IT Admin"
 $body = "<HTML><FONT FACE=`"Calibri`">Hello there,`r`n`r`n<BR><BR>"
-$body += "You're receiving this email as someone has tried update your details in 365. this won't be possible as you are a 365 admin and will need to complete these changes yourself due to security.`r`n`r`n<BR><BR>"
+$body += "You're receiving this email as someone has tried update your details in 365. This won't be possible as you are a 365 admin and will need to complete these changes yourself due to security.`r`n`r`n<BR><BR>"
 $body += "Job title: $($change.JobTitle)`r`n<BR><BR>"
 $body += "Mobile number: $($change.CellPhone)`r`n<BR><BR>"
 $body += "Office number: $($change.Office_x0020_Number)`r`n<BR><BR>"
@@ -157,6 +171,7 @@ $body += "Business Unit: $($change.Business_x0020_Unit)`r`n`r`n<BR><BR><BR><BR>"
 $body += "Love,`r`n`r`n<BR><BR>"
 $body += "The People Services Robot"
 Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $changeListId -listitemId "$($change.id)" -fieldHash @{"Status" = "This Anthesian is in the IT Team - we'll let them know the changes"} -Verbose
 Break
 }
 
@@ -321,8 +336,18 @@ If($officeterm){
         $timezonesync += 1
         }                 
     If($timezonesync -eq 0){
-    #If all returns okay, update the Directory    
-    $officedirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office" = "$($change.Office)";"Timezone" = "$($officeterm.CustomProperties.Timezone)";"Country" = "$($officeterm.CustomProperties.Country)"} -Verbose
+    #If all returns okay, update the Directory with the friendly utc timezone 
+    $exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)" -Verbose
+    #Philippine's uses several timezone names
+    If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
+    $exoTimezone = New-Object -TypeName psobject @{
+    "DisplayName" = "(UTC+08:00) $($graphuser.country) Standard Time"
+    }
+    }
+    Else{
+    $exoTimezone = Get-TimeZone $exoTimezone.timeZone
+    }    
+    $officedirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office" = "$($change.Office)";"Timezone" = "$($exoTimezone.DisplayName)";"Country" = "$($officeterm.CustomProperties.Country)"} -Verbose
         If($officedirectoryupdate.office -eq $change.Office){
         friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "Updated the office for [$($graphuser.userPrincipalName)] in the Directory: $($graphuser.officeLocation) to $($change.Office)"
         }
@@ -454,3 +479,5 @@ Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 }
 
 
+#Finish run
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype END -logstring "End of run for sync-DirectoryChangeRequests"
