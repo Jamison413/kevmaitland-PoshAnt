@@ -129,7 +129,10 @@ foreach ($currentRequest in $selectedRequests){
         start-Process $newPnpTeam.SiteUrl
 
         Write-Host -f DarkYellow "`tset-standardSitePermissions [$($new365Group.DisplayName)]"
-        set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $new365Group -pnpCreds $365creds -Verbose:$VerbosePreference -suppressEmailNotifications
+        try{
+            set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $new365Group -pnpCreds $365creds -Verbose:$VerbosePreference -suppressEmailNotifications -ErrorAction Continue
+            }
+        catch{$_}
 
         if($addExecutingUserAsTemporaryOwner){
             Write-Host -f DarkYellow "`tRemoving temporary Admin role for [$($365creds.UserName)] from [$($new365Group.DisplayName)]"
