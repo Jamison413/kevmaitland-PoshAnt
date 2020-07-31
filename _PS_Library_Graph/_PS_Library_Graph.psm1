@@ -146,9 +146,9 @@ function add-graphLicenseToUser(){
         ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
             [ValidateSet("K1","E1","E3","E5","EMS","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio")]
             [string]$licenseFriendlyName 
-        ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
-            [string]$licenseGuid
         ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
+            [string]$licenseGuid
+        ,[parameter(Mandatory = $false,ParameterSetName = "Guid")]
             [string[]]$disabledPlansGuids = @()
         ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
             [string[]]$licenseGuids
@@ -174,7 +174,7 @@ function add-graphLicenseToUser(){
     #Iterate through the supplied/derived licenseGuids
     $licenseGuids | % {
         $thisLicenseDefinition = @{"skuId"=$_}
-        $thisLicenseDefinition.Add("disabledPlans",$disabledPlansGuids) #This cannot proc if $PsCmdlet.ParameterSetName -eq "Guids", so we don't need to worry about which disabledPlans belong to which licenseGuid
+        $thisLicenseDefinition.Add("disabledPlans",$disabledPlansGuids) #$disabledPlansGuids is $null if $PsCmdlet.ParameterSetName -eq "Guids", so we don't need to worry about which disabledPlans belong to which licenseGuid
         [array]$licenseArray += $thisLicenseDefinition
         }
     

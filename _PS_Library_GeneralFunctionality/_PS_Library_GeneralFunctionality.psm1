@@ -496,7 +496,7 @@ function get-microsoftProductInfo(){
         @("Microsoft 365 E5 Security","Microsoft 365 E5 Security","IDENTITY_THREAT_PROTECTION","26124093-3d78-432b-b5dc-48bf992543d5","Microsoft 365 E5 Security"),
         @("Microsoft 365 E5 Security for EMS E5","Microsoft 365 E5 Security for EMS E5","IDENTITY_THREAT_PROTECTION_FOR_EMS_E5","44ac31e7-2999-4304-ad94-c948886741d4","Microsoft 365 E5 Security for EMS E5"),
         @("Microsoft 365 F1","Microsoft 365 F1","SPE_F1","66b55226-6b4f-492c-910c-a3b7a3c9d993","Microsoft 365 F1"),
-        @("Microsoft Defender Advanced Threat Protection","Microsoft Defender Advanced Threat Protection","WIN_DEF_ATP","111046dd-295b-4d6d-9724-d52ac90bd1f2","Microsoft Defender Advanced Threat Protection"),
+        @("Microsoft Defender Advanced Threat Protection","Microsoft Defender Advanced Threat Protection","WIN_DEF_ATP","b126b073-72db-4a9d-87a4-b17afe41d4ab","Microsoft Defender Advanced Threat Protection"),
         @("MICROSOFT DYNAMICS CRM ONLINE BASIC","MICROSOFT DYNAMICS CRM ONLINE BASIC","CRMPLAN2","906af65a-2970-46d5-9b58-4e9aa50f0657","MICROSOFT DYNAMICS CRM ONLINE BASIC"),
         @("MICROSOFT DYNAMICS CRM ONLINE","MICROSOFT DYNAMICS CRM ONLINE","CRMSTANDARD","d17b27af-3f49-4822-99f9-56a661538792","MICROSOFT DYNAMICS CRM ONLINE"),
         @("MS IMAGINE ACADEMY","MS IMAGINE ACADEMY","IT_ACADEMY_AD","ba9a34de-4489-469d-879c-0f0f145321cd","MS IMAGINE ACADEMY"),
