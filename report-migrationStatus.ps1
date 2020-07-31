@@ -1,6 +1,6 @@
-﻿$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+﻿$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
 $tokenResponseTeamBot = get-graphTokenResponse -aadAppCreds $teamBotDetails
-$intuneBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\intunebot.txt"
+$intuneBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\intunebotdetails.txt"
 $tokenResponseIntuneBot = get-graphTokenResponse -aadAppCreds $intuneBotDetails
 
 
@@ -16,7 +16,13 @@ $completed = $compare | ? {$_.SideIndicator -eq "=="}
 $toMigrate = $compare | ? {$_.SideIndicator -eq "<="}
 $weirdos = $compare | ? {$_.SideIndicator -eq "=>"}
 
+Write-Host -ForegroundColor Yellow "Migrated"
+Write-Host -ForegroundColor Yellow "--------"
 $completed.userprincipalname | sort
+Write-Host -ForegroundColor Yellow "ToDo"
+Write-Host -ForegroundColor Yellow "----"
 $toMigrate.userprincipalname | sort
 
-$completed.Count / ($completed.count + $toMigrate.Count)
+Write-Host -ForegroundColor Yellow "% Complete"
+Write-Host -ForegroundColor Yellow "----------"
+"$([System.Math]::Floor(($completed.Count / ($completed.count + $toMigrate.Count) *100)))%"
