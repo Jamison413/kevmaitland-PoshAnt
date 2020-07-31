@@ -351,6 +351,40 @@ function get-graphAdministrativeRoleMembers(){
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/directoryRoles/$($roleHash[$roleName])/members"
 
     }
+function get-graphAppClientCredentials{
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [ValidateSet("TeamsBot","SchemaBot","IntuneBot")]
+            [String]$appName
+        )
+    
+    switch($appName){ #Figure out the name of the file
+        "TeamsBot"  {$encryptedCredsFile = "teambotdetails.txt"}
+        "SchemaBot" {$encryptedCredsFile = "schemabot.txt"}
+        "IntuneBot" {$encryptedCredsFile = "intunebot.txt"}
+        }
+    
+    $placesToLook = @( #Figure out where to look
+        "$env:USERPROFILE\Desktop\$encryptedCredsFile"
+        ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\$encryptedCredsFile"
+        )
+
+    for($i=0; $i -lt $placesToLook.Count; $i++){ #Look for the file in each location until we find it
+        if(Test-Path $placesToLook[$i]){
+            $pathToEncryptedCsv = $placesToLook[$i]
+            continue
+            }
+        }
+    if([string]::IsNullOrWhiteSpace($pathToEncryptedCsv)){ #Break if we can't find it
+        Write-Error "Encrypted Client_Crednetials file for [$appName] not found in any of these locations: $($placesToLook -join ", ")"
+        break
+        }
+    else{ #Otherwise, import the file
+        $clientCredentials = import-encryptedCsv -pathToEncryptedCsv $pathToEncryptedCsv
+        }
+    $clientCredentials
+    }
 function get-graphAuthCode() {
      [cmdletbinding()]
     param(
