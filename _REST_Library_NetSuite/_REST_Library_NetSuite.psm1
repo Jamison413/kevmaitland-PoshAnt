@@ -478,9 +478,12 @@ function get-netSuiteClientsFromNetSuite(){
         )
 
     Write-Verbose "`tget-allNetSuiteClients([$($query)])"
-    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
-    $customers = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $customers = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
     $customersEnumerated = [psobject[]]::new($customers.count)
     for ($i=0; $i -lt $customers.count;$i++) {
         $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($customers.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
@@ -522,9 +525,12 @@ function get-netSuiteContactFromNetSuite(){
         )
 
     Write-Verbose "`tget-netSuiteContactFromNetSuite([$($query)])"
-    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
-    $contacts = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/contact$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $contacts = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/contact$query" -netsuiteParameters $netsuiteParameters #-Verbose 
     $contactsEnumerated = [psobject[]]::new($contacts.count)
     for ($i=0; $i -lt $contacts.count;$i++) {
     $url = "$($contacts.items[$i].links[0].href)" + "/?expandSubResources=True"
@@ -532,6 +538,30 @@ function get-netSuiteContactFromNetSuite(){
         $contactsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $url -netsuiteParameters $netsuiteParameters 
         }
     $contactsEnumerated
+    }
+function get-netSuiteEmployeesFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidatePattern('^?[\w+][=][\w+]')]
+        [string]$query
+
+        ,[parameter(Mandatory=$false)]
+        [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $projects.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+        }
+    $employeesEnumerated
     }
 function get-netSuiteOpportunityFromNetSuite(){
     [cmdletbinding()]
@@ -545,9 +575,12 @@ function get-netSuiteOpportunityFromNetSuite(){
         )
 
     Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
-    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
-    $opportunities = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/opportunity$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $opportunities = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/opportunity$query" -netsuiteParameters $netsuiteParameters #-Verbose 
     $opportunitiesEnumerated = [psobject[]]::new($opportunities.count)
     for ($i=0; $i -lt $opportunities.count;$i++) {
         $opportunitiesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $opportunities.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
@@ -592,12 +625,24 @@ function get-netSuitePaddedCode(){
     }
 function get-netSuiteParameters(){
     [cmdletbinding()]
-    Param()
-    Write-Verbose "get-netsuiteParameters()"
-    $placesToLook = @(
-        "$env:USERPROFILE\Desktop\netsuite.txt"
-        ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite.txt"
+    Param([parameter(Mandatory = $false)]
+        [ValidateSet("Production","Sandbox")]
+        [string]$connectTo = "Sandbox"
         )
+    Write-Verbose "get-netsuiteParameters()"
+    if($connectTo -eq "Production"){
+        $placesToLook = @(
+            "$env:USERPROFILE\Desktop\netsuite_live.txt"
+            ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_live.txt"
+            )
+        }
+    else{
+        $placesToLook = @(
+            "$env:USERPROFILE\Desktop\netsuite.txt"
+            ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite.txt"
+            )
+        
+        }
     for($i=0; $i -lt $placesToLook.Count; $i++){
         if(Test-Path $placesToLook[$i]){
             $pathToEncryptedCsv = $placesToLook[$i]
@@ -630,9 +675,12 @@ function get-netSuiteProjectFromNetSuite(){
         )
 
     Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
-    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
-    $projects = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $projects = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
     $projectsEnumerated = [psobject[]]::new($projects.count)
     for ($i=0; $i -lt $projects.count;$i++) {
         $projectsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $projects.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
@@ -774,8 +822,27 @@ function invoke-netSuiteRestMethod(){
     $netsuiteRestHeaders = get-netsuiteAuthHeaders -requestType $requestType -url $hostUrl -oauthParameters $oAuthParamsForSigning  -oauth_consumer_secret $netsuiteParameters.oauth_consumer_secret -oauth_token_secret $netsuiteParameters.oauth_token_secret -realm $netsuiteParameters.realm
     
     Write-Verbose "Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $(stringify-hashTable $netsuiteRestHeaders) -Method $requestType -ContentType application/swagger+json"
-    $response = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
-    $response            
+    $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
+    if($partialDataset.totalResults -ne $partialDataset.count){ #If the query has been paginated
+        if($partialDataset.offset -eq 0){$fullDataSet = New-Object object[] $partialDataSet.totalResults}
+        do{
+            for($i = 0; $i -lt $partialDataset.count; $i++){ #Fill $fullDataset with the contents of $partialDataset
+                $fullDataset[$i+$partialDataset.offset] = $partialDataset.items[$i]
+                if($i%100 -eq 0){Write-Verbose "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)]"}
+                }
+            $nextUrl = [uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href) #Check if there are more results to retrieve
+            if([string]::IsNullOrWhiteSpace($nextUrl)){}#$partialDataset.links.rel | % {Write-Verbose $_}}
+            else{
+                Write-Verbose "`tNext URL: [$([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href))]"
+                $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href)) -netsuiteParameters $netsuiteParameters
+                }
+            }
+        while($partialDataset.hasMore -eq $true)
+
+        $partialDataset.items = $fullDataset
+        $partialDataset.count = $partialDataset.items.count
+        }
+    $partialDataset            
     }
 function sync-netSuiteClientsFromNetSuiteToSql(){
     [cmdletbinding()]
@@ -789,7 +856,10 @@ function sync-netSuiteClientsFromNetSuiteToSql(){
         [System.Data.Common.DbConnection]$sqlDbConn
         )
 
-    if(!$netSuiteParams){$netSuiteParams = get-netsuiteParameters}
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
     switch ($sync) {
         "Delta" {
@@ -829,7 +899,10 @@ function sync-netSuiteOpportunitiesFromNetSuiteToSql(){
         [System.Data.Common.DbConnection]$sqlDbConn
         )
 
-    if(!$netSuiteParams){$netSuiteParams = get-netsuiteParameters}
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
     switch ($sync) {
         "Delta" {
@@ -869,7 +942,10 @@ function sync-netSuiteProjectsFromNetSuiteToSql(){
         [System.Data.Common.DbConnection]$sqlDbConn
         )
     
-    if(!$netSuiteParams){$netSuiteParams = get-netsuiteParameters}
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
     switch ($sync) {
         "Delta" {
@@ -1116,25 +1192,4 @@ function update-netSuiteProjectInSqlCache(){
             }
         }
     else{Write-Error "Record with NsInsternalId [$($sqlNetSuiteProject.NsExternalId)] does not exist in database. Cannot UPDATE.";break}
-    }
-function get-netSuiteEmployeesFromNetSuite(){
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
-        [string]$query
-
-        ,[parameter(Mandatory=$false)]
-        [psobject]$netsuiteParameters
-        )
-
-    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
-    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){$netsuiteParameters = get-netsuiteParameters}
-
-    $employees = invoke-netsuiteRestMethod -requestType GET -url "https://3487287-sb1.suitetalk.api.netsuite.com/rest/platform/v1/record/employee/" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $employeesEnumerated = [psobject[]]::new($employees.count)
-    for ($i=0; $i -lt $projects.count;$i++) {
-        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
-        }
-    $employeesEnumerated
     }

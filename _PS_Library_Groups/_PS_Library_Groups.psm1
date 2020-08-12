@@ -1089,6 +1089,7 @@ function sync-groupMemberships(){
                         }
                     catch{
                         Write-Warning "Failed to add [$($userToBeChanged.userPrincipalName)] to MESG [$($graphMesg.DisplayName)][$($graphMesg.Id)]" 
+                        $_
                         [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Added";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
                         }
                     }
