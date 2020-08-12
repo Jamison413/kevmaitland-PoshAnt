@@ -209,7 +209,7 @@ function add-graphUsersToGroup(){
         }
 
     $graphUserIds | % {
-        $bodyHash = @{"@odata.id"="https://graph.microsoft.com/v1.0/users/$_"}
+        $bodyHash = @{"@odata.id"="https://graph.microsoft.com/v1.0/directoryObjects/$_"}
         invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/`$ref" -graphBodyHashtable $bodyHash -Verbose:$VerbosePreference
         }
     }
@@ -422,6 +422,80 @@ function get-graphAuthCode() {
         }
     $output
     }
+function get-graphDevices(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet("Android","iOS","Windows")]
+            [string]$filterOperatingSystem
+        ,[parameter(Mandatory = $false)]
+            [string[]]$filterOwnerIds
+        ,[parameter(Mandatory = $false)]
+            [string[]]$filterDisplayNames
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$filterCustomEq = @{}
+        )
+
+    #
+    if($filterOperatingSystem){
+        $filter += " and operatingsystem eq '$filterOperatingSystem'"
+        }
+    #These aren't supported by Graph API yet, so we have to filter client-side :(
+    <#if($filterOwnerIds){
+        $filter += " and userId in (`'$($filterOwnerIds -join "','")`')"
+        }#>
+    if($filterDisplayNames){
+        $filter += " and displayName in (`'$($filterDisplayNames -join "','")`')"
+        }
+    $filterCustomEq.Keys | % {
+        $filter += " and $_ eq '$($filterCustomEq[$_])'"
+        }
+    
+
+    #Build the refiner based on the parameters supplied
+    if(![string]::IsNullOrWhiteSpace($select)){
+        if($select.StartsWith(",")){$select = $select.Substring(1,$select.Length-1)}
+        $select = "`$select=$select"
+        }
+    if(![string]::IsNullOrWhiteSpace($filter)){
+        if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
+        $filter = "`$filter=$filter"
+        }
+
+    $refiner = "?"+$select
+    if($filter){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        $refiner = $refiner+$filter
+        }#>
+
+    Write-Verbose "Graph Query = [/devices$refiner]"
+    try{
+        $allDevices = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/devices$refiner" -Verbose:$VerbosePreference
+        }
+    catch{
+        Write-Error "Error retrieving Graph Devices in get-graphDevices() using query [/devices$refiner]"
+        Throw $_ #Terminate on this error
+        }
+    
+    if($filterOwnerIds){
+        Write-Verbose "Returning all Devices owned by [$($filterOwnerIds -join ",")]"
+        $allDevices | ? { #Extract the USER-GID guid and match it to the supplied OwnerIds
+            $($($_.physicalIds | ? {$_ -match "USER-GID"}) | % {$($_ -split ":")[1]}) `
+                -match `
+                $($filterOwnerIds -join "|")
+            } | Sort-Object displayName
+        }
+    elseif($filterDisplayNames2){
+        Write-Verbose "Returning all Devices named [$($filterDeviceNames -join ",")]"
+        $allDevices | ? {$filterDisplayNames -contains $_.displayName} | Sort-Object displayName
+        }
+    else{
+        Write-Verbose "Returning all Devices"
+        $allDevices | Sort-Object displayName
+        }
+    }
 function get-graphDrives(){
      [cmdletbinding()]
     param(
@@ -619,6 +693,85 @@ function get-graphGroupWithUGSyncExtensions(){
     if($selectAllProperties){$lotsOfProperties = ",deletedDateTime,classification,createdDateTime,creationOptions,groupTypes,isAssignableToRole,mailEnabled,mailNickname,onPremisesDomainName,onPremisesLastSyncDateTime,onPremisesNetBiosName,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,preferredDataLocation,proxyAddresses,renewedDateTime,resourceBehaviorOptions,resourceProvisioningOptions,securityEnabled,securityIdentifier,visibility,onPremisesProvisioningErrors"}
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups?`$filter=anthesisgroup_UGSync/extensionType eq 'UGSync'$additionalFilters&`$select=displayName,id,description,mail,anthesisgroup_UGSync$lotsOfProperties"
             
+    }
+function get-graphIntuneDevices(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet("Android","iOS","Windows")]
+            [string]$filterOperatingSystem
+        ,[parameter(Mandatory = $false)]
+            [string[]]$filterOwnerIds
+        ,[parameter(Mandatory = $false)]
+            [string[]]$filterOwnerUPNs
+        ,[parameter(Mandatory = $false)]
+            [string[]]$filterDeviceNames
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$filterCustomEq = @{}
+        )
+
+    #
+    if($filterOperatingSystem){
+        $filter += " and operatingsystem eq '$filterOperatingSystem'"
+        }
+    #These aren't supported by Graph API yet, so we have to filter client-side :(
+    <#if($filterOwnerIds){
+        $filter += " and userId in (`'$($filterOwnerIds -join "','")`')"
+        }
+    if($filterOwnerUPNs){
+        $filter += " and userPrincipalName in (`'$($filterOwnerUPNs -join "','")`')"
+        }
+    if($filterDeviceNames){
+        $filter += " and deviceName in (`'$($filterDeviceNames -join "','")`')"
+        }
+    $filterCustomEq.Keys | % {
+        $filter += " and $_ eq '$($filterCustomEq[$_])'"
+        }
+    #>
+
+    #Build the refiner based on the parameters supplied
+    if(![string]::IsNullOrWhiteSpace($select)){
+        if($select.StartsWith(",")){$select = $select.Substring(1,$select.Length-1)}
+        $select = "`$select=$select"
+        }
+    if(![string]::IsNullOrWhiteSpace($filter)){
+        if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
+        $filter = "`$filter=$filter"
+        }
+
+    $refiner = "?"+$select
+    if($filter){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        $refiner = $refiner+$filter
+        }#>
+
+    Write-Verbose "Graph Query = [/deviceManagement/managedDevices$refiner]"
+    try{
+        $allIntuneDevices = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/deviceManagement/managedDevices$refiner" -Verbose:$VerbosePreference
+        }
+    catch{
+        Write-Error "Error retrieving Graph Intune Devices in get-graphIntuneDevices() using query [/deviceManagement/managedDevices$refiner]"
+        Throw $_ #Terminate on this error
+        }
+    
+    if($filterOwnerIds){
+        Write-Verbose "Returning all Intune Devices owned by [$($filterOwnerIds -join ",")]"
+        $allIntuneDevices | ? {$filterOwnerIds -contains $_.userId} | Sort-Object userPrincipalName,deviceName
+        }
+    elseif($filterOwnerUPNs){
+        Write-Verbose "Returning all Intune Devices owned by [$($filterOwnerUPNs -join ",")]"
+        $allIntuneDevices | ? {$filterOwnerUPNs -contains $_.userPrincipalName} | Sort-Object userPrincipalName,deviceName
+        }
+    elseif($filterDeviceNames){
+        Write-Verbose "Returning all Intune Devices named [$($filterDeviceNames -join ",")]"
+        $allIntuneDevices | ? {$filterDeviceNames -contains $_.deviceName} | Sort-Object userPrincipalName,deviceName
+        }
+    else{
+        Write-Verbose "Returning all Intune Devices"
+        $allIntuneDevices | Sort-Object userPrincipalName,deviceName
+        }
     }
 function get-graphList(){
     [cmdletbinding()]
