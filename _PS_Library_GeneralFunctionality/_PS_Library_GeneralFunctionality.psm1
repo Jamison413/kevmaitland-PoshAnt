@@ -1,4 +1,372 @@
-﻿function combine-url($arrayOfStrings){ 
+﻿function convert-timeZone(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName = "FromCountry")]
+            [parameter(Mandatory = $true,ParameterSetName = "FromISO3166")]
+            [parameter(Mandatory = $true,ParameterSetName = "FromTimezone")]
+            [parameter(Mandatory = $true,ParameterSetName = "FromUTC")]
+            [parameter(Mandatory = $true,ParameterSetName = "FromTimezoneDescription")]
+            [ValidateSet("Country","ISO3166","Timezone","UTC","TimezoneDescription")]
+            [string]$getType
+        #,[parameter(Mandatory = $true,ParameterSetName = "PreEncrypted")]
+        #    [parameter(Mandatory = $true,ParameterSetName = "NotEncrypted")]
+        ,[parameter(Mandatory = $true,ParameterSetName = "FromCountry")]
+            [ValidateSet("Afghanistan","Åland Islands","Albania","Algeria","American Samoa","Andorra","Angola","Anguilla","Antarctica","Antigua and Barbuda","Argentina","Armenia","Aruba","Australia","Austria","Azerbaijan","Bahamas, The","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize
+","Benin","Bermuda","Bhutan","Bolivarian Republic of Venezuela","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Bouvet Island","Brazil","British Indian Ocean Territory","Brunei","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia",
+"Cameroon","Canada","Cayman Islands","Central African Republic","Chad","Chile","China","Christmas Island","Cocos (Keeling) Islands","Colombia","Comoros","Congo","Congo (DRC)","Cook Islands","Costa Rica","Côte d'Ivoire","Croatia","Cuba","Curaçao","Cyprus","Czech Republic",
+"Democratic Republic of Timor-Leste","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Falkland Islands (Islas Malvinas)","Faroe Islands","Fiji Islands","Finland","France","French Guian
+a","French Polynesia","French Southern and Antarctic Lands","Gabon","Gambia, The","Georgia","Germany","Ghana","Gibraltar","Greece","Greenland","Grenada","Guadeloupe","Guam","Guatemala","Guernsey","Guinea","Guinea-Bissau","Guyana","Haiti","Heard Island and McDonald Islands
+","Honduras","Hong Kong SAR","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Jan Mayen","Japan","Jersey","Jordan","Kazakhstan","Kenya","Kiribati","Korea","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberi
+a","Libya","Liechtenstein","Lithuania","Luxembourg","Macao SAR","Macedonia, Former Yugoslav Republic of","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Man, Isle of","Marshall Islands","Martinique","Mauritania","Mauritius","Mayotte","Mexico","Micronesia","Mol
+dova","Monaco","Mongolia","Montenegro","Montserrat","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","Niue","Norfolk Island","North Korea","Northern Mariana Islands","Norway","Oman","Pakis
+tan","Palau","Palestinian Authority","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Pitcairn Islands","Poland","Portugal","Puerto Rico","Qatar","Reunion","Romania","Russia","Rwanda","Saint Barthélemy","Saint Helena, Ascension and Tristan da Cunha","Saint Kit
+ts and Nevis","Saint Lucia","Saint Martin (French part)","Saint Pierre and Miquelon","Saint Vincent and the Grenadines","Samoa","San Marino","São Tomé and Príncipe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Sint Maarten (Dutch part)","Slov
+akia","Slovenia","Solomon Islands","Somalia","South Africa","South Georgia and the South Sandwich Islands","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Svalbard","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","Togo","Tokela
+u","Tonga","Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Turks and Caicos Islands","Tuvalu","U.S. Minor Outlying Islands","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","Uruguay","Uzbekistan","Vanuatu","Vatican City","Vietnam","Virgi
+n Islands, British","Virgin Islands, U.S.","Wallis and Futuna","Yemen","Zambia","Zimbabwe")]
+            [string]$fromCountry
+        ,[parameter(Mandatory = $true,ParameterSetName = "FromISO3166")]
+            [ValidateSet("AD","AE","AF","AG","AI","AL","AM","AO","AQ","AR","AS","AT","AU","AW","AX","AZ","BA","BB","BD","BE","BF","BG","BH","BI","BJ","BL","BM","BN","BO","BQ","BR","BS","BT","BV","BW","BY","BZ","CA","CC","CD","CF","CG","CH","CI","CK","CL","CM","CN","CO","CR","CU","CV","CW","CX","CY
+","CZ","DE","DJ","DK","DM","DO","DZ","EC","EE","EG","ER","ES","ET","FI","FJ","FK","FM","FO","FR","GA","GB","GD","GE","GF","GG","GH","GI","GL","GM","GN","GP","GQ","GR","GS","GT","GU","GW","GY","HK","HM","HN","HR","HT","HU","ID","IE","IL","IM","IN","IO","IQ","IR","IS","IT",
+"JE","JM","JO","JP","KE","KG","KH","KI","KM","KN","KP","KR","KW","KY","KZ","LA","LB","LC","LI","LK","LR","LS","LT","LU","LV","LY","MA","MC","MD","ME","MF","MG","MH","MK","ML","MM","MN","MO","MP","MQ","MR","MS","MT","MU","MV","MW","MX","MY","MZ","NA","NC","NE","NF","NG","N
+I","NL","NO","NP","NR","NU","NZ","OM","PA","PE","PF","PG","PH","PK","PL","PM","PN","PR","PS","PT","PW","PY","QA","RE","RO","RS","RU","RW","SA","SB","SC","SD","SE","SG","SH","SI","SJ","SK","SL","SM","SN","SO","SR","SS","ST","SV","SX","SY","SZ","TC","TD","TF","TG","TH","TJ"
+,"TK","TL","TM","TN","TO","TR","TT","TV","TW","TZ","UA","UG","UM","US","UY","UZ","VA","VC","VE","VG","VI","VN","VU","WF","WS","XK","YE","YT","ZA","ZM","ZW")]
+            [string]$fromISO3166
+        ,[parameter(Mandatory = $true,ParameterSetName = "FromTimezone")]
+            [ValidateSet("Afghanistan Standard Time","Arab Standard Time","Arabian Standard Time","Arabic Standard Time","Argentina Standard Time","Atlantic Standard Time","AUS Eastern Standard Time","Azerbaijan Standard Time","Bangladesh Standard Time","Belarus Standard Time","Cape Verde Standard
+ Time","Caucasus Standard Time","Central America Standard Time","Central Asia Standard Time","Central Europe Standard Time","Central European Standard Time","Central Pacific Standard Time","Central Standard Time (Mexico)","China Standard Time","E. Africa Standard Time","E
+. Europe Standard Time","E. South America Standard Time","Eastern Standard Time","Egypt Standard Time","Fiji Standard Time","FLE Standard Time","Georgian Standard Time","GMT Standard Time","Greenland Standard Time","Greenwich Standard Time","GTB Standard Time","Hawaiian S
+tandard Time","India Standard Time","Iran Standard Time","Israel Standard Time","Jordan Standard Time","Korea Standard Time","Mauritius Standard Time","Middle East Standard Time","Montevideo Standard Time","Morocco Standard Time","Myanmar Standard Time","Namibia Standard 
+Time","Nepal Standard Time","New Zealand Standard Time","Pacific SA Standard Time","Pacific Standard Time","Pakistan Standard Time","Paraguay Standard Time","Romance Standard Time","Russian Standard Time","SA Eastern Standard Time","SA Pacific Standard Time","SA Western S
+tandard Time","Samoa Standard Time","SE Asia Standard Time","Singapore Standard Time","South Africa Standard Time","Sri Lanka Standard Time","Syria Standard Time","Taipei Standard Time","Tokyo Standard Time","Tonga Standard Time","Turkey Standard Time","Ulaanbaatar Standa
+rd Time","UTC","UTC+12","UTC-02","UTC-11","Venezuela Standard Time","W. Central Africa Standard Time","W. Europe Standard Time","West Asia Standard Time","West Pacific Standard Time")]
+            [string]$fromTimezone
+        ,[parameter(Mandatory = $true,ParameterSetName = "FromUTC")]
+            [ValidateSet("(UTC)","(UTC+01:00)","(UTC+02:00)","(UTC+03:00)","(UTC+03:30)","(UTC+04:00)","(UTC+04:30)","(UTC+05:00)","(UTC+05:30)","(UTC+05:45)","(UTC+06:00)","(UTC+06:30)","(UTC+07:00)","(UTC+08:00)","(UTC+09:00)","(UTC+10:00)","(UTC+11:00)","(UTC+12:00)","(UTC+13:00)","(UTC-01:00)"
+,"(UTC-02:00)","(UTC-03:00)","(UTC-04:00)","(UTC-04:30)","(UTC-05:00)","(UTC-06:00)","(UTC-08:00)","(UTC-10:00)","(UTC-11:00)")]
+            [string]$fromUTC
+        ,[parameter(Mandatory = $true,ParameterSetName = "FromTimezoneDescription")]
+            [ValidateSet("Abu Dhabi, Muscat","Amman","Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna","Ashgabat, Tashkent","Astana","Asuncion","Athens, Bucharest","Atlantic Time (Canada)","Auckland, Wellington","Baghdad","Baku","Bangkok, Hanoi, Jakarta","Beijing, Chongqing, Hong Kong, Urumqi","B
+eirut","Belgrade, Bratislava, Budapest, Ljubljana, Prague","Bogota, Lima, Quito, Rio Branco","Brasilia","Brussels, Copenhagen, Madrid, Paris","Cabo Verde Is.","Cairo","Canberra, Melbourne, Sydney","Caracas","Casablanca","Cayenne, Fortaleza","Central America","Chennai, Kol
+kata, Mumbai, New Delhi","City of Buenos Aires","Coordinated Universal Time","Coordinated Universal Time+12","Coordinated Universal Time-02","Coordinated Universal Time-11","Damascus","Dhaka","Dublin, Edinburgh, Lisbon, London","E. Europe","Eastern Time (US & Canada)","Fi
+ji","Georgetown, La Paz, Manaus, San Juan","Greenland","Guadalajara, Mexico City, Monterrey","Guam, Port Moresby","Harare, Pretoria","Harare, Pretoria","Hawaii","Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius","Islamabad, Karachi","Istanbul","Jerusalem","Kabul","Kathmandu"
+,"Kuala Lumpur, Singapore","Kuwait, Riyadh","Minsk","Monrovia, Reykjavik","Montevideo","Moscow, St. Petersburg, Volgograd (RTZ 2)","Nairobi","Nuku'alofa","Osaka, Sapporo, Tokyo","Pacific Time (US & Canada)","Port Louis","Samoa","Santiago","Sarajevo, Skopje, Warsaw, Zagreb
+","Seoul","Solomon Is., New Caledonia","Sri Jayawardenepura","Taipei","Tbilisi","Tehran","Ulaanbaatar","West Central Africa","Windhoek","Yangon (Rangoon)","Yerevan")]
+            [string]$fromTimezoneDescription
+        )
+    #Text comes from https://docs.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones
+    #The headers are: Country[0], ISO3166[1], Timezone[2], UTC[3], Timezone description[4]
+    $rawText = "Afghanistan	AF	Afghanistan Standard Time	(UTC+04:30)	Kabul
+Åland Islands	AX	FLE Standard Time	(UTC+02:00)	Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius
+Albania	AL	Central Europe Standard Time	(UTC+01:00)	Belgrade, Bratislava, Budapest, Ljubljana, Prague
+Algeria	DZ	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+American Samoa	AS	UTC-11	(UTC-11:00)	Coordinated Universal Time-11
+Andorra	AD	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Angola	AO	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Anguilla	AI	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Antarctica	AQ	Pacific SA Standard Time	(UTC-03:00)	Santiago
+Antigua and Barbuda	AG	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Argentina	AR	Argentina Standard Time	(UTC-03:00)	City of Buenos Aires
+Armenia	AM	Caucasus Standard Time	(UTC+04:00)	Yerevan
+Aruba	AW	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Australia	AU	AUS Eastern Standard Time	(UTC+10:00)	Canberra, Melbourne, Sydney
+Austria	AT	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Azerbaijan	AZ	Azerbaijan Standard Time	(UTC+04:00)	Baku
+Bahamas, The	BS	Eastern Standard Time	(UTC-05:00)	Eastern Time (US & Canada)
+Bahrain	BH	Arab Standard Time	(UTC+03:00)	Kuwait, Riyadh
+Bangladesh	BD	Bangladesh Standard Time	(UTC+06:00)	Dhaka
+Barbados	BB	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Belarus	BY	Belarus Standard Time	(UTC+03:00)	Minsk
+Belgium	BE	Romance Standard Time	(UTC+01:00)	Brussels, Copenhagen, Madrid, Paris
+Belize	BZ	Central America Standard Time	(UTC-06:00)	Central America
+Benin	BJ	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Bermuda	BM	Atlantic Standard Time	(UTC-04:00)	Atlantic Time (Canada)
+Bhutan	BT	Bangladesh Standard Time	(UTC+06:00)	Dhaka
+Bolivarian Republic of Venezuela	VE	Venezuela Standard Time	(UTC-04:30)	Caracas
+Bolivia	BO	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Bonaire, Sint Eustatius and Saba	BQ	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Bosnia and Herzegovina	BA	Central European Standard Time	(UTC+01:00)	Sarajevo, Skopje, Warsaw, Zagreb
+Botswana	BW	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Bouvet Island	BV	UTC	(UTC)	Coordinated Universal Time
+Brazil	BR	E. South America Standard Time	(UTC-03:00)	Brasilia
+British Indian Ocean Territory	IO	Central Asia Standard Time	(UTC+06:00)	Astana
+Brunei	BN	Singapore Standard Time	(UTC+08:00)	Kuala Lumpur, Singapore
+Bulgaria	BG	FLE Standard Time	(UTC+02:00)	Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius
+Burkina Faso	BF	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Burundi	BI	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Cabo Verde	CV	Cape Verde Standard Time	(UTC-01:00)	Cabo Verde Is.
+Cambodia	KH	SE Asia Standard Time	(UTC+07:00)	Bangkok, Hanoi, Jakarta
+Cameroon	CM	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Canada	CA	Eastern Standard Time	(UTC-05:00)	Eastern Time (US & Canada)
+Cayman Islands	KY	SA Pacific Standard Time	(UTC-05:00)	Bogota, Lima, Quito, Rio Branco
+Central African Republic	CF	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Chad	TD	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Chile	CL	Pacific SA Standard Time	(UTC-03:00)	Santiago
+China	CN	China Standard Time	(UTC+08:00)	Beijing, Chongqing, Hong Kong, Urumqi
+Christmas Island	CX	SE Asia Standard Time	(UTC+07:00)	Bangkok, Hanoi, Jakarta
+Cocos (Keeling) Islands	CC	Myanmar Standard Time	(UTC+06:30)	Yangon (Rangoon)
+Colombia	CO	SA Pacific Standard Time	(UTC-05:00)	Bogota, Lima, Quito, Rio Branco
+Comoros	KM	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Congo	CG	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Congo (DRC)	CD	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Cook Islands	CK	Hawaiian Standard Time	(UTC-10:00)	Hawaii
+Costa Rica	CR	Central America Standard Time	(UTC-06:00)	Central America
+Côte d'Ivoire	CI	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Croatia	HR	Central European Standard Time	(UTC+01:00)	Sarajevo, Skopje, Warsaw, Zagreb
+Cuba	CU	Eastern Standard Time	(UTC-05:00)	Eastern Time (US & Canada)
+Curaçao	CW	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Cyprus	CY	E. Europe Standard Time	(UTC+02:00)	E. Europe
+Czech Republic	CZ	Central Europe Standard Time	(UTC+01:00)	Belgrade, Bratislava, Budapest, Ljubljana, Prague
+Democratic Republic of Timor-Leste	TL	Tokyo Standard Time	(UTC+09:00)	Osaka, Sapporo, Tokyo
+Denmark	DK	Romance Standard Time	(UTC+01:00)	Brussels, Copenhagen, Madrid, Paris
+Djibouti	DJ	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Dominica	DM	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Dominican Republic	DO	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Ecuador	EC	SA Pacific Standard Time	(UTC-05:00)	Bogota, Lima, Quito, Rio Branco
+Egypt	EG	Egypt Standard Time	(UTC+02:00)	Cairo
+El Salvador	SV	Central America Standard Time	(UTC-06:00)	Central America
+Equatorial Guinea	GQ	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Eritrea	ER	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Estonia	EE	FLE Standard Time	(UTC+02:00)	Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius
+Ethiopia	ET	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Falkland Islands (Islas Malvinas)	FK	SA Eastern Standard Time	(UTC-03:00)	Cayenne, Fortaleza
+Faroe Islands	FO	GMT Standard Time	(UTC)	Dublin, Edinburgh, Lisbon, London
+Fiji Islands	FJ	Fiji Standard Time	(UTC+12:00)	Fiji
+Finland	FI	FLE Standard Time	(UTC+02:00)	Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius
+France	FR	Romance Standard Time	(UTC+01:00)	Brussels, Copenhagen, Madrid, Paris
+French Guiana	GF	SA Eastern Standard Time	(UTC-03:00)	Cayenne, Fortaleza
+French Polynesia	PF	Hawaiian Standard Time	(UTC-10:00)	Hawaii
+French Southern and Antarctic Lands	TF	West Asia Standard Time	(UTC+05:00)	Ashgabat, Tashkent
+Gabon	GA	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Gambia, The	GM	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Georgia	GE	Georgian Standard Time	(UTC+04:00)	Tbilisi
+Germany	DE	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Ghana	GH	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Gibraltar	GI	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Greece	GR	GTB Standard Time	(UTC+02:00)	Athens, Bucharest
+Greenland	GL	Greenland Standard Time	(UTC-03:00)	Greenland
+Grenada	GD	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Guadeloupe	GP	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Guam	GU	West Pacific Standard Time	(UTC+10:00)	Guam, Port Moresby
+Guatemala	GT	Central America Standard Time	(UTC-06:00)	Central America
+Guernsey	GG	GMT Standard Time	(UTC)	Dublin, Edinburgh, Lisbon, London
+Guinea	GN	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Guinea-Bissau	GW	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Guyana	GY	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Haiti	HT	Eastern Standard Time	(UTC-05:00)	Eastern Time (US & Canada)
+Heard Island and McDonald Islands	HM	Mauritius Standard Time	(UTC+04:00)	Port Louis
+Honduras	HN	Central America Standard Time	(UTC-06:00)	Central America
+Hong Kong SAR	HK	China Standard Time	(UTC+08:00)	Beijing, Chongqing, Hong Kong, Urumqi
+Hungary	HU	Central Europe Standard Time	(UTC+01:00)	Belgrade, Bratislava, Budapest, Ljubljana, Prague
+Iceland	IS	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+India	IN	India Standard Time	(UTC+05:30)	Chennai, Kolkata, Mumbai, New Delhi
+Indonesia	ID	SE Asia Standard Time	(UTC+07:00)	Bangkok, Hanoi, Jakarta
+Iran	IR	Iran Standard Time	(UTC+03:30)	Tehran
+Iraq	IQ	Arabic Standard Time	(UTC+03:00)	Baghdad
+Ireland	IE	GMT Standard Time	(UTC)	Dublin, Edinburgh, Lisbon, London
+Israel	IL	Israel Standard Time	(UTC+02:00)	Jerusalem
+Italy	IT	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Jamaica	JM	SA Pacific Standard Time	(UTC-05:00)	Bogota, Lima, Quito, Rio Branco
+Jan Mayen	SJ	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Japan	JP	Tokyo Standard Time	(UTC+09:00)	Osaka, Sapporo, Tokyo
+Jersey	JE	GMT Standard Time	(UTC)	Dublin, Edinburgh, Lisbon, London
+Jordan	JO	Jordan Standard Time	(UTC+02:00)	Amman
+Kazakhstan	KZ	Central Asia Standard Time	(UTC+06:00)	Astana
+Kenya	KE	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Kiribati	KI	UTC+12	(UTC+12:00)	Coordinated Universal Time+12
+Korea	KR	Korea Standard Time	(UTC+09:00)	Seoul
+Kosovo	XK	Central European Standard Time	(UTC+01:00)	Sarajevo, Skopje, Warsaw, Zagreb
+Kuwait	KW	Arab Standard Time	(UTC+03:00)	Kuwait, Riyadh
+Kyrgyzstan	KG	Central Asia Standard Time	(UTC+06:00)	Astana
+Laos	LA	SE Asia Standard Time	(UTC+07:00)	Bangkok, Hanoi, Jakarta
+Latvia	LV	FLE Standard Time	(UTC+02:00)	Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius
+Lebanon	LB	Middle East Standard Time	(UTC+02:00)	Beirut
+Lesotho	LS	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Liberia	LR	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Libya	LY	E. Europe Standard Time	(UTC+02:00)	E. Europe
+Liechtenstein	LI	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Lithuania	LT	FLE Standard Time	(UTC+02:00)	Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius
+Luxembourg	LU	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Macao SAR	MO	China Standard Time	(UTC+08:00)	Beijing, Chongqing, Hong Kong, Urumqi
+Macedonia, Former Yugoslav Republic of	MK	Central European Standard Time	(UTC+01:00)	Sarajevo, Skopje, Warsaw, Zagreb
+Madagascar	MG	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Malawi	MW	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Malaysia	MY	Singapore Standard Time	(UTC+08:00)	Kuala Lumpur, Singapore
+Maldives	MV	West Asia Standard Time	(UTC+05:00)	Ashgabat, Tashkent
+Mali	ML	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Malta	MT	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Man, Isle of	IM	GMT Standard Time	(UTC)	Dublin, Edinburgh, Lisbon, London
+Marshall Islands	MH	UTC+12	(UTC+12:00)	Coordinated Universal Time+12
+Martinique	MQ	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Mauritania	MR	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Mauritius	MU	Mauritius Standard Time	(UTC+04:00)	Port Louis
+Mayotte	YT	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Mexico	MX	Central Standard Time (Mexico)	(UTC-06:00)	Guadalajara, Mexico City, Monterrey
+Micronesia	FM	West Pacific Standard Time	(UTC+10:00)	Guam, Port Moresby
+Moldova	MD	GTB Standard Time	(UTC+02:00)	Athens, Bucharest
+Monaco	MC	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Mongolia	MN	Ulaanbaatar Standard Time	(UTC+08:00)	Ulaanbaatar
+Montenegro	ME	Central European Standard Time	(UTC+01:00)	Sarajevo, Skopje, Warsaw, Zagreb
+Montserrat	MS	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Morocco	MA	Morocco Standard Time	(UTC)	Casablanca
+Mozambique	MZ	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Myanmar	MM	Myanmar Standard Time	(UTC+06:30)	Yangon (Rangoon)
+Namibia	NA	Namibia Standard Time	(UTC+01:00)	Windhoek
+Nauru	NR	UTC+12	(UTC+12:00)	Coordinated Universal Time+12
+Nepal	NP	Nepal Standard Time	(UTC+05:45)	Kathmandu
+Netherlands	NL	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+New Caledonia	NC	Central Pacific Standard Time	(UTC+11:00)	Solomon Is., New Caledonia
+New Zealand	NZ	New Zealand Standard Time	(UTC+12:00)	Auckland, Wellington
+Nicaragua	NI	Central America Standard Time	(UTC-06:00)	Central America
+Niger	NE	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Nigeria	NG	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Niue	NU	UTC-11	(UTC-11:00)	Coordinated Universal Time-11
+Norfolk Island	NF	Central Pacific Standard Time	(UTC+11:00)	Solomon Is., New Caledonia
+North Korea	KP	Korea Standard Time	(UTC+09:00)	Seoul
+Northern Mariana Islands	MP	West Pacific Standard Time	(UTC+10:00)	Guam, Port Moresby
+Norway	NO	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Oman	OM	Arabian Standard Time	(UTC+04:00)	Abu Dhabi, Muscat
+Pakistan	PK	Pakistan Standard Time	(UTC+05:00)	Islamabad, Karachi
+Palau	PW	Tokyo Standard Time	(UTC+09:00)	Osaka, Sapporo, Tokyo
+Palestinian Authority	PS	Egypt Standard Time	(UTC+02:00)	Cairo
+Panama	PA	SA Pacific Standard Time	(UTC-05:00)	Bogota, Lima, Quito, Rio Branco
+Papua New Guinea	PG	West Pacific Standard Time	(UTC+10:00)	Guam, Port Moresby
+Paraguay	PY	Paraguay Standard Time	(UTC-04:00)	Asuncion
+Peru	PE	SA Pacific Standard Time	(UTC-05:00)	Bogota, Lima, Quito, Rio Branco
+Philippines	PH	Singapore Standard Time	(UTC+08:00)	Kuala Lumpur, Singapore
+Pitcairn Islands	PN	Pacific Standard Time	(UTC-08:00)	Pacific Time (US & Canada)
+Poland	PL	Central European Standard Time	(UTC+01:00)	Sarajevo, Skopje, Warsaw, Zagreb
+Portugal	PT	GMT Standard Time	(UTC)	Dublin, Edinburgh, Lisbon, London
+Puerto Rico	PR	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Qatar	QA	Arab Standard Time	(UTC+03:00)	Kuwait, Riyadh
+Reunion	RE	Mauritius Standard Time	(UTC+04:00)	Port Louis
+Romania	RO	GTB Standard Time	(UTC+02:00)	Athens, Bucharest
+Russia	RU	Russian Standard Time	(UTC+03:00)	Moscow, St. Petersburg, Volgograd (RTZ 2)
+Rwanda	RW	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Saint Barthélemy	BL	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Saint Helena, Ascension and Tristan da Cunha	SH	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Saint Kitts and Nevis	KN	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Saint Lucia	LC	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Saint Martin (French part)	MF	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Saint Pierre and Miquelon	PM	Greenland Standard Time	(UTC-03:00)	Greenland
+Saint Vincent and the Grenadines	VC	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Samoa	WS	Samoa Standard Time	(UTC+13:00)	Samoa
+San Marino	SM	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+São Tomé and Príncipe	ST	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Saudi Arabia	SA	Arab Standard Time	(UTC+03:00)	Kuwait, Riyadh
+Senegal	SN	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Serbia	RS	Central Europe Standard Time	(UTC+01:00)	Belgrade, Bratislava, Budapest, Ljubljana, Prague
+Seychelles	SC	Mauritius Standard Time	(UTC+04:00)	Port Louis
+Sierra Leone	SL	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Singapore	SG	Singapore Standard Time	(UTC+08:00)	Kuala Lumpur, Singapore
+Sint Maarten (Dutch part)	SX	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Slovakia	SK	Central Europe Standard Time	(UTC+01:00)	Belgrade, Bratislava, Budapest, Ljubljana, Prague
+Slovenia	SI	Central Europe Standard Time	(UTC+01:00)	Belgrade, Bratislava, Budapest, Ljubljana, Prague
+Solomon Islands	SB	Central Pacific Standard Time	(UTC+11:00)	Solomon Is., New Caledonia
+Somalia	SO	E. Africa Standard Time	(UTC+03:00)	Nairobi
+South Africa	ZA	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+South Georgia and the South Sandwich Islands	GS	UTC-02	(UTC-02:00)	Coordinated Universal Time-02
+South Sudan	SS	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Spain	ES	Romance Standard Time	(UTC+01:00)	Brussels, Copenhagen, Madrid, Paris
+Sri Lanka	LK	Sri Lanka Standard Time	(UTC+05:30)	Sri Jayawardenepura
+Sudan	SD	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Suriname	SR	SA Eastern Standard Time	(UTC-03:00)	Cayenne, Fortaleza
+Svalbard	SJ	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Swaziland	SZ	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Sweden	SE	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Switzerland	CH	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Syria	SY	Syria Standard Time	(UTC+02:00)	Damascus
+Taiwan	TW	Taipei Standard Time	(UTC+08:00)	Taipei
+Tajikistan	TJ	West Asia Standard Time	(UTC+05:00)	Ashgabat, Tashkent
+Tanzania	TZ	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Thailand	TH	SE Asia Standard Time	(UTC+07:00)	Bangkok, Hanoi, Jakarta
+Togo	TG	Greenwich Standard Time	(UTC)	Monrovia, Reykjavik
+Tokelau	TK	Tonga Standard Time	(UTC+13:00)	Nuku'alofa
+Tonga	TO	Tonga Standard Time	(UTC+13:00)	Nuku'alofa
+Trinidad and Tobago	TT	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Tunisia	TN	W. Central Africa Standard Time	(UTC+01:00)	West Central Africa
+Turkey	TR	Turkey Standard Time	(UTC+02:00)	Istanbul
+Turkmenistan	TM	West Asia Standard Time	(UTC+05:00)	Ashgabat, Tashkent
+Turks and Caicos Islands	TC	Eastern Standard Time	(UTC-05:00)	Eastern Time (US & Canada)
+Tuvalu	TV	UTC+12	(UTC+12:00)	Coordinated Universal Time+12
+U.S. Minor Outlying Islands	UM	UTC-11	(UTC-11:00)	Coordinated Universal Time-11
+Uganda	UG	E. Africa Standard Time	(UTC+03:00)	Nairobi
+Ukraine	UA	FLE Standard Time	(UTC+02:00)	Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius
+United Arab Emirates	AE	Arabian Standard Time	(UTC+04:00)	Abu Dhabi, Muscat
+United Kingdom	GB	GMT Standard Time	(UTC)	Dublin, Edinburgh, Lisbon, London
+United States	US	Pacific Standard Time	(UTC-08:00)	Pacific Time (US & Canada)
+Uruguay	UY	Montevideo Standard Time	(UTC-03:00)	Montevideo
+Uzbekistan	UZ	West Asia Standard Time	(UTC+05:00)	Ashgabat, Tashkent
+Vanuatu	VU	Central Pacific Standard Time	(UTC+11:00)	Solomon Is., New Caledonia
+Vatican City	VA	W. Europe Standard Time	(UTC+01:00)	Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna
+Vietnam	VN	SE Asia Standard Time	(UTC+07:00)	Bangkok, Hanoi, Jakarta
+Virgin Islands, U.S.	VI	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Virgin Islands, British	VG	SA Western Standard Time	(UTC-04:00)	Georgetown, La Paz, Manaus, San Juan
+Wallis and Futuna	WF	UTC+12	(UTC+12:00)	Coordinated Universal Time+12
+Yemen	YE	Arab Standard Time	(UTC+03:00)	Kuwait, Riyadh
+Zambia	ZM	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria
+Zimbabwe	ZW	South Africa Standard Time	(UTC+02:00)	Harare, Pretoria"
+    $timeZoneArray = @()
+    $rawText.Split("`n") | % {
+        #$timezone = $_.Split("`t")
+        $timeZoneArray += ,@($_.Split("`t")) #The , between += and @() prevents the array from becoming unrolled as it is added
+        }
+    
+    switch ($PsCmdlet.ParameterSetName){
+        {$_ -eq "FromCountry"} {
+            Write-Verbose "convert-timeZone | From Country [$fromCountry] To [$getType]"
+            $timeZoneArrayFromIndex = 0
+            $fromValue = $fromCountry
+            }
+        {$_ -eq "FromISO3166"} {
+            Write-Verbose "convert-timeZone | From ISO3166 [$fromISO3166] To [$getType]"
+            $timeZoneArrayFromIndex = 1
+            $fromValue = $fromISO3166
+            }
+        {$_ -eq "FromTimezone"} {
+            Write-Verbose "convert-timeZone | From Timezone [$fromTimezone] To [$getType]"
+            $timeZoneArrayFromIndex = 2
+            $fromValue = $fromTimezone
+            }
+        {$_ -eq "FromUTC"} {
+            Write-Verbose "convert-timeZone | From UTC [$fromUTC] To [$getType]"
+            $timeZoneArrayFromIndex = 3
+            $fromValue = $fromUTC
+            }
+        {$_ -eq "FromTimezoneDescription"} {
+            Write-Verbose "convert-timeZone | From TimezoneDescription [$fromTimezoneDescription] To [$getType]"
+            $timeZoneArrayFromIndex = 4
+            $fromValue = $fromTimezoneDescription
+            }
+        }
+
+    switch ($getType){
+        "Country"             {$timeZoneArrayToIndex = 0}
+        "ISO3166"             {$timeZoneArrayToIndex = 1}
+        "Timezone"            {$timeZoneArrayToIndex = 2}
+        "UTC"                 {$timeZoneArrayToIndex = 3}
+        "TimezoneDescription" {$timeZoneArrayToIndex = 4}
+        }
+
+    #$timeZoneArray | ? {$_[$timeZoneArrayFromIndex] -eq $fromValue} | Write-Verbose "[$($_[$timeZoneArrayFromIndex])] TimeZone found"
+    $foundTimezones #()
+    $timeZoneArray | ? {$_[$timeZoneArrayFromIndex] -eq $fromValue} | % {$foundTimezones += ,$_}
+    Write-Verbose "[$($foundTimezones.Count)] TimeZones found"
+
+    $foundTimezones | % {$_[$timeZoneArrayToIndex]}
+    #if($foundTimezones.Count -gt 1){$foundTimezones | % {$_[$timeZoneArrayToIndex]}}
+    #else {$foundTimezones[$timeZoneArrayToIndex]}
+    #write-host -f Magenta $foundTimezones[$timeZoneArrayToIndex]
+    #write-host -f yellow $foundTimezones
+    # This section helps to generate the ValidateSet conditions for the parameters
+    #$($timeZoneArray | %{$_[0]} | sort -Unique) -join "`",`""
+    #$($timeZoneArray | %{$_[1]} | sort -Unique) -join "`",`""
+    #$($timeZoneArray | %{$_[2]} | sort -Unique) -join "`",`""
+    #$($timeZoneArray | %{$_[3]} | sort -Unique) -join "`",`""
+    #$($timeZoneArray | %{$_[4]} | sort -Unique) -join "`",`""
+
+    }
+function combine-url($arrayOfStrings){ 
     $output = ""
     $arrayOfStrings | % {
         $output += $_.TrimStart("/").TrimEnd("/")+"/"
