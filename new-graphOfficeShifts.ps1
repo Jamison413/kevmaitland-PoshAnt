@@ -109,11 +109,11 @@ $offices | % {
             $thisShift = $_
             if(@(6,0) -contains $(Get-Date $thisShift["shiftStart"]).DayOfWeek.value__){ #If the shift is at a weekend, use a different colour
                 Write-Verbose "`tCreating weekend shift for [$($thisOffice["OfficeName"])] on [$($(Get-Date $thisShift["shiftStart"]).DayOfWeek)][$(Get-Date $thisShift["shiftStart"] -Format g)]"
-                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $thisShift["shiftName"] -shiftNotes $standardShiftNotes -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeWeekendColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
+                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $("$($thisOffice["OfficeName"]) $($thisShift["shiftName"])") -shiftNotes $standardShiftNotes -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeWeekendColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
                 }
             else{
                 Write-Verbose "`tCreating weekday shift for [$($thisOffice["OfficeName"])] on [$($(Get-Date $thisShift["shiftStart"]).DayOfWeek)][$(Get-Date $thisShift["shiftStart"] -Format g)]"
-                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $thisShift["shiftName"] -shiftNotes $standardShiftNotes -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
+                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $("$($thisOffice["OfficeName"]) $($thisShift["shiftName"])") -shiftNotes $standardShiftNotes -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
                 }
             }
         }
