@@ -355,7 +355,7 @@ function get-graphAppClientCredentials{
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-            [ValidateSet("TeamsBot","SchemaBot","IntuneBot")]
+            [ValidateSet("TeamsBot","SchemaBot","IntuneBot","SharePointBot","ShiftBot")]
             [String]$appName
         )
     
@@ -363,6 +363,8 @@ function get-graphAppClientCredentials{
         "TeamsBot"  {$encryptedCredsFile = "teambotdetails.txt"}
         "SchemaBot" {$encryptedCredsFile = "schemabot.txt"}
         "IntuneBot" {$encryptedCredsFile = "intunebot.txt"}
+        "SharePointBot" {$encryptedCredsFile = "spBotDetails.txt"}
+        "ShiftBot" {$encryptedCredsFile = "shiftBotDetails.txt"}
         }
     
     $placesToLook = @( #Figure out where to look
@@ -898,6 +900,46 @@ Else{
 Write-Error "Please provide a valid upn or guid"
 }
 }
+function get-graphShiftOpenShifts(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$MsAppActsAsUserId
+#        ,[parameter(Mandatory = $false)]
+#            [string[]]$filterIds
+        ,[parameter(Mandatory = $false)]
+            [string]$filterId
+        )
+    
+    if($filterIds){$filter += "`$filter=id in (`'$($filterIds -join "','")`')"}
+    if($filterId){$filter += "`$filter=id eq '$filterId')"}
+
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose:$VerbosePreference
+    
+    }
+function get-graphShiftOpenShiftChangeRequests(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$MsAppActsAsUserId
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet(“approved”,”pending”,"declined")]
+            [string]$requestState
+        )
+    
+    if($requestState){$filter += "`$filter = state eq '$requestState'"}
+
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShiftChangeRequests?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose
+    
+    }
 function get-graphSite(){
     [cmdletbinding()]
     param(
@@ -963,13 +1005,13 @@ function get-graphTokenResponse{
         )
     switch($grant_type){
         "authorization_code" {if(!$scope){$scope = "https://graph.microsoft.com/.default"}
-            $authCode = get-graphAuthCode -clientID $aadAppCreds.ClientID -redirectUri $aadAppCreds.RedirectUri -scope $scope
+            $authCode = get-graphAuthCode -clientID $aadAppCreds.ClientID -redirectUri $aadAppCreds.Redirect -scope $scope
             $ReqTokenBody = @{
                 Grant_Type    = "authorization_code"
                 Scope         = $scope
                 client_Id     = $aadAppCreds.ClientID
                 Client_Secret = $aadAppCreds.Secret
-                redirect_uri  = $aadAppCreds.RedirectUri
+                redirect_uri  = $aadAppCreds.Redirect
                 code          = $authCode
                 #resource      = "https://graph.microsoft.com"
                 }
@@ -1273,18 +1315,27 @@ function invoke-graphDelete(){
             [string]$graphQuery
         ,[parameter(Mandatory = $false)]
             [string]$graphBodyHashtable
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$additionalHeaders
         )
     $sanitisedGraphQuery = $graphQuery.Trim("/")
     Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
+
+    $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    if($additionalHeaders){
+        $additionalHeaders.GetEnumerator() | %{
+            $headers.Add($_.Key,$_.Value)
+            }
+        }
 
     if($graphBodyHashtable){
         $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable
         Write-Verbose $graphBodyJson
         $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method DELETE -Body $graphBodyJsonEncoded
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method DELETE -Body $graphBodyJsonEncoded
         }
     else{
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method DELETE
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method DELETE
         }
     if($response.value){$response.value}
     else{$response}
@@ -1300,11 +1351,20 @@ function invoke-graphGet(){
             [switch]$firstPageOnly
         ,[parameter(Mandatory = $false)]
             [switch]$returnEntireResponse
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$additionalHeaders
         )
     $sanitisedGraphQuery = $graphQuery.Trim("/")
+    $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    if($additionalHeaders){
+        $additionalHeaders.GetEnumerator() | %{
+            $headers.Add($_.Key,$_.Value)
+            }
+        }
+    #Write-Verbose $(stringify-hashTable -hashtable $headers -interlimiter "=" -delimiter ";")
     do{
         Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method GET -Verbose:$VerbosePreference
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET -Verbose:$VerbosePreference
         if($response.value){
             $results += $response.value
             Write-Verbose "[$([int]$response.value.count)] results returned on this cycle, [$([int]$results.count)] in total"
@@ -1335,16 +1395,24 @@ function invoke-graphPatch(){
             [string]$graphQuery
         ,[parameter(Mandatory = $true)]
             [Hashtable]$graphBodyHashtable
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$additionalHeaders
         )
 
     $sanitisedGraphQuery = $graphQuery.Trim("/")
+    $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    if($additionalHeaders){
+        $additionalHeaders.GetEnumerator() | %{
+            $headers.Add($_.Key,$_.Value)
+            }
+        }
     Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
         
     $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable
     Write-Verbose $graphBodyJson
     $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
     
-    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Patch
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers $headers -Method Patch
     }
 function invoke-graphPost(){
     [cmdletbinding()]
@@ -1355,16 +1423,24 @@ function invoke-graphPost(){
             [string]$graphQuery
         ,[parameter(Mandatory = $true)]
             [Hashtable]$graphBodyHashtable
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$additionalHeaders
         )
 
     $sanitisedGraphQuery = $graphQuery.Trim("/")
+    $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    if($additionalHeaders){
+        $additionalHeaders.GetEnumerator() | %{
+            $headers.Add($_.Key,$_.Value)
+            }
+        }
     Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
         
     $graphBodyJson = ConvertTo-Json -InputObject $graphBodyHashtable -Depth 10
     Write-Verbose $graphBodyJson
     $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
     
-    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers $headers -Method Post
     }
 function invoke-graphPut(){
     [cmdletbinding()]
@@ -1379,9 +1455,17 @@ function invoke-graphPut(){
             $binaryFileStream
         ,[parameter(Mandatory = $true,ParameterSetName = "NormalRequest")]
             [Hashtable]$graphBodyHashtable
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$additionalHeaders
         )
 
     $sanitisedGraphQuery = $graphQuery.Trim("/")
+    $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    if($additionalHeaders){
+        $additionalHeaders.GetEnumerator() | %{
+            $headers.Add($_.Key,$_.Value)
+            }
+        }
     Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
         
     if($binaryFileStream){
@@ -1395,7 +1479,87 @@ function invoke-graphPut(){
         $bodyData = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
         }
 
-    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $bodyData -ContentType $contentType -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Put
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $bodyData -ContentType $contentType -Headers $headers -Method Put
+    }
+function new-graphCalendarEvent(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userId
+        ,[parameter(Mandatory = $true)]
+            [string]$subject
+        ,[parameter(Mandatory = $true)]
+            [datetime]$start
+        ,[parameter(Mandatory = $true)]
+            [ArgumentCompleter({
+                param($Command, $Parameter, $WordToComplete, $CommandAst, $FakeBoundParams)
+                $((Get-TimeZone -ListAvailable).Id | sort) #Use Get-TimeZone to populate the pseudoValidateSet
+                })]
+            [ValidateScript({$_ -in ((Get-TimeZone -ListAvailable).Id)})]
+            [string]$startTimeZone
+        ,[parameter(Mandatory = $true)]
+            [datetime]$end
+        ,[parameter(Mandatory = $true)]
+            [ArgumentCompleter({
+                param($Command, $Parameter, $WordToComplete, $CommandAst, $FakeBoundParams)
+                $((Get-TimeZone -ListAvailable).Id | sort) #Use Get-TimeZone to populate the pseudoValidateSet
+                })]
+            [string]$endTimeZone
+        ,[parameter(Mandatory = $false)]
+            [string]$location
+        ,[parameter(Mandatory = $false)]
+            [string]$bodyHTML
+        ,[parameter(Mandatory = $false)]
+            [bool]$isTeamsMeeting
+        ,[parameter(Mandatory = $false)]
+            [int]$reminderMinutesBeforeStart
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet ("free","tentative","busy","oof","workingElsewhere","unknown")]
+            [string]$freeBusyStatus = "busy"
+        ,[parameter(Mandatory = $false)]
+            [string[]]$categories
+        )
+
+    $event = @{
+        subject = $subject
+        start   = @{
+            dateTime = $(Get-Date $start -Format s)
+            timeZone = $startTimeZone
+            }
+        end   = @{
+            dateTime = $(Get-Date $end -Format s)
+            timeZone = $endTimeZone
+            }
+        }
+    if($location){
+        $event.Add("location",@{displayName=$location})
+        }
+    if($bodyHTML){
+        $body = @{}
+        $body.Add("contentType","HTML")
+        $body.Add("content",$bodyHTML)
+        $event.Add("body",$body)
+        }
+    if($isTeamsMeeting){
+        $event.Add("isOnlineMeeting",$true)
+        $event.Add("onlineMeetingProvider","teamsForBusiness")
+        }
+    if($reminderMinutesBeforeStart){
+        $event.Add("reminderMinutesBeforeStart",$reminderMinutesBeforeStart)
+        $event.Add("isReminderOn",$true)
+        }
+    if($freeBusyStatus){
+        $event.Add("showAs",$freeBusyStatus)
+        }
+    if($categories){
+        $event.Add("categories",$categories)
+        }
+
+    Write-Verbose "new-graphCalendarEvent | $(stringify-hashTable $event -interlimiter "=" -delimiter "; ")"
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events" -graphBodyHashtable $event -Verbose:$VerbosePreference
+    #https://docs.microsoft.com/en-us/graph/api/calendar-post-events?view=graph-rest-1.0&tabs=http
     }
 function new-graphListItem(){
     [cmdletbinding()]
@@ -1436,6 +1600,47 @@ function new-graphListItem(){
     $graphBodyHash = @{"fields"=$listItemFieldValuesHash}
     Write-Verbose "new-graphListItem | $(stringify-hashTable $listItemFieldValuesHash)"
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items" -graphBodyHashtable $graphBodyHash -Verbose:$VerbosePreference
+    }
+function new-graphOpenShiftShared(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$MsAppActsAsUserId
+        ,[parameter(Mandatory = $true)]
+            [string]$schedulingGroupId
+        ,[parameter(Mandatory = $true)]
+            [string]$shiftName
+        ,[parameter(Mandatory = $true)]
+            [string]$shiftNotes
+        ,[parameter(Mandatory = $true)]
+            [int]$availableSlots
+        ,[parameter(Mandatory = $true)]
+            [datetime]$startDateTime
+        ,[parameter(Mandatory = $true)]
+            [datetime]$endDateTime
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet ("White","Blue","Green","Purple","Pink","Yellow","Gray","DarkBlue","DarkGreen","DarkPurple","DarkPink","DarkYellow")]
+            [string]$shiftColour
+        )
+    #Creates an already-shared OpenShift
+    $shiftDetails=@{
+        displayName=$shiftName
+        notes=$shiftNotes
+        startDateTime=$(Get-Date $startDateTime -Format o) #Format dates as ISO 8601
+        endDateTime=$(Get-Date $endDateTime -Format o) #Format dates as ISO 8601
+        theme=$shiftColour
+        openSlotCount=$availableSlots
+        }
+    $newShift = @{
+       schedulingGroupId=$schedulingGroupId
+       sharedOpenShift=$shiftDetails
+       }
+
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts" -graphBodyHashtable $newShift -Verbose:$VerbosePreference -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
     }
 function new-graphTeam(){
     [cmdletbinding()]
