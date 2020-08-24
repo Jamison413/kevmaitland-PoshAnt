@@ -2216,6 +2216,44 @@ function test-graphBearerAccessTokenStillValid(){
         else{$false}#Otherwise return False
         }
     }
+function update-graphGroupOfDevicesBasedOnOwners(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userGroupId
+        ,[parameter(Mandatory = $true)]
+            [string]$devicesGroupId
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet("Android","iOS","Windows")]
+            [string]$deviceType
+        )
+
+    $usersInGroup = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $userGroupId -memberType TransitiveMembers -returnOnlyLicensedUsers
+    if([string]::IsNullOrWhiteSpace($deviceType)){
+        $devicesOwnedByUsers = get-graphDevices -tokenResponse $tokenResponse -filterOwnerIds $usersInGroup.id 
+        }
+    else{
+        $devicesOwnedByUsers = get-graphDevices -tokenResponse $tokenResponse -filterOwnerIds $usersInGroup.id -filterOperatingSystem $deviceType
+        }
+    
+    $devicesCurrentlyInGroup = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $devicesGroupId -memberType TransitiveMembers
+
+    if([string]::IsNullOrWhiteSpace($usersInGroup.Id)){$devicesOwnedByUsers = @()}
+    if([string]::IsNullOrWhiteSpace($devicesCurrentlyInGroup.Id)){$devicesCurrentlyInGroup = @()}
+    $delta = Compare-Object -ReferenceObject $devicesCurrentlyInGroup -DifferenceObject $devicesOwnedByUsers -Property Id -PassThru
+
+    $toAdd = $delta | ? {$_.SideIndicator -eq "=>"} 
+    if($toAdd){
+        add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $devicesGroupId -memberType Members -graphUserIds $toAdd.id -Verbose:$VerbosePreference
+        }
+
+    $toRemove = $delta | ? {$_.SideIndicator -eq "<="} 
+    if($toRemove){
+        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $devicesGroupId -memberType Members -graphUserIds $toRemove.id -Verbose:$VerbosePreference
+        }
+    }
 function update-graphListItem(){
     [cmdletbinding()]
     param(
