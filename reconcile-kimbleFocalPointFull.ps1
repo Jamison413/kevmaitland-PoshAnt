@@ -170,6 +170,38 @@ $engagementsToDelete | % {
 
 #endregion
 
+#region Contacts
+$cachedContacts = get-allFocalPointCachedKimbleContacts -dbConnection $sqlDbConn -pWhereStatement $null
+$kimbleContacts = get-allKimbleContacts -pQueryUri $standardKimbleQueryUri -pRestHeaders $standardKimbleHeaders -pWhereStatement $null
+$contactsDelta = Compare-Object -ReferenceObject $kimbleContacts -DifferenceObject $cachedContacts -Property Id -PassThru -CaseSensitive:$false -IncludeEqual
+
+$contactsToAdd = $contactsDelta | ? {$_.SideIndicator -eq "<="} 
+$contactsToAdd | % {
+    $me = $_
+    add-kimbleContactToFocalPointCache -kimbleContact $me -dbConnection $sqlDbConn 
+    } | % {Write-Host $me.Id $me.Name}
+#Update all the matched Accounts based on the Kimble Data
+$contactsToUpdate = $contactsDelta | ? {$_.SideIndicator -eq "=="}
+if($i -ne $null){rv i}
+$failed = @()
+$contactsToUpdate | % {
+    $me = $_
+    Write-Progress -Activity "Updating cached Kimble Engagments" -status "$($me.Name)" -percentComplete ($i / $engagementsToUpdate.count * 100)
+    $result = update-kimbleContactToFocalPointCache -kimbleContact $me -dbConnection $sqlDbConn 
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]";$failed += $me}
+    $i++
+    }
+#These are now missing from Kimble. Not sure what to do with these...
+$contactsToDelete = $contactsDelta | ? {$_.SideIndicator -eq "=>" }
+$contactsToDelete | % {
+    $me = $_
+    $me.IsDeleted = $true
+    $me | Add-Member -MemberType NoteProperty -Name "IsMissingFromKimble" -Value $true -Force
+    $result = update-kimbleContactToFocalPointCache -kimbleContact $me -dbConnection $sqlDbConn
+    if($result -ne 1){Write-Host "FAILED TO UPDATE [$($me.Id)] [$($me.Name)]"}
+    }
+
+#endregion
 
 $sqlDbConn.close()
 Stop-Transcript

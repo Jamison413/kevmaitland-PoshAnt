@@ -421,11 +421,23 @@ function convert-nsNetSuiteProjectToSqlNetSuiteProject(){
         }
     $pretendSqlNetSuiteProject
     }
+function delete-netSuiteContactFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [string]$id
+
+        ,[parameter(Mandatory=$false)]
+        [psobject]$netsuiteParameters
+        )
+
+    invoke-netsuiteRestMethod -requestType DELETE -url "$($netsuiteParameters.uri)/contact/$id" -netsuiteParameters $netsuiteParameters #-Verbose 
+    }
 function get-netSuiteAuthHeaders(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true)]
-        [ValidateSet("GET","POST")]
+        [ValidateSet("DELETE","GET","POST","PATCH")]
         [string]$requestType
         
         ,[parameter(Mandatory = $true)]
@@ -516,12 +528,15 @@ function get-netSuiteClientFromSqlCache{
 function get-netSuiteContactFromNetSuite(){
     [cmdletbinding()]
     Param (
-        [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
-        [string]$query
-
-        ,[parameter(Mandatory=$false)]
-        [psobject]$netsuiteParameters
+        [parameter(Mandatory = $true,ParameterSetName="Query")]
+            [ValidatePattern('^?[\w+][=][\w+]')]
+            [string]$query
+        ,[parameter(Mandatory=$true,ParameterSetName="Id")]
+            [string]$contactId
+        ,[parameter(Mandatory=$false,ParameterSetName="Query")]
+            [parameter(Mandatory = $false,ParameterSetName="GetAll")]
+            [parameter(Mandatory = $false,ParameterSetName="Id")]
+            [psobject]$netsuiteParameters
         )
 
     Write-Verbose "`tget-netSuiteContactFromNetSuite([$($query)])"
@@ -530,13 +545,21 @@ function get-netSuiteContactFromNetSuite(){
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
 
-    $contacts = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/contact$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $contactsEnumerated = [psobject[]]::new($contacts.count)
-    for ($i=0; $i -lt $contacts.count;$i++) {
-    $url = "$($contacts.items[$i].links[0].href)" + "/?expandSubResources=True"
-    write-host $url -ForegroundColor white
-        $contactsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $url -netsuiteParameters $netsuiteParameters 
+    switch ($PsCmdlet.ParameterSetName){
+        "Id"    {
+            $contactsEnumerated = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/contact/$contactId" -netsuiteParameters $netsuiteParameters 
+            }
+        default {
+            $contacts = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/contact$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+            $contactsEnumerated = [psobject[]]::new($contacts.count)
+            for ($i=0; $i -lt $contacts.count;$i++) {
+                $url = "$($contacts.items[$i].links[0].href)" + "/?expandSubResources=True"
+                if($i%100 -eq 0){Write-Verbose "[$($i)]/[$($contacts.count)] ($($i / $contacts.count)%)"}
+                $contactsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $url -netsuiteParameters $netsuiteParameters 
+                }            
+            }
         }
+
     $contactsEnumerated
     }
 function get-netSuiteEmployeesFromNetSuite(){
@@ -715,7 +738,7 @@ function get-oAuthSignature(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true)]
-        [ValidateSet("GET","POST")]
+        [ValidateSet("DELETE","GET","POST","PATCH")]
         [string]$requestType
         
         ,[parameter(Mandatory = $true)]
@@ -778,15 +801,15 @@ function invoke-netSuiteRestMethod(){
     [cmdletbinding()]
     Param(
         [parameter(Mandatory = $true)]
-        [ValidateSet("GET","POST")]
+        [ValidateSet("DELETE","GET","POST","PATCH")]
         [string]$requestType
-        
         ,[parameter(Mandatory = $true)]
         [ValidatePattern("http")]
         [string]$url
-
         ,[parameter(Mandatory=$false)]
         [psobject]$netsuiteParameters
+        ,[parameter(Mandatory=$false)]
+        [hashtable]$requestBodyHashTable
         )
 
     if(!$netsuiteParameters){$netsuiteParameters = get-netsuiteParameters}
@@ -820,29 +843,39 @@ function invoke-netSuiteRestMethod(){
         }
     
     $netsuiteRestHeaders = get-netsuiteAuthHeaders -requestType $requestType -url $hostUrl -oauthParameters $oAuthParamsForSigning  -oauth_consumer_secret $netsuiteParameters.oauth_consumer_secret -oauth_token_secret $netsuiteParameters.oauth_token_secret -realm $netsuiteParameters.realm
-    
-    Write-Verbose "Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $(stringify-hashTable $netsuiteRestHeaders) -Method $requestType -ContentType application/swagger+json"
-    $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
-    if($partialDataset.totalResults -ne $partialDataset.count){ #If the query has been paginated
-        if($partialDataset.offset -eq 0){$fullDataSet = New-Object object[] $partialDataSet.totalResults}
-        do{
-            for($i = 0; $i -lt $partialDataset.count; $i++){ #Fill $fullDataset with the contents of $partialDataset
-                $fullDataset[$i+$partialDataset.offset] = $partialDataset.items[$i]
-                if($i%100 -eq 0){Write-Verbose "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)]"}
-                }
-            $nextUrl = [uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href) #Check if there are more results to retrieve
-            if([string]::IsNullOrWhiteSpace($nextUrl)){}#$partialDataset.links.rel | % {Write-Verbose $_}}
-            else{
-                Write-Verbose "`tNext URL: [$([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href))]"
-                $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href)) -netsuiteParameters $netsuiteParameters
-                }
-            }
-        while($partialDataset.hasMore -eq $true)
 
-        $partialDataset.items = $fullDataset
-        $partialDataset.count = $partialDataset.items.count
+    Write-Verbose "Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $(stringify-hashTable $netsuiteRestHeaders) -Method $requestType -ContentType application/swagger+json -Body $(stringify-hashTable $requestBodyHashTable)"
+    if($requestType -eq "GET"){
+        $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
+        if($partialDataset.totalResults -ne $partialDataset.count){ #If the query has been paginated
+            if($partialDataset.offset -eq 0){$fullDataSet = New-Object object[] $partialDataSet.totalResults}
+            do{
+                for($i = 0; $i -lt $partialDataset.count; $i++){ #Fill $fullDataset with the contents of $partialDataset
+                    $fullDataset[$i+$partialDataset.offset] = $partialDataset.items[$i]
+                    if($i%100 -eq 0){Write-Verbose "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)] ($(($i+$partialDataset.offset) / $partialDataSet.totalResults)%)"}
+                    }
+                $nextUrl = [uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href) #Check if there are more results to retrieve
+                if([string]::IsNullOrWhiteSpace($nextUrl)){}#$partialDataset.links.rel | % {Write-Verbose $_}}
+                else{
+                    Write-Verbose "`tNext URL: [$([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href))]"
+                    $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href)) -netsuiteParameters $netsuiteParameters
+                    }
+                }
+            while($partialDataset.hasMore -eq $true)
+
+            $partialDataset.items = $fullDataset
+            $partialDataset.count = $partialDataset.items.count
+            }
+        $partialDataset            
         }
-    $partialDataset            
+    else{
+        if($requestType -ne "DELETE"){
+            $bodyJson = ConvertTo-Json -InputObject $requestBodyHashTable
+            Write-Verbose $bodyJson
+            $bodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($bodyJson)
+            }
+        Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json" -Body $bodyJsonEncoded
+        }
     }
 function sync-netSuiteClientsFromNetSuiteToSql(){
     [cmdletbinding()]

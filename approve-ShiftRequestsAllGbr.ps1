@@ -1,4 +1,4 @@
-﻿$VerbosePreference = 2
+﻿#$VerbosePreference = 2
 $logFileLocation = "C:\ScriptLogs\"
 $logFileName = "approve-shiftRequestsAllGbr"
 $fullLogPathAndName = $logFileLocation+$logFileName+"_$whatToSync`_FullLog_$(Get-Date -Format "yyMMdd").log"
@@ -9,8 +9,8 @@ if($PSCommandPath){
     }
 
 
-$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
-#$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
+#$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
+$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
 $msAppActsAsUserId = "36bc6f20-feed-422d-b2f2-7758e9708604"
 
 $shiftBotDetails = get-graphAppClientCredentials -appName ShiftBot

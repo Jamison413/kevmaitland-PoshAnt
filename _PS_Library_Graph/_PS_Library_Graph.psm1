@@ -1872,8 +1872,8 @@ function reset-graphUnifiedGroupSettingsToOriginals(){
             $body += "</UL> Our Team names adhere to our <A HREF=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-11`">Naming Conventions</A> to ensure everyone in Anthesis is talking a common language, and we rely on Team Classification and Privacy/Visibilty settings to ensure robust and scalable access to data.`r`n`r`n<BR><BR>"
             $body += "If you think that these settings are wrong, you'll need to speak with one of the humans in the IT Team.`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>The Helpful Teams Robot</FONT></HTML>"
-            #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Team [$($combinedMesg.displayName)] settings rolled back" -BodyAsHtml $body -To $($owners.mail) -Cc $itAdminEmailAddresses -Encoding UTF8
-            Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Team [$($combinedMesg.displayName)] settings rolled back" -BodyAsHtml $body -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
+            Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Team [$($combinedMesg.displayName)] settings rolled back" -BodyAsHtml $body -To $($owners.mail) -Cc $itAdminEmailAddresses -Encoding UTF8
+            #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Team [$($combinedMesg.displayName)] settings rolled back" -BodyAsHtml $body -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
             }
         #Now, fix the settings:
         invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($graphGroupExtended.id)" -graphBodyHashtable $changes -Verbose:$VerbosePreference
