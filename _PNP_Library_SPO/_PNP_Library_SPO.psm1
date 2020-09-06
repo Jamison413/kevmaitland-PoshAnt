@@ -492,6 +492,113 @@ function get-spoKimbleSupplierListItems($spoCredentials, $verboseLogging){
         }
     $allSpoSuppliers
     }
+function merge-pnpTerms(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [Microsoft.SharePoint.Client.Taxonomy.TermSetItem]$termToBeRetained
+        ,[parameter(Mandatory = $true)]
+            [Microsoft.SharePoint.Client.Taxonomy.TermSetItem]$termToBeMerged
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet("Merged","Retained")]
+            [string]$setDefaultLabelTo = "Retained"
+        ,[parameter(Mandatory = $true)]
+            [string]$pnpTermGroup
+        ,[parameter(Mandatory = $true)]
+            [string]$pnpTermSet
+        )
+    Write-Verbose "merge-pnpTerms(`$termToBeRetained=[$termToBeRetained], `$termToBeMerged=[$termToBeMerged])"    
+    switch($setDefaultLabelTo){ #We have to get these 
+        "Merged"   {$targetLabel = $termToBeMerged.Name}
+        "Retained" {$targetLabel = $termToBeRetained.Name}
+        }
+
+    $goodCustomProperties = $termToBeRetained.CustomProperties
+    $duffCustomProperties = $termToBeMerged.CustomProperties
+    $termToBeMerged.Merge($termToBeRetained)
+    $termToBeMerged.Context.ExecuteQuery()
+    $updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $termToBeMerged.Id -Includes CustomProperties
+    $duffCustomProperties.GetEnumerator() | % { #Iterate through each CustomProperty on the merged Term
+        $thisCustomProperty = $_
+        while(![string]::IsNullOrWhiteSpace($updatedTerm.CustomProperties."$($thisCustomProperty.Key)_merged$i")){ #Find the lowest number for merging without overwriting anything
+            $i++
+            }
+        $updatedTerm.SetCustomProperty("$($thisCustomProperty.Key)_merged$i",$thisCustomProperty.Value) #Add this $duffCustomProperty back into the CustomProperties on for the original
+        }
+    try{$updatedTerm.Context.ExecuteQuery()}
+    catch{
+        Write-Error "Error merging [$($pnpTermGroup)][$($pnpTermSet)][$($termToBeMerged.Name)] into [$($termToBeRetained.Name)] in merge-pnpTerms()" 
+        $_
+        }
+    #By default, the Label will be set to the Retained Term's Label. If we want to change this (i.e. keep the Retained Term's CustomProperties, but use the Merged Term's Name), we need to do something extra
+    if($setDefaultLabelTo -eq "Merged"){
+        Write-Verbose "Setting default Label to [$($targetLabel)] for Term [$($updatedTerm.Name)][$($updatedTerm.Id)]"
+        $i=0
+        do{
+            if($i -eq 0){$updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $termToBeRetained.Id -Includes CustomProperties, Labels}
+            else{
+                Write-Verbose "Term name is still [$($updatedTerm.Name)] on iteration [$($i)]  - sleeping for another 5 seconds and dancing widdershins around the Term"
+                Start-Sleep -Seconds 5
+                }
+            $updatedTerm.Labels | ? {$_.Value -eq $targetLabel} | Out-Null
+            $($updatedTerm.Labels | ? {$_.Value -eq $targetLabel}) | fl # .SetAsDefaultForLanguage() only works if the relevant Label has been enumerated to the screen. WTF. CSOM, eh?
+            $correctLabel = $updatedTerm.Labels | ? {$_.Value -eq $targetLabel}
+            $correctLabel.SetAsDefaultForLanguage()
+            try{$updatedTerm.Context.ExecuteQuery()}
+            catch{
+                Write-Error "Error setting default Label to [$($targetLabel)] on [$($pnpTermGroup)][$($pnpTermSet)][$($updatedTerm.Name)] in merge-pnpTerms()"
+                $_
+                }
+            $i++
+            $updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $duffTermToMergeIntoGoodTerm.Id -Includes CustomProperties, Labels
+            }
+        while($updatedTerm.Name -eq $termWithWrongName_originalName)        
+        }
+    else{
+        #Do nothing
+        }
+    <# Code transplant
+                $goodCustomProperties = $termWithWrongName.CustomProperties
+                $duffCustomProperties = $duffTermToMergeIntoGoodTerm.CustomProperties
+                $duffTermToMergeIntoGoodTerm.Merge($termWithWrongName)
+                $duffTermToMergeIntoGoodTerm.Context.ExecuteQuery()
+                $updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $duffTermToMergeIntoGoodTerm.Id -Includes CustomProperties
+                $duffCustomProperties.GetEnumerator() | % { #Iterate through each CustomProperty on the original Term
+                    $thisCustomProperty = $_
+                    while(![string]::IsNullOrWhiteSpace($updatedTerm.CustomProperties."$($thisCustomProperty.Key)_merged$i")){ #Find the lowest number for merging without overwriting anything
+                        $i++
+                        }
+                    $updatedTerm.SetCustomProperty("$($thisCustomProperty.Key)_merged$i",$thisCustomProperty.Value) #Add this $duffCustomProperty back into the CustomProperties on for the original
+                    }
+                try{$updatedTerm.Context.ExecuteQuery()}
+                catch{
+                    $_
+                    $problemChilds += $updatedTerm
+                    }
+                #Then, set the correct Label as the default (the .Merge() function either leaves you with the correct CustomProperties _or_ the correct Label, and it's simpler to fiddle with the single Label than an unknown number of CustomProperties
+                Write-Verbose "Setting default Label to [$($thisUpdatedClient.companyName)] for Term [$($updatedTerm.Name)][$($updatedTerm.Id)]"
+                $i=0
+                do{
+                    if($i -eq 0){$updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $duffTermToMergeIntoGoodTerm.Id -Includes CustomProperties, Labels}
+                    else{
+                        Write-Verbose "Term name is still [$($updatedTerm.Name)] on iteration [$($i)]  - sleeping for another 5 seconds and dancing widdershins around the Term"
+                        Start-Sleep -Seconds 5
+                        }
+                    $updatedTerm.Labels | ? {$_.Value -eq $thisUpdatedClient.companyName} | Out-Null
+                    $($updatedTerm.Labels | ? {$_.Value -eq $thisUpdatedClient.companyName}) | fl # .SetAsDefaultForLanguage() only works if the relevant Label has been enumerated to the screen. WTF. CSOM, eh?
+                    $correctLabel = $updatedTerm.Labels | ? {$_.Value -eq $thisUpdatedClient.companyName}
+                    $correctLabel.SetAsDefaultForLanguage()
+                    try{$updatedTerm.Context.ExecuteQuery()}
+                    catch{
+                        $_
+                        $problemChilds += $updatedTerm
+                        }
+                    $i++
+                    $updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $duffTermToMergeIntoGoodTerm.Id -Includes CustomProperties, Labels
+                    }
+                while($updatedTerm.Name -eq $termWithWrongName_originalName)
+    #>
+    }
 function new-spoClientLibrary($clientName, $clientDescription, $spoCredentials, $verboseLogging){
     #
     # Deprecated - use new-spoDocumentLibrary

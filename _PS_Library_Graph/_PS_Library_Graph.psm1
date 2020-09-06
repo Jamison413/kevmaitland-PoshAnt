@@ -505,11 +505,14 @@ function get-graphDrives(){
             [parameter(Mandatory = $true,ParameterSetName = "fromSiteId")]
             [parameter(Mandatory = $true,ParameterSetName = "fromUpn")]
             [parameter(Mandatory = $true,ParameterSetName = "fromGroupId")]
+            [parameter(Mandatory = $true,ParameterSetName = "fromDriveId")]
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "fromUrl")]
             [string]$siteUrl
         ,[parameter(Mandatory = $true,ParameterSetName = "fromSiteId")]
             [string]$siteGraphId
+        ,[parameter(Mandatory = $false,ParameterSetName = "fromSiteId")]
+            [string]$listGraphId
         ,[parameter(Mandatory = $true,ParameterSetName = "fromGroupId")]
             [string]$groupGraphId
         ,[parameter(Mandatory = $true,ParameterSetName = "fromUpn")]
@@ -524,13 +527,21 @@ function get-graphDrives(){
             [parameter(Mandatory = $false,ParameterSetName = "fromSiteId")]
             [parameter(Mandatory = $false,ParameterSetName = "fromUpn")]
             [parameter(Mandatory = $false,ParameterSetName = "fromGroupId")]
-            [string]$filterDriveName
+            [string]$filterDriveName_unsupported
+        ,[parameter(Mandatory = $false,ParameterSetName = "fromSiteId")]
+            [parameter(Mandatory = $true,ParameterSetName = "fromDriveId")]
+            [string]$driveId
         )
     
     if($returnOnlyDefaultDocumentsLibrary){$endpoint = "/drive"}
+    elseif($listGraphId){$endpoint = "/lists"}
     else{$endpoint = "/drives"}
 
     switch ($PsCmdlet.ParameterSetName){ #Build the query based on the parameters supplied. Because we're dealing with several permutations of endpoints (/groups vs /sites & /drive vs /drives), this looks more complicated than it really is. 
+        "fromDriveId" {
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveId"
+            return
+            }
         "fromUpn" { #If we've only got a UPN, we need to get the corresponding group Id
             Write-Verbose "get-graphDrives | Getting GroupId from UPN [$teamUpn]"
             $groupGraphId = (get-graphGroups -tokenResponse $tokenResponse -filterUpn $teamUpn).id
@@ -553,6 +564,8 @@ function get-graphDrives(){
        {@("fromUrl","fromSiteId") -contains $_} {#Now we can use the /sites endpoint with either the /drive or /drives endpoint (whichever we picked before the switch statement)
             Write-Verbose "get-graphDrives | Getting from $_"
             $query = "/sites/$siteGraphId$endpoint"
+            if($filterDriveId){$query+="/$filterDriveId"}
+            if($listGraphId){$query+="/$listGraphId/drive"}
             }
         }
     
@@ -782,9 +795,11 @@ function get-graphList(){
             [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
             [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "driveId")]
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "driveId")]
             [string]$graphSiteId
         ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
@@ -795,15 +810,22 @@ function get-graphList(){
         ,[parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
             [string]$listName
+        ,[parameter(Mandatory = $true,ParameterSetName = "driveId")]
+            [string]$graphDriveId
         )
 
     switch ($PsCmdlet.ParameterSetName){
+        "driveId" {
+            $drive = get-graphDrives -tokenResponse $tokenResponse -driveId $graphDriveId
+            get-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $graphSiteId -listName $drive.name
+            return
+            }
         {$_ -match "URL"} { #If we've got a URL to the Site, we'll need to get the Id
             Write-Verbose "get-graphList | Getting Site from URL [$serverRelativeSiteUrl]"
             $graphSiteId = $(get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl $serverRelativeSiteUrl).Id
             }
         {$_ -match "AndName"} { #If we've got a URL to the Site, we'll need to get the Id
-            $filter = "?`$filter= displayName eq '$listName'"
+            $filter = "?`$filter= displayName eq '$([uri]::EscapeDataString($listName))'"
             Write-Verbose "get-graphList | Filter set to [$filter]"
             }
         {$_ -match "AndId"} { #If we've got a URL to the Site, we'll need to get the Id
@@ -811,7 +833,6 @@ function get-graphList(){
             Write-Verbose "get-graphList | ListId [$listId]"
             }
         }
-
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists$ListId$filter" -Verbose:$VerbosePreference
 
     }
@@ -1561,6 +1582,23 @@ function new-graphCalendarEvent(){
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events" -graphBodyHashtable $event -Verbose:$VerbosePreference
     #https://docs.microsoft.com/en-us/graph/api/calendar-post-events?view=graph-rest-1.0&tabs=http
     }
+function new-graphList(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$siteGraphId
+        ,[parameter(Mandatory = $true)]
+            [string]$listDisplayName
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet ("documentLibrary")]
+            [string]$listType
+        )    
+
+    $bodyHash = @{"displayName"=$listDisplayName;"list"=@{"template"=$listType}}
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$siteGraphId/lists" -graphBodyHashtable $bodyHash
+    }
 function new-graphListItem(){
     [cmdletbinding()]
     param(
@@ -1881,6 +1919,31 @@ function reset-graphUnifiedGroupSettingsToOriginals(){
         set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended -Verbose:$VerbosePreference
         }
     }
+function set-graphDrive_unsupported(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$driveId
+        ,[parameter(Mandatory = $true)]
+            [hashtable]$drivePropertyHash = @{}
+        )
+    $validProperties = @("description","displayName","name")
+    $duffProperties = @()
+    $drivePropertyHash.Keys | % { #Check the properties we're going to try and update the Drive with are valid:
+        if($validProperties -notcontains $_ ){
+            $duffProperties += $_
+            }
+        }
+
+    if($duffProperties.Count -gt 0){
+        Write-Error -Message "Property(s) [$($duffProperties -join ", ")] is invalild for Graph Drive object. Will not attempt to update."
+        return
+        }
+
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/drives/$driveId" -graphBodyHashtable $drivePropertyHash -Verbose:$VerbosePreference
+    }
 function set-graphGroupSharedMailboxAccess(){
     [cmdletbinding()]
     param(
@@ -2033,6 +2096,70 @@ function set-graphGroupUGSyncSchemaExtensions(){
     invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$groupId" -graphBodyHashtable $bodyHash
     
     }
+function set-graphList(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true)]
+            [string]$graphListId
+        ,[parameter(Mandatory = $true)]
+            [hashtable]$listPropertyHash = @{}
+        )
+    $validProperties = @("description","displayName")
+    $duffProperties = @()
+    $listPropertyHash.Keys | % { #Check the properties we're going to try and update the Drive with are valid:
+        if($validProperties -notcontains $_ ){
+            $duffProperties += $_
+            }
+        }
+
+    if($duffProperties.Count -gt 0){
+        Write-Error -Message "Property(s) [$($duffProperties -join ", ")] is invalild for Graph List object. Will not attempt to update."
+        return
+        }
+
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$graphListId" -graphBodyHashtable $listPropertyHash
+    }
+function set-graphMailboxSettings(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$identity
+       ,[parameter(Mandatory = $false)]
+            [string]$timeZone
+         )
+If(($identity -match "@anthesisgroup.com") -or ($identity.Length -eq 36)){
+#Identity contains a upn or looks like a guid
+    If($timeZone){
+        If((Get-TimeZone -ListAvailable | Select-Object -Property "Id") -match $timeZone){
+        #timezone is available in Windows
+        $graphQuery = "users/$identity/mailboxSettings"
+        #We set the mailbox timezone and meeting hours timezone the same
+        $graphBodyHashtable = [ordered]@{
+        workingHours = @{
+        timeZone=@{
+        "name"="$($timeZone)";
+        }      
+        }
+        "timeZone"= "$($timeZone)"
+        }
+        $response = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery  $graphQuery -graphBodyHashtable $graphBodyHashtable -Verbose
+        $response
+        }
+        Else{
+        Write-Error "Please provide a valid timezone available in Windows"
+        }
+    }
+}
+Else{
+Write-Error "Please provide a valid upn or guid"
+}
+}
 function set-graphUnifiedGroupGuestSettings(){
     [CmdletBinding()]
     param(
@@ -2090,44 +2217,7 @@ function set-graphUnifiedGroupGuestSettings(){
         }
 
     }
-function set-graphMailboxSettings(){
-    [cmdletbinding()]
-    param(
-        [parameter(Mandatory = $true)]
-            [psobject]$tokenResponse
-       ,[parameter(Mandatory = $true)]
-            [string]$identity
-       ,[parameter(Mandatory = $false)]
-            [string]$timeZone
-         )
-If(($identity -match "@anthesisgroup.com") -or ($identity.Length -eq 36)){
-#Identity contains a upn or looks like a guid
-    If($timeZone){
-        If((Get-TimeZone -ListAvailable | Select-Object -Property "Id") -match $timeZone){
-        #timezone is available in Windows
-        $graphQuery = "users/$identity/mailboxSettings"
-        #We set the mailbox timezone and meeting hours timezone the same
-        $graphBodyHashtable = [ordered]@{
-        workingHours = @{
-        timeZone=@{
-        "name"="$($timeZone)";
-        }      
-        }
-        "timeZone"= "$($timeZone)"
-        }
-        $response = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery  $graphQuery -graphBodyHashtable $graphBodyHashtable -Verbose
-        $response
-        }
-        Else{
-        Write-Error "Please provide a valid timezone available in Windows"
-        }
-    }
-}
-Else{
-Write-Error "Please provide a valid upn or guid"
-}
-}
-function set-graphuserManager(){
+function set-graphUserManager(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
@@ -2153,7 +2243,7 @@ Else{
 write-host "User or Manager ID missing" -ForegroundColor Red
 }
 }
-function set-graphuser(){
+function set-graphUser(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]

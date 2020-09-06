@@ -13,6 +13,108 @@ $AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'
 [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
+function add-netSuiteAccountToNetSuite{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [string]$companyName 
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet("","")]
+            [string]$subsidiary 
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet("LEAD-Qualified","LEAD-Unqualified","CLIENT-Closed Won","CLIENT-Renewal")]
+            [string]$status 
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet("Aerospace & Defense","Agriculture","Apparel","Biotechnology","Business & Trade Organization","Business Services","Chemicals & Raw Materials","Construction & Architecture","Consultancy","Containers & Packaging","Distribution & Logistics","Education & Academia","Energy","Engineering & Engineering Services","Financial Services & Insurance","FMCG - Non-Food","Food & Beverage","Forestry, Timber & Paper","Government & Public Services","Health & Pharmaceutical","Hospitality","Information & Communications Technology","Intercompany","Legal Services","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality")]
+            [string]$industry 
+        ,[parameter(Mandatory = $true)]
+            [System.Data.Common.DbConnection]$dbConnection
+        ,[parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        )
+    Write-Verbose "add-netSuiteAccountToNetSuite [$($companyName)]"
+
+    switch($status){
+        "LEAD-Qualified"    {$statusId = 7}
+        "LEAD-Unqualified"  {$statusId = 6}
+        "CLIENT-Closed Won" {$statusId = 13}
+        "CLIENT-Renewal"    {$statusId = 15}
+        }
+
+    switch($industry){
+        "LEAD-Qualified"    {$statusId = 7}
+        "LEAD-Unqualified"  {$statusId = 6}
+        "CLIENT-Closed Won" {$statusId = 13}
+        "CLIENT-Renewal"    {$statusId = 15}
+        }
+
+    $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
+    $supplierSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,9fb8ecd6-c87d-485d-a488-26fd18c62303"
+    $devSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,8ba7475f-dad0-4d16-bdf5-4f8787838809"
+
+    #Switch to set correct SiteId
+    switch($sqlNetsuiteAccount.RecordType){
+        "Client"   {$correctSiteId = $clientSiteId}
+        "Supplier" {$correctSiteId = $supplierSiteId}
+        default    {Write-Error "SqlNetSuiteAccount [$($sqlNetsuiteAccount.AccountName)][$($sqlNetsuiteAccount.NsInternalId)] is neither flagged as a 'Client' nor a 'Supplier' [$($sqlNetsuiteAccount.RecordType)]";break}
+        }
+    $correctSiteId = $devSiteId
+
+    if(![string]::IsNullOrWhiteSpace($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)){    #Check whether the DocLib Exists already
+        Write-Verbose "Looking for /drive by Id [$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)]"
+        $graphDrive = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)"
+        }
+    if(!$graphDrive){ #If we don't have a Graph DriveId, or the one we do have doesn't work (e.g. it's been deleted and manually re-created), have a rummage and try to find it by DisplayName(name)
+        Write-Verbose "Couldn't find the /drive by Id, looking for Name in case it's been deleted and manually recreated. "
+        $allDrivesInSite = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$correctSiteId/drives" -Verbose  #/drives does not support $filter (as of 2020-01-21)
+        $graphDrive = $allDrivesInSite.value | ? {(sanitise-forSharePointGroupName (remove-diacritics $_.name)) -eq (sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteAccount.AccountName))}
+        if($graphDrive.Count -gt 1){
+            Write-Error "Multiple potential Graph /drive matches found with displayName [$($sqlNetsuiteAccount.AccountName)]:`r`n`t$($graphDrive.webUrl -join '`r`n`t')`r`nCannot continue"
+            break
+            }
+        if($graphDrive -eq $null){Write-Verbose "Couldn't find the /drive by Name either. Will try to create a new one. "}
+        }
+
+    if($graphDrive){ #Check Name -eq AccountName
+        if((sanitise-forSharePointGroupName (remove-diacritics $graphDrive.name)) -ne (sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteAccount.AccountName))){ #Update if different
+            $docLibNameUpdateHash = @{"displayName"="$(sanitise-forSharePointGroupName $sqlNetsuiteAccount.AccountName)"}
+            #Get List Ids from /drive object
+            $graphList = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($graphDrive.id)/list"
+            $updatedGraphList = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$($graphList.parentReference.siteId)/lists/$($graphList.id)" -graphBodyHashtable $docLibNameUpdateHash
+            Write-Verbose "$($updatedGraphList.list.template) [$($updatedGraphList.webUrl)][$($updatedGraphList.parentReference) | $($updatedGraphList.id)] changed displayName from [$($graphList.displayName)] to [$($updatedGraphList.displayName)]"
+            $updateSqlRecord = $true
+            }
+        else{$updateSqlRecord = $true} #We don't need to process anything in SharePoint if the Displayname hasn't changed, just prevent this record from re-processings on the next cycle
+        }
+    else{ #If we can't find a /drives object, create a new one
+        $docLibInnerHash = @{"template"="documentLibrary"}
+        $docLibOuterHash = @{"displayName"="$(sanitise-forSharePointGroupName $sqlNetsuiteAccount.AccountName)";"list"=$docLibInnerHash}
+        $newGraphList = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$correctSiteId/lists" -graphBodyHashtable $docLibOuterHash
+        $graphDrive = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$($newGraphList.parentReference.siteId)/lists/$($newGraphList.id)/drive"
+        Write-Verbose "$($newGraphList.list.template) [$($newGraphList.webUrl)][$($newGraphList.parentReference) | $($newGraphList.id)] created with displayName [$($newGraphList.displayName)]"
+        $updateSqlRecord = $true
+        }
+    
+    if($graphDrive){ #If we've got a /drive object now, try creating the standard folders
+        $standardClientFolders = @(
+            "_These Client Document Libraries are created automatically by NetSuite"
+            ,"_These Client Document Libraries are created automatically by NetSuite\_That's clever!"
+            ,"_These Client Document Libraries are created automatically by NetSuite\Create a Client in NetSuite and see"
+            )
+        add-graphArrayOfFoldersToDrive -graphDriveId $graphDrive.id -foldersAndSubfoldersArray $standardClientFolders -tokenResponse $tokenResponse -conflictResolution Fail
+        }
+
+    if($updateSqlRecord){#If we think we should update this record to prevent re-processing on the next cycle
+        Write-Verbose "Updating SQL record after successful proccesing"
+        $sqlNetsuiteAccount.SharePointDocLibGraphDriveId = $graphDrive.id
+        $sqlNetsuiteAccount.DateModifiedInSql = Get-Date
+        $updateResult = update-netSuiteAccountInSqlCache -sqlNetsuiteAccount $sqlNetsuiteAccount -dbConnection $dbConnection -isNotDirty
+        Write-Verbose "Update Result: [$($updateResult)]"
+        #One day, we'll write something to write the URL of the DocLib back to NetSuite...
+        }
+
+    $graphDrive #Return the /drives object (if found)
+    }
 function add-netSuiteAccountToSharePoint{
     [cmdletbinding()]
     Param (
@@ -481,12 +583,15 @@ function get-netSuiteAuthHeaders(){
 function get-netSuiteClientsFromNetSuite(){
     [cmdletbinding()]
     Param (
-        [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
-        [string]$query
-
-        ,[parameter(Mandatory=$false)]
-        [psobject]$netsuiteParameters
+        [parameter(Mandatory = $true,ParameterSetName="Query")]
+            [ValidatePattern('^?[\w+][=][\w+]')]
+            [string]$query
+        ,[parameter(Mandatory=$true,ParameterSetName="Id")]
+            [string]$clientId
+        ,[parameter(Mandatory=$false,ParameterSetName="Query")]
+            [parameter(Mandatory = $false,ParameterSetName="GetAll")]
+            [parameter(Mandatory = $false,ParameterSetName="Id")]
+            [psobject]$netsuiteParameters
         )
 
     Write-Verbose "`tget-allNetSuiteClients([$($query)])"
@@ -495,11 +600,21 @@ function get-netSuiteClientsFromNetSuite(){
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
 
-    $customers = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $customersEnumerated = [psobject[]]::new($customers.count)
-    for ($i=0; $i -lt $customers.count;$i++) {
-        $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($customers.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
+    switch ($PsCmdlet.ParameterSetName){
+        "Id"    {
+            $customersEnumerated = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/customer/$clientId" -netsuiteParameters $netsuiteParameters 
+            }
+        default {
+            $customers = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+            $customersEnumerated = [psobject[]]::new($customers.count)
+            for ($i=0; $i -lt $customers.count;$i++) {
+                if($i%100 -eq 0){Write-Verbose "[$($i)]/[$($customers.count)] ($($i / $customers.count)%)"}
+                $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($customers.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
+                }
+            }
         }
+
+
     $customersEnumerated
     }
 function get-netSuiteClientFromSqlCache{
@@ -703,7 +818,7 @@ function get-netSuiteProjectFromNetSuite(){
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
 
-    $projects = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $projects = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/job$query" -netsuiteParameters $netsuiteParameters #-Verbose 
     $projectsEnumerated = [psobject[]]::new($projects.count)
     for ($i=0; $i -lt $projects.count;$i++) {
         $projectsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $projects.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
@@ -848,17 +963,21 @@ function invoke-netSuiteRestMethod(){
     if($requestType -eq "GET"){
         $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
         if($partialDataset.totalResults -ne $partialDataset.count){ #If the query has been paginated
-            if($partialDataset.offset -eq 0){$fullDataSet = New-Object object[] $partialDataSet.totalResults}
+            if($partialDataset.offset -eq 0){
+                $fullDataSet = New-Object object[] $partialDataSet.totalResults
+                Write-Verbose "`$fullDataSet.count = [$($fullDataSet.Count)]"
+                }
             do{
                 for($i = 0; $i -lt $partialDataset.count; $i++){ #Fill $fullDataset with the contents of $partialDataset
                     $fullDataset[$i+$partialDataset.offset] = $partialDataset.items[$i]
-                    if($i%100 -eq 0){Write-Verbose "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)] ($(($i+$partialDataset.offset) / $partialDataSet.totalResults)%)"}
+                    if($i%100 -eq 0){Write-Verbose "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)] ($([System.Math]::Floor(($i+$partialDataset.offset)*100 / $partialDataSet.totalResults))%)"}
                     }
                 $nextUrl = [uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href) #Check if there are more results to retrieve
                 if([string]::IsNullOrWhiteSpace($nextUrl)){}#$partialDataset.links.rel | % {Write-Verbose $_}}
                 else{
-                    Write-Verbose "`tNext URL: [$([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href))]"
-                    $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $([uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href)) -netsuiteParameters $netsuiteParameters
+                    if(![string]::IsNullOrWhiteSpace($parameters)){$nextUrl = "$nextUrl&$parameters"} #Weirldy links.next.href doesn't include the original query, so this will [Index was outside the bounds of the array.] if we don't resupply it manually
+                    Write-Verbose "`tNext URL: [$($nextUrl)]"
+                    $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $nextUrl -netsuiteParameters $netsuiteParameters
                     }
                 }
             while($partialDataset.hasMore -eq $true)

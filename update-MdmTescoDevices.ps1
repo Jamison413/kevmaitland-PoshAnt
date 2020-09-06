@@ -1,5 +1,5 @@
 ﻿$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
-$teamBotTokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$tokenResponseTeambot = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $tescoUsersGroupId = "3c48c759-8ce8-4eab-9dc3-984305593446"
 $tescoDevicesGroupId = "35847d50-69c2-4b76-8737-5942954754c4"

@@ -26,6 +26,20 @@ function new-weekShiftHash(){
             [datetime]$date
         ,[parameter(Mandatory = $false)]
             [bool]$startFromPreviousMonday = $true
+        ,[parameter(Mandatory = $false)]
+            [bool]$suppressMonday = $false
+        ,[parameter(Mandatory = $false)]
+            [bool]$suppressTuesday = $false
+        ,[parameter(Mandatory = $false)]
+            [bool]$suppressWednesday = $false
+        ,[parameter(Mandatory = $false)]
+            [bool]$suppressThursday = $false
+        ,[parameter(Mandatory = $false)]
+            [bool]$suppressFriday = $false
+        ,[parameter(Mandatory = $false)]
+            [bool]$suppressSaturday = $false
+        ,[parameter(Mandatory = $false)]
+            [bool]$suppressSunday = $false
         )
 
     if($startFromPreviousMonday){
@@ -33,8 +47,19 @@ function new-weekShiftHash(){
         $date = $date.AddDays(-$delta).Date
         }
 
+    $dayMap = ,@()*7
+    $dayMap[0] = $suppressSunday
+    $dayMap[1] = $suppressMonday
+    $dayMap[2] = $suppressTuesday
+    $dayMap[3] = $suppressWednesday
+    $dayMap[4] = $suppressThursday
+    $dayMap[5] = $suppressFriday
+    $dayMap[6] = $suppressSaturday
+
     for($i=0;$i -lt 7;$i++){
-        [array]$weekOfShifts += new-dayShiftHash -date $date.AddDays($i)
+        if($dayMap[$($date.AddDays($i).DayOfWeek.value__)] -eq $false){ #Weird double-negative, but it'll make more sense to people calling the function if they actively have to suppress days fo the week
+            [array]$weekOfShifts += new-dayShiftHash -date $date.AddDays($i)
+            }
         }
     $weekOfShifts
     }
@@ -65,14 +90,15 @@ $offices += [ordered]@{
     OfficeDesks=4
     }
 
-$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
-#$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
+#$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
+$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
+$msAppActsAsUserId = "36bc6f20-feed-422d-b2f2-7758e9708604"
 $standardShiftNotes = "Remember to sign in/out with the Blip! App, and use hand sanitiser when entering/exiting the office please"
 
 $shiftBotDetails = get-graphAppClientCredentials -appName ShiftBot
 $tokenResponseShiftBot = get-graphTokenResponse -grant_type client_credentials -aadAppCreds $shiftBotDetails
 #$tokenResponseShiftBot = get-graphTokenResponse -grant_type device_code -aadAppCreds $shiftBotDetails
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponseTeamBot = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #Get the last listed OpenShift, then generate standard shifts for the following week 
@@ -81,7 +107,7 @@ $lastOpenShifts = $openShifts | Group-Object schedulingGroupId | % {$_.Group | S
 [datetime]$lastScheduledDay = $($lastOpenShifts | Sort-Object {$_.sharedOpenShift.endDateTime} | Select-Object -Last 1).sharedOpenShift.endDateTime
 [datetime]$nextMonday = $lastScheduledDay.AddDays(-$($lastScheduledDay.DayOfWeek.value__ - 1)+7) 
 if($lastScheduledDay.DayOfWeek.value__ -eq 0){$nextMonday = $nextMonday.AddDays(-7)} #Special case for Sundays being part of the wrong week
-$nextWeekOfShifts = new-weekShiftHash -date $nextMonday
+$nextWeekOfShifts = new-weekShiftHash -date $nextMonday -suppressMonday:$true -suppressFriday:$true -suppressSaturday:$true -suppressSunday:$true
 
 #Get the SchedulingGroupId values for the offices
 $officeSchedulingGroups = invoke-graphGet -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups" -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
