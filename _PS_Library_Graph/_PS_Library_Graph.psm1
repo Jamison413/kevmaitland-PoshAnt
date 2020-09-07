@@ -498,6 +498,61 @@ function get-graphDevices(){
         $allDevices | Sort-Object displayName
         }
     }
+function get-graphDriveItems(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "root")]
+            [parameter(Mandatory = $true,ParameterSetName = "itemId")]
+            [parameter(Mandatory = $true,ParameterSetName = "path")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "root")]
+            [parameter(Mandatory = $true,ParameterSetName = "itemId")]
+            [parameter(Mandatory = $true,ParameterSetName = "path")]
+            [string]$driveGraphId
+        ,[parameter(Mandatory = $true,ParameterSetName = "itemId")]
+            [string]$itemGraphId = "root"
+        ,[parameter(Mandatory = $true,ParameterSetName = "path")]
+            [string]$folderPathRelativeToRoot
+        )
+    
+    switch ($PsCmdlet.ParameterSetName){ 
+        "root" {
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root/children"
+            return
+            }
+        "itemId" { 
+            #Write-Verbose "get-graphDrives | Getting GroupId from UPN [$teamUpn]"
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/items/$itemGraphId/children"
+            return
+            }
+        "path" { 
+            #Write-Verbose "get-graphDrives | Getting GroupId from UPN [$teamUpn]"
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root:/$folderPathRelativeToRoot`:/children"
+            return
+            }
+        }
+    
+    #Now build the refiner based on the other paramters supplied
+    if($filterDriveName){
+        $filter += " and name eq '$filterDriveName'"
+        }
+    if(![string]::IsNullOrWhiteSpace($filter)){
+        if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
+        $filter = "`$filter=$filter"
+        }
+
+    $refiner = "?"+$select
+    if($filter){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        $refiner = $refiner+$filter
+        }    
+    if($refiner.Length -gt 1){$query = $query+[uri]::EscapeDataString($refiner)}
+
+    #Finally, submit the query and return the results
+    $drives = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $query
+    $drives
+
+    }
 function get-graphDrives(){
      [cmdletbinding()]
     param(
@@ -1943,6 +1998,33 @@ function set-graphDrive_unsupported(){
         }
 
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/drives/$driveId" -graphBodyHashtable $drivePropertyHash -Verbose:$VerbosePreference
+    }
+function set-graphDriveItem(){
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$driveId
+        ,[parameter(Mandatory = $true)]
+            [string]$driveItemId
+        ,[parameter(Mandatory = $true)]
+            [hashtable]$driveItemPropertyHash = @{}
+        )
+    $validProperties = @("name")
+    $duffProperties = @()
+    $driveItemPropertyHash.Keys | % { #Check the properties we're going to try and update the Drive with are valid:
+        if($validProperties -notcontains $_ ){
+            $duffProperties += $_
+            }
+        }
+
+    if($duffProperties.Count -gt 0){
+        Write-Error -Message "Property(s) [$($duffProperties -join ", ")] is invalild for Graph Drive object. Will not attempt to update."
+        return
+        }
+
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/drives/$driveId/items/$driveItemId" -graphBodyHashtable $driveItemPropertyHash -Verbose:$VerbosePreference
+    
     }
 function set-graphGroupSharedMailboxAccess(){
     [cmdletbinding()]
