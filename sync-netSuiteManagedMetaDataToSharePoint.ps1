@@ -1,4 +1,12 @@
-﻿function get-clientDrives(){
+﻿if($PSCommandPath){
+    $InformationPreference = 2
+    $VerbosePreference = 0
+    $logFileLocation = "C:\ScriptLogs\"
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))`_Transcript_$(Get-Date -Format "yyyy-MM-dd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
+
+function get-clientDrives(){
     #Get the Drives from Graph to compare against
     $sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot
     $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $sharePointBotDetails
@@ -13,32 +21,33 @@
     $allClientDrives
     }
 if($PSCommandPath){
-    $InformationPreference = 2
-    $VerbosePreference = 0
     $logFileLocation = "C:\ScriptLogs\"
     $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))`_Transcript_$(Get-Date -Format "yyyy-MM-dd").log"
     Start-Transcript $transcriptLogName -Append
+    $InformationPreference = "Continue"
+    $VerbosePreference = 2
     }
+$InformationPreference = "Continue"
+$VerbosePreference = 2
 
 $listOfClientFolders = @("_NetSuite automatically creates Opportunity & Project folders","Background","Non-specific BusDev")
 $listOfLeadProjSubFolders = @("Admin & contracts", "Analysis","Data & refs","Meetings","Proposal","Reports","Summary (marketing) - end of project")
 $now = Get-Date
 
-$sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot
+$sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot 
 $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $sharePointBotDetails
 $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
 #$supplierSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,9fb8ecd6-c87d-485d-a488-26fd18c62303"
 #$devSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,8ba7475f-dad0-4d16-bdf5-4f8787838809"
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
 
-Write-Information "sync-netsuiteManagedMetaDataToSharePoint started at [$(Get-Date -Format s)]"
+Write-Host "sync-netsuiteManagedMetaDataToSharePoint started at [$(Get-Date -Format s)]"
 $fullSyncTime = Measure-Command {
     [datetime]$lastSpoSyncRun = $(Get-PnPTerm -TermGroup "Anthesis" -TermSet "IT" -Identity "LastModified" -Includes CustomProperties).CustomProperties.LastSpoSyncRun
-
     #region Clients
     $pnpTermGroup = "Kimble"
     $pnpTermSet = "Clients"
@@ -46,7 +55,7 @@ $fullSyncTime = Measure-Command {
 
     #Filter these client-side (CSOM, eh?) to get only the changes since this script last completed successfully
     [array]$clientTermsToCheck = $allClientTerms | ? {($_.LastModifiedDate -gt $lastSpoSyncRun -or $_.CustomProperties.flagForReprocessing -eq $true) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteId)}
-    Write-Information "Processing [$($clientTermsToCheck.Count)] Clients"
+    Write-Host "Processing [$($clientTermsToCheck.Count)] Clients"
     if($clientTermsToCheck){
         $clientTermsToCheck | % {
             Add-Member -InputObject $_ -MemberType NoteProperty -Name Name2 -Value $($_.Name).Replace("&","").Replace("＆","").Replace("  "," ") -Force
@@ -141,7 +150,7 @@ $fullSyncTime = Measure-Command {
         }
     #Filter these client-side (CSOM, eh?) to get only the changes since this script last completed successfully
     [array]$oppTermsToCheck = $allOppTerms | ? {($_.LastModifiedDate -gt $lastSpoSyncRun -or $_.CustomProperties.flagForReprocessing -eq $true) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteOppId) -and [string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjId)}
-    Write-Information "Processing [$($oppTermsToCheck.Count)] Opportunities"
+    Write-Host "Processing [$($oppTermsToCheck.Count)] Opportunities"
     if($oppTermsToCheck){
         $oppTermsToCheck | % {
             Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveId -Value $($_.CustomProperties.GraphDriveId) -Force
@@ -158,10 +167,10 @@ $fullSyncTime = Measure-Command {
         [array]$flagForReprocessing = @()
         $oppTermsToCheck | % {
             $thisOppTerm = $_
-            Write-Information "Checking Opp Term [$($thisOppTerm.Name)] for CustomProperties.DriveItemId"
+            Write-Host "Checking Opp Term [$($thisOppTerm.Name)] for CustomProperties.DriveItemId"
             if($thisOppTerm.CustomProperties.DriveItemId){
                 $thisClientTerm = $allClientTerms | ? {$_.CustomProperties.NetSuiteId -eq $thisOppTerm.CustomProperties.NetSuiteClientId}
-                Write-Information "`tOpp Term [$($thisOppTerm.Name)].CustomProperties.DriveItemId is [$($thisOppTerm.CustomProperties.DriveItemId)] - setting Folder name to [$($thisOppTerm.Name)]"
+                Write-Host "`tOpp Term [$($thisOppTerm.Name)].CustomProperties.DriveItemId is [$($thisOppTerm.CustomProperties.DriveItemId)] - setting Folder name to [$($thisOppTerm.Name)]"
                 try{
                     $updatedFolder = set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $thisClientTerm.CustomProperties.GraphDriveId -driveItemId $thisOppTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$thisOppTerm.Name}
                     }
@@ -171,7 +180,7 @@ $fullSyncTime = Measure-Command {
                     }
                 }
             else{#If no Opp, Create new folders
-                Write-Information "`tNo DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] found - creating new set of Project folders"
+                Write-Host "`tNo DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] found - creating new set of Project folders"
                 $thisClientTerm = $allClientTerms | ? {$_.CustomProperties.NetSuiteId -eq $thisOppTerm.CustomProperties.NetSuiteClientId}
                 [array]$customisedFolderList = $thisOppTerm.Name
                 $customisedFolderList += $listOfLeadProjSubFolders | % {"$($thisOppTerm.Name)\$_"}
@@ -194,11 +203,11 @@ $fullSyncTime = Measure-Command {
         $oppTermsToCheck | % {
             $thisOppToUpdate = $_
             if($flagForReprocessing -notcontains $thisOppToUpdate){ #If the process above worked as expected, update SharePointLastModifiedDate to prevent it from being re-processed next time
-                Write-Information "[$($thisOppToUpdate.Name)] was processed successfully - updating SharePointLastModifiedDate to [$($now)]"
+                Write-Host "[$($thisOppToUpdate.Name)] was processed successfully - updating SharePointLastModifiedDate to [$($now)]"
                 $thisOppToUpdate.SetCustomProperty("SharePointLastModifiedDate",$now)
                 }
             else{
-                Write-Information "Something went wrong with [$($thisOppToUpdate.Name)] - flagging for reprocessing"
+                Write-Host "Something went wrong with [$($thisOppToUpdate.Name)] - flagging for reprocessing"
                 $thisOppToUpdate.SetCustomProperty("flagForReprocessing",$true)
                 }
             try{
@@ -222,7 +231,7 @@ $fullSyncTime = Measure-Command {
         }
     #Filter these client-side (CSOM, eh?) to get only the changes since this script last completed successfully
     [array]$projTermsToCheck = $allProjTerms | ? {($_.LastModifiedDate -gt $lastSpoSyncRun -or $_.CustomProperties.flagForReprocessing -eq $true) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjId) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteClientId)}
-    Write-Information "Processing [$($projTermsToCheck.Count)] Projects"
+    Write-Host "Processing [$($projTermsToCheck.Count)] Projects"
     if($projTermsToCheck){
         $projTermsToCheck | % {
             Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveId -Value $($_.CustomProperties.GraphDriveId) -Force
@@ -240,11 +249,11 @@ $fullSyncTime = Measure-Command {
         [array]$flagForReprocessing = @()
                                                                                                                                                                                                                                                                         $projTermsToCheck | % {
         $thisProjTerm = $_
-        Write-Information "Checking Project Term [$($thisProjTerm.Name)] for CustomProperties.DriveItemId"
+        Write-Host "Checking Project Term [$($thisProjTerm.Name)] for CustomProperties.DriveItemId"
         if($thisProjTerm.CustomProperties.DriveItemId){        #If DriveItemId, update folder
             try{
                 $thisClientTerm = $allClientTerms | ? {$_.CustomProperties.NetSuiteId -eq $thisProjTerm.CustomProperties.NetSuiteClientId}
-                Write-Information "`tProject Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId is [$($thisProjTerm.CustomProperties.DriveItemId)] - setting Folder name to [$($thisProjTerm.Name)]"
+                Write-Host "`tProject Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId is [$($thisProjTerm.CustomProperties.DriveItemId)] - setting Folder name to [$($thisProjTerm.Name)]"
                 try{
                     $updatedFolder = set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $thisClientTerm.CustomProperties.GraphDriveId -driveItemId $thisProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$thisProjTerm.Name}
                     }
@@ -270,10 +279,10 @@ $fullSyncTime = Measure-Command {
                 }
             }
         else{#If no DriveItemId, Check for Opp
-            Write-Information "`tProject Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId is missing - checking for Opportunity with NetSuiteProjectId -eq [$($thisProjTerm.CustomProperties.NetSuiteProjId)]"
+            Write-Host "`tProject Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId is missing - checking for Opportunity with NetSuiteProjectId -eq [$($thisProjTerm.CustomProperties.NetSuiteProjId)]"
             $thisOppTerm = $allOppTerms | ? {$_.CustomProperties.NetSuiteProjectId -eq $thisProjTerm.Id}
             if(![string]::IsNullOrWhiteSpace($thisOppTerm.CustomProperties.DriveItemId)){#If Opp, update DriveItemId and add to flagForReprocessing (to include in next run)
-                Write-Information "`t`tOpportunity Term [$($thisOppTerm.Name)] found with .CustomProperties.DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] - updating Project Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId to match"
+                Write-Host "`t`tOpportunity Term [$($thisOppTerm.Name)] found with .CustomProperties.DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] - updating Project Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId to match"
                 $thisProjTerm.SetCustomProperty("DriveItemId",$thisOppTerm.CustomProperties.DriveItemId)
                 try{
                     Write-Verbose "`tTrying: [$($thisProjTerm.Name)].SetCustomProperty(DriveItemId,[$($updatedFolder.id)])"
@@ -286,7 +295,7 @@ $fullSyncTime = Measure-Command {
                     }
                 }
             else{#If no Opp, Create new folders
-                Write-Information "`t`tNo corresponding Opportunity Term [$($thisOppTerm.Name)] or DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] found - creating new set of Project folders"
+                Write-Host "`t`tNo corresponding Opportunity Term [$($thisOppTerm.Name)] or DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] found - creating new set of Project folders"
                 $thisClientTerm = $allClientTerms | ? {$_.CustomProperties.NetSuiteId -eq $thisProjTerm.CustomProperties.NetSuiteClientId}
                 [array]$customisedFolderList = $thisProjTerm.Name
                 $customisedFolderList += $listOfLeadProjSubFolders | % {"$($thisProjTerm.Name)\$_"}
@@ -309,7 +318,7 @@ $fullSyncTime = Measure-Command {
         $projTermsToCheck | % {
             $thisProjToUpdate = $_
             if($flagForReprocessing -notcontains $thisProjToUpdate){ #If the process above worked as expected, update SharePointLastModifiedDate to prevent it from being re-processed next time
-                Write-Information "[$($thisProjToUpdate.Name)] was processed successfully - updating flagForReprocessing to [$false]"
+                Write-Host "[$($thisProjToUpdate.Name)] was processed successfully - updating flagForReprocessing to [$false]"
                 $thisProjToUpdate.SetCustomProperty("flagForReprocessing",$false)
                 }
             else{
@@ -332,7 +341,7 @@ $fullSyncTime = Measure-Command {
 
     ###########################################
     #If the script hasn't borked completely, update the LastSpoSyncRun timestamp
-    Write-Information "Setting Term [Anthesis][IT][LastModified] CustomProperty LastSpoSyncRun = [$(Get-Date $now -f s)]"
+    Write-Host "Setting Term [Anthesis][IT][LastModified] CustomProperty LastSpoSyncRun = [$(Get-Date $now -f s)]"
     $lastProcessedTerm = Get-PnPTerm -TermGroup "Anthesis" -TermSet "IT" -Identity "LastModified" -Includes CustomProperties
     $lastProcessedTerm.SetCustomProperty("LastSpoSyncRun",$(Get-Date $now -f s))
     try{
@@ -345,6 +354,6 @@ $fullSyncTime = Measure-Command {
 
     }
 
-Write-Information "sync-netsuiteManagedMetaDataToSharePoint completed in [$($fullSyncTime.TotalSeconds)] seconds"
+Write-Host "sync-netsuiteManagedMetaDataToSharePoint completed in [$($fullSyncTime.TotalSeconds)] seconds"
 
 Stop-Transcript

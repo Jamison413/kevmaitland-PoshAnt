@@ -961,7 +961,7 @@ function invoke-netSuiteRestMethod(){
 
     Write-Verbose "Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $(stringify-hashTable $netsuiteRestHeaders) -Method $requestType -ContentType application/swagger+json -Body $(stringify-hashTable $requestBodyHashTable)"
     if($requestType -eq "GET"){
-        $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json"
+        $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json" #-Proxy 'http://127.0.0.1:8888'
         if($partialDataset.totalResults -ne $partialDataset.count){ #If the query has been paginated
             if($partialDataset.offset -eq 0){
                 $fullDataSet = New-Object object[] $partialDataSet.totalResults

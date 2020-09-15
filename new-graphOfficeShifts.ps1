@@ -90,8 +90,8 @@ $offices += [ordered]@{
     OfficeDesks=4
     }
 
-#$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
-$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
+$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
+#$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
 $msAppActsAsUserId = "36bc6f20-feed-422d-b2f2-7758e9708604"
 $standardShiftNotes = "Remember to sign in/out with the Blip! App, and use hand sanitiser when entering/exiting the office please"
 

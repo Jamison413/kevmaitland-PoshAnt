@@ -12,7 +12,7 @@ $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desk
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
 
-Write-Information "sync-netsuiteToManagedMetaData started at $(Get-Date -Format s)"
+Write-Host "sync-netsuiteToManagedMetaData started at $(Get-Date -Format s)"
 $fullSyncTime = Measure-Command {
     #region Prospects/Clients
     $pnpTermGroup = "Kimble"
@@ -26,12 +26,12 @@ $fullSyncTime = Measure-Command {
     [datetime]$lastProcessed = $($allClientTerms | sort {$_.CustomProperties.NetSuiteLastModifiedDate} | select -Last 1).CustomProperties.NetSuiteLastModifiedDate
 
     $netQuery =  "?q=companyName CONTAIN_NOT `"Anthesis`"" #Excludes any Companies with "Anthesis" in the companyName
-    $netQuery += " AND companyName CONTAIN_NOT `"(intercompany project)`"" #Excludes any Companies with "(intercompany project)" in the companyName
+    $netQuery += " AND companyName CONTAIN_NOT `"intercompany project`"" #Excludes any Companies with "(intercompany project)" in the companyName
     $netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
     $netQuery += " AND entityStatus ANY_OF_NOT [6, 7]" #Excludes LEAD-Unqualified and LEAD-Qualified (https://XXX.app.netsuite.com/app/crm/sales/customerstatuslist.nl?whence=)
     $netQuery += " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $lastProcessed -Format g).Split(" ")[0])`"" #Excludes any Companies that haven;t been updated since X
-    [array]$clientsToCheck = get-netSuiteClientsFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production)
-    Write-Information "Processing [$($clientsToCheck.Count)] Clients"
+    [array]$clientsToCheck = get-netSuiteClientsFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production) -Verbose
+    Write-Host "Processing [$($clientsToCheck.Count)] Clients"
     #$clientsToCheck = $clientsToCheck | ? {$_.entityStatus.refName -notmatch "LEAD"} #Filter out Leads
     $clientsToCheck | % { #Set the objects up so they are easy to compare
         Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.id -Force
@@ -55,7 +55,7 @@ $fullSyncTime = Measure-Command {
     $missingFromMmd = $deltaClientId | ? {$_.SideIndicator -eq "<="}
     $missingFromMmd | % { #If no Id match, then create new Client Term and flag for reprocessing
         $thisNewClient = $_
-        Write-Information "Creating new Client Term for [$($thisNewClient.companyName)]"
+        Write-Host "Creating new Client Term for [$($thisNewClient.companyName)]"
         $testForCollision = $allClientTerms | ? {$_.Name2 -eq $thisNewClient.Name2}
         if($testForCollision){#If Term exists, back up any out-of-date NetSuiteId value and re-use the Term and flag for reprocessing
             Write-Warning "There is already a term with the same default label and parent term [$($thisNewClient.companyName)] - cannot create new Client Term."
@@ -67,8 +67,24 @@ $fullSyncTime = Measure-Command {
                 $testForCollision.SetCustomProperty("NetSuiteId",$thisNewClient.id) #Set the correct NEtsuiteId
                 $testForCollision.SetCustomProperty("flagForReprocessing",$true) #Set the flag for reprocessing so this Term gets processed into SharePoint
                 try{
-                    Write-Information "Reusing existing Term [$($testForCollision.Name)]and updating CCustomProperties"
+                    Write-Host "Reusing existing Term [$($testForCollision.Name)]and updating CCustomProperties"
                     Write-Verbose "`tTrying: [$($testForCollision.Name)].SetCustomProperty(NetSuiteId_overwritten$i,[$($testForCollision.CustomProperties.NetSuiteId)]) & SetCustomProperty(NetSuiteId,$($thisNewClient.id)) & SetCustomProperty(flagForReprocessing,$true)"
+                    $testForCollision.Context.ExecuteQuery()
+                    }
+                catch{
+                    Write-Error "Error `"backing up`" an old NetSuiteId value [$($testForCollision.CustomProperties.NetSuiteId))] to [NetSuiteId_overwritten$i] for Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisNewClient.companyName)] in sync-netsuiteToManagedMetaData()"
+                    [array]$doNotUpdateLastModified += $thisNewClient
+                    [array]$bigProblems += ,@($thisNewClient,$testForCollision,"Error `"backing up`" an old NetSuiteId value [$($testForCollision.CustomProperties.NetSuiteId))] to [NetSuiteId_overwritten$i] for Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisNewClient.companyName)] in sync-netsuiteToManagedMetaData()")
+                    $_
+                    continue #If we can't backup the odl NetSuiteId value, skip over of this Client
+                    }
+                }
+            else{#Just update NetSuiteId with the correct value
+                $testForCollision.SetCustomProperty("NetSuiteId",$thisNewClient.id) #Set the correct NEtsuiteId
+                $testForCollision.SetCustomProperty("flagForReprocessing",$true) #Set the flag for reprocessing so this Term gets processed into SharePoint
+                try{
+                    Write-Host "Reusing existing Term [$($testForCollision.Name)] (which didn't have a NetsuiteID)"
+                    Write-Verbose "`tTrying: [$($testForCollision.Name)].SetCustomProperty(NetSuiteId,$($thisNewClient.id)) & SetCustomProperty(flagForReprocessing,$true)"
                     $testForCollision.Context.ExecuteQuery()
                     }
                 catch{
@@ -82,7 +98,7 @@ $fullSyncTime = Measure-Command {
             }
         else{#If Term does not exist, create new Client Term and flag for reprocessing
             try{
-                Write-Information "Creating new Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisNewClient.companyName)][@{NetSuiteId=$($thisNewClient.id);NetSuiteLastModifiedDate=$($thisNewClient.lastModifiedDate);flagForReprocessing=$true]"
+                Write-Host "Creating new Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisNewClient.companyName)][@{NetSuiteId=$($thisNewClient.id);NetSuiteLastModifiedDate=$($thisNewClient.lastModifiedDate);flagForReprocessing=$true]"
                 Write-Verbose "`tTrying: New-PnPTerm -TermGroup [$pnpTermGroup] -TermSet [$pnpTermSet] -Name [$($thisNewClient.companyName)] -Lcid 1033 -CustomProperties @{NetSuiteId=$($thisNewClient.id);NetSuiteLastModifiedDate=$($thisNewClient.lastModifiedDate);flagForReprocessing=$true"
                 $newTerm = New-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Name $thisNewClient.companyName -Lcid 1033 -CustomProperties @{NetSuiteId=$thisNewClient.id;NetSuiteLastModifiedDate=$thisNewClient.lastModifiedDate;flagForReprocessing=$true}
                 }
@@ -104,10 +120,10 @@ $fullSyncTime = Measure-Command {
     $clientsWithChangedNames = $deltaName | ? {$_.SideIndicator -eq "<="}
     $clientsWithChangedNames | % {
         $thisUpdatedClient = $_
-        Write-Information "Company name [$($thisUpdatedClient.companyName)][$($thisUpdatedClient.id)] seems to have changed. Investigating further."
+        Write-Host "Company name [$($thisUpdatedClient.companyName)][$($thisUpdatedClient.id)] seems to have changed. Investigating further."
         $termWithWrongName = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedClient.NetSuiteId}
         if ($termWithWrongName.Count -eq 1){
-            Write-Information "`tRenaming Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)] to [$($thisUpdatedClient.companyName)]"
+            Write-Host "`tRenaming Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)] to [$($thisUpdatedClient.companyName)]"
             $termWithWrongName_originalName = $termWithWrongName.Name
             $termWithWrongName.Name = $thisUpdatedClient.companyName
             try{
@@ -122,7 +138,7 @@ $fullSyncTime = Measure-Command {
                     $duffTermToMergeIntoGoodTerm = $allClientTerms | ? {$_.Name2 -eq $thisUpdatedClient.Name2 -and $_.Id -ne $termWithWrongName.id}
                     if($duffTermToMergeIntoGoodTerm){ #If there's another Term, merge them
                         try{
-                            Write-Information "`t`tMerging Terms -termToBeRetained [$($termWithWrongName.Name)] -termToBeMerged [$($duffTermToMergeIntoGoodTerm.Name)] -pnpTermGroup $pnpTermGroup -pnpTermSet $pnpTermSet"
+                            Write-Host "`t`tMerging Terms -termToBeRetained [$($termWithWrongName.Name)] -termToBeMerged [$($duffTermToMergeIntoGoodTerm.Name)] -pnpTermGroup $pnpTermGroup -pnpTermSet $pnpTermSet"
                             Write-Verbose "`tTrying: merge-pnpTerms -termToBeRetained [$($termWithWrongName.Name)] -termToBeMerged [$($duffTermToMergeIntoGoodTerm.Name)] -setDefaultLabelTo Merged -pnpTermGroup $pnpTermGroup -pnpTermSet $pnpTermSet -Verbose:$VerbosePreference"
                             merge-pnpTerms -termToBeRetained $termWithWrongName -termToBeMerged $duffTermToMergeIntoGoodTerm -setDefaultLabelTo Merged -pnpTermGroup $pnpTermGroup -pnpTermSet $pnpTermSet -Verbose:$VerbosePreference
                             }
@@ -133,7 +149,7 @@ $fullSyncTime = Measure-Command {
                             }
                         }
                     else{#If there isn't another Term, they've probably already been merged, so try relabelling it.
-                        Write-Information "Setting default Label to [$($thisUpdatedClient.companyName)] for Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)]"
+                        Write-Host "Setting default Label to [$($thisUpdatedClient.companyName)] for Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)]"
                         $i=0
                         do{ #CSOM Voodoo 
                             if($i -eq 0){$updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $termWithWrongName.Id -Includes CustomProperties, Labels} #Refresh the Term to ensure we've got the correct Labels
@@ -163,7 +179,7 @@ $fullSyncTime = Measure-Command {
                 elseif($_.Exception -match "TermStoreEx:Failed to read from or write to database. Refresh and try again. If the problem persists, please contact the administrator."){
                     Write-Warning "Failed to read from or write to database. Refresh and try again. [$($termWithWrongName_originalName)]->[$($thisUpdatedClient.companyName)]"
                     #If there isn't another Term, they've probably already been merged, so try relabelling it.
-                    Write-Information "Setting default Label to [$($thisUpdatedClient.companyName)] for Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)]"
+                    Write-Host "Setting default Label to [$($thisUpdatedClient.companyName)] for Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)]"
                     $i=0
                     do{#CSOM Voodoo
                         if($i -eq 0){$updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $termWithWrongName.Id -Includes CustomProperties, Labels} #Refresh the Term to ensure we've got the correct Labels
@@ -212,7 +228,7 @@ $fullSyncTime = Measure-Command {
             $updatedTerm = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $thisClientToUpdate.companyName -Includes CustomProperties, Labels
             if($updatedTerm){ 
                 $updatedTerm.SetCustomProperty("NetSuiteLastModifiedDate",$thisClientToUpdate.lastModifiedDate)
-                Write-Information "[$($thisClientToUpdate.companyName)] was processed successfully - updating NetSuiteLastModifiedDate to [$($thisClientToUpdate.lastModifiedDate)]"
+                Write-Host "[$($thisClientToUpdate.companyName)] was processed successfully - updating NetSuiteLastModifiedDate to [$($thisClientToUpdate.lastModifiedDate)]"
                 try{
                     Write-Verbose "`tTrying: [$($updatedTerm.Name)][$($updatedTerm.Id)].SetCustomProperty(NetSuiteLastModifiedDate,$($thisClientToUpdate.lastModifiedDate))"
                     $updatedTerm.Context.ExecuteQuery()
@@ -245,8 +261,8 @@ $fullSyncTime = Measure-Command {
     [datetime]$lastProcessed = $($allOppTerms | sort {$_.CustomProperties.NetSuiteOppLastModifiedDate} | select -Last 1).CustomProperties.NetSuiteOppLastModifiedDate
 
     $netQuery =  "?q=lastModifiedDate ON_OR_AFTER `"$($(Get-Date $lastProcessed -Format g).Split(" ")[0])`"" #Excludes any Opps that haven;t been updated since X
-    [array]$oppsToCheck = get-netSuiteOpportunityFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production) 
-    Write-Information "Processing [$($oppsToCheck.Count)] Opportunities"
+    [array]$oppsToCheck = get-netSuiteOpportunityFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production)
+    Write-Host "Processing [$($oppsToCheck.Count)] Opportunities"
     #$oppsToCheck = get-netSuiteOpportunityFromNetSuite -netsuiteParameters $(get-netSuiteParameters -connectTo Production) 
     $oppsToCheck | % { #Set the objects up so they are easy to compare
         Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.id -Force
@@ -296,7 +312,7 @@ $fullSyncTime = Measure-Command {
             }
         else{
             try{
-                Write-Information "Creating new Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisOppLabel)][@{NetSuiteOppId=$($thisNewOpp.id);NetSuiteOppLastModifiedDate=$($thisNewOpp.lastModifiedDate);flagForReprocessing=$true]"
+                Write-Host "Creating new Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisOppLabel)][@{NetSuiteOppId=$($thisNewOpp.id);NetSuiteOppLastModifiedDate=$($thisNewOpp.lastModifiedDate);flagForReprocessing=$true]"
                 Write-Verbose "`tTrying: New-PnPTerm -TermGroup [$pnpTermGroup] -TermSet [$pnpTermSet] -Name [$($thisOppLabel)] -Lcid 1033 -CustomProperties @{NetSuiteOppId=$($thisNewOpp.id);NetSuiteOppLastModifiedDate=$($thisNewOpp.lastModifiedDate);NetSuiteClientId=$($thisNewOpp.entity.id);NetSuiteProjectId=$($thisNewOpp.custbody_project_created.id);flagForReprocessing=$true}"
                 $newTerm = New-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Name $thisOppLabel -Lcid 1033 -CustomProperties @{NetSuiteOppId=$thisNewOpp.id;NetSuiteOppLastModifiedDate=$thisNewOpp.lastModifiedDate;NetSuiteClientId=$thisNewOpp.entity.id;NetSuiteProjectId=$thisNewOpp.custbody_project_created.id;flagForReprocessing=$true}
                 }
@@ -314,30 +330,30 @@ $fullSyncTime = Measure-Command {
     $matchedId = $deltaOppId | ? {$_.SideIndicator -eq "=="}
     $matchedIdReversed = Compare-Object -ReferenceObject $allOppTerms -DifferenceObject @($matchedId | Select-Object) -Property NetSuiteId -PassThru -IncludeEqual -ExcludeDifferent #We then use $matchedId to filter only the Terms with corresponding $clientsToCheck records
         <#Sanity check - these should produce identical results, (but weirdly you have to run them separately). CSOM, eh?:
-        $matchedId | sort NetSuiteId | select entityid -First 10
-        $matchedIdReversed | sort NetSuiteId | select Name -First 10
+        $matchedId | sort NetSuiteId | select Name2 -Last 10
+        $matchedIdReversed | sort NetSuiteId | select Name -Last 10
         #>
-    $deltaName = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,Name2 -PassThru #We compare the two equal sets on both NetSuiteId and Name2 to see which pairs have mismatched Name values
+    $deltaName = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,Name2 -PassThru -IncludeEqual #We compare the two equal sets on both NetSuiteId and Name2 to see which pairs have mismatched Name values
     $oppsWithChangedNames = $deltaName | ? {$_.SideIndicator -eq "<="}
     $oppsWithChangedNames | % {
         $thisUpdatedOpp = $_
-        Write-Information "Project name [$($thisUpdatedOpp.entityid)][$($thisUpdatedOpp.id)] seems to have changed. Investigating further."
+        Write-Host "Opp name [$($thisUpdatedOpp.tranId) $($thisUpdatedOpp.title)][$($thisUpdatedOpp.id)] seems to have changed. Investigating further."
         $termWithWrongName = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedOpp.NetSuiteId}
         if ($termWithWrongName.Count -eq 1){
-            Write-Verbose "Renaming Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)] to [$($thisUpdatedOpp.entityid)]"
+            Write-Verbose "Renaming Term [$($termWithWrongName.Name)][$($termWithWrongName.Id)] to [$($termWithWrongName.Name)][$($termWithWrongName.Id)]"
             $termWithWrongName_originalName = $termWithWrongName.Name
-            $termWithWrongName.Name = $thisUpdatedOpp.entityid
+            $termWithWrongName.Name = "$($thisUpdatedOpp.tranId) $($thisUpdatedOpp.title)"
             try{
-                Write-Verbose "`tTrying: [$($termWithWrongName_originalName)].Name = [$($thisUpdatedOpp.entityid)]"
+                Write-Verbose "`tTrying: [$($termWithWrongName_originalName)].Name = [$($termWithWrongName.Name)][$($termWithWrongName.Id)]"
                 $termWithWrongName.Context.ExecuteQuery()
                 }
             catch {
-                Write-Error "Error renaming Term [$($termWithWrongName_originalName)] to [$($thisUpdatedOpp.entityid)] in sync-netsuiteToManagedMetaData()"
+                Write-Error "Error renaming Term [$($termWithWrongName_originalName)] to [$($termWithWrongName.Name)][$($termWithWrongName.Id)] in sync-netsuiteToManagedMetaData()"
                 [array]$doNotUpdateLastModified += $thisUpdatedOpp
                 }
             }
         else{
-             Write-Warning "Could not find corresponding Term for updated NetSuite Opp [$($thisUpdatedOpp.entityid)][$($thisUpdatedOpp.id)]"
+             Write-Warning "Could not find corresponding Term for updated NetSuite Opp [$($termWithWrongName.Name)][$($termWithWrongName.Id)][$($thisUpdatedOpp.id)]"
              [array]$doNotUpdateLastModified += $thisUpdatedOpp
             }    
         }
@@ -346,7 +362,7 @@ $fullSyncTime = Measure-Command {
     $oppsWithChangedClient = $deltaClientId | ? {$_.SideIndicator -eq "<="}
     $oppsWithChangedClient | % {
         $thisUpdatedOpp = $_
-        Write-Verbose "Project [$($thisUpdatedOpp.entityid)][$($thisUpdatedOpp.id)] seems to have been assigned to a new Client. Investigating further."
+        Write-Verbose "Opps [$($termWithWrongName.Name)][$($termWithWrongName.Id)][$($thisUpdatedOpp.id)] seems to have been assigned to a new Client. Investigating further."
         $termWithWrongClient = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedOpp.NetSuiteId}
         if ($termWithWrongClient.Count -eq 1){
             Write-Verbose "Reassigning Project Term [$($termWithWrongClient.Name)][$($termWithWrongClient.Id)] to Client [$($thisUpdatedOpp.parent.id)]"
@@ -365,7 +381,7 @@ $fullSyncTime = Measure-Command {
                 }
             }
         else{
-             Write-Warning "Could not find corresponding Term for updated NetSuite Project [$($thisUpdatedOpp.entityid)][$($thisUpdatedOpp.id)]"
+             Write-Warning "Could not find corresponding Term for updated NetSuite Project [$($termWithWrongName.Name)][$($termWithWrongName.Id)][$($thisUpdatedOpp.id)]"
              [array]$doNotUpdateLastModified += $thisUpdatedOpp
             }    
         }
@@ -407,7 +423,7 @@ $fullSyncTime = Measure-Command {
     $netQuery =  "?q=lastModifiedDate ON_OR_AFTER `"$($(Get-Date $lastProcessed -Format g).Split(" ")[0])`"" #Excludes any Companies that haven;t been updated since X
     #$netQuery += " AND custentity_ant_projectsector IS_NOT `"Intercompany`"" #Excludes any Companies with "(intercompany project)" in the companyName
     [array]$projToCheck = get-netSuiteProjectFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production) 
-    Write-Information "Processing [$($projToCheck.Count)] Projects"
+    Write-Host "Processing [$($projToCheck.Count)] Projects"
     #$projToCheck = get-netSuiteProjectFromNetSuite -netsuiteParameters $(get-netSuiteParameters -connectTo Production)    ##GET ALL PROJECTS
     $projToCheck = $projToCheck | ? {$_.custentity_ant_projectsector -ne "Intercompany"}   #Fix this after Go LIVE
     $projToCheck | % { #Set the objects up so they are easy to compare-object
@@ -553,5 +569,5 @@ $fullSyncTime = Measure-Command {
     #endregion
 
     }
-Write-Information "sync-netsuiteToManagedMetaData completed in [$($fullSyncTime.TotalSeconds)] seconds"
+Write-Host "sync-netsuiteToManagedMetaData completed in [$($fullSyncTime.TotalSeconds)] seconds"
 Stop-Transcript
