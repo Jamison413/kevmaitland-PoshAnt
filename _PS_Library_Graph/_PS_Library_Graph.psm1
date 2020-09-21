@@ -288,6 +288,19 @@ function delete-graphListItem(){
         #Need to expand to allow for ListName and SiteName as well as the Id's (to match other functions here)
         invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "sites/$graphSiteId/lists/$graphListId/items/$graphItemId"  -Verbose:$VerbosePreference
 }
+function delete-graphCalendarEvent(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userId
+        ,[parameter(Mandatory = $true)]
+            [string]$eventId
+        )
+    Write-Verbose "delete-graphCalendarEvent | $($eventId)"
+    invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/$eventId" -Verbose:$VerbosePreference
+}
 function get-groupAdminRoleEmailAddresses(){
     [CmdletBinding()]
     param(
@@ -424,6 +437,19 @@ function get-graphAuthCode() {
         }
     $output
     }
+function get-graphCalendarEvent(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userId
+        ,[parameter(Mandatory = $false)]
+            [string]$eventId
+        )
+    #Write-Verbose "get-graphCalendarEvent | $($eventId)"
+    invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/" -Verbose:$VerbosePreference
+}
 function get-graphDevices(){
     [cmdletbinding()]
     param(
@@ -1016,6 +1042,25 @@ function get-graphShiftOpenShiftChangeRequests(){
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShiftChangeRequests?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose
     
     }
+function get-graphShiftofferShiftRequests(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$MsAppActsAsUserId
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet(“approved”,”pending”,"declined")]
+            [string]$requestState
+        )
+    
+    if($requestState){$filter += "`$filter = state eq '$requestState'"}
+
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/offerShiftRequests?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose
+    
+}
 function get-graphSite(){
     [cmdletbinding()]
     param(

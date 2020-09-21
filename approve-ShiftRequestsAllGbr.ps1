@@ -19,7 +19,7 @@ $tokenResponseShiftBot = get-graphTokenResponse -grant_type client_credentials -
 #Write-Verbose "Access Token: [$($tokenResponseShiftBot.access_token)]"
 
 $allShifts = get-graphShiftOpenShifts -tokenResponse $tokenResponseShiftBot -teamId $teamId -MsAppActsAsUserId $msAppActsAsUserId #Swap this shit out when openShifts supports filtering on id
-$pendingRequests = get-graphShiftOpenShiftChangeRequests -tokenResponse $tokenResponseshiftBot -teamId $teamId -MsAppActsAsUserId "36bc6f20-feed-422d-b2f2-7758e9708604" -requestState pending -Verbose:$VerbosePreference
+$pendingRequests = get-graphShiftOpenShiftChangeRequests -tokenResponse $tokenResponseshiftBot -teamId $teamId -MsAppActsAsUserId $msAppActsAsUserId -requestState pending -Verbose:$VerbosePreference
 if($pendingRequests){
     Write-Verbose $pendingRequests
     $pendingRequests | % {
