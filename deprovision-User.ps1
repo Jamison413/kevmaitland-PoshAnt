@@ -174,6 +174,7 @@ foreach($user in $upnsToDeactivate){
     if($user){
         $userExoObject = Get-User -Identity $user
         $userAadObject = Get-AzureADUser -SearchString $user.Replace("@anthesisgroup.com","")
+        $userMsolObject = Get-MsolUser -UserPrincipalName $user
         if($userExoObject.DistinguishedName -ne $null){
             write-host "Disabling $($userExoObject.DisplayName)"
             Set-MsolUser -UserPrincipalName $userExoObject.UserPrincipalName -BlockCredential $true
