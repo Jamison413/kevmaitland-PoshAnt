@@ -39,7 +39,7 @@
         $folderName = Split-Path $_ -Leaf
         if($folderName -eq $_){ #If it is _just_ a folder (i.e. not a subfolder), just create it
             try{
-                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -Verbose:$VerbosePreference -ErrorAction Stop
+                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -ErrorAction Stop
                 $driveItemsToReturn += $newFolder
                 }
             catch{
@@ -53,7 +53,7 @@
         else{ #If it _is_ a subfolder, we also need to supply the relative path (and invoke-graphGet doesn't like a $null value for -relativePathToFolder)
             try{
                 $relativePath = Split-Path $_ -Parent
-                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -Verbose:$VerbosePreference -ErrorAction Stop -relativePathToFolder $([uri]::EscapeDataString($relativePath))
+                $newFolder = add-graphFolderToDrive -graphDriveId $graphDriveId -folderName $folderName -tokenResponse $tokenResponse -conflictResolution $conflictResolution -ErrorAction Stop -relativePathToFolder $([uri]::EscapeDataString($relativePath))
                 $driveItemsToReturn += $newFolder
                 }
             catch{
@@ -130,7 +130,7 @@ function add-graphFolderToDrive(){
     if($useRelativePath){$graphQuery = "/drives/$graphDriveId/root:/$relativePathToFolder`:/children".Replace("root:/:/","root:/")}
     else{$graphQuery = "/drives/$graphDriveId/items/$parentItemId/children".Replace("items/root","root")}
     Write-Verbose $graphQuery
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery $graphQuery -graphBodyHashtable $folderHash -Verbose:$VerbosePreference
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery $graphQuery -graphBodyHashtable $folderHash
     }
 function add-graphLicenseToUser(){
     [cmdletbinding()]
@@ -183,7 +183,7 @@ function add-graphLicenseToUser(){
         "removeLicenses"=$licensesToRemove
         }
 
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable -Verbose:$VerbosePreference
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable
     }
 function add-graphUsersToGroup(){
     [cmdletbinding()]
@@ -210,7 +210,7 @@ function add-graphUsersToGroup(){
 
     $graphUserIds | % {
         $bodyHash = @{"@odata.id"="https://graph.microsoft.com/v1.0/directoryObjects/$_"}
-        invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/`$ref" -graphBodyHashtable $bodyHash -Verbose:$VerbosePreference
+        invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/`$ref" -graphBodyHashtable $bodyHash
         }
     }
 function add-graphWebsiteTabToChannel(){
@@ -267,10 +267,10 @@ function delete-graphDriveItem(){
     
     if($eTag){
         $deleteBody = @{"if-match"=$eTag}
-        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/items/$graphDriveItemId" -graphBodyHashtable $deleteBody -Verbose:$VerbosePreference
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/items/$graphDriveItemId" -graphBodyHashtable $deleteBody
         }
     else{
-        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/items/$graphDriveItemId"  -Verbose:$VerbosePreference
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/items/$graphDriveItemId" 
         }
     }
 function delete-graphListItem(){
@@ -286,7 +286,7 @@ function delete-graphListItem(){
             [string]$graphItemId
         )
         #Need to expand to allow for ListName and SiteName as well as the Id's (to match other functions here)
-        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "sites/$graphSiteId/lists/$graphListId/items/$graphItemId"  -Verbose:$VerbosePreference
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "sites/$graphSiteId/lists/$graphListId/items/$graphItemId" 
 }
 function get-groupAdminRoleEmailAddresses(){
     [CmdletBinding()]
@@ -474,7 +474,7 @@ function get-graphDevices(){
 
     Write-Verbose "Graph Query = [/devices$refiner]"
     try{
-        $allDevices = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/devices$refiner" -Verbose:$VerbosePreference
+        $allDevices = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/devices$refiner"
         }
     catch{
         Write-Error "Error retrieving Graph Devices in get-graphDevices() using query [/devices$refiner]"
@@ -511,47 +511,32 @@ function get-graphDriveItems(){
             [string]$driveGraphId
         ,[parameter(Mandatory = $true,ParameterSetName = "itemId")]
             [string]$itemGraphId = "root"
+        ,[parameter(Mandatory = $true,ParameterSetName = "root")]
+            [parameter(Mandatory = $true,ParameterSetName = "itemId")]
+            [parameter(Mandatory = $true,ParameterSetName = "path")]
+            [ValidateSet("Item","Children")]
+            [string]$returnWhat
         ,[parameter(Mandatory = $true,ParameterSetName = "path")]
             [string]$folderPathRelativeToRoot
         )
     
+    if($returnWhat -eq "Children"){$getChildren = "/children"}
+
     switch ($PsCmdlet.ParameterSetName){ 
         "root" {
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root/children"
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root$getChildren" #-ErrorAction $ErrorActionPreference
             return
             }
         "itemId" { 
-            #Write-Verbose "get-graphDrives | Getting GroupId from UPN [$teamUpn]"
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/items/$itemGraphId/children"
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/items/$itemGraphId$getChildren" #-ErrorAction $ErrorActionPreference
             return
             }
         "path" { 
-            #Write-Verbose "get-graphDrives | Getting GroupId from UPN [$teamUpn]"
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root:/$folderPathRelativeToRoot`:/children"
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root:/$folderPathRelativeToRoot`:$getChildren" #-ErrorAction $ErrorActionPreference
             return
             }
         }
     
-    #Now build the refiner based on the other paramters supplied
-    if($filterDriveName){
-        $filter += " and name eq '$filterDriveName'"
-        }
-    if(![string]::IsNullOrWhiteSpace($filter)){
-        if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
-        $filter = "`$filter=$filter"
-        }
-
-    $refiner = "?"+$select
-    if($filter){
-        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
-        $refiner = $refiner+$filter
-        }    
-    if($refiner.Length -gt 1){$query = $query+[uri]::EscapeDataString($refiner)}
-
-    #Finally, submit the query and return the results
-    $drives = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $query
-    $drives
-
     }
 function get-graphDrives(){
      [cmdletbinding()]
@@ -673,7 +658,7 @@ function get-graphGroups(){
 
     switch ($PsCmdlet.ParameterSetName){
         “explicit”  {
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$filterId$select" -Verbose:$VerbosePreference
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$filterId$select"
             return
             }
         }
@@ -707,7 +692,7 @@ function get-graphGroups(){
     Write-Verbose "`$select = $select"
     Write-Verbose "`$refiner = $refiner"
 
-    $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups$refiner" -Verbose:$VerbosePreference
+    $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups$refiner"
 
     if($filterGroupType -eq "MailEnabledSecurity" -or $filterGroupType -eq "Distribution"){
         $results | ? {$_.groupTypes -notcontains "Unified"} | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name ExternalDirectoryObjectId -Value $_.id}
@@ -819,7 +804,7 @@ function get-graphIntuneDevices(){
 
     Write-Verbose "Graph Query = [/deviceManagement/managedDevices$refiner]"
     try{
-        $allIntuneDevices = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/deviceManagement/managedDevices$refiner" -Verbose:$VerbosePreference
+        $allIntuneDevices = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/deviceManagement/managedDevices$refiner"
         }
     catch{
         Write-Error "Error retrieving Graph Intune Devices in get-graphIntuneDevices() using query [/deviceManagement/managedDevices$refiner]"
@@ -888,7 +873,7 @@ function get-graphList(){
             Write-Verbose "get-graphList | ListId [$listId]"
             }
         }
-    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists$ListId$filter" -Verbose:$VerbosePreference
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists$ListId$filter"
 
     }
 function get-graphListItems(){
@@ -937,7 +922,7 @@ function get-graphListItems(){
     #Special case for Filter-by-Id as it expicitly requests a single result
     if($filterId){
         Write-Verbose "get-graphListItems | Requesting ListItem by Id [$filterId]"
-        invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$filterId" -Verbose:$VerbosePreference
+        invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$filterId"
         return
         }
 
@@ -955,7 +940,7 @@ function get-graphListItems(){
         $refiner = $refiner+$expand
         }
 
-    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items$refiner" -Verbose:$VerbosePreference
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items$refiner"
 
     }
 function get-graphMailboxSettings(){
@@ -994,7 +979,7 @@ function get-graphShiftOpenShifts(){
     if($filterIds){$filter += "`$filter=id in (`'$($filterIds -join "','")`')"}
     if($filterId){$filter += "`$filter=id eq '$filterId')"}
 
-    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose:$VerbosePreference
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId}
     
     }
 function get-graphShiftOpenShiftChangeRequests(){
@@ -1033,11 +1018,11 @@ function get-graphSite(){
             $sanitisedServerRelativeUrl = $serverRelativeUrl.Replace("https://","").Replace("anthesisllc.sharepoint.com","").Replace(":","").Replace("//","/")
             if($sanitisedServerRelativeUrl.Substring(0,1) -ne "/"){$sanitisedServerRelativeUrl = "/" + $sanitisedServerRelativeUrl}
             Write-Verbose "get-graphSite | Getting Site from URL [$sanitisedServerRelativeUrl][$serverRelativeUrl]"
-            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/anthesisllc.sharepoint.com:$sanitisedServerRelativeUrl" -Verbose:$VerbosePreference
+            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/anthesisllc.sharepoint.com:$sanitisedServerRelativeUrl"
             }
         "IdLonger" { #If we're working with $siteUrl, we'll need to get $siteGraphId (which is more of a faff)
             Write-Verbose "get-graphSite | Getting SiteId from URL [$siteUrl]"
-            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId"  -Verbose:$VerbosePreference
+            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId" 
             }       
         }
 
@@ -1200,7 +1185,7 @@ function get-graphUsers(){
 
     Write-Verbose "Graph Query = [users$refiner]"
     try{
-        $allUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users$refiner" -Verbose:$VerbosePreference
+        $allUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users$refiner"
         }
     catch{
         Write-Error "Error retrieving Graph Users in get-graphUsers() using query [users$refiner]"
@@ -1243,7 +1228,7 @@ function get-graphUsersFromGroup(){
     switch ($PsCmdlet.ParameterSetName){
         “groupUpn”  {
             Write-Verbose "We've been given a GroupUPN, so we need the GroupId"
-            $graphGroup = get-graphGroups -tokenResponse $tokenResponse -filterUpn $groupUpn -Verbose:$VerbosePreference
+            $graphGroup = get-graphGroups -tokenResponse $tokenResponse -filterUpn $groupUpn
             if(!$graphGroup){
                 Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
                 break
@@ -1258,7 +1243,7 @@ function get-graphUsersFromGroup(){
         }
     Write-Verbose "Graph Query = [groups/$($groupId)/$($memberType+$refiner)]"
     try{
-        $allMembers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/$groupId/$memberType$refiner" -Verbose:$VerbosePreference
+        $allMembers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/$groupId/$memberType$refiner"
         }
     catch{
         Write-Error "Error retrieving Graph Group $memberType in get-graphUsersFromGroup() using query [groups/$($groupId)/$($memberType+$refiner)]"
@@ -1320,15 +1305,15 @@ function get-graphUsersWithEmployeeInfoExtensions(){
         }
 
     switch ($PsCmdlet.ParameterSetName){
-        "ambiguous"           {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference}
-        "explicitUpn"         {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference -filterUpn $filterUpn}
+        "ambiguous"           {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers}
+        "explicitUpn"         {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -filterUpn $filterUpn}
         "explicitDisplayName" {
             $customFilter.Add("displayName",$filterDisplayName)
-            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference
+            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers
             }
         "explicitId"          {
             $customFilter.Add("id",$filterId)
-            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -Verbose:$VerbosePreference
+            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers
             }
         }
 
@@ -1440,7 +1425,7 @@ function invoke-graphGet(){
     #Write-Verbose $(stringify-hashTable -hashtable $headers -interlimiter "=" -delimiter ";")
     do{
         Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET -Verbose:$VerbosePreference
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET #-Verbose:$VerbosePreference -ErrorAction:$ErrorActionPreference
         if($response.value){
             $results += $response.value
             Write-Verbose "[$([int]$response.value.count)] results returned on this cycle, [$([int]$results.count)] in total"
@@ -1557,6 +1542,63 @@ function invoke-graphPut(){
 
     Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $bodyData -ContentType $contentType -Headers $headers -Method Put
     }
+function move-driveItem(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$driveGraphIdSource
+        ,[parameter(Mandatory = $true)]
+            [string]$itemGraphIdSource
+        ,[parameter(Mandatory = $false)]
+            [string]$driveGraphIdDestination
+        ,[parameter(Mandatory = $true)]
+            [string]$parentItemGraphIdDestination
+        ,[parameter(Mandatory = $false)]
+            [string]$newItemName
+        )
+
+    $reqBodyParentRef = @{id=$parentItemGraphIdDestination} #All MOVE operations explicitly require a destination ID to move the item _to_ (no assumptions about Root destinations)
+    if($driveGraphIdDestination){
+        $reqBodyParentRef.Add("driveId",$driveGraphIdDestination) #If we're MOVE to a different Drive, add the ID here (otherwise MOVE assumed to be within the current Drive)
+        }
+
+    $reqBody = @{parentReference=$reqBodyParentRef}
+    if($newItemName){
+        $reqBody.Add("name",$newItemName) #If we're changing the Item during the MOVE, add that here
+        }
+
+    $query = "/drives/$driveGraphIdSource/items/$itemGraphIdSource"
+    $movedItem = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery $query -graphBodyHashtable $reqBody
+    $movedItem
+
+    <#https://docs.microsoft.com/en-us/graph/api/driveitem-move?view=graph-rest-1.0&tabs=http
+    PATCH /me/drive/items/{item-id}
+    Content-type: application/json
+
+    {
+      "parentReference": {
+        "id": "{new-parent-folder-id}"
+      },
+      "name": "new-item-name.txt"
+    }
+
+    #https://docs.microsoft.com/en-us/graph/api/driveitem-copy?view=graph-rest-1.0
+    POST /me/drive/items/{item-id}/copy
+    Content-Type: application/json
+
+    {
+      "parentReference": {
+        "driveId": "6F7D00BF-FC4D-4E62-9769-6AEA81F3A21B",
+        "id": "DCD0D3AD-8989-4F23-A5A2-2C086050513F"
+      },
+      "name": "contoso plan (copy).txt"
+    }    #>
+
+    #Finally, submit the query and return the results
+   
+    }
 function new-graphCalendarEvent(){
     [cmdletbinding()]
     param(
@@ -1634,7 +1676,7 @@ function new-graphCalendarEvent(){
         }
 
     Write-Verbose "new-graphCalendarEvent | $(stringify-hashTable $event -interlimiter "=" -delimiter "; ")"
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events" -graphBodyHashtable $event -Verbose:$VerbosePreference
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events" -graphBodyHashtable $event
     #https://docs.microsoft.com/en-us/graph/api/calendar-post-events?view=graph-rest-1.0&tabs=http
     }
 function new-graphList(){
@@ -1683,16 +1725,16 @@ function new-graphListItem(){
     switch ($PsCmdlet.ParameterSetName){
         {$_ -match "URLAnd"} {
             Write-Verbose "new-graphListItem | Getting SiteId"
-            $graphSiteId = $(get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl $serverRelativeSiteUrl -Verbose:$VerbosePreference).id
+            $graphSiteId = $(get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl $serverRelativeSiteUrl).id
             }
         {$_ -match "AndName"} {
             Write-Verbose "new-graphListItem | Getting ListId"
-            $listId = $(get-graphList -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listName $listName -Verbose:$VerbosePreference).id
+            $listId = $(get-graphList -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listName $listName).id
             }
         }
     $graphBodyHash = @{"fields"=$listItemFieldValuesHash}
     Write-Verbose "new-graphListItem | $(stringify-hashTable $listItemFieldValuesHash)"
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items" -graphBodyHashtable $graphBodyHash -Verbose:$VerbosePreference
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items" -graphBodyHashtable $graphBodyHash
     }
 function new-graphOpenShiftShared(){
     [cmdletbinding()]
@@ -1733,7 +1775,7 @@ function new-graphOpenShiftShared(){
        sharedOpenShift=$shiftDetails
        }
 
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts" -graphBodyHashtable $newShift -Verbose:$VerbosePreference -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts" -graphBodyHashtable $newShift -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
     }
 function new-graphTeam(){
     [cmdletbinding()]
@@ -1818,7 +1860,7 @@ function remove-graphUsersFromGroup(){
 
     $graphUserIds | % {
         #$bodyHash = @{"@odata.id"="https://graph.microsoft.com/v1.0/users/$_"}
-        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/$_/`$ref" -Verbose:$VerbosePreference
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/$_/`$ref"
         }
     }
 function repair-graphGroupUGSyncSchemaExtensions(){
@@ -1969,9 +2011,9 @@ function reset-graphUnifiedGroupSettingsToOriginals(){
             #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Team [$($combinedMesg.displayName)] settings rolled back" -BodyAsHtml $body -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
             }
         #Now, fix the settings:
-        invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($graphGroupExtended.id)" -graphBodyHashtable $changes -Verbose:$VerbosePreference
+        invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($graphGroupExtended.id)" -graphBodyHashtable $changes
         #And check the Membership settings are correct too:
-        set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended -Verbose:$VerbosePreference
+        set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended
         }
     }
 function set-graphDrive_unsupported(){
@@ -1997,7 +2039,7 @@ function set-graphDrive_unsupported(){
         return
         }
 
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/drives/$driveId" -graphBodyHashtable $drivePropertyHash -Verbose:$VerbosePreference
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/drives/$driveId" -graphBodyHashtable $drivePropertyHash
     }
 function set-graphDriveItem(){
     param(
@@ -2023,7 +2065,7 @@ function set-graphDriveItem(){
         return
         }
 
-    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/drives/$driveId/items/$driveItemId" -graphBodyHashtable $driveItemPropertyHash -Verbose:$VerbosePreference
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/drives/$driveId/items/$driveItemId" -graphBodyHashtable $driveItemPropertyHash
     
     }
 function set-graphGroupSharedMailboxAccess(){
@@ -2056,7 +2098,7 @@ function set-graphGroupSharedMailboxAccess(){
     switch ($PsCmdlet.ParameterSetName){
         “groupUpn”  {
             Write-Verbose "We've been given a GroupUPN, so we need the Group object"
-            $graphGroup = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $groupUpn -Verbose:$VerbosePreference
+            $graphGroup = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $groupUpn
             if(!$graphGroup){
                 Write-Error "Could not retrieve Graph Group using UPN [$groupUpn]. Check the UPN is valid and try again."
                 break
@@ -2065,7 +2107,7 @@ function set-graphGroupSharedMailboxAccess(){
         "groupObject" {
             if($graphGroup.psobject.Properties.Name -notcontains "CustomAttribute1"){
                 Write-Verbose "We've been given a Group object, but it's missing the CustomAttributes"
-                $graphGroup = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $groupUpn -Verbose:$VerbosePreference
+                $graphGroup = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $groupUpn
                 if(!$graphGroup){
                     Write-Error "Could not retrieve CustomAttributes of Graph Group [$($graphGroup.displayName)][$($graphGroup.id)]. Cannot identify linked Shared Mailbox without these."
                     break
@@ -2091,7 +2133,7 @@ function set-graphGroupSharedMailboxAccess(){
         }
 
     #Get the list of users who *should* have access, and get it via the associated Members Subgroup so that we can get the transitive members
-    $usersToSet = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphGroup.CustomAttribute3 -memberType TransitiveMembers -returnOnlyLicensedUsers -Verbose:$VerbosePreference
+    $usersToSet = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphGroup.CustomAttribute3 -memberType TransitiveMembers -returnOnlyLicensedUsers
     
     if($reconcileFullAccessPermissions){
         Write-Verbose "Reconciling FullAccess permissions on Shared Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)]"
@@ -2281,12 +2323,12 @@ function set-graphUnifiedGroupGuestSettings(){
         'values'     = @($sharingSettings)
             }
 
-    $existingSettings = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$($graphUnifiedGroupExtended.id)/settings" -Verbose:$VerbosePreference
+    $existingSettings = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$($graphUnifiedGroupExtended.id)/settings"
     if($existingSettings){
         $existingSettings.values | ? {$_.Name -eq "AllowToAddGuests"} | % { #"/groups/$($graphUnifiedGroupExtended.id)/settings" returns a weird object: the .values property is a 0+ array of [PSCustomObject]
             if($_.value -ne $allowToAddGuests){
                 #If the wrong AllowToAddGuests settings are in place, fix them and notify IT
-                invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($graphUnifiedGroupExtended.id)/settings/$($existingSettings.id)" -graphBodyHashtable $sharingBody -Verbose:$VerbosePreference
+                invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$($graphUnifiedGroupExtended.id)/settings/$($existingSettings.id)" -graphBodyHashtable $sharingBody
                 Write-Warning "AllowToAddGuests changed from [$($_.value)] to [$allowToAddGuests] for Unified Group [$($graphUnifiedGroupExtended.id)][$($graphUnifiedGroupExtended.DisplayName)]"
                 Send-MailMessage -Subject "AllowToAddGuests changed from [$($_.value)] to [$sharingSettings] for Unified Group [$($graphUnifiedGroupExtended.id)][$($graphUnifiedGroupExtended.DisplayName)]" -to "kevin.maitland@anthesisgroup.com" -From securitybot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Priority High
                 }
@@ -2295,7 +2337,7 @@ function set-graphUnifiedGroupGuestSettings(){
             }
         }
     else{#If there are no AllowToAddGuests settings, just create them
-        invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$($graphUnifiedGroupExtended.id)/settings" -graphBodyHashtable $sharingBody -Verbose:$VerbosePreference
+        invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$($graphUnifiedGroupExtended.id)/settings" -graphBodyHashtable $sharingBody
         }
 
     }
@@ -2367,7 +2409,7 @@ function set-graphUser(){
         break
         }
     
-    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn" -graphBodyHashtable $userPropertyHash -Verbose:$VerbosePreference
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn" -graphBodyHashtable $userPropertyHash
     }
 function test-graphBearerAccessTokenStillValid(){
     [cmdletbinding()]
@@ -2418,12 +2460,12 @@ function update-graphGroupOfDevicesBasedOnOwners(){
 
     $toAdd = $delta | ? {$_.SideIndicator -eq "=>"} 
     if($toAdd){
-        add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $devicesGroupId -memberType Members -graphUserIds $toAdd.id -Verbose:$VerbosePreference
+        add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $devicesGroupId -memberType Members -graphUserIds $toAdd.id
         }
 
     $toRemove = $delta | ? {$_.SideIndicator -eq "<="} 
     if($toRemove){
-        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $devicesGroupId -memberType Members -graphUserIds $toRemove.id -Verbose:$VerbosePreference
+        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $devicesGroupId -memberType Members -graphUserIds $toRemove.id
         }
     }
 function update-graphListItem(){

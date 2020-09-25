@@ -70,30 +70,33 @@ $offices += [ordered]@{
     OfficeColour="Yellow"
     OfficeWeekendColour="darkYellow"
     OfficeDesks=8
+    ShiftNotes="Remember to clock in using the Wheelhouse App (available on the Anthesis and/or personal App Store), and to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
     OfficeName="GBR-Bristol"
     OfficeColour="Green"
     OfficeWeekendColour="darkGreen"
     OfficeDesks=18
+    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
     OfficeName="GBR-London"
     OfficeColour="Blue"
     OfficeWeekendColour="darkBlue"
     OfficeDesks=16
+    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
     OfficeName="GBR-Manchester"
     OfficeColour="Pink"
     OfficeWeekendColour="darkPink"
-    OfficeDesks=4
+    OfficeDesks=6
+    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 
 $teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
 #$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
 $msAppActsAsUserId = "36bc6f20-feed-422d-b2f2-7758e9708604"
-$standardShiftNotes = "Remember to sign in/out with the Blip! App, and use hand sanitiser when entering/exiting the office please"
 
 $shiftBotDetails = get-graphAppClientCredentials -appName ShiftBot
 $tokenResponseShiftBot = get-graphTokenResponse -grant_type client_credentials -aadAppCreds $shiftBotDetails
@@ -135,11 +138,11 @@ $offices | % {
             $thisShift = $_
             if(@(6,0) -contains $(Get-Date $thisShift["shiftStart"]).DayOfWeek.value__){ #If the shift is at a weekend, use a different colour
                 Write-Verbose "`tCreating weekend shift for [$($thisOffice["OfficeName"])] on [$($(Get-Date $thisShift["shiftStart"]).DayOfWeek)][$(Get-Date $thisShift["shiftStart"] -Format g)]"
-                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $("$($thisOffice["OfficeName"]) $($thisShift["shiftName"])") -shiftNotes $standardShiftNotes -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeWeekendColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
+                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $("$($thisOffice["OfficeName"]) $($thisShift["shiftName"])") -shiftNotes $thisOffice["shiftNotes"] -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeWeekendColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
                 }
             else{
                 Write-Verbose "`tCreating weekday shift for [$($thisOffice["OfficeName"])] on [$($(Get-Date $thisShift["shiftStart"]).DayOfWeek)][$(Get-Date $thisShift["shiftStart"] -Format g)]"
-                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $("$($thisOffice["OfficeName"]) $($thisShift["shiftName"])") -shiftNotes $standardShiftNotes -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
+                new-graphOpenShiftShared -tokenResponse $tokenResponseshiftBot -teamId $teamId -schedulingGroupId $thisSchedulingGroup.id -shiftName $("$($thisOffice["OfficeName"]) $($thisShift["shiftName"])") -shiftNotes $thisOffice["shiftNotes"] -availableSlots $thisOffice["OfficeDesks"] -startDateTime $thisShift["shiftStart"] -endDateTime $thisShift["shiftEnd"] -shiftColour $thisOffice["OfficeColour"] -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference
                 }
             }
         }

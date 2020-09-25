@@ -29,7 +29,7 @@ $fullSyncTime = Measure-Command {
     $netQuery += " AND companyName CONTAIN_NOT `"intercompany project`"" #Excludes any Companies with "(intercompany project)" in the companyName
     $netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
     $netQuery += " AND entityStatus ANY_OF_NOT [6, 7]" #Excludes LEAD-Unqualified and LEAD-Qualified (https://XXX.app.netsuite.com/app/crm/sales/customerstatuslist.nl?whence=)
-    $netQuery += " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $lastProcessed -Format g).Split(" ")[0])`"" #Excludes any Companies that haven;t been updated since X
+    $netQuery += " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $lastProcessed -Format g))`"" #Excludes any Companies that haven;t been updated since X
     [array]$clientsToCheck = get-netSuiteClientsFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production) -Verbose
     Write-Host "Processing [$($clientsToCheck.Count)] Clients"
     #$clientsToCheck = $clientsToCheck | ? {$_.entityStatus.refName -notmatch "LEAD"} #Filter out Leads
@@ -358,7 +358,7 @@ $fullSyncTime = Measure-Command {
             }    
         }
 
-    $deltaClientId = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,ClientId -PassThru #We compare the two equal sets on both NetSuiteId and Name2 to see which pairs have mismatched Name values
+    $deltaClientId = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,ClientId -PassThru #We compare the two equal sets on both NetSuiteId and ClientId to see which pairs have mismatched Name values
     $oppsWithChangedClient = $deltaClientId | ? {$_.SideIndicator -eq "<="}
     $oppsWithChangedClient | % {
         $thisUpdatedOpp = $_
