@@ -301,6 +301,23 @@ function delete-graphCalendarEvent(){
     Write-Verbose "delete-graphCalendarEvent | $($eventId)"
     invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/$eventId" -Verbose:$VerbosePreference
 }
+function delete-graphShiftUserShifts(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$MsAppActsAsUserId
+        ,[parameter(Mandatory = $true)]
+            [string]$shiftId
+        )
+    
+
+    invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/Shifts/$shiftId" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose:$VerbosePreference
+    
+    }
 function get-groupAdminRoleEmailAddresses(){
     [CmdletBinding()]
     param(
@@ -446,9 +463,14 @@ function get-graphCalendarEvent(){
             [string]$userId
         ,[parameter(Mandatory = $false)]
             [string]$eventId
+        ,[parameter(Mandatory = $false)]
+            [string]$filterSubject
         )
+
+    if($filterSubject){$filter += "`$filter=subject eq '$filterSubject'"}
+
     #Write-Verbose "get-graphCalendarEvent | $($eventId)"
-    invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/" -Verbose:$VerbosePreference
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events?$filter" -Verbose:$VerbosePreference
 }
 function get-graphDevices(){
     [cmdletbinding()]
@@ -1002,8 +1024,8 @@ function get-graphShiftOpenShifts(){
             [string]$filterId
         )
     
-    if($filterIds){$filter += "`$filter=id in (`'$($filterIds -join "','")`')"}
-    if($filterId){$filter += "`$filter=id eq '$filterId')"}
+    #if($filterIds){$filter += "`$filter=id in (`'$($filterIds -join "','")`')"}
+    if($filterId){$filter += "`$filter=id eq '$filterId'"}
 
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId}
     
@@ -1027,7 +1049,7 @@ function get-graphShiftOpenShiftChangeRequests(){
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShiftChangeRequests?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose
     
     }
-function get-graphShiftofferShiftRequests(){
+function get-graphShiftOfferShiftRequests(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
@@ -1046,6 +1068,25 @@ function get-graphShiftofferShiftRequests(){
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/offerShiftRequests?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose
     
 }
+function get-graphShiftUserShifts(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$MsAppActsAsUserId
+#        ,[parameter(Mandatory = $false)]
+#            [string[]]$filterIds
+        ,[parameter(Mandatory = $false)]
+            [string]$filterId
+        )
+    
+
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/Shifts?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose:$VerbosePreference
+    
+    }
 function get-graphSite(){
     [cmdletbinding()]
     param(
@@ -1312,6 +1353,16 @@ function get-graphUsersFromGroup(){
         $allMembers
         }
     }
+function get-graphUserGroupMembership(){
+    [cmdletbinding()]
+    param(
+         [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userUpn
+        )
+        invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/users/$($userUpn)/memberOf"  -Verbose:$VerbosePreference
+}    
 function get-graphUsersWithEmployeeInfoExtensions(){
     [cmdletbinding()]
     param(
