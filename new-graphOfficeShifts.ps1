@@ -94,9 +94,9 @@ $offices += [ordered]@{
     ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 
-$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
-#$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
-$msAppActsAsUserId = "36bc6f20-feed-422d-b2f2-7758e9708604"
+#$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
+$teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
+$msAppActsAsUserId = "00aa81e4-2e8f-4170-bc24-843b917fd7cf" #GroupBot
 
 $shiftBotDetails = get-graphAppClientCredentials -appName ShiftBot
 $tokenResponseShiftBot = get-graphTokenResponse -grant_type client_credentials -aadAppCreds $shiftBotDetails
@@ -104,11 +104,11 @@ $tokenResponseShiftBot = get-graphTokenResponse -grant_type client_credentials -
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponseTeamBot = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
-#Get the last listed OpenShift, then generate standard shifts for the following week 
+
 $openShifts = invoke-graphGet -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/openshifts" -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
-$lastOpenShifts = $openShifts | Group-Object schedulingGroupId | % {$_.Group | Sort-Object sharedOpenShift.endDateTime | Select-Object -Last 1}
-[datetime]$lastScheduledDay = $($lastOpenShifts | Sort-Object {$_.sharedOpenShift.endDateTime} | Select-Object -Last 1).sharedOpenShift.endDateTime
+[datetime]$lastScheduledDay = $openShifts | Group-Object schedulingGroupId | % {$_.Group.sharedOpenShift.endDateTime} | Sort-Object -Descending | select -Index 0
 [datetime]$nextMonday = $lastScheduledDay.AddDays(-$($lastScheduledDay.DayOfWeek.value__ - 1)+7) 
+
 if($lastScheduledDay.DayOfWeek.value__ -eq 0){$nextMonday = $nextMonday.AddDays(-7)} #Special case for Sundays being part of the wrong week
 $nextWeekOfShifts = new-weekShiftHash -date $nextMonday -suppressMonday:$true -suppressFriday:$true -suppressSaturday:$true -suppressSunday:$true
 
@@ -132,7 +132,7 @@ $offices | % {
             isActive = $thisSchedulingGroup.isActive
             userIds = @($teamMembers.id) #This will automaticlly add all Team Members to each SchedulingGroup
             }
-        invoke-graphPut -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups/$($thisSchedulingGroup.id)" -graphBodyHashtable $updatedHash -additionalHeaders @{"MS-APP-ACTS-AS"="36bc6f20-feed-422d-b2f2-7758e9708604"} #PATCH doesn't work on schedulingGroups yet :'( But PUT works!
+        invoke-graphPut -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups/$($thisSchedulingGroup.id)" -graphBodyHashtable $updatedHash -additionalHeaders @{"MS-APP-ACTS-AS"="36bc6f20-feed-422d-b2f2-7758e9708604"} -Verbose:$VerbosePreference #PATCH doesn't work on schedulingGroups yet :'( But PUT works!
              
         $nextWeekOfShifts | % { #Add 1 week's worth of shifts 
             $thisShift = $_

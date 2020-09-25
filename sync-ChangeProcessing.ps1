@@ -466,9 +466,18 @@ $NewLeaverInformation = @()
 ForEach($Item in $AllLeaversitems){
 
     If("1" -eq $item.FieldValues.PowershellTrigger){
-            
-            
-            write-host "An item has been added, and needs processing: '$($Item.FieldValues.Employee_x0020_Name.LookupValue)'. Let's send an email to IT and People Services" -ForegroundColor Yellow
+            write-host "An item has been added, and needs processing: '$($Item.FieldValues.Employee_x0020_Name.LookupValue)'. Let's send an email to IT and People Services and set the country for sorting." -ForegroundColor Yellow
+
+            #Find the Leaver msol object and get the usage location (as our data isn't good enough to rely on the country proprty) - get the country from the offices group in the Term Store
+            $msoluser = Get-MsolUser -UserPrincipalName $Item.FieldValues.Employee_x0020_Name.Email
+            $allterms = Get-PnPTerm -TermGroup "Anthesis" -TermSet "Offices"
+            $thisterm =  $allterms | Where-Object {$_.CustomProperties.'Usage Location' -eq "$($msoluser.UsageLocation)"} | Select-Object -Index 0
+            If($thisterm){
+            Set-PnPListItem -List $List -Identity $Item.Id -Values @{"Country" = $thisterm.CustomProperties.Country}
+            }
+            Else{
+            Write-Host "Couldn't find Term to update the country for Leavers list" -ForegroundColor Red
+            }
 
             #Get the information for the New Starter, convert it to an HTML table, create a friendly link to the item and send an email
             $NewLeaverInformation += New-Object psobject -Property @{

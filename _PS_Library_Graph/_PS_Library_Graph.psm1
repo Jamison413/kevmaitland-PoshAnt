@@ -288,6 +288,19 @@ function delete-graphListItem(){
         #Need to expand to allow for ListName and SiteName as well as the Id's (to match other functions here)
         invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "sites/$graphSiteId/lists/$graphListId/items/$graphItemId" 
 }
+function delete-graphCalendarEvent(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userId
+        ,[parameter(Mandatory = $true)]
+            [string]$eventId
+        )
+    Write-Verbose "delete-graphCalendarEvent | $($eventId)"
+    invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/$eventId" -Verbose:$VerbosePreference
+}
 function get-groupAdminRoleEmailAddresses(){
     [CmdletBinding()]
     param(
@@ -424,6 +437,19 @@ function get-graphAuthCode() {
         }
     $output
     }
+function get-graphCalendarEvent(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$userId
+        ,[parameter(Mandatory = $false)]
+            [string]$eventId
+        )
+    #Write-Verbose "get-graphCalendarEvent | $($eventId)"
+    invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/" -Verbose:$VerbosePreference
+}
 function get-graphDevices(){
     [cmdletbinding()]
     param(
@@ -1001,6 +1027,25 @@ function get-graphShiftOpenShiftChangeRequests(){
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShiftChangeRequests?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose
     
     }
+function get-graphShiftofferShiftRequests(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$MsAppActsAsUserId
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet(“approved”,”pending”,"declined")]
+            [string]$requestState
+        )
+    
+    if($requestState){$filter += "`$filter = state eq '$requestState'"}
+
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/offerShiftRequests?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose
+    
+}
 function get-graphSite(){
     [cmdletbinding()]
     param(
@@ -2513,6 +2558,62 @@ function update-graphListItem(){
     $graphBodyHashtable = $fieldHash
     $reponse = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose
     $reponse
+}
+function Update-graphOpenShiftShared(){
+        [cmdletbinding()]
+        param(
+            [parameter(Mandatory = $true)]
+                [psobject]$tokenResponse        
+            ,[parameter(Mandatory = $true)]
+                [string]$teamId
+            ,[parameter(Mandatory = $true)]
+                [string]$MsAppActsAsUserId
+            ,[parameter(Mandatory = $false)]
+                [string]$schedulingGroupId
+            ,[parameter(Mandatory = $true)]
+                [string]$openShiftId
+            ,[parameter(Mandatory = $false)]
+                [string]$shiftName
+            ,[parameter(Mandatory = $false)]
+                [string]$shiftNotes
+            ,[parameter(Mandatory = $false)]
+                [int]$availableSlots
+            ,[parameter(Mandatory = $false)]
+                [ValidateSet ("White","Blue","Green","Purple","Pink","Yellow","Gray","DarkBlue","DarkGreen","DarkPurple","DarkPink","DarkYellow")]
+                [string]$shiftColour
+            )
+
+        #Get the Shift - we can't amend the start and end times of a shift as it RECREATES the shift, which means a new ID and subsequently all Shift requests are declined... 
+        $currentShift = get-graphShiftOpenShifts -tokenResponse $tokenResponse -teamId $teamId -MsAppActsAsUserId $msAppActsAsUserId | Where-Object -Property "Id" -EQ $openShiftId
+        if($currentShift){
+        #Swap out anything that's missing with existing information from the Shift
+        if([string]::IsNullOrWhiteSpace($shiftName)){$shiftName = $currentShift.sharedOpenShift.displayName}
+        if([string]::IsNullOrWhiteSpace($shiftNotes)){$shiftNotes = $currentShift.sharedOpenShift.notes}
+        if([string]::IsNullOrWhiteSpace($shiftColour)){$shiftColour = $currentShift.sharedOpenShift.theme}
+        if(!$availableSlots){$availableSlots = $currentShift.sharedOpenShift.openSlotCount}
+
+        #Create an already-shared OpenShift object to apply
+        $shiftDetails=@{
+            displayName=$shiftName
+            notes=$shiftNotes
+            startDateTime="$($currentShift.sharedOpenShift.startDateTime)"
+            endDateTime="$($currentShift.sharedOpenShift.endDateTime)"
+            theme=$shiftColour
+            openSlotCount=$availableSlots
+            }
+        $notdraftshift=@{
+        draftOpenShift="null"
+        }
+        $Shift = @{
+           schedulingGroupId=$schedulingGroupId
+           sharedOpenShift=$shiftDetails
+           }
+ 
+        invoke-graphPut -tokenResponse $tokenResponseShiftBot -graphQuery "/teams/$teamId/schedule/openShifts/$openShiftId" -graphBodyHashtable $Shift -Verbose:$true -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
+        }
+        else{
+        Write-Error -Exception "Couldn't find the Shift with the given teamId and openShiftId" -Message "Shift not found" 
+        }
 }
 function update-mailboxCustomAttibutesToGraphSchemaExtensions(){
     [cmdletbinding()]
