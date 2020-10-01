@@ -60,8 +60,7 @@ if($offerpendingRequests){
         #First get the existing Shift AND OpenShift that has been offered
         $existingusershift = invoke-graphGet -tokenResponse $tokenResponseShiftBot -graphQuery "/teams/$teamId/schedule/shifts/$($thisOfferRequest.senderShiftId)" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId} -Verbose:$VerbosePreference
         $thisOpenShift = $allShifts.Where({($_.sharedOpenShift.displayName -eq $existingusershift.sharedShift.displayName) -and ($_.sharedOpenShift.startDateTime -eq $existingusershift.sharedShift.startDateTime) -and ($_.sharedOpenShift.endDateTime -eq $existingusershift.sharedShift.endDateTime)})
-        
-        If(($openShift | Measure-Object).Count -eq 1){
+        If(($thisOpenShift | Measure-Object).Count -eq 1){
             Write-Host "we've found the open shift - processing the approval, updating the open shift slot count and deleting the calendar entry for the user" -ForegroundColor Cyan
             #Process the offer approval, and update the OPENSHFT slot count to reflect the change (or it stays as one less slot available - the offer shift is just to give to another user, not back to the OPENSHFT)
             invoke-graphPost -tokenResponse $tokenResponseShiftBot -graphQuery "/teams/$teamId/schedule/offerShiftRequests/$($thisOfferRequest.id)/approve" -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId} -graphBodyHashtable @{message="Approve-ulated"}
