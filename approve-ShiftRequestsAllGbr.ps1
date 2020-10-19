@@ -11,7 +11,8 @@ if($PSCommandPath){
 
 #$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
 $teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
-$msAppActsAsUserId = "36bc6f20-feed-422d-b2f2-7758e9708604"
+#$msAppActsAsUserId = "36bc6f20-feed-422d-b2f2-7758e9708604" #Kev Maitland
+$msAppActsAsUserId = "00aa81e4-2e8f-4170-bc24-843b917fd7cf" #GroupBot
 
 $shiftBotDetails = get-graphAppClientCredentials -appName ShiftBot
 $tokenResponseShiftBot = get-graphTokenResponse -grant_type client_credentials -aadAppCreds $shiftBotDetails

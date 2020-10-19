@@ -144,7 +144,7 @@ function add-graphLicenseToUser(){
             [parameter(Mandatory = $true,ParameterSetName="Guids")]
             [string]$userIdOrUpn
         ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [ValidateSet("K1","E1","E3","E5","EMS","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio")]
+            [ValidateSet("K1","E1","E3","E5","EMS","ATP","PowerBIFree","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio")]
             [string]$licenseFriendlyName 
         ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
             [string]$licenseGuid

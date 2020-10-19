@@ -211,7 +211,7 @@ function guess-aliasFromDisplayName(){
         [string]$fixedSuffix
         )
     #Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
-    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","")}
+    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","").Replace("@","").Replace("\","").Replace("[","").Replace("]","").Replace("`"","").Replace(";","").Replace(":","").Replace("<","").Replace(">","")}
     $guessedAlias = set-suffixAndMaxLength -string $guessedAlias -suffix $fixedSuffix -maxLength 64
     $guessedAlias = sanitise-forMicrosoftEmailAddress -dirtyString $guessedAlias
     $guessedAlias = remove-diacritics -String $guessedAlias
