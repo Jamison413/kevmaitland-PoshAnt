@@ -12,12 +12,16 @@ Start-Transcript $transcriptLogName -Append
 
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_MSOL
+Import-Module _PS_Library_Graph
 
 $Admin = "kevin.maitland@anthesisgroup.com"
 $AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Kev.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 connect-ToMsol -credential $adminCreds
+
+$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 
 #For Licensed User Accounts
@@ -50,6 +54,98 @@ Write-host "$TotalOptimalMFAScore%"
 
 
 
+#Microsoft now just prompts people to set up MFA as default so they might have MFA enabled already, find the difference and activate it for those who have already set up a method (it means no change):
+#"If the user hasn't yet registered MFA authentication methods, they receive a prompt to register the next time they sign in using modern authentication (such as via a web browser)." https://docs.microsoft.com/en-us/azure/active-directory/authentication/howto-mfa-userstates
+$userswithnomfa = @()
+$usersnotactivatedwithMFA = @()
+ForEach($user in $enabledUsersWithoutMFA){
+
+$e = ""
+$e = Get-MsolUser -UserPrincipalName "$($user.UserPrincipalName)"
+
+If($e.StrongAuthenticationMethods.IsDefault -match "True"){
+$usersnotactivatedwithMFA += $user
+}
+Else{
+$userswithnomfa += $user
+}
+}
+
+#Enable MFA for anyone who already has it set up
+ForEach($MFAregistereduser in $usersnotactivatedwithMFA){
+
+    write-host "Enabling MFA for $($MFAregistereduser.UserPrincipalName)" -ForegroundColor Yellow
+
+    #Create an empty StrongAuthenticationRequirement object
+    $emptyAuthObject = New-Object -TypeName Microsoft.Online.Administration.StrongAuthenticationRequirement
+    $emptyAuthObject.RelyingParty = "*"
+    $emptyAuthObject.State = "Enabled"
+    $emptyAuthObject.RememberDevicesNotIssuedBefore = (Get-Date)
+
+    #Get the GUID for the SSPR Group
+    #$ssprGroup = Get-MsolGroup -SearchString "SSPR Testers"
+    [guid]$ssprGroupObjectId = "fee80bd5-6e2f-4888-a51c-9581cf64eb18" #This is the GUID for the SSPR Testers Group
+
+
+    #Figure out who to run this for
+    $upnsToEnable = convertTo-arrayOfEmailAddresses $MFAregistereduser.UserPrincipalName
+
+
+$upnsToEnable | % {
+    $thisUser = Get-MsolUser -UserPrincipalName $_
+    Write-Verbose "MFA is currently set to [$($thisUser.StrongAuthenticationRequirements.State)] for $_"
+    if([string]::IsNullOrWhiteSpace($thisUser.StrongAuthenticationRequirements)){
+        Write-Verbose "Enabling MFA for $_"
+        Set-MsolUser -UserPrincipalName $thisUser.UserPrincipalName -StrongAuthenticationRequirements $emptyAuthObject
+        }
+    else{Write-Verbose "MFA already [$($thisUser.StrongAuthenticationRequirements.State)] for $_"}
+    Add-MsolGroupMember -GroupObjectId $ssprGroupObjectId -GroupMemberType User -GroupMemberObjectId $thisUser.ObjectId
+    }
+}
+
+#Send a message to Teams to get Emily to chase anyone who's bypassed the prompts
+
+
+$allnewuserrequestsoldlist = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/hr" -listName "New User Requests" -expandAllFields
+$allnewuserrequestsnewlist = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -listName "New Starter Details" -expandAllFields
+
+#Remove boxes
+$userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "acsmailboxaccess@anthesisgroup.com"
+$userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "ACSSupport@anthesisgroup.com"
+
+$startstochase = @()
+ForEach($user in $userswithnomfa){
+
+
+$thisuserold = $allnewuserrequestsoldlist | Where-Object -Property "Fields" -Match "$($user.DisplayName)"
+$thisusernew = $allnewuserrequestsnewlist | Where-Object -Property "Fields" -Match "$($user.DisplayName)"
+If($thisusernew){
+#from new list
+$expandstartdate = $thisusernew | select -ExpandProperty "Fields" | select -Property "StartDate"
+}
+Else{
+#From old list
+$expandstartdate = $thisuserold | select -ExpandProperty "Fields" | select -Property "Start_x0020_Date"
+}
+If($expandstartdate){
+
+$startdate = $expandstartdate.Start_x0020_Date.Split("T")[0] | get-date -Format dd/MM/yyyy
+If($startdate -lt (get-date)){
+$userobj = @{
+"User" = $user.UserPrincipalName;
+"Start Date" = $startdate
+} 
+$startstochase += "$($userobj.user) started $($userobj.'Start Date')"
+}
+}
+}
+
+$subject = "MFA status report"
+$body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team, these guys need chasing for MFA if they have started`r`n`r`n<BR><BR>"
+ForEach($persontochase in $startstochase){$body += "$($persontochase) `r`n<BR>"}
+Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
+
+<#
 
 $subject = "MFA status report"
 $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
@@ -85,4 +181,6 @@ Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulmfarobo
 Send-MailMessage -To "andrew.ost@anthesisgroup.com" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
 Write-Information "Message Sent (maybe)"
 #$body
+
+#>
 Stop-Transcript

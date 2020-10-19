@@ -398,8 +398,8 @@ function new-365Group(){
                             $parentGroup = get-membersGroup -groupName $_
                             #Sadly, EXO is just too slow to replicate to Graph
                             $parentGroup = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName $_
-                            Add-DistributionGroupMember -Identity $parentGroup.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck:$true -Member $membersSg.id -Confirm:$false
-                            #Add-DistributionGroupMember -Identity $parentGroup.anthesisgroup_UGSync.memberGroupId -BypassSecurityGroupManagerCheck:$true -Member $membersSg.id -Confirm:$false
+                            Add-DistributionGroupMember -Identity $parentGroup.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck -Member $membersSg.id -Confirm:$false
+                            #Add-DistributionGroupMember -Identity $parentGroup.anthesisgroup_UGSync.memberGroupId -BypassSecurityGroupManagerCheck -Member $membersSg.id -Confirm:$false
                             }
                         }
                     }
@@ -622,11 +622,11 @@ function remove-DataManagerFromGroup(){
         continue
         }
 
-    Remove-DistributionGroupMember -Identity $dataManagerGroupId -Member $upnToRemove -BypassSecurityGroupManagerCheck:$true -Confirm:$false
+    Remove-DistributionGroupMember -Identity $dataManagerGroupId -Member $upnToRemove -BypassSecurityGroupManagerCheck -Confirm:$false
 
     ,[array]$otherDataManagers = $dataManagerGroupMembers | ? {$_.WindowsLiveID -ne $upnToRemove}
     if($otherDataManagers.Count -eq 0){ #If this user is the last Data Manager, add GroupBot to prevent this Data Manager group from becoming empty
-        Add-DistributionGroupMember -Identity $dataManagerGroupId -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck:$true -Confirm:$false
+        Add-DistributionGroupMember -Identity $dataManagerGroupId -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck -Confirm:$false
         }
     }
 function rummage-forDistributionGroup(){
@@ -1084,7 +1084,7 @@ function sync-groupMemberships(){
                     try{
                         #Unbelievbly, you still can't manage MESGs via Graph.
                         #add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $graphMesg.Id -memberType Members -graphUserIds $userToBeChanged.objectId -WhatIf:$WhatIfPreference -ErrorAction Stop #We always add to members regardless of $syncWhat because we're dealing with the MESGs. $syncWhat will already have set either the Data Managers MESG or Members MESG as $graphMesg
-                        Add-DistributionGroupMember -Identity $graphMesg.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck:$true -WhatIf:$WhatIfPreference -ErrorAction Stop
+                        Add-DistributionGroupMember -Identity $graphMesg.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck -WhatIf:$WhatIfPreference -ErrorAction Stop
                         [array]$usersAdded += (New-Object psobject -Property $([ordered]@{"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
                         }
                     catch{
@@ -1101,7 +1101,7 @@ function sync-groupMemberships(){
                     try{
                         #Unbelievbly, you still can't manage MESGs via Graph.
                         #remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $graphMesg.Id -memberType Members -graphUserIds $userToBeChanged.objectId -WhatIf:$WhatIfPreference -ErrorAction Stop
-                        Remove-DistributionGroupMember -Identity $graphMesg.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck:$true -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
+                        Remove-DistributionGroupMember -Identity $graphMesg.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
                          [array]$usersRemoved += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
                         }
                     catch{
@@ -1353,7 +1353,7 @@ function sync-groupMemberships_deprecated(){
                     $userToBeChanged = $_
                     Write-Verbose "`tAdding [$($userToBeChanged.userPrincipalName)] to [$($AADGroup.DisplayName)][$($AADGroup.Id)] MESG"
                     try{
-                        Add-DistributionGroupMember -Identity $AADGroup.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck:$true -WhatIf:$WhatIfPreference -ErrorAction Stop
+                        Add-DistributionGroupMember -Identity $AADGroup.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck -WhatIf:$WhatIfPreference -ErrorAction Stop
                         [array]$usersAdded += (New-Object psobject -Property $([ordered]@{"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
                         }
                     catch{
@@ -1367,7 +1367,7 @@ function sync-groupMemberships_deprecated(){
                     $userToBeChanged = $_
                     Write-Verbose "`tRemoving [$($userToBeChanged.userPrincipalName)] from [$($AADGroup.DisplayName)][$($AADGroup.Id)] MESG"
                     try{
-                        Remove-DistributionGroupMember -Identity $AADGroup.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck:$true -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
+                        Remove-DistributionGroupMember -Identity $AADGroup.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
                         [array]$usersRemoved += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
                         }
                     catch{

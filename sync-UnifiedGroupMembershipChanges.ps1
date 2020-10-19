@@ -17,15 +17,15 @@ $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desk
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #Unbelievbly, you still can't manage MESGs via Graph.
-$groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$groupAdmin = "newgroupbot@anthesisgroup.com"
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\NewGroupBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $adminCreds
 
 
 $all365Groups = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse
 $toExclude = @("Sym - Supply Chain","Apparel Team (All)","Teams Testing Team","All Homeworkers (All)","Archived Finance Team (North America)")
-$365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential" -and $_.DisplayName -notmatch "All "}
+$365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential"}# -and $_.DisplayName -notmatch "All "}
 
 $adminEmailAddresses = get-groupAdminRoleEmailAddresses -tokenResponse $tokenResponse
 

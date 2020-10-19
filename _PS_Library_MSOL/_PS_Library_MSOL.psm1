@@ -105,18 +105,21 @@ function connect-ToExo($credential){
         0 {
             Write-Host -f Yellow Connecting to EXO services
             if ($credential -eq $null){$credential = set-MsolCredentials}
-            Import-Module Microsoft.Exchange.Management.ExoPowershellModule
+            #Import-Module Microsoft.Exchange.Management.ExoPowershellModule
             Write-Host -f DarkYellow "Initiating New-PSSession"
             try {
                 #bodge-exo 
-                $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+                #$ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId?SerializationData=Full' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common' -Credential $Credential -ErrorAction Stop -WarningAction Stop -InformationAction Stop
+                $ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Authentication Basic -AllowRedirection -Credential $credential  -ErrorAction Stop
                 }
             catch{
                 Write-Host -ForegroundColor DarkRed "MFA might be required"
-                $ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+                #$ExchangeSession = New-ExoPSSession -UserPrincipalName $Credential.Username -ConnectionUri 'https://outlook.office365.com/PowerShell-LiveId?SerializationData=Full' -AzureADAuthorizationEndpointUri 'https://login.windows.net/common'
+                $ExchangeSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Authentication Basic -AllowRedirection -ErrorAction Stop
                 }
             Write-Host -f DarkYellow "Importing New-PSSession"
-            Import-Module (Import-PSSession $ExchangeSession -AllowClobber) -Global            
+            #Import-Module (Import-PSSession $ExchangeSession -DisableNameChecking -AllowClobber -CommandName *) -Global        
+            Import-Module (Import-PSSession $ExchangeSession -DisableNameChecking) -Global
             }
         1 {
             if((Get-Module | ? {$_.ExportedCommands.Keys -contains "Get-Mailbox"}).Count -gt 0)
@@ -124,7 +127,7 @@ function connect-ToExo($credential){
                 Write-Host -f Yellow "Already connected to EXO services"
                 }
             else{
-                Import-Module (Import-PSSession $(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}) -AllowClobber) -Global
+                Import-Module (Import-PSSession $(Get-PSSession | ? {$_.ComputerName -eq "outlook.office365.com" -and $_.Availability -eq "Available" -and $_.State -eq "Opened"}) -AllowClobber -CommandName * -DisableNameChecking) -Global
                 }
             }
         default {
