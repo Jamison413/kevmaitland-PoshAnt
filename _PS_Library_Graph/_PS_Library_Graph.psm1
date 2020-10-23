@@ -405,7 +405,7 @@ function get-graphAppClientCredentials{
     for($i=0; $i -lt $placesToLook.Count; $i++){ #Look for the file in each location until we find it
         if(Test-Path $placesToLook[$i]){
             $pathToEncryptedCsv = $placesToLook[$i]
-            continue
+            break
             }
         }
     if([string]::IsNullOrWhiteSpace($pathToEncryptedCsv)){ #Break if we can't find it
@@ -566,21 +566,31 @@ function get-graphDriveItems(){
             [string]$returnWhat
         ,[parameter(Mandatory = $true,ParameterSetName = "path")]
             [string]$folderPathRelativeToRoot
+        ,[parameter(Mandatory = $false,ParameterSetName = "root")]
+            [parameter(Mandatory = $false,ParameterSetName = "itemId")]
+            [parameter(Mandatory = $false,ParameterSetName = "path")]
+            [string]$filterNameRegex
         )
     
     if($returnWhat -eq "Children"){$getChildren = "/children"}
 
     switch ($PsCmdlet.ParameterSetName){ 
         "root" {
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root$getChildren" #-ErrorAction $ErrorActionPreference
+            $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root$getChildren" #-ErrorAction $ErrorActionPreference
+            if($filterNameRegex){$results | ? {$_.name -match $filterNameRegex}}
+            else{$results}
             return
             }
         "itemId" { 
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/items/$itemGraphId$getChildren" #-ErrorAction $ErrorActionPreference
+            $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/items/$itemGraphId$getChildren" #-ErrorAction $ErrorActionPreference
+            if($filterNameRegex){$results | ? {$_.name -match $filterNameRegex}}
+            else{$results}
             return
             }
         "path" { 
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root:/$folderPathRelativeToRoot`:$getChildren" #-ErrorAction $ErrorActionPreference
+            $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root:/$folderPathRelativeToRoot`:$getChildren" #-ErrorAction $ErrorActionPreference
+            if($filterNameRegex){$results | ? {$_.name -match $filterNameRegex}}
+            else{$results}
             return
             }
         }

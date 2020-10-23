@@ -474,7 +474,7 @@ $fullSyncTime = Measure-Command {
     $pnpTermGroup = "Kimble"
     $pnpTermSet = "Clients"
     $allClientTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.IsDeprecated -eq $false}
-
+    
     #Filter these client-side (CSOM, eh?) to get only the changes since this script last completed successfully
     [array]$clientTermsToCheck = $allClientTerms | ? {($_.LastModifiedDate -gt $lastSpoSyncRun -or $_.CustomProperties.flagForReprocessing -eq $true) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteId)}
     Write-Host "Processing [$($clientTermsToCheck.Count)] Clients"
@@ -596,7 +596,7 @@ $fullSyncTime = Measure-Command {
         }
 
     #endregion
-
+    
     #region Opportunities
     if($missingFromSpo){ #Refresh $allClientTerms if we've created new Clients
         $pnpTermGroup = "Kimble"
@@ -614,7 +614,7 @@ $fullSyncTime = Measure-Command {
         if(!$allClientDrives){$allClientDrives = get-clientDrives} #Only load the Client Drives via graph if there is work to do and we haven't already got them
 
         @($oppTermsToCheck | Select-Object) | % {
-            $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -aadAppCreds $sharePointBotDetails
+            $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -aadAppCreds $sharePointBotDetails -renewTokenExpiringInSeconds 30
             $thisOppTerm = $_
             Write-Host "Processing Opp Term [$($thisOppTerm.Name)][$($thisOppTerm.id)][$($thisOppTerm.CustomProperties.DriveItemId)] for NetSuiteClientId [$($thisOppTerm.CustomProperties.NetSuiteClientId)]"
             process-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $thisOppTerm -arrayOfAllClientTerms $allClientTerms -arrayOfLeadProjSubFolders $listOfLeadProjSubFolders -arrayOfAllOppTerms $allOppTerms
@@ -640,106 +640,7 @@ $fullSyncTime = Measure-Command {
             Write-Host "Processing Proj Term [$($thisProjTerm.Name)][$($thisProjTerm.id)][$($thisProjTerm.CustomProperties.DriveItemId)] for NetSuiteClientId [$($thisProjTerm.CustomProperties.NetSuiteClientId)]"
             process-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $thisProjTerm -arrayOfAllClientTerms $allClientTerms -arrayOfLeadProjSubFolders $listOfClientFolders -arrayOfAllOppTerms $allOppTerms
             }
-
-        #############################
-        #Process Projects en-masse as don't want to query every DriveItem in every Drive in advance
-        #############################
-        #Check for DriveItemId
-            #If DriveItemId, update folder
-            #If no DriveItemId, Check for Opp
-                #If Opp, update DriveItemId and add to flagForReprocessing (to include in next run)
-                #If no Opp, Create new folders
-        [array]$flagForReprocessing = @()
-        $projTermsToCheck | % {
-            $thisProjTerm = $_
-            Write-Host "Processing Project Term [$($thisProjTerm.Name)][$($thisProjTerm.id)][$($thisProjTerm.CustomProperties.DriveItemId)] for NetSuiteClientId [$($thisProjTerm.CustomProperties.NetSuiteClientId)]"
-
-            if($thisProjTerm.CustomProperties.DriveItemId){        #If DriveItemId, update folder
-            try{
-                $thisClientTerm = $allClientTerms | ? {$_.CustomProperties.NetSuiteId -eq $thisProjTerm.CustomProperties.NetSuiteClientId}
-                Write-Host "`tProject Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId is [$($thisProjTerm.CustomProperties.DriveItemId)] - setting Folder name to [$($thisProjTerm.Name)]"
-                try{
-                    $updatedFolder = set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $thisClientTerm.CustomProperties.GraphDriveId -driveItemId $thisProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$thisProjTerm.Name}
-                    }
-                catch{
-                    if($_.Exception -match "(409) Conflict"){
-                        Write-Warning "`tPotential duplicate Project folder found for [$($thisClientTerm.Name)][$($thisProjTerm.Name)]"
-                        $duplicateNetProjectFolder = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisClientTerm.CustomProperties.GraphDriveId | ? {$_.name -eq $thisProjTerm.Name}
-                        if($duplicateNetProjectFolder.size -eq 0 -and $duplicateNetProjectFolder.id -ne $thisProjTerm.CustomProperties.DriveItemId){
-                            Write-Warning "`tDeleting empty duplicate project folder"
-                            delete-graphDriveItem -tokenResponse $tokenResponseSharePointBot -graphDriveId $thisClientTerm.CustomProperties.GraphDriveId -graphDriveItemId $duplicateNetProjectFolder.id -eTag $duplicateNetProjectFolder.eTag -Verbose
-                            $updatedFolder = set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $thisClientTerm.CustomProperties.GraphDriveId -driveItemId $thisProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$thisProjTerm.Name}
-                            }
-                        }
-                    if($_.exception -eq "Cannot bind argument to parameter 'graphDriveId' because it is an empty string."){
-                        [array]$noDriveForYou += $thisProjTerm
-                        #Check whether this is an InterCompany ("pretend") client, and ignore it if it is.
-                        }
-                    }
-                }
-            catch{
-                $_
-                #There's a whole lot that could wrong here ($thisClientTerm.DriveId could be $null, the Drive could be missing or the DriveItem could be missing. Log the error for further investigation
-                }
-            }
-                                                                                                                                            else{#If no DriveItemId, Check for Opp
-            Write-Host "`tProject Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId is missing - checking for Opportunity with NetSuiteProjectId -eq [$($thisProjTerm.CustomProperties.NetSuiteProjId)]"
-            $thisOppTerm = $allOppTerms | ? {$_.CustomProperties.NetSuiteProjectId -eq $thisProjTerm.Id}
-            if(![string]::IsNullOrWhiteSpace($thisOppTerm.CustomProperties.DriveItemId)){#If Opp, update DriveItemId and add to flagForReprocessing (to include in next run)
-                Write-Host "`t`tOpportunity Term [$($thisOppTerm.Name)] found with .CustomProperties.DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] - updating Project Term [$($thisProjTerm.Name)].CustomProperties.DriveItemId to match"
-                $thisProjTerm.SetCustomProperty("DriveItemId",$thisOppTerm.CustomProperties.DriveItemId)
-                try{
-                    Write-Verbose "`tTrying: [$($thisProjTerm.Name)].SetCustomProperty(DriveItemId,[$($updatedFolder.id)])"
-                    $thisProjTerm.Context.ExecuteQuery()
-                    [array]$flagForReprocessing += $thisProjTerm
-                    }
-                catch{
-                    Write-Error "Error updating DriveItemId CustomProperty [$($thisProjTerm.CustomProperties.DriveItemId))] to [$($updatedFolder.id)] for Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisProjTerm.Name)] in sync-netsuiteToManagedMetaData()"
-                    [array]$flagForReprocessing += $thisNewClient
-                    }
-                }
-            else{#If no Opp, Create new folders
-                Write-Host "`t`tNo corresponding Opportunity Term [$($thisOppTerm.Name)] or DriveItemId [$($thisOppTerm.CustomProperties.DriveItemId)] found - creating new set of Project folders"
-                $thisClientTerm = $allClientTerms | ? {$_.CustomProperties.NetSuiteId -eq $thisProjTerm.CustomProperties.NetSuiteClientId}
-                [array]$customisedFolderList = $thisProjTerm.Name
-                $customisedFolderList += $listOfLeadProjSubFolders | % {"$($thisProjTerm.Name)\$_"}
-                $newProjectFolders = add-graphArrayOfFoldersToDrive -graphDriveId $thisClientTerm.CustomProperties.GraphDriveId -foldersAndSubfoldersArray $customisedFolderList -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail #-ErrorAction SilentlyContinue
-                $thisProjTerm.SetCustomProperty("DriveItemId",$newProjectFolders[1].id)
-                try{
-                    Write-Verbose "`tTrying: [$($thisProjTerm.Name)].SetCustomProperty(DriveItemId,[$($updatedFolder.id)])"
-                    $thisProjTerm.Context.ExecuteQuery()
-                    }
-                catch{
-                    Write-Error "Error updating DriveItemId CustomProperty [$($thisProjTerm.CustomProperties.DriveItemId))] to [$($updatedFolder.id)] for Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisProjTerm.Name)] in sync-netsuiteToManagedMetaData()"
-                    [array]$flagForReprocessing += $thisNewClient
-                    }
-                }
-            }
         }
-        #############################
-        #Update flagForReprocessing
-        #############################
-        $projTermsToCheck | % {
-            $thisProjToUpdate = $_
-            if($flagForReprocessing -notcontains $thisProjToUpdate){ #If the process above worked as expected, update SharePointLastModifiedDate to prevent it from being re-processed next time
-                Write-Host "[$($thisProjToUpdate.Name)] was processed successfully - updating flagForReprocessing to [$false]"
-                $thisProjToUpdate.SetCustomProperty("flagForReprocessing",$false)
-                }
-            else{
-                Write-Warning "Something went wrong with [$($thisProjToUpdate.Name)] - flagging for reprocessing"
-                $thisProjToUpdate.SetCustomProperty("flagForReprocessing",$true)
-                }
-            try{
-                Write-Verbose "`tTrying: [$($thisProjToUpdate.Name)][$($thisProjToUpdate.Id)].SetCustomProperty(SharePointLastModifiedDate,$($now))"
-                $thisProjToUpdate.Context.ExecuteQuery()
-                }
-            catch{
-                Write-Error "Error setting CustomProperty SharePointLastModifiedDate on Term [$($thisProjToUpdate.Name)][$($thisProjToUpdate.Id)] in sync-netsuiteToManagedMetaData()"
-                $_
-                }
-            }
-        }
-
     #endregion
 
 
