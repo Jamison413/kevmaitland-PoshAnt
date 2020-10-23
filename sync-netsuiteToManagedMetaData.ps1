@@ -30,7 +30,7 @@ $fullSyncTime = Measure-Command {
     $netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
     $netQuery += " AND entityStatus ANY_OF_NOT [6, 7]" #Excludes LEAD-Unqualified and LEAD-Qualified (https://XXX.app.netsuite.com/app/crm/sales/customerstatuslist.nl?whence=)
     $netQuery += " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $lastProcessed -Format g))`"" #Excludes any Companies that haven;t been updated since X
-    [array]$clientsToCheck = get-netSuiteClientsFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production) -Verbose
+    [array]$clientsToCheck = get-netSuiteClientsFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production) #-Verbose
     Write-Host "Processing [$($clientsToCheck.Count)] Clients"
     #$clientsToCheck = $clientsToCheck | ? {$_.entityStatus.refName -notmatch "LEAD"} #Filter out Leads
     $clientsToCheck | % { #Set the objects up so they are easy to compare
@@ -67,7 +67,7 @@ $fullSyncTime = Measure-Command {
                 $testForCollision.SetCustomProperty("NetSuiteId",$thisNewClient.id) #Set the correct NEtsuiteId
                 $testForCollision.SetCustomProperty("flagForReprocessing",$true) #Set the flag for reprocessing so this Term gets processed into SharePoint
                 try{
-                    Write-Host "Reusing existing Term [$($testForCollision.Name)]and updating CCustomProperties"
+                    Write-Host "Reusing existing Term [$($testForCollision.Name)]and updating CustomProperties"
                     Write-Verbose "`tTrying: [$($testForCollision.Name)].SetCustomProperty(NetSuiteId_overwritten$i,[$($testForCollision.CustomProperties.NetSuiteId)]) & SetCustomProperty(NetSuiteId,$($thisNewClient.id)) & SetCustomProperty(flagForReprocessing,$true)"
                     $testForCollision.Context.ExecuteQuery()
                     }
@@ -252,10 +252,15 @@ $fullSyncTime = Measure-Command {
     $pnpTermGroup = "Kimble"
     $pnpTermSet = "Opportunities"
     $allOppTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.IsDeprecated -eq $false}
-    $allOppTerms | % {
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.CustomProperties.NetSuiteOppId -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name Name2 -Value $_.Name -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name ClientId -Value $_.CustomProperties.NetSuiteClientId -Force
+    $allOppTerms | % { #Set the objects up so they are easy to compare. compare-object was struggling with $nulls, "" and whitespaces, so we're standardising on $null here
+        if([string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteOppId)){Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.CustomProperties.NetSuiteOppId -Force}
+        if([string]::IsNullOrWhiteSpace($_.Name)){Add-Member -InputObject $_ -MemberType NoteProperty -Name Name2 -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name Name2 -Value $_.Name -Force}
+        if([string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteClientId)){Add-Member -InputObject $_ -MemberType NoteProperty -Name ClientId -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name ClientId -Value $_.CustomProperties.NetSuiteClientId -Force}
+        if([string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjectId)){Add-Member -InputObject $_ -MemberType NoteProperty -Name ProjectId -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name ProjectId -Value $_.CustomProperties.NetSuiteProjectId -Force}
         }
 
     [datetime]$lastProcessed = $($allOppTerms | sort {$_.CustomProperties.NetSuiteOppLastModifiedDate} | select -Last 1).CustomProperties.NetSuiteOppLastModifiedDate
@@ -264,10 +269,15 @@ $fullSyncTime = Measure-Command {
     [array]$oppsToCheck = get-netSuiteOpportunityFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production)
     Write-Host "Processing [$($oppsToCheck.Count)] Opportunities"
     #$oppsToCheck = get-netSuiteOpportunityFromNetSuite -netsuiteParameters $(get-netSuiteParameters -connectTo Production) 
-    $oppsToCheck | % { #Set the objects up so they are easy to compare
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.id -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name Name2 -Value "$($_.tranId) $($_.title)" -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name ClientId -Value $_.entity.id -Force
+    $oppsToCheck | % { #Set the objects up so they are easy to compare. compare-object was struggling with $nulls, "" and whitespaces, so we're standardising on $null here
+        if([string]::IsNullOrWhiteSpace($_.id)){Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.id -Force}
+        if([string]::IsNullOrWhiteSpace("$($_.tranId) $($_.title)")){Add-Member -InputObject $_ -MemberType NoteProperty -Name Name2 -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name Name2 -Value "$($_.tranId) $($_.title)" -Force}
+        if([string]::IsNullOrWhiteSpace($_.entity.id)){Add-Member -InputObject $_ -MemberType NoteProperty -Name ClientId -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name ClientId -Value $_.entity.id -Force}
+        if([string]::IsNullOrWhiteSpace($_.custbody_project_created.id)){Add-Member -InputObject $_ -MemberType NoteProperty -Name ProjectId -Value $null -Force}
+        else{Add-Member -InputObject $_ -MemberType NoteProperty -Name ProjectId -Value $_.custbody_project_created.id -Force}
         }
 
     #Match all updated NetSuite records against Managed Metadata using NetSuiteId
@@ -362,8 +372,8 @@ $fullSyncTime = Measure-Command {
     $oppsWithChangedClient = $deltaClientId | ? {$_.SideIndicator -eq "<="}
     $oppsWithChangedClient | % {
         $thisUpdatedOpp = $_
-        Write-Verbose "Opps [$($termWithWrongName.Name)][$($termWithWrongName.Id)][$($thisUpdatedOpp.id)] seems to have been assigned to a new Client. Investigating further."
         $termWithWrongClient = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedOpp.NetSuiteId}
+        Write-Verbose "Opps [$($termWithWrongClient.Name)][$($termWithWrongClient.Id)][$($thisUpdatedOpp.id)] seems to have been assigned to a new Client. Investigating further."
         if ($termWithWrongClient.Count -eq 1){
             Write-Verbose "Reassigning Project Term [$($termWithWrongClient.Name)][$($termWithWrongClient.Id)] to Client [$($thisUpdatedOpp.parent.id)]"
             while(![string]::IsNullOrWhiteSpace($termWithWrongClient.CustomProperties."NetSuiteClientId_previous$i")){ #Find the lowest number for merging without overwriting anything
@@ -381,10 +391,36 @@ $fullSyncTime = Measure-Command {
                 }
             }
         else{
-             Write-Warning "Could not find corresponding Term for updated NetSuite Project [$($termWithWrongName.Name)][$($termWithWrongName.Id)][$($thisUpdatedOpp.id)]"
+             Write-Warning "Could not find corresponding Term for updated NetSuite Project [$($termWithWrongClient.Name)][$($termWithWrongClient.Id)][$($thisUpdatedOpp.id)]"
              [array]$doNotUpdateLastModified += $thisUpdatedOpp
             }    
         }
+
+    $deltaProjectId = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,ProjectId -PassThru #We compare the two equal sets on both NetSuiteId and NetSuiteProjectId to see which pairs have mismatched NetSuiteProjectId values
+    $oppsWithChangedProject = $deltaProjectId | ? {$_.SideIndicator -eq "<="}
+    $oppsWithChangedProject | % {
+        $thisUpdatedOpp = $_
+        Write-Host "Opp name [$($thisUpdatedOpp.tranId) $($thisUpdatedOpp.title)][$($thisUpdatedOpp.id)] seems to have been converted to a Project. Investigating further."
+        $termWithWrongProject = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedOpp.NetSuiteId}
+        if ($termWithWrongProject.Count -eq 1){
+            Write-Verbose "Updating Term [$($termWithWrongProject.Name)][$($termWithWrongProject.Id)] setting NetSuiteProjectId to [$($thisUpdatedOpp.ProjectId)]"
+            $termWithWrongProject.SetCustomProperty("NetSuiteProjectId",$thisUpdatedOpp.ProjectId)
+            try{
+                Write-Verbose "`tTrying: [$($termWithWrongProject.Name)][$($termWithWrongProject.Id)].CustomProperties.NetSuiteProjectId = [$($thisUpdatedOpp.ProjectId)]"
+                $termWithWrongProject.Context.ExecuteQuery()
+                }
+            catch {
+                Write-Error "Error updating Term [$($termWithWrongProject.Name)][$($termWithWrongProject.Id)].CustomProperties.NetSuiteProjectId = [$($thisUpdatedOpp.ProjectId)] in sync-netsuiteToManagedMetaData()"
+                [array]$doNotUpdateLastModified += $thisUpdatedOpp
+                }
+            }
+        else{
+             Write-Warning "Could not find corresponding Term for updated NetSuite Opp [$($termWithWrongProject.Name)][$($termWithWrongProject.Id)][$($thisUpdatedOpp.id)]"
+             [array]$doNotUpdateLastModified += $thisUpdatedOpp
+            }    
+ 
+        }
+
     #############################
     #Update LastModifiedDate
     #############################
