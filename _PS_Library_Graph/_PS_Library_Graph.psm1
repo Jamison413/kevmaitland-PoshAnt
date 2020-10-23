@@ -144,7 +144,7 @@ function add-graphLicenseToUser(){
             [parameter(Mandatory = $true,ParameterSetName="Guids")]
             [string]$userIdOrUpn
         ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [ValidateSet("K1","E1","E3","E5","EMS","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio")]
+            [ValidateSet("K1","E1","E3","E5","EMS","ATP","PowerBIFree","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio")]
             [string]$licenseFriendlyName 
         ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
             [string]$licenseGuid
@@ -299,6 +299,23 @@ function delete-graphCalendarEvent(){
             [string]$eventId
         )
     Write-Verbose "delete-graphCalendarEvent | $($eventId)"
+    invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/$eventId" -Verbose:$VerbosePreference
+}
+function delete-graphRecurringCalendarEvent(){
+    [cmdletbinding()]
+        Param (
+        [parameter(Mandatory = $true,ParameterSetName="UserId")]
+            [parameter(Mandatory = $true,ParameterSetName="UserUpn")]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserId")]
+            [parameter(Mandatory = $true,ParameterSetName = "UserUpn")]
+            [string]$seriesmasterId
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserUpn")]
+            [string]$UserUpn
+        ,[parameter(Mandatory = $true,ParameterSetName = "UserId")]
+            [string]$UserId
+        )
+    Write-Verbose "Deleting recurring event ID: $($seriesmasterId)"
     invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events/$eventId" -Verbose:$VerbosePreference
 }
 function delete-graphShiftUserShifts(){
@@ -1018,6 +1035,36 @@ $response
 Else{
 Write-Error "Please provide a valid upn or guid"
 }
+}
+function get-graphRoomCalendarEvents(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$roomemail
+        ,[parameter(Mandatory = $true)]
+            [string]$startDate
+        ,[parameter(Mandatory = $true)]
+            [string]$endDate
+        ,[parameter(Mandatory = $true)]
+            [string]$endTime
+        ,[parameter(Mandatory = $true)]
+            [string]$startTime
+
+        )
+    
+    $startDate = get-date $startDate -Format "yyyy-MM-dd"
+    $endDate = get-date $endDate -Format "yyyy-MM-dd" 
+    $startTime = get-date $startTime -Format "HH:mm:ss"
+    $endTime = get-date $endTime -Format "HH:mm:ss"
+
+    #FormatDateTimeinfo
+    $startDateTime = $startDate + "T" + $startTime
+    $endDateTime = $endDate + "T" + $endTime
+
+    #Need to use calendarView for all room events and specify a start/end datetime for query
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/users/$roomemail/calendarView/?endDateTime=$endDateTime&startDateTime=$startDateTime" -Verbose:$VerbosePreference
 }
 function get-graphShiftOpenShifts(){
     [cmdletbinding()]
