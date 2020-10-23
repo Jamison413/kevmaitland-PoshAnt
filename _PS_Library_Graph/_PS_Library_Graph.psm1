@@ -1289,6 +1289,9 @@ function get-graphUsers(){
     $filterCustomEq.Keys | % {
         $filter += " and $_ eq '$($filterCustomEq[$_])'"
         }
+    $filterCustomEq.Keys | % {
+        $filter += " and $_ eq '$($filterCustomEq[$_])'"
+        }
 
     if($filterLicensedUsers){
         $select = ",id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,companyName,country,department,anthesisgroup_employeeInfo"
@@ -1437,6 +1440,13 @@ function get-graphUsersWithEmployeeInfoExtensions(){
             [parameter(Mandatory = $false,ParameterSetName = "explicitUpn")]
             [parameter(Mandatory = $false,ParameterSetName = "explicitId")]
             [parameter(Mandatory = $false,ParameterSetName = "explicitDisplayName")]
+            #$(Get-PnPTerm -TermGroup "Anthesis" -TermSet "Business Units").Name
+            [ValidateSet($null,"Anthesis (UK) Ltd (GBR)","Anthesis Consulting Group (GBR)","Anthesis Consultoria Ambiental ltda (BRA)","Anthesis Energy UK Ltd (GBR)","Anthesis Enveco AB (SWE)","Anthesis Finland Oy (FIN)","Anthesis GmbH (DEU)","Anthesis Ireland Ltd (IRL)","Anthesis LLC (USA)","Anthesis Middle East (ARE)","Anthesis Philippines Inc. (PHL)","Anthesis Srl (ITA)","Caleb Management Services Ltd (GBR)","France (FRA)","Lavola 1981 SAU (ESP)","Lavola Andora SA (AND)","Lavola Columbia (COL)","The Goodbrand Works Ltd (GBR)")]
+            [string]$filterBusinessUnit
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitUpn")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitId")]
+            [parameter(Mandatory = $false,ParameterSetName = "explicitDisplayName")]
             [switch]$selectAllProperties
         )
     #Add $filters for the various properties
@@ -1445,6 +1455,9 @@ function get-graphUsersWithEmployeeInfoExtensions(){
         }
     if($filterContractType){
         $customFilter.Add("anthesisgroup_employeeInfo/contractType",$filterContractType)
+        }
+    if($filterBusinessUnit){
+        $filter += " and anthesisgroup_employeeInfo/businessUnit eq '$filterBusinessUnit'"
         }
 
     switch ($PsCmdlet.ParameterSetName){
