@@ -27,7 +27,7 @@
 
 <#--------Import Modules--------#>
 
-Import-Module -Name ActiveDirectory #Not compatible with pscore
+Import-Module -Name ActiveDirectory
 Import-Module -Name _PS_Library_UserManagement.psm1
 Import-Module -Name _PS_Library_GeneralFunctionality.psm1
 Import-Module -Name _PS_Library_Graph.psm1
@@ -42,18 +42,20 @@ $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 
 <#--------Service Connections--------#>
 
-$msolCredentials = set-MsolCredentials #Set these once as a PSCredential object and use that to build the CSOM SharePointOnlineCredentials object and set the creds for REST
-$restCredentials = new-spoCred -username $msolCredentials.UserName -securePassword $msolCredentials.Password
-$csomCredentials = new-csomCredentials -username $msolCredentials.UserName -password $msolCredentials.Password
-connect-ToMsol -credential $msolCredentials
-connect-ToExo -credential $msolCredentials
-connect-toAAD -credential $msolCredentials
-Connect-MsolService -credential $msolCredentials
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+connect-ToMsol
+connect-ToExo
+connect-toAAD
+Connect-MsolService
+#Jira
+$credential = Import-CliXml -Path 'C:\Users\Admin\Desktop\JiraPS.xml'
+
+
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
-$adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
+#Not really needed at the moment
+#$adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 
 <#--------Available License Check--------#>
 
@@ -88,14 +90,6 @@ If($msoluser){
         catch{
         Write-host "Failed to update MSOL account details" -ForegroundColor Red
         log-Error "Failed to update MSOL account details"
-        log-Error $Error
-        }
-        try{
-        update-msolusercoregroups -upn $upn -businessunit $businessunit -regionalgroup $regionalgroup
-        }
-        catch{
-        Write-host "Failed to update MSOL account core groups" -ForegroundColor Red
-        log-Error "Failed to update MSOL account core groups"
         log-Error $Error
         }
         try{
@@ -168,9 +162,9 @@ Switch($selection){
 
 #Get secondary geographic data from the term store
 $officeterm = Get-PnPTerm -Identity $($thisUser.FieldValues.Main_x0020_Office0.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
-$regionalgroup = (Get-DistributionGroup -Identity $officeterm.CustomProperties.'365 Regional Group').guid
 $country = $officeTerm.CustomProperties.Country
-   
+
+ 
 #365 user account: Create the 365 user
 write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) first, which will create the unliscensed 365 E1 user"    
     provision-365user -upn ($upn = (remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) `
@@ -186,6 +180,7 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -city = ($city = "$(($thisUser.FieldValues.Main_x0020_Office0.Label).Trim())") `
     -postcode = ($postcode = ($officeTerm.CustomProperties.'Postal Code')) `
     -linemanager = ($linemanager = ($thisUser.FieldValues.Line_x0020_Manager.Email)) `
+    -managerSAM = ($managerSAM = (($thisUser.FieldValues.Line_x0020_Manager.Email).split("@")[0]).replace("."," ")) `
     -businessunit = ($businessunit = ($thisUser.FieldValues.Business_x0020_Unit0.Label)) `
     -jobtitle = ($jobtitle = ($thisUser.FieldValues.JobTitle)) `
     -plaintextpassword = "Anthesis123" `
@@ -195,19 +190,44 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) `
 
+
+
+
+#Add to a regional group - this needs rewriting into a function, bodging for now
+$thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+$regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
+If(($regionalmembersgroup | Measure-Object).Count -eq 1){
+add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+$graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
+add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
+}
+Else{
+Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
+Write-Error "More than 1 group found for regional group. They haven't been added"
+}
+
+#Add to MDM groups - this is for Intune enrollment
+$BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
+if ($BYOD -eq 'y') {
+Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+}
+$COBO = Read-Host "Add to MDM - COBO user group? (y/n)"
+if ($COBO -eq 'y') {
+Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+}
+
 #update employee extension info with graph
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
 
 #Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+if($thisUser.FieldValues.WorkPhone){
 $businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.WorkPhone).Trim())")}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+}
+if($thisUser.FieldValues.CellPhone){
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.CellPhone).Trim())"}
-
-#Add users to any regional groups via stacking - this information is kept in the term store manually as we need to track how the geographic teams stack into eachother e.g. Bay Area > USA (All) > North America (All)
-$membersresult = add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $officeterm.CustomProperties.'Members Group GUID'
-$365result = add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $officeterm.CustomProperties.'365 Group GUID'
-
+}
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account
 If((![string]::IsNullOrWhiteSpace($upn)) -and (("Bristol, GBR" -eq $office) -or ("London, GBR" -eq $office))){
@@ -223,7 +243,7 @@ write-host "Creating AD account for $(remove-diacritics $($thisUser.FieldValues.
     -firstname $firstname `
     -surname ($surname = $lastname) `
     -displayname $displayname `
-    -managerSAM ($managerSAM =  ($thisUser.FieldValues.Line_x0020_Manager.Email.split("@")[0])) `
+    -managerSAM ($managerSAM =  ($thisUser.FieldValues.Line_x0020_Manager.Email.split("@")[0]).replace("."," ")) `
     -primaryteam $primaryteam `
     -jobtitle $jobtitle `
     -plaintextpassword $plaintextpassword `
@@ -274,6 +294,42 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 ForEach($thisUser in $selectedRequests){
 
+<#Testing Jira Ticket#>
+#Tickets for entries in the new list get 
+Set-JiraConfigServer 'https://anthesisit.atlassian.net'
+New-JiraSession -Credential $credential
+function New-JiraServiceRequest(){
+[cmdletbinding()]
+param(
+        [parameter(Mandatory = $false)]
+        [ValidateSet(“Bristol”,”Barcelona")]
+            [string]$ITTeam
+       ,[parameter(Mandatory = $false)]
+            [string]$summary
+       ,[parameter(Mandatory = $false)]
+            [string]$description
+        )
+#Get the team metadata
+Switch($ITTeam){
+"Bristol" {$id = "10129"}
+"Barcelona" {$id = "10128"}
+}
+#Build the object to post
+$fields = @{
+            #IT Team Responsible
+            customfield_10048 = @{
+            value = "$($ITTeam)"
+            id = "$($id)"
+            }
+           }
+Write-host "Creating Jira Ticket (service request type). Title is $($summary), Description is $($description)." -ForegroundColor Yellow
+New-JiraIssue -Project ITC -IssueType 'Service Request' -Summary "$($summary)" -Description $($description) -Fields $fields
+}
+
+New-JiraServiceRequest -ITTeam Bristol -summary "New Starter Request: $($thisUser.FieldValues.Title)" -description "New user account requested via the old list for $($thisUser.FieldValues.Title) in $($thisUser.FieldValues.Primary_x0020_Workplace)" -Verbose
+    
+
+
 #Before we start, check the contract type
 write-host "Before we start, what is the contract type?"
 write-host "A: Employee"
@@ -286,10 +342,9 @@ Switch($selection){
 
 #Get secondary geographic data from the term store
 $officeterm = Get-PnPTerm -Identity $($thisUser.fieldvalues.Primary_x0020_Workplace.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
-$regionalgroup = (Get-DistributionGroup -Identity $officeterm.CustomProperties.'365 Regional Group').guid
 $country = $officeTerm.CustomProperties.Country
+$regionalgroup = $officeterm
 
-   
 #365 user account: Create the 365 user
 write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) first, which will create the unliscensed 365 E1 user"    
     provision-365user -upn ($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) `
@@ -305,6 +360,7 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -city = ($city = "$(($thisUser.FieldValues.Primary_x0020_Workplace.Label).Trim())") `
     -postcode = ($postcode = ($officeTerm.CustomProperties.'Postal Code')) `
     -linemanager = ($linemanager = ($thisUser.FieldValues.Line_x0020_Manager.Email)) `
+    -managerSAM = ($managerSAM = (($thisUser.FieldValues.Line_x0020_Manager.Email).split("@")[0]).replace("."," ")) `
     -businessunit = ($businessunit = ($thisUser.FieldValues.Finance_x0020_Cost_x0020_Attribu.Label)) `
     -jobtitle = ($jobtitle = ($thisUser.FieldValues.Job_x0020_title)) `
     -plaintextpassword = "Anthesis123" `
@@ -314,14 +370,32 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) 
 
+
+
+#Add to a regional group - this needs rewriting into a function, bodging for now
+$thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+$regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
+If(($regionalmembersgroup | Measure-Object).Count -eq 1){
+add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+$graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
+add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
+}
+Else{
+Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
+Write-Error "More than 1 group found for regional group. They haven't been added"
+}
+   
+
 #update employee extension info with graph
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
 
 #Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
+If($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe){
 $businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0).Trim())"}
+}
 
     
 #AD user account: If user will be based in Bristol or London office, offer to create an AD user account
@@ -330,7 +404,7 @@ write-host "It looks like this user will either be based in the Bristol or Londo
 $confirmation = Read-Host "Create an AD account? (y/n)"
 if ($confirmation -eq 'y') {
 Write-Host "Okay, let's create an AD account for $($upn)..." -ForegroundColor Yellow
-}
+
 $allpermanentstaffadgroupprompt = Read-Host "Do we also want to add the New Starter to the All Permanant Staff AD Group? (y/n)"
     try{
 write-host "Creating AD account for $(remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))"    
@@ -353,6 +427,7 @@ Catch{
     log-Error "Failed to create AD account"
     log-Error $Error
     }
+}
 }
 Else{
 write-host "Okay, we will stop here." -ForegroundColor White
