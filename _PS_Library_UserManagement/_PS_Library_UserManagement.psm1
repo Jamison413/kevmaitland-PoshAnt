@@ -138,7 +138,7 @@ function create-msolUser{
 
 Try{
         #create the Mailbox rather than the MSOLUser, which will effectively create an unlicensed E1 user
-        if(![string]::IsNullOrWhiteSpace($upn)){New-Mailbox -Name $upn.Replace("."," ").Split("@")[0] -Password (ConvertTo-SecureString -AsPlainText $plaintextpassword -Force) -MicrosoftOnlineServicesID $upn}
+        if(![string]::IsNullOrWhiteSpace($upn)){New-Mailbox -Name $upn.Replace("."," ").Split("@")[0] -Password (ConvertTo-SecureString -AsPlainText $plaintextpassword -Force) -MicrosoftOnlineServicesID $upn -ResetPasswordOnNextLogon:$true}
         }
         Catch{
         Write-Error "Failed to create new Msol user [$($upn)] in create-msoluser"

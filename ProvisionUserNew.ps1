@@ -5,16 +5,11 @@
 #                                                                                                        #
 ##########################################################################################################
 
-
-
-
 <#---------------------------------------------Script Notes---------------------------------------------#>
 
-#This script handles both 365 and AD user creation
+#This script handles JUST 365 user creation - if you need an AD account, please create manually or use ad-newuser
 #It will be able to pull new starter information from both the new and old lists (see below for the correct sections)
 #Most of the cmdlets this script uses resides in the _PS_Library_UserManagement.psm1 module
-#This script CANNOT be run in PS6 (pscore) if you are trying to create an AD user, the ActiveDirectory module is not ported over yet fully.
-
 
 <#------------------------------------------------------------------------------------------------------#>
 
@@ -27,7 +22,6 @@
 
 <#--------Import Modules--------#>
 
-Import-Module -Name ActiveDirectory
 Import-Module -Name _PS_Library_UserManagement.psm1
 Import-Module -Name _PS_Library_GeneralFunctionality.psm1
 Import-Module -Name _PS_Library_Graph.psm1
@@ -42,27 +36,23 @@ $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 
 <#--------Service Connections--------#>
 
-
+#365 services
 connect-ToMsol
 connect-ToExo
 connect-toAAD
 Connect-MsolService
-#Jira
-$credential = Import-CliXml -Path 'C:\Users\Admin\Desktop\JiraPS.xml'
 
 
+#Graph
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
-#Not really needed at the moment
-#$adCredentials = Get-Credential -Message "Enter local AD Administrator credentials to create a new user in AD" -UserName "$env:USERDOMAIN\username"
 
 <#--------Available License Check--------#>
 
 #Just in case you want to save yourself a few more clicks, this will show you currently available licensing
 
 get-available365licensecount -licensetype "all"
-
 
 
 <#--------Create Meta-Functions--------#>
@@ -121,8 +111,6 @@ Else{
 write-host "*****************Failed to retrieve msol user account in time: $($upn)*****************" -ForegroundColor red
 }
 }
-
-
 
 
 #################################
@@ -192,29 +180,34 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
 
 
 
-
-#Add to a regional group - this needs rewriting into a function, bodging for now
-$thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
-$regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
-If(($regionalmembersgroup | Measure-Object).Count -eq 1){
-add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
-$graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
-add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
+If($selection -ne "B"){
+    #Add to a regional group - this needs rewriting into a function, bodging for now
+    $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+    $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
+    If(($regionalmembersgroup | Measure-Object).Count -eq 1){
+        add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+        $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
+        add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
 }
 Else{
 Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
 Write-Error "More than 1 group found for regional group. They haven't been added"
 }
+    #Add to MDM groups - this is for Intune enrollment
+    $BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
+    If ($BYOD -eq 'y') {
+    Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+    }
+    $COBO = Read-Host "Add to MDM - COBO user group? (y/n)"
+    If ($COBO -eq 'y') {
+    Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+}
 
-#Add to MDM groups - this is for Intune enrollment
-$BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
-if ($BYOD -eq 'y') {
-Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
 }
-$COBO = Read-Host "Add to MDM - COBO user group? (y/n)"
-if ($COBO -eq 'y') {
-Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+Else{
+Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor White
 }
+
 
 #update employee extension info with graph
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
@@ -229,39 +222,6 @@ if($thisUser.FieldValues.CellPhone){
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.CellPhone).Trim())"}
 }
     
-#AD user account: If user will be based in Bristol or London office, offer to create an AD user account
-If((![string]::IsNullOrWhiteSpace($upn)) -and (("Bristol, GBR" -eq $office) -or ("London, GBR" -eq $office))){
-write-host "It looks like this user will either be based in the Bristol or London offices." -ForegroundColor Yellow
-$confirmation = Read-Host "Create an AD account? (y/n)"
-if ($confirmation -eq 'y') {
-Write-Host "Okay, let's create an AD account for $($upn)..." -ForegroundColor Yellow
-}
-$allpermanentstaffadgroupprompt = Read-Host "Do we also want to add the New Starter to the All Permanant Staff AD Group? (y/n)"
-    try{
-write-host "Creating AD account for $(remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))"    
-    create-ADUser -upn $upn `
-    -firstname $firstname `
-    -surname ($surname = $lastname) `
-    -displayname $displayname `
-    -managerSAM ($managerSAM =  ($thisUser.FieldValues.Line_x0020_Manager.Email.split("@")[0]).replace("."," ")) `
-    -primaryteam $primaryteam `
-    -jobtitle $jobtitle `
-    -plaintextpassword $plaintextpassword `
-    -businessunit $businessunit `
-    -adCredentials $adCredentials `
-    -office $office `
-    -allpermanentstaffadgroupprompt $allpermanentstaffadgroupprompt `
-    -SAMaccountname ($SAMaccountname = $($upn.Split("@")[0]))
-    }
-Catch{
-    Write-host "Failed to create AD account" -ForegroundColor Red
-    log-Error "Failed to create AD account"
-    log-Error $Error
-    }
-}
-Else{
-write-host "Okay, we will stop here." -ForegroundColor White
-}
 }
 
 
@@ -293,42 +253,6 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 
 ForEach($thisUser in $selectedRequests){
-
-<#Testing Jira Ticket#>
-#Tickets for entries in the new list get 
-Set-JiraConfigServer 'https://anthesisit.atlassian.net'
-New-JiraSession -Credential $credential
-function New-JiraServiceRequest(){
-[cmdletbinding()]
-param(
-        [parameter(Mandatory = $false)]
-        [ValidateSet(“Bristol”,”Barcelona")]
-            [string]$ITTeam
-       ,[parameter(Mandatory = $false)]
-            [string]$summary
-       ,[parameter(Mandatory = $false)]
-            [string]$description
-        )
-#Get the team metadata
-Switch($ITTeam){
-"Bristol" {$id = "10129"}
-"Barcelona" {$id = "10128"}
-}
-#Build the object to post
-$fields = @{
-            #IT Team Responsible
-            customfield_10048 = @{
-            value = "$($ITTeam)"
-            id = "$($id)"
-            }
-           }
-Write-host "Creating Jira Ticket (service request type). Title is $($summary), Description is $($description)." -ForegroundColor Yellow
-New-JiraIssue -Project ITC -IssueType 'Service Request' -Summary "$($summary)" -Description $($description) -Fields $fields
-}
-
-New-JiraServiceRequest -ITTeam Bristol -summary "New Starter Request: $($thisUser.FieldValues.Title)" -description "New user account requested via the old list for $($thisUser.FieldValues.Title) in $($thisUser.FieldValues.Primary_x0020_Workplace)" -Verbose
-    
-
 
 #Before we start, check the contract type
 write-host "Before we start, what is the contract type?"
@@ -373,16 +297,21 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
 
 
 #Add to a regional group - this needs rewriting into a function, bodging for now
-$thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
-$regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
-If(($regionalmembersgroup | Measure-Object).Count -eq 1){
-add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
-$graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
-add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
+If($selection -ne "B"){
+    $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+    $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
+    If(($regionalmembersgroup | Measure-Object).Count -eq 1){
+    add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+    $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
+    add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
 }
 Else{
 Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
 Write-Error "More than 1 group found for regional group. They haven't been added"
+}
+}
+Else{
+Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor White
 }
    
 
@@ -395,42 +324,6 @@ If($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe){
 $businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0).Trim())"}
-}
-
-    
-#AD user account: If user will be based in Bristol or London office, offer to create an AD user account
-If((![string]::IsNullOrWhiteSpace($upn)) -and (("Bristol, GBR" -eq $office) -or ("London, GBR" -eq $office))){
-write-host "It looks like this user will either be based in the Bristol or London offices." -ForegroundColor Yellow
-$confirmation = Read-Host "Create an AD account? (y/n)"
-if ($confirmation -eq 'y') {
-Write-Host "Okay, let's create an AD account for $($upn)..." -ForegroundColor Yellow
-
-$allpermanentstaffadgroupprompt = Read-Host "Do we also want to add the New Starter to the All Permanant Staff AD Group? (y/n)"
-    try{
-write-host "Creating AD account for $(remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))"    
-    create-ADUser -upn $upn `
-    -firstname $firstname `
-    -surname ($surname = $lastname) `
-    -displayname $displayname `
-    -managerSAM ($managerSAM =  ($thisUser.FieldValues.Line_x0020_Manager.Email.split("@")[0])) `
-    -primaryteam $primaryteam `
-    -jobtitle $jobtitle `
-    -plaintextpassword $plaintextpassword `
-    -businessunit $businessunit `
-    -adCredentials $adCredentials `
-    -office $office `
-    -allpermanentstaffadgroupprompt $allpermanentstaffadgroupprompt `
-    -SAMaccountname ($SAMaccountname = $($upn.Split("@")[0]))
-    }
-Catch{
-    Write-host "Failed to create AD account" -ForegroundColor Red
-    log-Error "Failed to create AD account"
-    log-Error $Error
-    }
-}
-}
-Else{
-write-host "Okay, we will stop here." -ForegroundColor White
 }
 }
 
