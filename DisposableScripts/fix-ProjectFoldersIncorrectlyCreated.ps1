@@ -102,7 +102,7 @@ $wonProjs | % {
             $thisProject.Context.ExecuteQuery()
             delete-graphDriveItem -tokenResponse $tokenResponseSharePointBot -graphDriveId $thisClient.CustomProperties.GraphDriveId -graphDriveItemId $binMe.id -Verbose
             }
-        else{}
+        else{write-warning "Neither Opp nor Proj folder are emtpy for [$($oppFolderByName.webUrl)]"}
         }
     }
 

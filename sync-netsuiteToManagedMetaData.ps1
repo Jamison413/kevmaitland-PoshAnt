@@ -53,7 +53,7 @@ $fullSyncTime = Measure-Command {
     [array]$doNotUpdateLastModified = @() #If anything goes wrong processing a Client, we don't want to update the NetSuiteProjLastModifiedDate CustomProperty on the Term as the mismatch means it will get picked up in the next Full Reconcile
     $deltaClientId = Compare-Object -ReferenceObject @($clientsToCheck | Select-Object) -DifferenceObject $allClientTerms -Property NetSuiteId -PassThru -IncludeEqual #Match all updated NetSuite records against Managed Metadata using NetSuiteId
     $missingFromMmd = $deltaClientId | ? {$_.SideIndicator -eq "<="}
-    $missingFromMmd | % { #If no Id match, then create new Client Term and flag for reprocessing
+    $missingFromMmd | Select-Object |  % { #If no Id match, then create new Client Term and flag for reprocessing
         $thisNewClient = $_
         Write-Host "Creating new Client Term for [$($thisNewClient.companyName)]"
         $testForCollision = $allClientTerms | ? {$_.Name2 -eq $thisNewClient.Name2}
@@ -118,7 +118,7 @@ $fullSyncTime = Measure-Command {
         #>
     $deltaName = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,Name2 -PassThru #We compare the two equal sets on both NetSuiteId and Name2 to see which pairs have mismatched Name values
     $clientsWithChangedNames = $deltaName | ? {$_.SideIndicator -eq "<="}
-    $clientsWithChangedNames | % {
+    $clientsWithChangedNames | Select-Object | % {
         $thisUpdatedClient = $_
         Write-Host "Company name [$($thisUpdatedClient.companyName)][$($thisUpdatedClient.id)] seems to have changed. Investigating further."
         $termWithWrongName = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedClient.NetSuiteId}
@@ -398,7 +398,7 @@ $fullSyncTime = Measure-Command {
 
     $deltaProjectId = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,ProjectId -PassThru #We compare the two equal sets on both NetSuiteId and NetSuiteProjectId to see which pairs have mismatched NetSuiteProjectId values
     $oppsWithChangedProject = $deltaProjectId | ? {$_.SideIndicator -eq "<="}
-    $oppsWithChangedProject | % {
+    $oppsWithChangedProject | ? {![string]::IsNullOrWhiteSpace($_.ProjectId)} | % {
         $thisUpdatedOpp = $_
         Write-Host "Opp name [$($thisUpdatedOpp.tranId) $($thisUpdatedOpp.title)][$($thisUpdatedOpp.id)] seems to have been converted to a Project. Investigating further."
         $termWithWrongProject = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedOpp.NetSuiteId}
@@ -481,7 +481,7 @@ $fullSyncTime = Measure-Command {
     [array]$doNotUpdateLastModified = @() #If anything goes wrong processing a Project, we don't want to update the NetSuiteProjLastModifiedDate CustomProperty on the Term as the mismatch means it will get picked up in the next Full Reconcile
     $deltaProjId = Compare-Object -ReferenceObject @($projToCheck | Select-Object) -DifferenceObject $allProjTerms -Property NetSuiteId -PassThru -IncludeEqual #Match all updated NetSuite records against Managed Metadata using NetSuiteId
     $missingFromMmd = $deltaProjId | ? {$_.SideIndicator -eq "<="}
-    $missingFromMmd | % {
+    $missingFromMmd | Select-Object | % {
         $thisNewProj = $_
         $thisProjLabel = $thisNewProj.entityId
         $testForCollision = $allProjTerms | ? {$_.Name -eq $thisNewProj.Name}
@@ -528,7 +528,7 @@ $fullSyncTime = Measure-Command {
         #>
     $deltaName = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,Name2 -PassThru #We compare the two equal sets on both NetSuiteId and Name2 to see which pairs have mismatched Name values
     $projectsWithChangedNames = $deltaName | ? {$_.SideIndicator -eq "<="}
-    $projectsWithChangedNames | % {
+    $projectsWithChangedNames | Select-Object | % {
         $thisUpdatedProject = $_
         $doNotProceed = $false
         Write-Verbose "Project name [$($thisUpdatedProject.entityid)][$($thisUpdatedProject.id)] seems to have changed. Investigating further."
@@ -554,7 +554,7 @@ $fullSyncTime = Measure-Command {
 
     $deltaClientId = Compare-Object -ReferenceObject @($matchedId | Select-Object) -DifferenceObject @($matchedIdReversed | Select-Object) -Property NetSuiteId,ClientId -PassThru #We compare the two equal sets on both NetSuiteId and Name2 to see which pairs have mismatched Name values
     $projectsWithChangedClient = $deltaClientId | ? {$_.SideIndicator -eq "<="}
-    $projectsWithChangedClient | % {
+    $projectsWithChangedClient | Select-Object | % {
         $thisUpdatedProject = $_
         Write-Verbose "Project [$($thisUpdatedProject.entityid)][$($thisUpdatedProject.id)] seems to have been assigned to a new Client. Investigating further."
         $termWithWrongClient = $matchedIdReversed | ? {$_.NetSuiteId -eq $thisUpdatedProject.NetSuiteId}

@@ -1,6 +1,7 @@
 ﻿$365creds = set-MsolCredentials
 connect-ToExo -credential $365creds
 
+
 $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt" -Verbose
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
@@ -218,7 +219,43 @@ foreach ($currentRequest in $selectedRequests){
         catch{$_}
         }
     catch{$_}
-    }
+    
+
+<#Testing Jira Ticket#>
+Set-JiraConfigServer 'https://anthesisit.atlassian.net'
+$credential = Import-CliXml -Path 'C:\Users\Admin\Desktop\JiraPS.xml'
+New-JiraSession -Credential $credential
+function New-JiraServiceRequest(){
+[cmdletbinding()]
+param(
+        [parameter(Mandatory = $false)]
+        [ValidateSet(“Bristol”,”Barcelona")]
+            [string]$ITTeam
+       ,[parameter(Mandatory = $false)]
+            [string]$summary
+       ,[parameter(Mandatory = $false)]
+            [string]$description
+        )
+#Get the team metadata
+Switch($ITTeam){
+"Bristol" {$id = "10129"}
+"Barcelona" {$id = "10128"}
+}
+#Build the object to post
+$fields = @{
+            #IT Team Responsible
+            customfield_10048 = @{
+            value = "$($ITTeam)"
+            id = "$($id)"
+            }
+           }
+Write-host "Creating Jira Ticket (service request type). Title is $($summary), Description is $($description)." -ForegroundColor Yellow
+New-JiraIssue -Project ITC -IssueType 'Service Request' -Summary "$($summary)" -Description $($description) -Fields $fields
+}
+
+New-JiraServiceRequest -ITTeam Bristol -summary "New External Site Request: $($fullRequest.FieldValues.Title)" -description "External Site Requested by $($fullRequest.FieldValues.Site_x0020_Admin.Email)" -Verbose
+    
+ }
 
 
 
