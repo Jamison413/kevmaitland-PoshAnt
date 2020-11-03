@@ -138,7 +138,7 @@ function create-msolUser{
 
 Try{
         #create the Mailbox rather than the MSOLUser, which will effectively create an unlicensed E1 user
-        if(![string]::IsNullOrWhiteSpace($upn)){New-Mailbox -Name $upn.Replace("."," ").Split("@")[0] -Password (ConvertTo-SecureString -AsPlainText $plaintextpassword -Force) -MicrosoftOnlineServicesID $upn}
+        if(![string]::IsNullOrWhiteSpace($upn)){New-Mailbox -Name $upn.Replace("."," ").Split("@")[0] -Password (ConvertTo-SecureString -AsPlainText $plaintextpassword -Force) -MicrosoftOnlineServicesID $upn -ResetPasswordOnNextLogon:$true}
         }
         Catch{
         Write-Error "Failed to create new Msol user [$($upn)] in create-msoluser"
@@ -201,6 +201,21 @@ function license-msolUser{
         Write-Error "Failed to license new Msol user [$($upn)] in license-msoluser (EMS)"
         Write-Error $_
         }
+    Try{
+        If("GB" -eq $usagelocation){
+        $licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:MDATP_XPLAT"}
+        write-host "****************Adding ATP license****************"
+        Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $licenseToAssign.AccountSkuId
+        }
+        Else{
+        write-host "I Shouldn't have an ATP license (yet) - Usage Location is $($usagelocation)"
+        }
+        }
+        Catch{
+        Write-Error "Failed to license new Msol user [$($upn)] in license-msoluser (ATP)"
+        Write-Error $_
+        }
+
 <#
 .SYNOPSIS
 Licenses Msol user object with given licenses. The function breaks down the two types of licensning into 'Core Licensing' for E1 and E3 and 'Optional Licesnning' for licenses such as EMS which might not apply to the whole business. 
@@ -329,14 +344,27 @@ function update-msolusercoregroups{
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
         [string]$businessunit
         ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
-        [string]$regionalgroup
+        [Microsoft.SharePoint.Client.Taxonomy.TermSetItem]$regionalgroup
+        ,[parameter(Mandatory = $false,ParameterSetName="UPN")]
+        [psobject]$tokenResponse
     )
 
 #If key details aren't null, let's add the msoluser to the correct regional group based on Office location (from Term Store)
 Try{
+    
     if(![string]::IsNullOrWhiteSpace($office)){
-        write-host "Adding to regionalgroup: $($office)"
-    Add-DistributionGroupMember -Identity $regionalgroup -Member $upn -BypassSecurityGroupManagerCheck 
+    write-host "Adding to regionalgroup: $($office)"
+    #Add-DistributionGroupMember -Identity $regionalgroup -Member $upn -BypassSecurityGroupManagerCheck 
+        $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($regionalgroup.CustomProperties.'365 Regional Group')" -Verbose
+        $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
+            If(($regionalmembersgroup | Measure-Object).Count -eq 1){
+            Add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Confirm:$false -BypassSecurityGroupManagerCheck
+            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $upn -Verbose
+            }
+            Else{
+            Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
+            Write-Error "More than 1 group found for regional group. They haven't been added"
+            }
     }
     }
     catch{
@@ -552,7 +580,7 @@ function set-mailboxPermissions{
         Add-MailboxFolderPermission "$($UPN):\Calendar" -User "All$(get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $businessunit)@anthesisgroup.com" -AccessRights "LimitedDetails"
          }
       Catch{
-        Write-Error "Failed to update SPO user [$($upn)] in update-sharePointInitialConfig"
+        Write-Error "Failed to update EXO user [$($upn)] in set-mailboxPermissions"
         Write-Error $_
       }
 }
