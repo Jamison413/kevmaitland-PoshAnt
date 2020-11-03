@@ -186,7 +186,7 @@ If($selection -ne "B"){
     $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
     If(($regionalmembersgroup | Measure-Object).Count -eq 1){
         add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
-        $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
+        $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
         add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
 }
 Else{
@@ -302,7 +302,7 @@ If($selection -ne "B"){
     $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
     If(($regionalmembersgroup | Measure-Object).Count -eq 1){
     add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
-    $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $upn
+    $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
     add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
 }
 Else{

@@ -220,36 +220,43 @@ function process-folder(){
             }
         #region Update Name (if changed)
         if($oppProjTerm.Name -ne $driveFolder.name){#Fix the name if it has changed
-            Write-Host "`t$($thisIsA)Folder Name [$($driveFolder.name)] is out-of-date - updating $($thisIsA)Folder name to [$($oppProjTerm.Name)]"
-            try{
-                $updatedFolder = set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $clientTerm.CustomProperties.GraphDriveId -driveItemId $oppProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$oppProjTerm.Name} -ErrorAction Stop
-                if($updatedFolder){
-                    $driveFolder = $updatedFolder
-                    $flagForReprocessing = $false #If this worked, mark the Term as clean
-                    }
-                else{Write-Host "`t`test-graphDriveItem didn't return the updated Folder, but didn't produce an error either :/"}
+            if($thisIsA -eq "Opp" -and ![string]::IsNullOrEmpty($oppProjTerm.CustomProperties.NetSuiteProjectId)){
+                #Do nothing - once the Opp has been converted to a Project, we don't want to use the Opp to set the folder name any more
+                Write-Host "`t$($thisIsA)Folder Name [$($driveFolder.name)] is out-of-date, but that's becasue it's been converted to a Project. Skipping this discrepency."
                 }
-            catch{
-                if($_.Exception -match "(409)"){ #Folder already exists
-                    Write-Host "`t`tA different $($thisIsA)Folder with the name [$($oppProjTerm.Name)] already exists. Attempting simple Merge."
-                    try{
-                        $updatedFolder = merge-folders -tokenResponse $tokenResponseSharePointBot -sourceDriveItem $driveFolder -oppProjTerm $oppProjTerm -sourceClientTerm $clientTerm -updateOppProjTerm
-                        if($updatedFolder){
-                            $driveFolder = $updatedFolder
-                            $flagForReprocessing = $false #If this worked, mark the Term as clean
+            else{
+                Write-Host "`t$($thisIsA)Folder Name [$($driveFolder.name)] is out-of-date - updating $($thisIsA)Folder name to [$($oppProjTerm.Name)]"
+                try{
+                    $updatedFolder = set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $clientTerm.CustomProperties.GraphDriveId -driveItemId $oppProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$oppProjTerm.Name} -ErrorAction Stop
+                    if($updatedFolder){
+                        $driveFolder = $updatedFolder
+                        $flagForReprocessing = $false #If this worked, mark the Term as clean
+                        }
+                    else{Write-Host "`t`test-graphDriveItem didn't return the updated Folder, but didn't produce an error either :/"}
+                    }
+                catch{
+                    if($_.Exception -match "(409)"){ #Folder already exists
+                        Write-Host "`t`tA different $($thisIsA)Folder with the name [$($oppProjTerm.Name)] already exists. Attempting simple Merge."
+                        try{
+                            $updatedFolder = merge-folders -tokenResponse $tokenResponseSharePointBot -sourceDriveItem $driveFolder -oppProjTerm $oppProjTerm -sourceClientTerm $clientTerm -updateOppProjTerm
+                            if($updatedFolder){
+                                $driveFolder = $updatedFolder
+                                $flagForReprocessing = $false #If this worked, mark the Term as clean
+                                }
+                            else{Write-Host "`t`tmerge-folders didn't return the updated Folder, but didn't produce an error either :/"}
                             }
-                        else{Write-Host "`t`tmerge-folders didn't return the updated Folder, but didn't produce an error either :/"}
+                        catch{
+                            Write-Error "Error merging Folders follwing a Name collision while updating Name for $($thisIsA) [$($oppProjTerm.Name)][$($oppProjTerm.id)][$($oppProjTerm.CustomProperties.DriveItemId)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)]. driveItem being renamed was [$($driveFolder.Name)][$($driveFolder.id)][$($driveFolder.webUrl)] | Retrying with -Verbose"
+                            merge-folders -tokenResponse $tokenResponseSharePointBot -sourceDriveItem $driveFolder -oppProjTerm $oppProjTerm -sourceClientTerm $clientTerm -updateOppProjTerm -Verbose
+                            }
                         }
-                    catch{
-                        Write-Error "Error merging Folders follwing a Name collision while updating Name for $($thisIsA) [$($oppProjTerm.Name)][$($oppProjTerm.id)][$($oppProjTerm.CustomProperties.DriveItemId)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)]. driveItem being renamed was [$($driveFolder.Name)][$($driveFolder.id)][$($driveFolder.webUrl)] | Retrying with -Verbose"
-                        merge-folders -tokenResponse $tokenResponseSharePointBot -sourceDriveItem $driveFolder -oppProjTerm $oppProjTerm -sourceClientTerm $clientTerm -updateOppProjTerm -Verbose
+                    else{
+                        Write-Error "Error updating Name of $($thisIsA)Folder [$($driveFolder.name)][$($driveFolder.webUrl)] for $thisIsA [$($oppProjTerm.Name)][$($oppProjTerm.CustomProperties.DriveItemId)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)] | Retrying with Verbose"
+                        set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $clientTerm.CustomProperties.GraphDriveId -driveItemId $oppProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$oppProjTerm.Name} -Verbose
+                        Return #Exit early - we don't want *more* folders being created if we've already got name collisions.
                         }
                     }
-                else{
-                    Write-Error "Error updating Name of $($thisIsA)Folder [$($driveFolder.name)][$($driveFolder.webUrl)] for $thisIsA [$($oppProjTerm.Name)][$($oppProjTerm.CustomProperties.DriveItemId)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)] | Retrying with Verbose"
-                    set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $clientTerm.CustomProperties.GraphDriveId -driveItemId $oppProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$oppProjTerm.Name} -Verbose
-                    Return #Exit early - we don't want *more* folders being created if we've already got name collisions.
-                    }
+                
                 }
             }
             #endregion

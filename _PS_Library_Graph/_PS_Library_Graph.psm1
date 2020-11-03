@@ -1278,7 +1278,7 @@ function get-graphUsers(){
             [string]$filterUsageLocation
         ,[parameter(Mandatory = $false)]
             [ValidatePattern("@")]
-            [string]$filterUpn
+            [string[]]$filterUpns
         ,[parameter(Mandatory = $false)]
             [hashtable]$filterCustomEq = @{}
         ,[parameter(Mandatory = $false)]
@@ -1293,8 +1293,8 @@ function get-graphUsers(){
     if($filterUsageLocation){
         $filter += " and usageLocation eq '$filterUsageLocation'"
         }
-    if($filterUpn){
-        $filter += " and userPrincipalName eq '$filterUpn'"
+    if($filterUpns){
+        $filter += " and (userPrincipalName eq '$($filterUpns -join "' or userPrincipalName eq '")')"
         }
     $filterCustomEq.Keys | % {
         $filter += " and $_ eq '$($filterCustomEq[$_])'"
@@ -1472,7 +1472,7 @@ function get-graphUsersWithEmployeeInfoExtensions(){
 
     switch ($PsCmdlet.ParameterSetName){
         "ambiguous"           {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers}
-        "explicitUpn"         {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -filterUpn $filterUpn}
+        "explicitUpn"         {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -filterUpns $filterUpn}
         "explicitDisplayName" {
             $customFilter.Add("displayName",$filterDisplayName)
             get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers
@@ -2018,7 +2018,7 @@ function remove-graphUsersFromGroup(){
     switch ($PsCmdlet.ParameterSetName){
         "UserUpns" {
             $graphUserUpns | % {
-                [array]$graphUserIds += $(get-graphUsers -tokenResponse $tokenResponse -filterUpn $_).id
+                [array]$graphUserIds += $(get-graphUsers -tokenResponse $tokenResponse -filterUpns $_).id
                 }
             
             } 
@@ -2520,8 +2520,8 @@ function set-graphUserManager(){
             [string]$managerUPN
         )
 
-$employeeid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($userUPN) | Select-Object -Property "id"
-$managerid = get-graphUsers -tokenResponse $tokenResponse -filterUpn $($managerUPN) | Select-Object -Property "id"
+$employeeid = get-graphUsers -tokenResponse $tokenResponse -filterUpns $($userUPN) | Select-Object -Property "id"
+$managerid = get-graphUsers -tokenResponse $tokenResponse -filterUpns $($managerUPN) | Select-Object -Property "id"
 If(($employeeid) -and ($managerid)){
 $body = "{
   `"@odata.id`": `"https://graph.microsoft.com/v1.0/users/$($managerid.id)`"
