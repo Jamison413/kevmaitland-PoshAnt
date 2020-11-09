@@ -47,44 +47,71 @@ function parse-unifiedAuditLogCsvToPsObjects($pathToAuditLogCsvFile){
         $event | Add-Member -MemberType NoteProperty -Name TimeStamp -Value $thisLog.Split(",")[0] -Force
         $event | Add-Member -MemberType NoteProperty -Name User -Value $thisLog.Split(",")[1] -Force
         $event | Add-Member -MemberType NoteProperty -Name Event -Value $thisLog.Split(",")[2] -Force
-        $remainingEvent = $thisLog.Substring($thisLog.Split(",")[0].Length + $thisLog.Split(",")[1].Length + $thisLog.Split(",")[2].Length +5)
-        $subLumpLabel = ""
-        foreach($lump in ($remainingEvent -split ':[\[{]+""')){
-            foreach($subLump in $($lump -split ',""|,{').Replace('""','')){
-                $i = 0
-                #Write-Host -ForegroundColor Yellow "$subLump"
-                if([string]::IsNullOrWhiteSpace($subLump.Split(":")[1])){
-                    $subLumpLabel += $subLump.Split(":")[0]+"_"
-                    }
-                else{
-                    $member = $($subLumpLabel+$subLump.Split(":")[0])
-                    if($(Get-Member -InputObject $event -Name $member -MemberType Properties) -ne $null){
-                        $member+=[string]$i
-                        do{
-                            $member = $member.Substring(0,$member.Length-[string]$i.Length)
-                            $i++
-                            $member+=[string]$i
-                            }
-                        while($(Get-Member -InputObject $event -Name $member -MemberType Properties) -ne $null)
-                        }
-                    $value = $subLump.SubString($subLump.Split(":")[0].Length+1)
-                    while ($value.EndsWith('}') -or $value.EndsWith(']') -or $value.EndsWith('"')){$value = $value.Substring(0,$value.Length-1)}
-                    Write-Host -ForegroundColor darkYellow "`t$member  :  $value"
-                    $event | Add-Member -MemberType NoteProperty -Name $member -Value $value 
-                    if($subLump.SubString($subLump.Split(":")[0].Length+1) -match "}"){
-                        if(($lump.Replace('""','').IndexOf($subLump)+$subLump.Length -lt $lump.Replace('""','').Length) -and ($lump.Replace('""','').Substring($lump.Replace('""','').IndexOf($subLump)+$subLump.Length,2) -ne ",{") -and ($subLump.Length - $subLump.IndexOf("}") -le 2)){ #Special cases for [{},{},{}] and unescaped } in value
-                            Write-Host -ForegroundColor darkcyan "SubLumpLabel = $subLumpLabel > $($subLumpLabel.SubString(0,$subLumpLabel.Length - $($subLumpLabel.Split("_")[$($subLumpLabel.Split("_").Count-2)].Length +1)))"
-                            $subLumpLabel = $subLumpLabel.SubString(0,$subLumpLabel.Length - $($subLumpLabel.Split("_")[$($subLumpLabel.Split("_").Count-2)].Length +1))
-                            }
-                        }
-                    }
-                }
-            [array]$events += $event
+        $remainingEvent = $thisLog.Substring($thisLog.Split(",")[0].Length + $thisLog.Split(",")[1].Length + $thisLog.Split(",")[2].Length +4).Trim('"')
+        $remainingEvent = $remainingEvent.Replace('""""',"''")
+        $remainingEvent = $remainingEvent.Replace('""','"')
+        [array]$eventObjects += ConvertFrom-Json $remainingEvent
+        }
+    $eventObjects
+    }
+function export-psObjectsToBetterCsv(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [psobject[]]$inputPsObjects
+        ,[parameter(Mandatory = $true)]
+            [string]$outputCsvFilePath
+        ,[parameter(Mandatory = $false)]
+            [switch]$fullyFlattenObjects = $false
+        )
+    
+    $headers = get-propertyNames -inputPsObjects $inputPsObjects -fullyFlattenObjects:$true | Sort-Object
+    $headers | % {
+        if($_ -match "."){
+            $_ = {"$_.$($_)"}
             }
         }
-    $events
-    }
+    $inputPsObjects[0] | Select-Object -Property $headers | Export-Csv -NoTypeInformation -Path $outputCsvFilePath
+    
+    $headers[1]
 
+    }
+function Flatten-Array{
+    $input | ForEach-Object{
+        if ($_ -is [array]){$_ | Flatten-Array}else{$_}
+    } | Where-Object{![string]::IsNullorEmpty($_)}
+    # | Where-Object{$_} would also work.
+}
+function get-propertyNames(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [psobject[]]$inputPsObjects
+        ,[parameter(Mandatory = $false)]
+            [switch]$fullyFlattenObjects = $false
+        ,[parameter(Mandatory = $false)]
+            [string]$propertyPrefix
+        )
+
+    $properties = $inputPsObjects | Get-Member | ? {$_.MemberType -eq "NoteProperty"} | Select-Object -Unique | Flatten-Array 
+    @($properties | Select-Object) | % {
+        $thisProperty = $_
+        <#if($fullyFlattenObjects){
+            if($thisProperty.Definition -match 'Object\[\]'){
+                get-propertyNames -inputPsObjects $inputPsObjects.$($thisProperty.Name) -fullyFlattenObjects -propertyPrefix "$($propertyPrefix)$($thisProperty.Name)."
+                }
+            }
+        "$($propertyPrefix)$($thisProperty.Name)"
+        }#>
+        if($thisProperty.Definition -match 'Object\[\]'){
+            $thisProperty -join ","
+            get-propertyNames -inputPsObjects $inputPsObjects.$($thisProperty.Name) -fullyFlattenObjects -propertyPrefix "$($propertyPrefix)$($thisProperty.Name)."
+            }
+        else{
+            "$($propertyPrefix)$($thisProperty.Name)"
+            }
+        }
+    }
 if ($log){rv log}
 do{
     [int]$lastCount = $log.Count

@@ -1,4 +1,53 @@
-﻿function convert-timeZone(){
+﻿function Convert-AzureAdObjectIdToSid {
+<#
+.SYNOPSIS
+Convert an Azure AD Object ID to SID
+ 
+.DESCRIPTION
+Converts an Azure AD Object ID to a SID.
+Author: Oliver Kieselbach (oliverkieselbach.com)
+The script is provided "AS IS" with no warranties.
+ 
+.PARAMETER ObjectID
+The Object ID to convert
+#>
+
+    param([String] $ObjectId)
+
+    $bytes = [Guid]::Parse($ObjectId).ToByteArray()
+    $array = New-Object 'UInt32[]' 4
+
+    [Buffer]::BlockCopy($bytes, 0, $array, 0, 16)
+    $sid = "S-1-12-1-$array".Replace(' ', '-')
+
+    return $sid
+}
+function Convert-AzureAdSidToObjectId {
+<#
+.SYNOPSIS
+Convert a Azure AD SID to Object ID
+ 
+.DESCRIPTION
+Converts an Azure AD SID to Object ID.
+Author: Oliver Kieselbach (oliverkieselbach.com)
+The script is provided "AS IS" with no warranties.
+ 
+.PARAMETER ObjectID
+The SID to convert
+#>
+
+    param([String] $Sid)
+
+    $text = $sid.Replace('S-1-12-1-', '')
+    $array = [UInt32[]]$text.Split('-')
+
+    $bytes = New-Object 'Byte[]' 16
+    [Buffer]::BlockCopy($array, 0, $bytes, 0, 16)
+    [Guid]$guid = $bytes
+
+    return $guid
+}
+function convert-timeZone(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true,ParameterSetName = "FromCountry")]
@@ -1245,4 +1294,18 @@ function stringify-hashTable($hashtable,$interlimiter,$delimiter){
         $dirty.Substring(0,$dirty.Length-$delimiter.length)
         }
     }
+function test-isGuid(){
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$objectGuid
+        )
+
+    # Define verification regex
+    [regex]$guidRegex = '(?im)^[{(]?[0-9A-F]{8}[-]?(?:[0-9A-F]{4}[-]?){3}[0-9A-F]{12}[)}]?$'
+
+    # Check guid against regex
+    return $objectGuid -match $guidRegex
+    }
+
 #endregion
