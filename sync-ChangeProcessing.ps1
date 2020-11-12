@@ -53,6 +53,7 @@ $context = Get-PnPContext
 #Get all the items
 $AllNewStartersitems = Get-PnPListItem -List $List
 
+
 <#--------------New Starter Intitial Notification Email---------------#>
 
 #If PowersehllTrigger is set to "1"
@@ -192,7 +193,6 @@ Connect-PnPOnline -AccessToken $tokenResponse.access_token
 
 
 <#--------Create the Employee Folder Structure--------#>
-
 
 ForEach($folder in $Folderstocreate){
 
@@ -377,7 +377,7 @@ Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeoplese
 <#--------------Start Date Change Processing---------------#>
 
  #Iterate through each item and see if anything has changed by comparing the Start Date and Last_Start Date columns.
-    ForEach($item in $AllNewStartersitems){
+ForEach($item in $AllNewStartersitems){
     
    #I don't work at the moment
     #$LastModifiedDate = $Item.FieldValues.Last_x0020_Modified_x0020_Date
@@ -433,6 +433,43 @@ Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeoplese
             Set-PnPListItem -List $List -Identity $item.ID -Values @{"FlowTrigger" = "Change"}
          }
 
+}
+
+
+
+<#--------------Laptop Sent Notification to Line Manager---------------#>
+
+
+ForEach($item in $AllNewStartersitems){
+        
+        #Check if the Laptop status field is set to "Sent to Starter" and the Manager notification field is still set to 1 (so waiting to be notified - this is the default value and waits to be changed)
+        If($($item.FieldValues.Laptop_x0020_Status -eq "Sent to Starter") -and ($item.FieldValues.Laptop_x0020_Status_ManagerNotif -eq 1)){
+
+
+        Write-host "There has been a change to the Laptop Status: '$($Item.FieldValues.Employee_x0020_Preferred_x0020_N)'" -ForegroundColor Yellow
+
+            $htmlfriendlytitle = $List -replace " ",'%20'
+            $StarterItemLink = $SiteURL + "/Lists" + "/$($htmlfriendlytitle)" +  "/DispForm.aspx?" + "ID=$($Item.FieldValues.ID)"
+
+        #Send email letting people know
+                    $subject = "New Starters Update: A Laptop for $($Item.FieldValues.Employee_x0020_Preferred_x0020_N) has been posted!"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hi $($Item.FieldValues.Line_x0020_Manager.LookupValue),`r`n`r`n<BR><BR>"
+            $body += "You're receiving this email as a laptop for $($item.FieldValues.Employee_x0020_Preferred_x0020_N) has been posted and will arrive before their start date.`r`n`r`n<BR><BR>"
+            $body += "You can check the information about the New Starter here: $($StarterItemLink)`r`n`r`n<BR><BR><BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>"
+            $body += "The People Services Robot"
+
+            Send-MailMessage -To "IT_Team_GBR@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "Nina.Cairns@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "Shauna.Vaughan@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+            Send-MailMessage -To "$($item.FieldValues.Line_x0020_Manager.Email)" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+
+            Connect-PnPOnline -Credentials $adminCreds -Url $SiteURL
+            $context = Get-PnPContext
+
+            Set-PnPListItem -List $List -Identity $item.ID -Values @{"Laptop_x0020_Status_ManagerNotif" = "0"}
+
+    }
 }
 
 

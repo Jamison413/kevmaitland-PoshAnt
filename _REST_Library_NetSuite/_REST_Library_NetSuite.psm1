@@ -677,6 +677,55 @@ function get-netSuiteContactFromNetSuite(){
 
     $contactsEnumerated
     }
+function get-netSuiteCustomListValues(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [ValidateSet("customer","contact","clientSector","clientType","clientRating","customerstatus")]
+            [string]$objectType
+
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    switch($objectType){
+        "customer"       {$endpoint = "customer"}
+        "contact"        {$endpoint = "contact"}
+        "clientSector"   {$endpoint = "customlist_ant_clientsector"}
+        "clientType"     {$endpoint = "customlist_clienttype"}
+        "clientRating"   {$endpoint = "customlist_clientrating"}
+        "customerstatus" {$endpoint = "customerstatus"}
+        }
+
+    try{
+        $customListValues = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/$endpoint" -netsuiteParameters $netsuiteParameters #-Verbose 
+        $customListValuesEnumerated = [psobject[]]::new($customListValues.count)
+        for ($i=0; $i -lt $customListValues.count;$i++) {
+            if($i%100 -eq 0){Write-Verbose "[$($i)]/[$($customListValues.count)] ($($i / $customListValues.count)%)"}
+            $customListValuesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($customListValues.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
+            }
+        }
+    catch{
+        #Weird 405 error on customerStatus prevents us listing the available values, so we have to trial-and-error
+        if((ConvertFrom-Json $_.ErrorDetails).status -eq 405){
+            while($consecutiveErrors -le 2){
+                try{
+                    $i++
+                    [array]$customListValuesEnumerated += invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/$endpoint/$i" -netsuiteParameters $netsuiteParameters -ErrorAction SilentlyContinue
+                    $consecutiveErrors = 0
+                    }
+                catch{$consecutiveErrors++}
+                }
+            }
+        }
+    $customListValuesEnumerated
+    }
 function get-netSuiteEmployeesFromNetSuite(){
     [cmdletbinding()]
     Param (
@@ -700,6 +749,26 @@ function get-netSuiteEmployeesFromNetSuite(){
         $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
         }
     $employeesEnumerated
+    }
+function get-netSuiteMetadata(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $false)]
+        [ValidateSet("customer","contact")]
+        [string]$objectType
+
+        ,[parameter(Mandatory=$false)]
+        [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "get-netSuiteMetadata [$objectType]"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    $metadata = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/metadata-catalog/$objectType" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $metadata 
     }
 function get-netSuiteOpportunityFromNetSuite(){
     [cmdletbinding()]
@@ -1345,3 +1414,5 @@ function update-netSuiteProjectInSqlCache(){
         }
     else{Write-Error "Record with NsInsternalId [$($sqlNetSuiteProject.NsExternalId)] does not exist in database. Cannot UPDATE.";break}
     }
+
+$clientStauses = invoke-netSuiteRestMethod -requestType GET -url "$((get-netsuiteParameters -connectTo Production).uri)/customerstatus/20" -netsuiteParameters $(get-netsuiteParameters -connectTo Production)

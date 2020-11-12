@@ -1845,6 +1845,103 @@ function new-graphCalendarEvent(){
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events" -graphBodyHashtable $event
     #https://docs.microsoft.com/en-us/graph/api/calendar-post-events?view=graph-rest-1.0&tabs=http
     }
+function new-graphGroup(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$groupDisplayName
+        ,[parameter(Mandatory = $false)]
+            [string]$groupDescription
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet ("Security")]
+            [string]$groupType
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet ("Assigned")]
+            [string]$membershipType
+        ,[parameter(Mandatory = $true)]
+            [string[]]$groupOwners
+        ,[parameter(Mandatory = $true)]
+            [string[]]$groupMembers
+        )    
+
+    $bodyHash = @{"displayName"=$groupDisplayName;"description"=$groupDescription}
+    switch($groupType){
+        "Security" {
+            $bodyHash.Add("mailEnabled",$false)
+            $bodyHash.Add("mailNickname",$(guess-aliasFromDisplayName $groupDisplayName))
+            $bodyHash.Add("securityEnabled",$true)
+            }
+        }
+
+    #Get GUIDs for Owners & Members
+    if($groupOwners){ #Split into GUIDs & (presumed) UPNs
+        $ownersGuids = @()
+        $groupOwners | Select-Object | % {
+            if(test-isGuid $_){$ownersGuids += $_}
+            elseif($_ -match "@"){$ownersUpns += $_}
+            else{[array]$ownersUpns += "$_@anthesisgroup.com"}
+            }
+        if($ownersUpns){ #If we have UPNs, we need to convert them to GUIDs
+            try{[array]$ownersGuids += $(get-graphUsers -tokenResponse $tokenResponse -filterUpns $ownersUpns).id} #Try doing it all in one query first (more efficient)
+            catch{ #If it doesn't work, process the users individually so we can warn about the specific problems
+                $ownersUpns | Select-Object | % {
+                    $user = get-graphUsers -tokenResponse $tokenResponse -filterUpns $_
+                    if($user){$ownersGuids += $user.id}
+                    else{Write-Warning "Owner [$($_)] could not be resolved to an AAD user. Cannot add to group."}
+                    }
+                }
+            }
+        }
+    if($groupMembers){ #Split into GUIDs & (presumed) UPNs
+        $memberGuids = @()
+        $groupMembers | Select-Object | % {
+            if(test-isGuid $_){$memberGuids += $_}
+            elseif($_ -match "@"){[array]$memberUpns += $_}
+            else{[array]$memberUpns += "$_@anthesisgroup.com"}
+            }
+        if($memberUpns){ #If we have UPNs, we need to convert them to GUIDs
+            try{[array]$memberGuids += $(get-graphUsers -tokenResponse $tokenResponse -filterUpns $memberUpns).id} #Try doing it all in one query first (more efficient)
+            catch{ #If it doesn't work, process the users individually so we can warn about the specific problems
+                $memberUpns | Select-Object | % {
+                    $user = get-graphUsers -tokenResponse $tokenResponse -filterUpns $_
+                    if($user){$memberGuids += $user.id}
+                    else{Write-Warning "Member [$($_)] could not be resolved to an AAD user. Cannot add to group."}
+                    }
+                }
+            }
+
+        }
+
+    #Max 20 combined Owners/Members can be supplied during Group creation: https://docs.microsoft.com/en-us/graph/api/group-post-groups?view=graph-rest-1.0&tabs=http#example-2-create-a-group-with-owners-and-members
+    $ownersGuids | Select-Object | % {
+        if($i -lt 20){
+            [array]$ownersArray += "https://graph.microsoft.com/v1.0/directoryObjects/$_"
+            $i++
+            }
+        }
+    $memberGuids | Select-Object | % {
+        if($i -lt 20){
+            [array]$membersArray += "https://graph.microsoft.com/v1.0/directoryObjects/$_"
+            $i++
+            }
+        }
+
+    if($ownersArray){$bodyHash.Add("owners@odata.bind",$ownersArray)}
+    if($membersArray){$bodyHash.Add("members@odata.bind",$membersArray)}
+
+    $newGroup = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups" -graphBodyHashtable $bodyHash
+
+    #Max 20 Owners/Members can be supplied during Group creation: https://docs.microsoft.com/en-us/graph/api/group-post-groups?view=graph-rest-1.0&tabs=http#example-2-create-a-group-with-owners-and-members
+    if($memberGuids.Count + $ownersGuids.Count -gt 20){
+        $fullOwners = add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $newGroup.id -memberType Owners -graphUserIds $ownersGuids
+        $fullMembers = add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $newGroup.id -memberType Members -graphUserIds $memberGuids
+        $newGroup = get-graphGroups -tokenResponse $tokenResponse -filterId $newGroup.id
+        }
+
+    $newGroup
+    }
 function new-graphList(){
     [cmdletbinding()]
     param(

@@ -13,14 +13,15 @@ Start-Transcript $transcriptLogName -Append
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_MSOL
 Import-Module _PS_Library_Graph
+Import-Module _PS_Library_MFA
 
-$Admin = "kevin.maitland@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Kev.txt) 
+$Admin = "emily.pressey@anthesisgroup.com"
+$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Em.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 connect-ToMsol -credential $adminCreds
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 
@@ -35,23 +36,6 @@ $suboptimalEnabledUsersWithMFA = $enabledUsersWithMFA | ? {"PhoneAppNotification
 Write-Information "$($suboptimalEnabledUsersWithMFA.Count) Suboptimally configured User accounts with MFA enabled found"
 $optimalEnabledUsersWithMFA = $enabledUsersWithMFA | ? {"PhoneAppNotification" -eq $($_.StrongAuthenticationMethods | ? {$_.IsDefault -eq $true}).MethodType} | Sort-Object UsageLocation, DisplayName
 Write-Information "$($OptimalEnabledUsersWithMFA.Count) Optimally configured User accounts with MFA enabled found"
-
-#User MFA Stats
-
-[INT]$TotalMFACount = $enabledUsers.Count
-[INT]$TotalEnabledCount = $enabledUsersWithMFA.Count
-#Extra details
-    [INT]$Totalsuboptimal = $suboptimalEnabledUsersWithMFA.Count
-    [INT]$Totaloptimal = $optimalEnabledUsersWithMFA.Count
-[INT]$TotalWithoutMFA = $enabledUsersWithoutMFA.Count
-#Find the total percentage
-[INT]$TotalMFAScore = $TotalEnabledCount/$TotalMFACount*100
-[INT]$TotalOptimalMFAScore = $Totaloptimal/$TotalEnabledCount*100
-
-Write-host "$TotalMFAScore%"
-Write-host "$TotalOptimalMFAScore%"
-
-
 
 
 #Microsoft now just prompts people to set up MFA as default so they might have MFA enabled already, find the difference and activate it for those who have already set up a method (it means no change):
@@ -70,6 +54,50 @@ Else{
 $userswithnomfa += $user
 }
 }
+
+#Remove boxes and bots
+$userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "acsmailboxaccess@anthesisgroup.com"
+$userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "ACSSupport@anthesisgroup.com"
+$userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "NewGroupBot@anthesisgroup.com"
+$usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "acsmailboxaccess@anthesisgroup.com"
+$usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "ACSSupport@anthesisgroup.com"
+$usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "NewGroupBot@anthesisgroup.com"
+
+#Enable it for anyone in Spain, remove them from the list
+ForEach($user in $userswithnomfa){
+    If(($user.UsageLocation -eq "ES") -or ($user.UsageLocation -eq "CO")){
+    Write-Host "$($user.UserPrincipalName) is in ESP or CO, enabling MFA" -ForegroundColor Yellow
+    
+    
+    #Create an empty StrongAuthenticationRequirement object
+    $emptyAuthObject = New-Object -TypeName Microsoft.Online.Administration.StrongAuthenticationRequirement
+    $emptyAuthObject.RelyingParty = "*"
+    $emptyAuthObject.State = "Enabled"
+    $emptyAuthObject.RememberDevicesNotIssuedBefore = (Get-Date)
+
+    #Get the GUID for the SSPR Group
+    #$ssprGroup = Get-MsolGroup -SearchString "SSPR Testers"
+    [guid]$ssprGroupObjectId = "fee80bd5-6e2f-4888-a51c-9581cf64eb18" #This is the GUID for the SSPR Testers Group
+
+    #Figure out who to run this for
+    $ESPToEnable = convertTo-arrayOfEmailAddresses $user.UserPrincipalName
+
+
+$ESPToEnable | % {
+    $thisUser = Get-MsolUser -UserPrincipalName $_
+    Write-Verbose "MFA is currently set to [$($thisUser.StrongAuthenticationRequirements.State)] for $_"
+    if([string]::IsNullOrWhiteSpace($thisUser.StrongAuthenticationRequirements)){
+        Write-Verbose "Enabling MFA for $_"
+        Set-MsolUser -UserPrincipalName $thisUser.UserPrincipalName -StrongAuthenticationRequirements $emptyAuthObject
+        }
+    else{Write-Verbose "MFA already [$($thisUser.StrongAuthenticationRequirements.State)] for $_"}
+    Add-MsolGroupMember -GroupObjectId $ssprGroupObjectId -GroupMemberType User -GroupMemberObjectId $thisUser.ObjectId
+    }
+#Remove them from the list
+$userswithnomfa = $userswithnomfa | where-object -Property "userPrincipalName" -NE $thisUser.UserPrincipalName       
+ }
+}
+
 
 #Enable MFA for anyone who already has it set up
 ForEach($MFAregistereduser in $usersnotactivatedwithMFA){
@@ -103,33 +131,36 @@ $upnsToEnable | % {
     }
 }
 
+
+
 #Send a message to Teams to get Emily to chase anyone who's bypassed the prompts
-
-
 $allnewuserrequestsoldlist = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/hr" -listName "New User Requests" -expandAllFields
 $allnewuserrequestsnewlist = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -listName "New Starter Details" -expandAllFields
 
-#Remove boxes
-$userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "acsmailboxaccess@anthesisgroup.com"
-$userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "ACSSupport@anthesisgroup.com"
 
 $startstochase = @()
 ForEach($user in $userswithnomfa){
 
-
+$thisuserold = ""
+$thisusernew = ""
 $thisuserold = $allnewuserrequestsoldlist | Where-Object -Property "Fields" -Match "$($user.DisplayName)"
 $thisusernew = $allnewuserrequestsnewlist | Where-Object -Property "Fields" -Match "$($user.DisplayName)"
+
 If($thisusernew){
 #from new list
 $expandstartdate = $thisusernew | select -ExpandProperty "Fields" | select -Property "StartDate"
+$expandstartdate = $expandstartdate.StartDate.Split("T")[0]
+Write-Host "$($user.UserPrincipalName) start date: $($expandstartdate)" -ForegroundColor Cyan
 }
 Else{
 #From old list
 $expandstartdate = $thisuserold | select -ExpandProperty "Fields" | select -Property "Start_x0020_Date"
+$expandstartdate = $expandstartdate.Start_x0020_Date.Split("T")[0]
+Write-Host "$($user.UserPrincipalName) start date: $($expandstartdate)" -ForegroundColor Cyan
 }
 If($expandstartdate){
 
-$startdate = $expandstartdate.Start_x0020_Date.Split("T")[0] | get-date -Format dd/MM/yyyy
+$startdate = $expandstartdate | get-date
 If($startdate -lt (get-date)){
 $userobj = @{
 "User" = $user.UserPrincipalName;
