@@ -817,12 +817,14 @@ function get-microsoftProductInfo(){
         "MSProductName" {$getId = 1}
         "MSStringID" {$getId = 2}
         "GUID" {$getId = 3}
+        "intY" {$getId = 4}
         }
     switch($fromType){
         "FriendlyName" {$fromId = 0}
         "MSProductName" {$fromId = 1}
         "MSStringID" {$fromId = 2}
         "GUID" {$fromId = 3}
+        "intY" {$getId = 4}
         }
     Write-Verbose "getId = [$getId]"
     Write-Verbose "fromId = [$fromId]"
