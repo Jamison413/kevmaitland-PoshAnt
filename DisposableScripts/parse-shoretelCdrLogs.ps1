@@ -25,7 +25,7 @@ gci "C:\Users\KevMaitland\OneDrive - Anthesis LLC\Desktop\CDR Logs" | % {
                 "CallerID" = $thisEntry[7]
                 "DailyID" = $thisEntry[8]
                 })
-            if($logEntry.DialledNumber -match "9+"){Add-Member -InputObject $logEntry -MemberType NoteProperty -Name Direction -Value "Outbound"}
+            if($logEntry.DialledNumber -match "9\+"){Add-Member -InputObject $logEntry -MemberType NoteProperty -Name Direction -Value "Outbound"}
             else{Add-Member -InputObject $logEntry -MemberType NoteProperty -Name Direction -Value "Inbound"}
             $logs += $logEntry
             }
@@ -36,3 +36,5 @@ $usersReceivingCalls = $logs | ? {$_.DialledNumber -ne "Main" -and $_.Direction 
 $usersMakingCalls = $logs | ? {$_.Direction -eq "Outbound"}
 
 $usersReceivingCalls | Group-Object -Property DialledNumber | Sort-Object Count -Descending
+$usersReceivingCalls | Group-Object -Property DialledNumber | Sort-Object Name
+$usersMakingCalls | Group-Object -Property DialledNumber | Sort-Object Count -Descending

@@ -151,6 +151,10 @@ function new-mdmLocalAdminPolicy(){
             [Switch]$removeOtherMembers
         ,[parameter(Mandatory = $false)]
             [Switch]$overrideOtherPolicies
+        ,[parameter(Mandatory = $false)]
+            [Switch]$includeDeviceAdmins
+        ,[parameter(Mandatory = $false)]
+            [Switch]$includeMe
         )
 
     $user = get-graphUsers -tokenResponse $tokenResponseTeams -filterUpns $userUPN
@@ -191,34 +195,44 @@ function new-mdmLocalAdminPolicy(){
         $mdmGroup = new-graphGroup -tokenResponse $tokenResponseTeams -groupDisplayName $namingConvention -groupDescription "Used to assign $userUPN as Local Admin" -groupType Security -membershipType Assigned -groupOwners "00aa81e4-2e8f-4170-bc24-843b917fd7cf" -groupMembers $userUPN
         }
 
+    #Define the new Policy
+    if($includeMe){ #This will ad the AAD Device Administrators Role/Group to the Local Admin group
+        $additionalAdmins = "
+    <member name = `"$(Invoke-Expression "whoami")`""
+        }
+    if($includeDeviceAdmins){ #This will ad the AAD Device Administrators Role/Group to the Local Admin group
+        $additionalAdmins += "
+    <member name = `"S-1-12-1-2392505957-1079223134-2636866998-1702916978`""
+        }
+    $omaSettingsLocalAdmin = @{
+        '@odata.type' = "#microsoft.graph.omaSettingString"
+        displayName = $namingConvention
+        description = "Used to assign $userUPN as Local Admin"
+        omaUri = "./Vendor/MSFT/Policy/Config/RestrictedGroups/ConfigureGroupMembership"
+        value = "<groupmembership>
+<accessgroup desc = `"Administrators`">
+    <member name = `"Administrator`" />$deviceAdmins
+    <member name = `"AzureAD\$userUPN`" />
+</accessgroup>
+</groupmembership>"
+        }
+    $bodyHash = @{
+        displayName = $namingConvention
+        description = "Used to assign $userUPN as Local Admin"
+        omaSettings = @($omaSettingsLocalAdmin)
+        }
+
     #Test whether policy exists
     $existingPolicy = get-mdmPolicyDeviceConfig -tokenResponse $tokenResponseIntune -filterDisplayNameEquals $namingConvention
     if($existingPolicy.Count -gt 1){ #Filter not yet supported for this endpoint
         $existingPolicy = $existingPolicy | ? {$_.displayName -eq $namingConvention}
         }
-    if($existingPolicy){$mdmPolicy = $existingPolicy}
+    if($existingPolicy){
+        $mdmPolicy = invoke-graphPatch -tokenResponse $tokenResponseIntune -graphQuery "/deviceManagement/deviceConfigurations/$($existingPolicy.id)" -graphBodyHashtable $bodyHash
+        }
     else{
-        $omaSettingsLocalAdmin = @{
-            '@odata.type' = "#microsoft.graph.omaSettingString"
-            displayName = $namingConvention
-            description = "Used to assign $userUPN as Local Admin"
-            omaUri = "./Vendor/MSFT/Policy/Config/RestrictedGroups/ConfigureGroupMembership"
-            value = "<groupmembership>
-<accessgroup desc = `"Administrators`">
-    <member name = `"Administrator`" />
-    <member name = `"AzureAD\$userUPN`" />
-</accessgroup>
-</groupmembership>"
-            }
-        $bodyHash = @{
-            '@odata.type' = "#microsoft.graph.windows10CustomConfiguration"
-            displayName = $namingConvention
-            description = "Used to assign $userUPN as Local Admin"
-            omaSettings = @($omaSettingsLocalAdmin)
-            }
-        
+        $bodyHash.Add('@odata.type',"#microsoft.graph.windows10CustomConfiguration") #We only define the objectType if we're creating a new policy
         $mdmPolicy = invoke-graphPost -tokenResponse $tokenResponseIntune -graphQuery "/deviceManagement/deviceConfigurations" -graphBodyHashtable $bodyHash
-
         }
     
     #Assign Policy to Group

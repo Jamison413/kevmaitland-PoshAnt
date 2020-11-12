@@ -72,7 +72,24 @@
     $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
     $tokenResponse
     }
+function get-atpMachines(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        )
 
+    invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines" -Verbose:$VerbosePreference
+    }
+function get-atpSoftware(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        )
+
+    invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/software" -Verbose:$VerbosePreference
+    }
 function invoke-atpGet(){
     [cmdletbinding()]
     param(
