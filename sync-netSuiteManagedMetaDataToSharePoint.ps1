@@ -645,7 +645,7 @@ $fullSyncTime = Measure-Command {
             $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -aadAppCreds $sharePointBotDetails -renewTokenExpiringInSeconds 30
             $thisProjTerm = $_
             Write-Host "Processing Proj Term [$($thisProjTerm.Name)][$($thisProjTerm.id)][$($thisProjTerm.CustomProperties.DriveItemId)] for NetSuiteClientId [$($thisProjTerm.CustomProperties.NetSuiteClientId)]"
-            process-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $thisProjTerm -arrayOfAllClientTerms $allClientTerms -arrayOfLeadProjSubFolders $listOfClientFolders -arrayOfAllOppTerms $allOppTerms
+            process-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $thisProjTerm -arrayOfAllClientTerms $allClientTerms -arrayOfLeadProjSubFolders $listOfLeadProjSubFolders -arrayOfAllOppTerms $allOppTerms
             }
         }
     #endregion
