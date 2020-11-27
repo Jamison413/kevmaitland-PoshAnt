@@ -1,4 +1,4 @@
-﻿if((Test-Path -Path $env:APPDATA\Microsoft\Templates\Normal.dotm.old2) -eq $false){​​
+﻿if((Test-Path -Path $env:APPDATA\Microsoft\Templates\Normal.dotm.old2) -eq $false){
 Rename-Item -Path $env:APPDATA\Microsoft\Templates\Normal.dotm -NewName Normal.dotm.old2 -Force
 }​​
 if((Test-Path -Path $env:APPDATA\Microsoft\Templates\Normal.dotm.old2) -eq $true -or (Test-Path -Path $env:APPDATA\Microsoft\Templates\Normal.dotm) -eq $false){​​
