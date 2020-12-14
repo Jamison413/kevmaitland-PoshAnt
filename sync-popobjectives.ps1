@@ -5,11 +5,19 @@ Write-Host "Script started:" (Get-date)
 
 Import-Module _PNP_Library_SPO
 
+<#
+$Admin = "kimblebot@anthesisgroup.com"
+$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+#>
 
 $Admin = "emily.pressey@anthesisgroup.com"
 $AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
+
+$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+connect-ToExo -credential $exoCreds
 
 
 function get-POPReviewPeriod(){
@@ -118,6 +126,45 @@ Else{
 }
 
 
+####################
+#                  #
+# Anthesis Academy #
+#                  #
+####################
+
+$registrantProcessingList = "Anthesis Academy: Registrant Processing List"
+$masterModuleList = "Anthesis Academy: Master Module List" 
+$modulecompletelist = "Anthesis Academy: Module Completion Record"
+
+
+#Generate new module codes
+$allmodules = Get-PnPListItem -List $masterModuleList
+ForEach($moduleitem in $allmodules){
+
+  If(!($moduleitem.FieldValues.ModuleCode)){
+    
+    #Generate code
+    $generatemodulecode = "$($moduleitem.Id)" + "_" + (($moduleitem.FieldValues.Created_x0020_Date).Split("T")[0]) + "_" + (($moduleitem.FieldValues.ModuleName).Replace(" ",""))
+
+    #If no module code, check no duplicates and add one, add to complete list also
+    $completedmodules = Get-PnPListItem -List $modulecompletelist
+    If(($completedmodules.where({$_.modulecode -eq $generatemodulecode}))){
+    write-host "Something has gone wrong and there are duplicate Module Codes" -ForegroundColor Red
+        $report = @()
+        $report += "***************Errors found in Anthesis Academy Sync: Duplicate Module Codes***************" + "<br><br>"
+        $report += "Errors found on this Module: $($moduleitem.fieldvalues.ModuleName). This will cause issues in Powerapps and needs to be manually resolved." + "<br><br>"       
+        $report = $report | out-string
+Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+
+    }
+    Else{
+    Set-PnPListItem -List $masterModuleList -Identity $moduleitem.Id -Values @{"ModuleCode" = $($generatemodulecode)}
+    Add-PnPListItem -List $modulecompletelist -Values @{"ModuleName" = $moduleitem.FieldValues.ModuleName; "ModuleCode" = $generatemodulecode}
+    }
+
+  }
+}
+
 
 #Sync Anthesis Academy Registrants
 
@@ -125,8 +172,6 @@ Else{
 #Just a note: on the Registrant prcoessing list there are two 'trigger' columns, Processed (Powershell) and FlowProcessed (Flow). On Flow, if there is a 1 we are still waiting for the Line Manager to approve registration, after approval this column will be set to 0 indicating no outstanding actions waiting.
 #On approval, Flow also sets the Powershell 'processed' column to 1, which we will pick up below, process it and set it to 0 if nothing went wrong.
 
-$registrantProcessingList = "Anthesis Academy: Registrant Processing List"
-$masterModuleList = "Anthesis Academy: Master Module List" 
 
 $allnewregistrants = Get-PnPListItem -List $registrantProcessingList  -Query "<View><Query><Where><Eq><FieldRef Name='Processed'/><Value Type='Text'>1</Value></Eq></Where></Query></View>"
 ForEach($newregistrant in $allnewregistrants){
@@ -135,7 +180,7 @@ ForEach($newregistrant in $allnewregistrants){
 If($newregistrant.FieldValues.FlowProcessed -eq "1"){
 Write-Host "We shouldn't be processing this registrant, they are unapproved by line manager: $($newregistrant.FieldValues.RegistrantName.Email)" -ForegroundColor Red
         $report = @()
-        $report += "***************Errors found in Anthesis Academy Sync: Powershel is trying to process an Unapproved Registrant***************" + "<br><br>"
+        $report += "***************Errors found in Anthesis Academy Sync: Powershell is trying to process an Unapproved Registrant***************" + "<br><br>"
         $report += "Weird - it's $($newregistrant.FieldValues.RegistrantName.Email). ID $($newregistrant.Id). This shouldn't be happening!" + "<br><br>"       
         $report = $report | out-string
 Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
@@ -180,12 +225,27 @@ Exit
 
 #Add the new registrant if they aren't already there - update the module list item
 If($currentregistrants -notcontains $newregistrant.FieldValues.RegistrantName.Email){
+
+#############
+#If there are no current registrants (this is a pnp bug, some sort of array issue), just add 1, else add to the list and up the count
+#############
+If(!$currentregistrants){
+    $moduleUpdate = Set-PnPListItem -List $masterModuleList -Identity $thismodule.Id -Values @{"RegistrantList" = $newregistrant.FieldValues.RegistrantName.Email; "RegistrantCount" = "1"}
+}
+Else{
     $currentregistrants += $newregistrant.FieldValues.RegistrantName.Email
     #Overwrite the current list and update the count
     $registrantcount = ($currentregistrants | Measure-Object).Count
     $moduleUpdate = Set-PnPListItem -List $masterModuleList -Identity $thismodule.Id -Values @{"RegistrantList" = $currentregistrants; "RegistrantCount" = $registrantcount}
+}        
     #Check it worked
-    If(($moduleUpdate.FieldValues.RegistrantList.Email -contains $newregistrant.FieldValues.RegistrantName.Email) -and ($moduleUpdate.FieldValues.RegistrantCount -eq $registrantcount)){
+    
+    #Registrant count matches number of registrants
+    $thenewregistrantlist = Get-PnPListItem -List $masterModuleList -Id $thismodule.Id
+    $registrants = $thenewregistrantlist.FieldValues.RegistrantList
+    
+    #New Registrant in Module Registrant list
+    If(($moduleUpdate.FieldValues.RegistrantList.Email -contains $newregistrant.FieldValues.RegistrantName.Email) -and (($registrants | Measure-Object).Count -eq $thenewregistrantlist.FieldValues.RegistrantCount)){
     write-host "Success! $($newregistrant.FieldValues.RegistrantName.Email) now registered for $($thismodule.fieldvalues.ModuleName)" -ForegroundColor Yellow
     Set-PnPListItem -List $registrantProcessingList -Identity $newregistrant.Id -Values @{"Processed" = "0"}
     
@@ -194,7 +254,7 @@ If($currentregistrants -notcontains $newregistrant.FieldValues.RegistrantName.Em
                 <p>We just wanted to let you know that you have been successfully signed up for the Anthesis Academy Module <b>$($thismodule.fieldvalues.ModuleName)<\b><\p>
                 <p>You don't need to do anything else - keep an eye on your Teams and Inbox for next steps from the Module Leader ($($thismodule.fieldvalues.ModuleLeader.LookupValue))<\b><br><br><\p>
                 <p>Love,</p>
-                <p>The Anthesis Academy Registration Robot</p>
+                <p>The Anthesis Academy Registration</p>
                 </BODY></HTML>"
                 Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to "emily.pressey@anthesisgroup.com" -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
     }
@@ -215,8 +275,6 @@ Else{
 Write-Host "Error: Too many modules were found, we couldn't find the one needed! There are likely to be duplicate Module Codes in the list" -ForegroundColor Red
 }
 }
-
-
 
 
 Stop-Transcript
