@@ -253,8 +253,8 @@ Else{
                 $body = "<HTML><BODY><p>Hi $($newregistrant.FieldValues.RegistrantName.Email),</p>
                 <p>We just wanted to let you know that you have been successfully signed up for the Anthesis Academy Module <b>$($thismodule.fieldvalues.ModuleName)<\b><\p>
                 <p>You don't need to do anything else - keep an eye on your Teams and Inbox for next steps from the Module Leader ($($thismodule.fieldvalues.ModuleLeader.LookupValue))<\b><br><br><\p>
-                <p>Love,</p>
-                <p>The Anthesis Academy Registration</p>
+                <p></p>
+                <p>The Anthesis Academy</p>
                 </BODY></HTML>"
                 Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to "emily.pressey@anthesisgroup.com" -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
     }
