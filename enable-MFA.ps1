@@ -90,8 +90,8 @@ Stop-Transcript
 
 
 
-$e = Get-MsolUser -UserPrincipalName "Aga.Siemiginowska@anthesisgroup.com"
-$e.StrongAuthenticationUserDetails
+$e = Get-MsolUser -UserPrincipalName "Cora.Philpott@anthesisgroup.com"
+$e.StrongAuthenticationUserRequirements
 
 
 <#

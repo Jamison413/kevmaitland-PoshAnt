@@ -21,7 +21,7 @@ foreach($request in $selectedRequests){
     $request = $requests | ? {$_.FieldValues.GUID.Guid -eq $request.'$_.FieldValues.GUID.Guid'}
     $displayName = "$($request.FieldValues.Title) $($request.FieldValues.Site_x0020_Type)"
 
-    $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
+    $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
     $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
     #region Get the Managers and Members in the right formats
@@ -139,7 +139,7 @@ foreach($request in $selectedRequests){
 
     if($addExecutingUserAsTemporaryOwner){
         Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-DistributionGroupMember -Identity $new365Group.CustomAttribute2 -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        Remove-DistributionGroupMember -Identity $new365Group.anthesisgroup_UGSync.dataManagerGroupId -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
         }
     if($addExecutingUserAsTemporaryMember){
         Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
