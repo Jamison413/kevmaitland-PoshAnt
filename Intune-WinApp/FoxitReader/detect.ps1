@@ -1,5 +1,5 @@
 $thisApp = "FoxitReader"
-$filePathToTest = "${env:ProgramFiles}\Foxit Software\Foxit Reader"
+$filePathToTest = "${env:ProgramFiles(x86)}\Foxit Software\Foxit Reader"
 #$thisApp = "%%PLACEHOLDERAPPNAME%%"
 #$filePathToTest = "%%PLACEHOLDERDETECTIONFILE%%"
 $scheduledTaskToTest = "$env:ProgramData\CustomScripts\redo-choco$thisApp-scheduledTaskCreated.log"

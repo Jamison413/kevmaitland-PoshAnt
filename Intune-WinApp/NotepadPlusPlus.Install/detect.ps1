@@ -1,5 +1,5 @@
 $thisApp = "NotepadPlusPlus.Install"
-$filePathToTest = "${env:ProgramFiles}\Paint.Net\PaintDotNet.exe"
+$filePathToTest = "${env:ProgramFiles}\Notepad++\notepad++.exe"
 #$thisApp = "%%PLACEHOLDERAPPNAME%%"
 #$filePathToTest = "%%PLACEHOLDERDETECTIONFILE%%"
 $scheduledTaskToTest = "$env:ProgramData\CustomScripts\redo-choco$thisApp-scheduledTaskCreated.log"

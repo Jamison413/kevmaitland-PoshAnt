@@ -1287,6 +1287,8 @@ function get-graphUsers(){
             [string[]]$selectCustomProperties
         ,[parameter(Mandatory = $false)]
             [switch]$selectAllProperties = $false
+        ,[parameter(Mandatory = $false)]
+            [switch]$useBetaEndPoint = $false
         )
 
     #We need the GroupId, so if we were only given the UPN, we need to find the Id from that.
@@ -1308,6 +1310,7 @@ function get-graphUsers(){
         }
     if($selectAllProperties){
         $select = ",anthesisgroup_employeeInfo,accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"
+        if($useBetaEndPoint){$select = $select+",infoCatalogs,preferredDataLocation,signInActivity"}
         } #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
     $selectCustomProperties | % {
         $select += ",$_"
@@ -1331,7 +1334,7 @@ function get-graphUsers(){
 
     Write-Verbose "Graph Query = [users$refiner]"
     try{
-        $allUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users$refiner"
+        $allUsers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users$refiner" -useBetaEndPoint:$useBetaEndPoint
         }
     catch{
         Write-Error "Error retrieving Graph Users in get-graphUsers() using query [users$refiner]"
@@ -1580,6 +1583,8 @@ function invoke-graphGet(){
             [switch]$returnEntireResponse
         ,[parameter(Mandatory = $false)]
             [hashtable]$additionalHeaders
+        ,[parameter(Mandatory = $false)]
+            [switch]$useBetaEndPoint = $false
         )
     $sanitisedGraphQuery = $graphQuery.Trim("/")
     $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
@@ -1589,9 +1594,11 @@ function invoke-graphGet(){
             }
         }
     #Write-Verbose $(stringify-hashTable -hashtable $headers -interlimiter "=" -delimiter ";")
+    if($useBetaEndPoint){$endpoint = "beta"}
+    else{$endpoint = "v1.0"}
     do{
-        Write-Verbose "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery"
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET #-Verbose:$VerbosePreference -ErrorAction:$ErrorActionPreference
+        Write-Verbose "https://graph.microsoft.com/$endpoint/$sanitisedGraphQuery"
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/$endpoint/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET #-Verbose:$VerbosePreference -ErrorAction:$ErrorActionPreference
         if($response.value){
             $results += $response.value
             Write-Verbose "[$([int]$response.value.count)] results returned on this cycle, [$([int]$results.count)] in total"
@@ -1606,7 +1613,7 @@ function invoke-graphGet(){
             }
         
         if($firstPageOnly){break}
-        if(![string]::IsNullOrWhiteSpace($response.'@odata.nextLink')){$sanitisedGraphQuery = $response.'@odata.nextLink'.Replace("https://graph.microsoft.com/v1.0/","")}
+        if(![string]::IsNullOrWhiteSpace($response.'@odata.nextLink')){$sanitisedGraphQuery = $response.'@odata.nextLink'.Replace("https://graph.microsoft.com/$endpoint/","")}
         }
     #while($response.value.count -gt 0)
     while($response.'@odata.nextLink')
