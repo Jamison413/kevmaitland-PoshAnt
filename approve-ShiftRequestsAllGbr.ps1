@@ -8,10 +8,12 @@ if($PSCommandPath){
     Start-Transcript $transcriptLogName -Append
     }
 
-$groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
-$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
+$Admin = "emily.pressey@anthesisgroup.com"
+$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 connect-ToExo -credential $exoCreds
+
 $TeamsReport = @()
 
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
