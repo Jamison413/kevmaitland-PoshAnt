@@ -8,6 +8,7 @@ $clientSectorValues = get-netSuiteCustomListValues -objectType clientSector -net
 $clientStatusValues = get-netSuiteCustomListValues -objectType customerstatus -netsuiteParameters $netSuiteProductionParams
 $clientTypeValues = get-netSuiteCustomListValues -objectType clientType -netsuiteParameters $netSuiteProductionParams
 $clientRatingValues = get-netSuiteCustomListValues -objectType clientRating -netsuiteParameters $netSuiteProductionParams
+$subsidiaries = get-netSuiteCustomListValues -objectType subsidiary -netsuiteParameters $netSuiteProductionParams
 
 $filterCompanyFlaggedForSync = @{
     propertyName="netsuite_sync_company_"
@@ -21,8 +22,27 @@ $filterCompanyHasNoNetsuiteId = @{
 $companiesToCreate = get-hubspotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync,$filterCompanyHasNoNetsuiteId)} -firstPageOnly
 
 $companiesToCreate | Select-Object | % {
+    #$thisCompanyToCreate = $companiesToCreate[0]
     $thisCompanyToCreate = $_
-    $thisCompanyToCreate 
+
+    #Find a generic e-mail address if non was provided
+    if(![string]::IsNullOrWhiteSpace($thisCompanyToCreate.properties.generic_email_address__c)){
+        $genericEmail = $thisCompanyToCreate.properties.generic_email_address__c
+        }
+    else{
+        #Get contacts and pick one at random
+        }
+
+    add-netSuiteAccountToNetSuite `
+        -newDataOriginatedFrom HubSpot `
+        -companyName $thisCompanyToCreate.properties.name `
+        -externalId $thisCompanyToCreate.id `
+        -genericEmail $genericEmail `
+        -subsidiary $thisCompanyToCreate.properties.netsuite_subsidiary `
+        -status LEAD-Unqualified `
+        -sector $thisCompanyToCreate.properties.netsuite_sector `
+        -clientRating 'D – Low Potential' `
+        -netsuiteParameters $netSuiteProductionParams
     }
 
 
@@ -30,7 +50,7 @@ $companiesToCreate | Select-Object | % {
 
 
 
-
+$netExampleCustomer = get-netSuiteClientsFromNetSuite -clientId 7172 -netsuiteParameters $netSuiteProductionParams
 
 
 

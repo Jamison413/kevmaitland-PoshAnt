@@ -14,6 +14,7 @@ function set-MsolCredentials($username, $password){
     #>
     if ($username -eq $null -or $username -eq ""){$username = Read-Host -Prompt "Enter Office 365 Global Administrator username (blank for $($env:USERNAME)@anthesisgroup.com)"}
     if ($username -eq $null -or $username -eq ""){$username = "$($env:USERNAME)@anthesisgroup.com"}
+    if ($username -notmatch "@anthesisgroup.com"){$username = "$username@anthesisgroup.com"}
     if ($password -eq $null -or $password -eq ""){$password = Read-Host -Prompt "Password for $username" -AsSecureString}
         else{ConvertTo-SecureString ($password) -AsPlainText -Force}
     $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $username, $password

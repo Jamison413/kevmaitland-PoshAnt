@@ -811,6 +811,47 @@ function get-azureAdBitLockerKeysForUser {
 
      $bitLockerKeys
     }
+function get-dateFormatExamples(){
+    [CmdletBinding()]
+    param()
+    $uFormats = @("d","D","f","F","g","G","m","M","o","O","r","R","s","t","T","u","U","y","Y","FileDateTimeUniversal")
+    Write-Host -f Yellow "Without .ToUniversalTime()"
+    $date = Get-Date
+    $uFormats | % {
+        Write-Host "`tGet-Date -f $_ :`t$(Get-Date $date -f $_)"
+        }
+    Write-Host -f Yellow "With .ToUniversalTime()"
+    $date = (Get-Date $date).ToUniversalTime()
+    $uFormats | % {
+        Write-Host "`tGet-Date -f $_ :`t$(Get-Date $date -f $_)"
+        }
+    }
+function get-dateInIsoFormat(){
+    [CmdletBinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [datetime]$dateTime
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet("Minutes", "Seconds", "Milliseconds", "Ticks")]
+            [string]$precision
+        )
+    $utc = (Get-Date $dateTime).ToUniversalTime()
+    switch($precision){
+        "Minutes"      {(Get-Date $utc -Format o).Substring(0,16)+"Z"}
+        "Seconds"      {(Get-Date $utc -Format o).Substring(0,19)+"Z"}
+        "Milliseconds" {(Get-Date $utc -Format o).Substring(0,23)+"Z"}
+        "Ticks"        {(Get-Date $utc -Format o)}
+        }
+    }
+function get-errorSummary(){
+    [CmdletBinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [System.Management.Automation.ErrorRecord]$errorToSummarise
+        )
+
+    $($errorToSummarise | fl * -Force) | Out-String    
+    }
 function get-groupAdminRoleEmailAddresses_deprecated(){
     [CmdletBinding()]
     param()

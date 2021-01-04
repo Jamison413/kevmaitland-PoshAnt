@@ -557,7 +557,7 @@ function merge-pnpTerms(){
     else{
         #Do nothing
         }
-    <# Code transplant
+    <# Working code transplant
                 $goodCustomProperties = $termWithWrongName.CustomProperties
                 $duffCustomProperties = $duffTermToMergeIntoGoodTerm.CustomProperties
                 $duffTermToMergeIntoGoodTerm.Merge($termWithWrongName)
@@ -568,7 +568,7 @@ function merge-pnpTerms(){
                     while(![string]::IsNullOrWhiteSpace($updatedTerm.CustomProperties."$($thisCustomProperty.Key)_merged$i")){ #Find the lowest number for merging without overwriting anything
                         $i++
                         }
-                    $updatedTerm.SetCustomProperty("$($thisCustomProperty.Key)_merged$i",$thisCustomProperty.Value) #Add this $duffCustomProperty back into the CustomProperties on for the original
+                    $updatedTerm.SetCustomProperty("$($thisCustomProperty.Key)_merged$i",$thisCustomProperty.Value) #Add this $duffCustomProperty back into the CustomProperties for the original
                     }
                 try{$updatedTerm.Context.ExecuteQuery()}
                 catch{

@@ -28,19 +28,24 @@ $allProjTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Inclu
 $allProjTerms | % {
     Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.CustomProperties.NetSuiteProjId -Force
     }
-$projTermsToCheck = $allProjTerms | ? {$_.LastModifiedDate -gt $lastProcessed -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjId) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteClientId)}
-#$projTermsToCheck = $allProjTerms | ? {$_.LastModifiedDate -gt $lastProcessed -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjId) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteClientId) -and [string]::IsNullOrWhiteSpace($_.CustomProperties.DriveItemId)}
+#$projTermsToCheck = $allProjTerms | ? {$_.LastModifiedDate -gt $lastProcessed -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjId) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteClientId)}
+$projTermsToCheck = $allProjTerms | ? {$_.LastModifiedDate -gt $lastProcessed -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjId) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteClientId) -and [string]::IsNullOrWhiteSpace($_.CustomProperties.DriveItemId)}
 
 $projTermsToCheck | ? {$reallyNoFolder -notcontains $_} |% {
+$duffProj | %{
     $thisProjTerm = $_
-    $thisClientTerm = $allClientTerms | ? {$_.NetSuiteId -eq $thisProjTerm.CustomProperties.NetSuiteClientId}
-    Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.CustomProperties.NetSuiteId -eq 4387}
+    $thisClientTerm = $allClientTerms | ? {$_.CustomProperties.NetSuiteId -eq $thisProjTerm.CustomProperties.NetSuiteClientId}
+    #Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.CustomProperties.NetSuiteId -eq 4387}
 
     if(![string]::IsNullOrWhiteSpace($thisClientTerm.CustomProperties.GraphDriveId)){
         $thisClientDrive = get-graphDrives -driveId $thisClientTerm.CustomProperties.GraphDriveId -tokenResponse $tokenResponseSharePointBot
         $rootFolders = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisClientDrive.id
-        $preExistingProjectFolder = $rootFolders | ? {$_.name -match $(get-kimbleEngagementCodeFromString $thisProjTerm.name)}
-        if($preExistingProjectFolder){
+        [array]$preExistingProjectFolder = $rootFolders | ? {$_.name -match $(get-kimbleEngagementCodeFromString $thisProjTerm.name)}
+        if($preExistingProjectFolder.Count -gt 1){$preExistingProjectFolder = $preExistingProjectFolder |? {$_.name -notmatch $thisProjTerm.Name.Split(" ")[0]}}
+        if($preExistingProjectFolder.Count -gt 1){$preExistingProjectFolder = $preExistingProjectFolder |? {$_.name -notmatch ".url"}}
+        #if($preExistingProjectFolder.Count -gt 1){$preExistingProjectFolder = $preExistingProjectFolder |? {$_.name -match $thisProjTerm.Name.Replace($thisProjTerm.Name.Split(" ")[0],"").Trim() -or $_.name -eq $thisProjTerm.Name.Replace($thisProjTerm.Name.Split(" ")[0],"").Trim()}}
+        if($preExistingProjectFolder.Count -gt 1){$preExistingProjectFolder = $preExistingProjectFolder | sort size | select -Last 1}
+        if($preExistingProjectFolder.Count -eq 1){
             $thisProjTerm.SetCustomProperty("DriveItemId",$preExistingProjectFolder.id)
             try{
                 Write-Verbose "`tTrying: `$thisProjTerm.SetCustomProperty(DriveItemId,$($preExistingProjectFolder.id)) [$($thisProjTerm.Name)]"
@@ -53,8 +58,9 @@ $projTermsToCheck | ? {$reallyNoFolder -notcontains $_} |% {
                 }
             }
         else{
-            Write-Warning "Could not find pre-existing Project Folder for [$($thisProjTerm.Name)]"
+            Write-Warning "Could not find correct number of pre-existing Project Folder for [$($thisProjTerm.Name)]"
             [array]$noExistingFolder += $thisProjTerm
+            [array]$duffers += ,@($thisProjTerm,$preExistingProjectFolder)
             }        
         }
     else{
@@ -63,8 +69,8 @@ $projTermsToCheck | ? {$reallyNoFolder -notcontains $_} |% {
         }
     }
 
-$noExistingFolder | % {
-    if($_.Name -eq "P-1000242 BG ECO Delivery 2020"){break}
-    [array]$reallyNoFolder += $_
+$projTermsToCheck | % {
+    if($_.Name -match "P-1000602"){$startHere = $true}
+    if($startHere){[array]$catchMe += $_}
     }
     $reallyNoFolder.Count
