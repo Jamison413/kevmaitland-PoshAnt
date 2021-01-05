@@ -13,108 +13,6 @@ $AllProtocols = [System.Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'
 [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
-function add-netSuiteAccountToNetSuite{
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true)]
-            [string]$companyName 
-        ,[parameter(Mandatory = $true)]
-            [ValidateSet("","")]
-            [string]$subsidiary 
-        ,[parameter(Mandatory = $true)]
-            [ValidateSet("LEAD-Qualified","LEAD-Unqualified","CLIENT-Closed Won","CLIENT-Renewal")]
-            [string]$status 
-        ,[parameter(Mandatory = $true)]
-            [ValidateSet("Aerospace & Defense","Agriculture","Apparel","Biotechnology","Business & Trade Organization","Business Services","Chemicals & Raw Materials","Construction & Architecture","Consultancy","Containers & Packaging","Distribution & Logistics","Education & Academia","Energy","Engineering & Engineering Services","Financial Services & Insurance","FMCG - Non-Food","Food & Beverage","Forestry, Timber & Paper","Government & Public Services","Health & Pharmaceutical","Hospitality","Information & Communications Technology","Intercompany","Legal Services","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality","Hospitality")]
-            [string]$industry 
-        ,[parameter(Mandatory = $true)]
-            [System.Data.Common.DbConnection]$dbConnection
-        ,[parameter(Mandatory = $true)]
-            [psobject]$tokenResponse
-        )
-    Write-Verbose "add-netSuiteAccountToNetSuite [$($companyName)]"
-
-    switch($status){
-        "LEAD-Qualified"    {$statusId = 7}
-        "LEAD-Unqualified"  {$statusId = 6}
-        "CLIENT-Closed Won" {$statusId = 13}
-        "CLIENT-Renewal"    {$statusId = 15}
-        }
-
-    switch($industry){
-        "LEAD-Qualified"    {$statusId = 7}
-        "LEAD-Unqualified"  {$statusId = 6}
-        "CLIENT-Closed Won" {$statusId = 13}
-        "CLIENT-Renewal"    {$statusId = 15}
-        }
-
-    $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
-    $supplierSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,9fb8ecd6-c87d-485d-a488-26fd18c62303"
-    $devSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,8ba7475f-dad0-4d16-bdf5-4f8787838809"
-
-    #Switch to set correct SiteId
-    switch($sqlNetsuiteAccount.RecordType){
-        "Client"   {$correctSiteId = $clientSiteId}
-        "Supplier" {$correctSiteId = $supplierSiteId}
-        default    {Write-Error "SqlNetSuiteAccount [$($sqlNetsuiteAccount.AccountName)][$($sqlNetsuiteAccount.NsInternalId)] is neither flagged as a 'Client' nor a 'Supplier' [$($sqlNetsuiteAccount.RecordType)]";break}
-        }
-    $correctSiteId = $devSiteId
-
-    if(![string]::IsNullOrWhiteSpace($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)){    #Check whether the DocLib Exists already
-        Write-Verbose "Looking for /drive by Id [$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)]"
-        $graphDrive = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($sqlNetsuiteAccount.SharePointDocLibGraphDriveId)"
-        }
-    if(!$graphDrive){ #If we don't have a Graph DriveId, or the one we do have doesn't work (e.g. it's been deleted and manually re-created), have a rummage and try to find it by DisplayName(name)
-        Write-Verbose "Couldn't find the /drive by Id, looking for Name in case it's been deleted and manually recreated. "
-        $allDrivesInSite = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$correctSiteId/drives" -Verbose  #/drives does not support $filter (as of 2020-01-21)
-        $graphDrive = $allDrivesInSite.value | ? {(sanitise-forSharePointGroupName (remove-diacritics $_.name)) -eq (sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteAccount.AccountName))}
-        if($graphDrive.Count -gt 1){
-            Write-Error "Multiple potential Graph /drive matches found with displayName [$($sqlNetsuiteAccount.AccountName)]:`r`n`t$($graphDrive.webUrl -join '`r`n`t')`r`nCannot continue"
-            break
-            }
-        if($graphDrive -eq $null){Write-Verbose "Couldn't find the /drive by Name either. Will try to create a new one. "}
-        }
-
-    if($graphDrive){ #Check Name -eq AccountName
-        if((sanitise-forSharePointGroupName (remove-diacritics $graphDrive.name)) -ne (sanitise-forSharePointGroupName (remove-diacritics $sqlNetsuiteAccount.AccountName))){ #Update if different
-            $docLibNameUpdateHash = @{"displayName"="$(sanitise-forSharePointGroupName $sqlNetsuiteAccount.AccountName)"}
-            #Get List Ids from /drive object
-            $graphList = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($graphDrive.id)/list"
-            $updatedGraphList = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$($graphList.parentReference.siteId)/lists/$($graphList.id)" -graphBodyHashtable $docLibNameUpdateHash
-            Write-Verbose "$($updatedGraphList.list.template) [$($updatedGraphList.webUrl)][$($updatedGraphList.parentReference) | $($updatedGraphList.id)] changed displayName from [$($graphList.displayName)] to [$($updatedGraphList.displayName)]"
-            $updateSqlRecord = $true
-            }
-        else{$updateSqlRecord = $true} #We don't need to process anything in SharePoint if the Displayname hasn't changed, just prevent this record from re-processings on the next cycle
-        }
-    else{ #If we can't find a /drives object, create a new one
-        $docLibInnerHash = @{"template"="documentLibrary"}
-        $docLibOuterHash = @{"displayName"="$(sanitise-forSharePointGroupName $sqlNetsuiteAccount.AccountName)";"list"=$docLibInnerHash}
-        $newGraphList = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$correctSiteId/lists" -graphBodyHashtable $docLibOuterHash
-        $graphDrive = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$($newGraphList.parentReference.siteId)/lists/$($newGraphList.id)/drive"
-        Write-Verbose "$($newGraphList.list.template) [$($newGraphList.webUrl)][$($newGraphList.parentReference) | $($newGraphList.id)] created with displayName [$($newGraphList.displayName)]"
-        $updateSqlRecord = $true
-        }
-    
-    if($graphDrive){ #If we've got a /drive object now, try creating the standard folders
-        $standardClientFolders = @(
-            "_These Client Document Libraries are created automatically by NetSuite"
-            ,"_These Client Document Libraries are created automatically by NetSuite\_That's clever!"
-            ,"_These Client Document Libraries are created automatically by NetSuite\Create a Client in NetSuite and see"
-            )
-        add-graphArrayOfFoldersToDrive -graphDriveId $graphDrive.id -foldersAndSubfoldersArray $standardClientFolders -tokenResponse $tokenResponse -conflictResolution Fail
-        }
-
-    if($updateSqlRecord){#If we think we should update this record to prevent re-processing on the next cycle
-        Write-Verbose "Updating SQL record after successful proccesing"
-        $sqlNetsuiteAccount.SharePointDocLibGraphDriveId = $graphDrive.id
-        $sqlNetsuiteAccount.DateModifiedInSql = Get-Date
-        $updateResult = update-netSuiteAccountInSqlCache -sqlNetsuiteAccount $sqlNetsuiteAccount -dbConnection $dbConnection -isNotDirty
-        Write-Verbose "Update Result: [$($updateResult)]"
-        #One day, we'll write something to write the URL of the DocLib back to NetSuite...
-        }
-
-    $graphDrive #Return the /drives object (if found)
-    }
 function add-netSuiteAccountToSharePoint{
     [cmdletbinding()]
     Param (
@@ -242,6 +140,217 @@ function add-netsuiteAccountToSqlCache{
         else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
         $result
         }
+    }
+function add-netSuiteClientToNetSuite{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [ValidateSet("HubSpot")]
+            [string]$newDataOriginatedFrom
+        ,[parameter(Mandatory = $true)]
+            [string]$companyName 
+        ,[parameter(Mandatory = $true)]
+            [string]$externalId
+        ,[parameter(Mandatory = $true)]
+            [ValidatePattern(".[@].")]
+            [string]$genericEmail
+        ,[parameter(Mandatory = $true)]
+            #[ValidateSet("Anthesis (UK) Ltd","Anthesis Canada Inc.","Anthesis Consulting (USA) Inc.","Anthesis Consulting Group Limited","Anthesis Consulting UK Ltd","Anthesis Consultoria Ambiental ltda","Anthesis Energy UK Ltd","Anthesis Enveco AB","Anthesis Finland OY","Anthesis GmBh","Anthesis Ireland Ltd","Anthesis LLC","Anthesis Middle East","Anthesis Philippines Inc.","Caleb Management Services Ltd","Lavola 1981 SAU","Lavola Andora SA","Lavola Columbia","The Goodbrand Works Ltd","X-Elimination ACUS","X-Elimination AUK","X-Elimination LSA","X-Elimination PC")]
+            [string]$subsidiary 
+        ,[parameter(Mandatory = $true)]
+            #[ValidateSet("LEAD-Qualified","LEAD-Unqualified","CLIENT-Closed Won","CLIENT-Renewal")]
+            [string]$status 
+        ,[parameter(Mandatory = $false)]
+            [AllowNull()]
+            #[ValidateSet("Aerospace & Defense","Agriculture","Apparel","Biotechnology","Business & Trade Organization","Business Services","Chemicals & Raw Materials","Construction & Architecture","Consultancy","Containers & Packaging","Distribution & Logistics","Education & Academia","Energy","Engineering & Engineering Services","FMCG - Non-Food","Financial Services & Insurance","Food & Beverage","Forestry, Timber & Paper","Government & Public Services","Health & Pharmaceutical","Hospitality","Information & Communications Technology","Intercompany","Legal Services","Machinery","Manufacturing","Media, Entertainment & Sport","Metals & Mining","NGO & Not for profit","Oil Gas & Renewables","Property & Facilities Management","Retail","Transport & Automotive","Utilities","Waste Disposal & Recycling")]
+            [string]$sector 
+        ,[parameter(Mandatory = $false)]
+            [AllowNull()]
+            #[ValidateSet("Government","NGO","Private Company","Public Company","Public Sector")]
+            [string]$clientType #= "Private Company"
+        ,[parameter(Mandatory = $false)]
+            [AllowNull()]
+            #[ValidateSet("A – T3 Key Client","B – High Potential","C – Medium Potential","D – Low Potential")]
+            [string]$clientRating = "D – Low Potential"
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+    Write-Verbose "add-netSuiteClientToNetSuite [$($companyName)]"
+
+    try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $subsidiary}
+    catch{Write-Error $_;return}
+    try{$statusId = convert-netSuiteStatusToId -status $status}
+    catch{Write-Error $_;return}
+    if($sector){ #Not mandatory
+        try{$sectorId = convert-netSuiteSectorToId -sector $sector}
+        catch{Write-Error $_;return}
+        }
+    if($clientType){ #Not mandatory
+        try{$clientTypeId = convert-netSuiteClientTypeToId -clientType $clientType}
+        catch{Write-Error $_;return}
+        }
+    if($clientRating){ #Not mandatory
+        try{$clientRatingId = convert-netSuiteclientRatingToId -clientRating $clientRating}
+        catch{Write-Error $_;return}
+        }
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+    
+    $bodyHash = @{
+        companyName = $companyName
+        custentity_2663_email_address_notif = $genericEmail
+        custentity_clientrating = @{id=$clientRatingId}
+        email = $genericEmail
+        entityStatus = @{id=$statusId}
+        externalId = $externalId
+        subsidiary = @{id=$subsidiaryId}
+        }
+    switch($newDataOriginatedFrom){
+        "HubSpot" {$bodyHash.Add("custentitycustentity_hubspotid",$externalId)}
+        }
+    
+    invoke-netSuiteRestMethod -requestType POST -url "$($netsuiteParameters.uri)/customer" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $bodyHash
+
+    }
+function add-netSuiteClientToNetSuiteFromHubSpotObject{
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$hubSpotCompanyObject
+        ,[parameter(Mandatory = $true)]
+            [string]$hubSpotApiKey
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+
+    if([string]::IsNullOrWhiteSpace($hubSpotCompanyObject.properties.generic_email_address__c)){
+        #No generic e-mail address set - grabbing a Contact and using theirs
+        $contacts = get-hubSpotContactsFromCompanyId -apiKey $hubSpotApiKey -hubspotCompanyId $hubSpotCompanyObject.id
+        $mostRecentlyCreatedContact = $contacts | Sort-Object createdAt -Descending | select -First 1
+        $genericEmailAddress = $mostRecentlyCreatedContact.properties.email
+        }
+    else{
+        $genericEmailAddress = $hubSpotCompanyObject.properties.generic_email_address__c
+        }
+
+    $newNetSuiteCompany = add-netSuiteClientToNetSuite `
+        -newDataOriginatedFrom HubSpot `
+        -companyName $hubSpotCompanyObject.properties.name `
+        -externalId $hubSpotCompanyObject.id `
+        -genericEmail $genericEmailAddress `
+        -subsidiary $hubSpotCompanyObject.properties.netsuite_subsidiary `
+        -status LEAD-Unqualified `
+        -sector $hubSpotCompanyObject.properties.netsuite_sector `
+        -clientRating 'D – Low Potential' `
+        -netsuiteParameters $netSuiteParameters
+    if(!$newNetSuiteCompany){$newNetSuiteCompany = get-netSuiteClientsFromNetSuite -query "?q=custentitycustentity_hubspotid IS $($hubSpotCompanyObject.id)" -netsuiteParameters $netSuiteParameters}
+    $updatedHubSpotCompany = update-hubSpotObject -apiKey $hubSpotApiKey -objectType companies -objectId $hubSpotCompanyObject.id -fieldHash @{netsuiteid=$newNetSuiteCompany.id}
+    $newNetSuiteCompany
+    }
+function add-netSuiteContactToNetSuite{
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [ValidateSet("HubSpot")]
+            [string]$newDataOriginatedFrom
+        ,[parameter(Mandatory = $true)]
+            [string]$contactFullName 
+        ,[parameter(Mandatory = $true)]
+            [string]$companyNetSuiteId 
+        ,[parameter(Mandatory = $true)]
+            [AllowNull()]
+            [string]$externalId
+        ,[parameter(Mandatory = $true)]
+            [ValidatePattern(".[@].")]
+            [string]$email
+        ,[parameter(Mandatory = $false)]
+            [string]$mainPhone
+        ,[parameter(Mandatory = $false)]
+            [string]$mobilePhone
+        ,[parameter(Mandatory = $false)]
+            [string]$officePhone
+        ,[parameter(Mandatory = $false)]
+            [string]$jobTitle
+        ,[parameter(Mandatory = $true)]
+            #[ValidateSet("Anthesis (UK) Ltd","Anthesis Canada Inc.","Anthesis Consulting (USA) Inc.","Anthesis Consulting Group Limited","Anthesis Consulting UK Ltd","Anthesis Consultoria Ambiental ltda","Anthesis Energy UK Ltd","Anthesis Enveco AB","Anthesis Finland OY","Anthesis GmBh","Anthesis Ireland Ltd","Anthesis LLC","Anthesis Middle East","Anthesis Philippines Inc.","Caleb Management Services Ltd","Lavola 1981 SAU","Lavola Andora SA","Lavola Columbia","The Goodbrand Works Ltd","X-Elimination ACUS","X-Elimination AUK","X-Elimination LSA","X-Elimination PC")]
+            [string]$subsidiary 
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+    Write-Verbose "add-netSuiteContactToNetSuite [$($contactFullName)]"
+
+    try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $subsidiary}
+    catch{Write-Error $_;return}
+
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+    
+    $bodyHash = [ordered]@{
+        entityId = $contactFullName
+        externalId = $externalId
+        email = $email
+        phone = $mainPhone
+        mobilePhone = $mobilePhone
+        officePhone = $officePhone
+        title = $jobTitle
+        subsidiary = @{id=$subsidiaryId}
+        company = @{id=$companyNetSuiteId}
+        }
+    switch($newDataOriginatedFrom){
+        "HubSpot" {$bodyHash.Add("custentitycustentity_hubspotid",$externalId)}
+        }
+    
+    invoke-netSuiteRestMethod -requestType POST -url "$($netsuiteParameters.uri)/contact" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $bodyHash
+
+    }
+function add-netSuiteContactToNetSuiteFromHubSpotObject{
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$hubSpotContactObject
+        ,[parameter(Mandatory = $true)]
+            [string]$hubSpotApiKey
+        ,[parameter(Mandatory = $true)]
+            [string]$companyNetSuiteId 
+        ,[parameter(Mandatory = $true)]
+            #[ValidateSet("Anthesis (UK) Ltd","Anthesis Canada Inc.","Anthesis Consulting (USA) Inc.","Anthesis Consulting Group Limited","Anthesis Consulting UK Ltd","Anthesis Consultoria Ambiental ltda","Anthesis Energy UK Ltd","Anthesis Enveco AB","Anthesis Finland OY","Anthesis GmBh","Anthesis Ireland Ltd","Anthesis LLC","Anthesis Middle East","Anthesis Philippines Inc.","Caleb Management Services Ltd","Lavola 1981 SAU","Lavola Andora SA","Lavola Columbia","The Goodbrand Works Ltd","X-Elimination ACUS","X-Elimination AUK","X-Elimination LSA","X-Elimination PC")]
+            [string]$subsidiary 
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+    Write-Verbose "add-netSuiteContactToNetSuiteFromHubSpotObject [$($hubSpotContactObject.properties.firstname)][$($hubSpotContactObject.properties.lastname)][$($hubSpotContactObject.properties.id)]"
+
+    try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $subsidiary}
+    catch{Write-Error $_;return}
+
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    $fullContactName = "$($hubSpotContactObject.properties.firstname) $($hubSpotContactObject.properties.lastname)".Trim(" ")
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.phone)){$mainPhone = $hubSpotContactObject.properties.phone}
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.mobilephone)){$mainPhone = $hubSpotContactObject.properties.mobilephone} #Prefer mobiles over landlines as primary phone
+    
+    $newNetSuiteContact = add-netSuiteContactToNetSuite `
+        -newDataOriginatedFrom HubSpot `
+        -contactFullName $fullContactName `
+        -companyNetSuiteId $companyNetSuiteId `
+        -externalId $hubSpotContactObject.id `
+        -email $hubSpotContactObject.properties.email `
+        -mainPhone $mainPhone `
+        -mobilePhone $hubSpotContactObject.properties.mobilephone `
+        -officePhone $hubSpotContactObject.properties.phone `
+        -jobTitle $hubSpotContactObject.properties.jobtitle `
+        -subsidiary $subsidiary `
+        -netsuiteParameters $netsuiteParameters
+
+    $updatedHubSpotContact = update-hubSpotObject -apiKey $hubSpotApiKey -objectType contacts -objectId $hubSpotContactObject.id -fieldHash @{netsuiteid=$newNetSuiteContact.id; lastmodifiedinnetsuite=$newNetSuiteContact.lastModifiedDate; lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)}
+    $newNetSuiteContact
     }
 function add-netSuiteProjectToSharePoint{
     [cmdletbinding()]
@@ -415,6 +524,152 @@ function add-netsuiteOpportunityToSqlCache{
         else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
         $result
         }
+    }
+function convert-netSuiteClientRatingToId(){
+    [cmdletbinding()]
+    Param (    [parameter(Mandatory = $true)]
+        [ValidateSet("A – T3 Key Client","B – High Potential","C – Medium Potential","D – Low Potential")]
+        [string]$clientRating
+        )
+    #clientRating Validation:($(get-netSuiteCustomListValues -objectType clientRating -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false}).name -join '","'
+    #                         $(get-netSuiteCustomListValues -objectType clientRating -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false} | % {"`"$($_.Name)`"`t{`$clientRatingId = $($_.id)}"}
+
+    switch($clientRating){
+        "A – T3 Key Client"	{$clientRatingId = 1}
+        "B – High Potential"	{$clientRatingId = 2}
+        "C – Medium Potential"	{$clientRatingId = 3}
+        "D – Low Potential"	{$clientRatingId = 4}
+        }
+    $clientRatingId
+    }
+function convert-netSuiteClientTypeToId(){
+    [cmdletbinding()]
+    Param (    [parameter(Mandatory = $true)]
+        [ValidateSet("Government","NGO","Private Company","Public Company","Public Sector")]
+        [string]$clientType
+        )
+    #ClientType Validation:  ($(get-netSuiteCustomListValues -objectType clientType -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false}).name -join '","'
+    #                         $(get-netSuiteCustomListValues -objectType clientType -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false} | % {"`"$($_.Name)`"`t{`$clientTypeId = $($_.id)}"}
+
+    switch($clientType){
+        "Government"	{$clientTypeId = 3}
+        "NGO"	{$clientTypeId = 101}
+        "Private Company"	{$clientTypeId = 2}
+        "Public Company"	{$clientTypeId = 1}
+        "Public Sector"	{$clientTypeId = 102}
+        }
+    $clientTypeId
+    }
+function convert-netSuiteSectorToId(){
+    [cmdletbinding()]
+    Param (    [parameter(Mandatory = $true)]
+        [ValidateSet("Aerospace & Defense","Agriculture","Apparel","Biotechnology","Business & Trade Organization","Business Services","Chemicals & Raw Materials","Construction & Architecture","Consultancy","Containers & Packaging","Distribution & Logistics","Education & Academia","Energy","Engineering & Engineering Services","FMCG - Non-Food","Financial Services & Insurance","Food & Beverage","Forestry, Timber & Paper","Government & Public Services","Health & Pharmaceutical","Hospitality","Information & Communications Technology","Intercompany","Legal Services","Machinery","Manufacturing","Media, Entertainment & Sport","Metals & Mining","NGO & Not for profit","Oil Gas & Renewables","Property & Facilities Management","Retail","Transport & Automotive","Utilities","Waste Disposal & Recycling")]
+        [string]$sector
+        )
+    #Sector Validation:      ($(get-netSuiteCustomListValues -objectType clientSector -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false}).name -join '","'
+    #                         $(get-netSuiteCustomListValues -objectType clientSector -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false} | % {"`"$($_.Name)`"`t{`$sectorId = $($_.id)}"}
+
+    switch($sector){
+        "Aerospace & Defense"	{$sectorId = 1}
+        "Agriculture"	{$sectorId = 2}
+        "Apparel"	{$sectorId = 3}
+        "Biotechnology"	{$sectorId = 33}
+        "Business & Trade Organization"	{$sectorId = 4}
+        "Business Services"	{$sectorId = 5}
+        "Chemicals & Raw Materials"	{$sectorId = 7}
+        "Construction & Architecture"	{$sectorId = 8}
+        "Consultancy"	{$sectorId = 9}
+        "Containers & Packaging"	{$sectorId = 10}
+        "Distribution & Logistics"	{$sectorId = 11}
+        "Education & Academia"	{$sectorId = 12}
+        "Energy"	{$sectorId = 34}
+        "Engineering & Engineering Services"	{$sectorId = 13}
+        "FMCG - Non-Food"	{$sectorId = 15}
+        "Financial Services & Insurance"	{$sectorId = 14}
+        "Food & Beverage"	{$sectorId = 16}
+        "Forestry, Timber & Paper"	{$sectorId = 17}
+        "Government & Public Services"	{$sectorId = 18}
+        "Health & Pharmaceutical"	{$sectorId = 19}
+        "Hospitality"	{$sectorId = 36}
+        "Information & Communications Technology"	{$sectorId = 21}
+        "Intercompany"	{$sectorId = 38}
+        "Legal Services"	{$sectorId = 22}
+        "Machinery"	{$sectorId = 37}
+        "Manufacturing"	{$sectorId = 23}
+        "Media, Entertainment & Sport"	{$sectorId = 24}
+        "Metals & Mining"	{$sectorId = 25}
+        "NGO & Not for profit"	{$sectorId = 26}
+        "Oil Gas & Renewables"	{$sectorId = 27}
+        "Property & Facilities Management"	{$sectorId = 28}
+        "Retail"	{$sectorId = 29}
+        "Transport & Automotive"	{$sectorId = 30}
+        "Utilities"	{$sectorId = 31}
+        "Waste Disposal & Recycling"	{$sectorId = 32}
+        }
+    $sectorId
+    }
+function convert-netSuiteStatusToId(){
+    [cmdletbinding()]
+    Param (    [parameter(Mandatory = $true)]
+        [ValidateSet("LEAD-Qualified","LEAD-Unqualified","CLIENT-Closed Won","CLIENT-Renewal")]
+        [string]$status
+        )
+    #Status Validation:      ($(get-netSuiteCustomListValues -objectType customerstatus -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false -and $_.stage -ne "JOB"} | Sort-Object probability,name |  % {"`"$($_.stage)-$($_.name)`""}
+    #                         $(get-netSuiteCustomListValues -objectType customerstatus -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false -and $_.stage -ne "JOB"} | Sort-Object probability,name |  % {"`"$($_.stage)-$($_.name)`"`t{`$statusId = $($_.id)}"}
+
+    switch($status){
+        "PROSPECT-Closed Lost"	{$statusId = 14}
+        "LEAD-Unqualified"	{$statusId = 6}
+        "LEAD-Qualified"	{$statusId = 7}
+        "PROSPECT-Identified Opportunity"	{$statusId = 8}
+        "PROSPECT-Initial Discussion"	{$statusId = 9}
+        "PROSPECT-RFP"	{$statusId = 20}
+        "PROSPECT-Proposal Submitted"	{$statusId = 10}
+        "PROSPECT-Positive Proposal Response"	{$statusId = 19}
+        "PROSPECT-Detailed Opportunity Discussion"	{$statusId = 21}
+        "PROSPECT-In Negotiation"	{$statusId = 11}
+        "PROSPECT-Verbal Agreement"	{$statusId = 12}
+        "CUSTOMER-Closed Won"	{$statusId = 13}
+        "CUSTOMER-Renewal"	{$statusId = 15}
+        }
+    $statusId
+    }
+function convert-netSuiteSubsidiaryToId(){
+    [cmdletbinding()]
+    Param (    [parameter(Mandatory = $true)]
+        [ValidateSet("Anthesis (UK) Ltd","Anthesis Canada Inc.","Anthesis Consulting (USA) Inc.","Anthesis Consulting Group Limited","Anthesis Consulting UK Ltd","Anthesis Consultoria Ambiental ltda","Anthesis Energy UK Ltd","Anthesis Enveco AB","Anthesis Finland OY","Anthesis GmBh","Anthesis Ireland Ltd","Anthesis LLC","Anthesis Middle East","Anthesis Philippines Inc.","Caleb Management Services Ltd","Lavola 1981 SAU","Lavola Andora SA","Lavola Columbia","The Goodbrand Works Ltd","X-Elimination ACUS","X-Elimination AUK","X-Elimination LSA","X-Elimination PC")]
+        [string]$subsidiary
+        )
+    #Subsidiary Validation:  ($(get-netSuiteCustomListValues -objectType subsidiary -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false}).name -join '","'
+    #                         $(get-netSuiteCustomListValues -objectType subsidiary -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false} | % {"`"$($_.Name)`"`t{`$subsidiaryId = $($_.id)}"}
+
+    switch($subsidiary){
+        "Anthesis (UK) Ltd"	{$subsidiaryId = 6}
+        "Anthesis Canada Inc."	{$subsidiaryId = 43}
+        "Anthesis Consulting (USA) Inc."	{$subsidiaryId = 41}
+        "Anthesis Consulting Group Limited"	{$subsidiaryId = 1}
+        "Anthesis Consulting UK Ltd"	{$subsidiaryId = 33}
+        "Anthesis Consultoria Ambiental ltda"	{$subsidiaryId = 57}
+        "Anthesis Energy UK Ltd"	{$subsidiaryId = 7}
+        "Anthesis Enveco AB"	{$subsidiaryId = 52}
+        "Anthesis Finland OY"	{$subsidiaryId = 55}
+        "Anthesis GmBh"	{$subsidiaryId = 49}
+        "Anthesis Ireland Ltd"	{$subsidiaryId = 23}
+        "Anthesis LLC"	{$subsidiaryId = 42}
+        "Anthesis Middle East"	{$subsidiaryId = 46}
+        "Anthesis Philippines Inc."	{$subsidiaryId = 44}
+        "Caleb Management Services Ltd"	{$subsidiaryId = 34}
+        "Lavola 1981 SAU"	{$subsidiaryId = 4}
+        "Lavola Andora SA"	{$subsidiaryId = 40}
+        "Lavola Columbia"	{$subsidiaryId = 47}
+        "The Goodbrand Works Ltd"	{$subsidiaryId = 3}
+        "X-Elimination ACUS"	{$subsidiaryId = 45}
+        "X-Elimination AUK"	{$subsidiaryId = 32}
+        "X-Elimination LSA"	{$subsidiaryId = 48}
+        "X-Elimination PC"	{$subsidiaryId = 12}
+        default {Write-Error "Subsidiary [$subsidiary] does not map to a known Subsidiary ID"}
+        }
+    $subsidiaryId
     }
 function convert-nsNetSuiteAccountToSqlNetSuiteAccount(){
     [cmdletbinding()]
@@ -594,7 +849,7 @@ function get-netSuiteClientsFromNetSuite(){
             [psobject]$netsuiteParameters
         )
 
-    Write-Verbose "`tget-allNetSuiteClients([$($query)])"
+    Write-Verbose "`tget-netSuiteClientsFromNetSuite([$($query)])"
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
         $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
@@ -681,7 +936,7 @@ function get-netSuiteCustomListValues(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true)]
-            [ValidateSet("customer","contact","clientSector","clientType","clientRating","customerstatus")]
+            [ValidateSet("customer","contact","clientSector","clientType","clientRating","customerstatus","subsidiary")]
             [string]$objectType
 
         ,[parameter(Mandatory=$false)]
@@ -701,6 +956,7 @@ function get-netSuiteCustomListValues(){
         "clientType"     {$endpoint = "customlist_clienttype"}
         "clientRating"   {$endpoint = "customlist_clientrating"}
         "customerstatus" {$endpoint = "customerstatus"}
+        "subsidiary"     {$endpoint = "subsidiary"}
         }
 
     try{
@@ -767,7 +1023,8 @@ function get-netSuiteMetadata(){
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
 
-    $metadata = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/metadata-catalog/$objectType" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $metadata = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/metadata-catalog/$objectType" -netsuiteParameters $netsuiteParameters  #-Verbose 
+    #$metadata = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/metadata-catalog?select=$objectType" -netsuiteParameters $netsuiteParameters #-Verbose 
     $metadata 
     }
 function get-netSuiteOpportunityFromNetSuite(){
@@ -1018,6 +1275,7 @@ function invoke-netSuiteRestMethod(){
     $oAuthParamsForSigning.Add("oauth_token",$netsuiteParameters.oauth_token)
     $oAuthParamsForSigning.Add("oauth_signature_method",$netsuiteParameters.oauth_signature_method)
     $oAuthParamsForSigning.Add("oauth_version",$netsuiteParameters.oauth_version)
+    #$oAuthParamsForSigning.Add([uri]::EscapeDataString("ignoreMandatoryFields"),[uri]::EscapeDataString($true))
     #Add parameters from url
     $parameters.Split("&") | % {
         if(![string]::IsNullOrWhiteSpace($_.Split("=")[0])){
@@ -1062,7 +1320,7 @@ function invoke-netSuiteRestMethod(){
             Write-Verbose $bodyJson
             $bodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($bodyJson)
             }
-        Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json" -Body $bodyJsonEncoded
+        Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/json" -Body $bodyJsonEncoded
         }
     }
 function sync-netSuiteClientsFromNetSuiteToSql(){
@@ -1414,5 +1672,173 @@ function update-netSuiteProjectInSqlCache(){
         }
     else{Write-Error "Record with NsInsternalId [$($sqlNetSuiteProject.NsExternalId)] does not exist in database. Cannot UPDATE.";break}
     }
+function update-netSuiteClientInNetSuite(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [string]$netSuiteClientId
+        ,[parameter(Mandatory = $true)]
+            [hashtable]$fieldHash = @{}
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
 
-$clientStauses = invoke-netSuiteRestMethod -requestType GET -url "$((get-netsuiteParameters -connectTo Production).uri)/customerstatus/20" -netsuiteParameters $(get-netsuiteParameters -connectTo Production)
+    #Validate Dropdown fields if they've not been provided in the correct format
+    if($fieldHash.Keys -contains "custentity_clientrating" -and $fieldHash["custentity_clientrating"] -isnot [hashtable]){
+        try{$ratingId = convert-netSuiteClientRatingToId -clientRating $fieldHash["custentity_clientrating"]}
+        catch{return} #Errors reported by validation cmdlet. Just exit early.
+        $fieldHash["custentity_clientrating"] = @{id=$ratingId}
+        }
+    if($fieldHash.Keys -contains "custentity_clienttype" -and $fieldHash["custentity_clienttype"] -isnot [hashtable]){
+        try{$typeId = convert-netSuiteClientTypeToId -clientType $fieldHash["custentity_clienttype"]}
+        catch{return} #Errors reported by validation cmdlet. Just exit early.
+        $fieldHash["custentity_clienttype"] = @{id=$typeId}
+        }
+    if($fieldHash.Keys -contains "custentity_ant_clientsector" -and $fieldHash["custentity_ant_clientsector"] -isnot [hashtable]){
+        try{$sectorId = convert-netSuiteSectorToId -sector $fieldHash["custentity_ant_clientsector"]}
+        catch{return}
+        $fieldHash["custentity_ant_clientsector"] = @{id=$sectorId}
+        }
+    if($fieldHash.Keys -contains "entityStatus" -and $fieldHash["entityStatus"] -isnot [hashtable]){
+        try{$statusId = convert-netSuiteStatusToId -status $fieldHash["entityStatus"]}
+        catch{return}
+        $fieldHash["entityStatus"] = @{id=$statusId}
+        }
+    if($fieldHash.Keys -contains "subsidiary" -and $fieldHash["subsidiary"] -isnot [hashtable]){
+        try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $fieldHash["subsidiary"]}
+        catch{return}
+        $fieldHash["subsidiary"] = @{id=$subsidiaryId}
+        }
+
+    invoke-netSuiteRestMethod -requestType PATCH -url "$($netsuiteParameters.uri)/customer/$netSuiteClientId" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $fieldHash
+
+    }
+function update-netSuiteClientFromHubSpotObject(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$hubSpotCompanyObject
+        ,[parameter(Mandatory = $true)]
+            [string]$hubSpotApiKey
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+
+    $fieldHash = @{
+        companyName = $hubSpotCompanyObject.properties.name
+        email = $hubSpotCompanyObject.properties.generic_email_address__c
+        shipAddr1 = $hubSpotCompanyObject.properties.address
+        shipAddr2 = $hubSpotCompanyObject.properties.address2
+        shipCity = $hubSpotCompanyObject.properties.city
+        shipCountry = $hubSpotCompanyObject.properties.country
+        shipState = $hubSpotCompanyObject.properties.state
+        shipZip = $hubSpotCompanyObject.properties.zip
+        }
+
+        if(![string]::IsNullOrEmpty($hubSpotCompanyObject.properties.netsuite_sector)){
+            
+            }
+        if(![string]::IsNullOrEmpty($hubSpotCompanyObject.properties.netsuite_subsidiary)){
+            
+            }
+        #Don't update any other fields (e.g. Status, Susbsidiary,etc. based on HubSpot data)
+        #custentity_clientrating = ""
+        #custentity_clienttype = ""
+        #custentity_ant_clientsector = ""
+        #entityStatus = ""
+        #subsidiary = ""
+    
+    if(![string]::IsNullOrEmpty($hubSpotCompanyObject.properties.netsuiteid)){
+        $netClient = get-netSuiteClientsFromNetSuite -clientId $hubSpotCompanyObject.properties.netsuiteid -netsuiteParameters $netsuiteParameters #Just double-check that we're allowed to update this record
+        if($netClient.entityStatus -match "LEAD"){
+            $updatedNetSuiteClient = update-netSuiteClientInNetSuite -netSuiteClientId $hubSpotCompanyObject.properties.netsuiteid -fieldHash $fieldHash -netsuiteParameters $netsuiteParameters
+            $updatedNetSuiteClient = get-netSuiteClientsFromNetSuite -clientId $hubSpotCompanyObject.properties.netsuiteid -netsuiteParameters $netsuiteParameters
+            $updatedHubSpotClient = update-hubSpotObject -apiKey $hubSpotApiKey -objectType companies -objectId $hubSpotCompanyObject.id -fieldHash @{lastmodifiedinnetsuite=$updatedNetSuiteClient.lastModifiedDate; lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)}
+            $updatedNetSuiteClient
+            }
+        else{Write-Error "NetSuite company [$($netClient.companyName)][$($hubSpotCompanyObject.properties.netsuiteid)] is set to [$($netClient.entityStatus.refName)] cannot update this object using a HubSpot object"}
+        }
+    }
+function update-netSuiteContactInNetSuite(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [string]$netSuiteContactId
+        ,[parameter(Mandatory = $true)]
+            [hashtable]$fieldHash = @{}
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    if($fieldHash.Keys -contains "subsidiary" -and $fieldHash["subsidiary"] -isnot [hashtable]){
+        try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $fieldHash["subsidiary"]}
+        catch{return}
+        $fieldHash["subsidiary"] = @{id=$subsidiaryId}
+        }
+
+    invoke-netSuiteRestMethod -requestType PATCH -url "$($netsuiteParameters.uri)/contact/$netSuiteContactId" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $fieldHash
+
+    }
+function update-netSuiteContactInNetSuiteFromHubSpotObject(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$hubSpotContactObject
+        ,[parameter(Mandatory = $true)]
+            [string]$hubSpotApiKey
+        ,[parameter(Mandatory=$false)]
+            [string]$subsidiary
+        ,[parameter(Mandatory=$false)]
+            [string]$companyNetSuiteId
+        ,[parameter(Mandatory=$false)]
+            [psobject]$netsuiteParameters
+        )
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    $fullContactName = "$($hubSpotContactObject.properties.firstname) $($hubSpotContactObject.properties.lastname)".Trim(" ")
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.phone)){$mainPhone = $hubSpotContactObject.properties.phone}
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.mobilephone)){$mainPhone = $hubSpotContactObject.properties.mobilephone} #Prefer mobiles over landlines as primary phone
+
+    $bodyHash = @{
+        entityId = $fullContactName
+        email = $hubSpotContactObject.properties.email
+        phone = $mainPhone
+        mobilePhone = $hubSpotContactObject.properties.mobilephone
+        officePhone = $hubSpotContactObject.properties.phone
+        title = $hubSpotContactObject.properties.jobtitle
+        }
+
+    if(![string]::IsNullOrWhiteSpace($subsidiary)){
+        try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $subsidiary}
+        catch{Write-Error $_;return}
+        $bodyHash.Add("subsidiary",@{id=$subsidiaryId})
+        }
+    if(![string]::IsNullOrWhiteSpace($companyNetSuiteId)){
+        $bodyHash.Add("company",@{id=$companyNetSuiteId})
+        }
+
+    
+    if([string]::IsNullOrEmpty($hubSpotCompanyObject.properties.netsuiteid)){
+        Write-Error "HubSpot Contact [$($hubSpotContactObject.properties.firstname)][$($hubSpotContactObject.properties.lastname)][$($hubSpotContactObject.id)] has no NetSuiteId. Cannot update this object using a HubSpot object"
+        }
+    else{
+        $updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $hubSpotContactObject.properties.netsuiteid -fieldHash $fieldHash -netsuiteParameters $netsuiteParameters
+        $updatedNetSuiteContact = get-netSuiteContactFromNetSuite -contactId $hubSpotContactObject.properties.netsuiteid -netsuiteParameters $netsuiteParameters
+        $updatedHubSpotClient = update-hubSpotObject -apiKey $hubSpotApiKey -objectType companies -objectId $hubSpotContactObject.id -fieldHash @{lastmodifiedinnetsuite=$updatedNetSuiteContact.lastModifiedDate; lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)}
+        $updatedNetSuiteContact
+        }
+
+    }
+
+#$clientStauses = invoke-netSuiteRestMethod -requestType GET -url "$((get-netsuiteParameters -connectTo Production).uri)/customerstatus/20" -netsuiteParameters $(get-netsuiteParameters -connectTo Production)

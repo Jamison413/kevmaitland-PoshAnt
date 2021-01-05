@@ -16,7 +16,7 @@ Import-Module _PS_Library_Graph
 Import-Module _PS_Library_MFA
 
 $Admin = "emily.pressey@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Em.txt) 
+$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 connect-ToMsol -credential $adminCreds

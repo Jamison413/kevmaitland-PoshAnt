@@ -82,7 +82,7 @@ foreach ($currentRequest in $selectedRequests){
                 $clientOrSupplierSiteDocLib = $allClientSiteDocLibs | ? {$_.Name -eq $($fullRequest.FieldValues.ClientName.Label)}
                 }
             "subs"    {
-                $clientOrSupplierSiteDocLib = $allSupplierSiteDocLibs | ? {$_.Name -eq $($fullRequest.FieldValues.ClientName.Label)}
+                $clientOrSupplierSiteDocLib = $allSupplierSiteDocLibs | ? {$_.Name -eq $($fullRequest.FieldValues.Subcontractor_x002f_Supplier_x00.Label)}
                 }
             }
         if($clientOrSupplierSiteDocLib){ #The Spaniards create their own Clients Managed MetaData records, so there might not be Clients DocLibs for every instance
