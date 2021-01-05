@@ -15,10 +15,10 @@ $Admin = "emily.pressey@anthesisgroup.com"
 $AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
-
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 connect-ToExo -credential $exoCreds
 
+connect-toAAD -credential $adminCreds
 
 function get-POPReviewPeriod(){
     [cmdletbinding()]
@@ -70,6 +70,7 @@ If($objective.FieldValues.Status -eq "Open"){
     }
     #Set the permissions to just the manager and the employee, People Services will have full control anyway
     Try{
+    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
     Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -User $($objective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
     Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -User $($objective.FieldValues.Line_x0020_Manager.Email) -AddRole Contribute
     }
@@ -102,6 +103,7 @@ Else{
     }
     #Set the permissions to just the manager and the employee, People Services will have full control anyway
     Try{
+    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
     Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
     Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Line_x0020_Manager.Email) -AddRole Contribute
     }
@@ -124,6 +126,9 @@ Else{
 }
 
 }
+
+
+
 
 
 ####################
@@ -276,5 +281,100 @@ Write-Host "Error: Too many modules were found, we couldn't find the one needed!
 }
 }
 
+
+####################################
+#POP cleaning for changing managers#
+####################################
+
+
+#Live Objectives
+$allliveobjectives = Get-PnPListItem -List "POP Objectives List (UK)"
+ForEach($liveobjective in $allliveobjectives){
+$thisuserManager = ""
+$thisuserManager = Get-AzureADUserManager -ObjectId "$($liveobjective.FieldValues.Employee_x0020_Name.Email)"
+    #Check it matches the Manager on the Objective
+    If($liveobjective.FieldValues.Line_x0020_Manager.Email -ne $thisuserManager.UserPrincipalName){
+    Write-Host "Manager has changed from $($liveobjective.FieldValues.Line_x0020_Manager.Email)  ->  $($thisuserManager.UserPrincipalName). Updating live Objective: $($liveobjective.Id)" -ForegroundColor Yellow
+    Set-PnPListItem -List "POP Objectives List (UK)" -Identity $liveobjective.Id -Values @{"Line_x0020_Manager" = $($thisuserManager.UserPrincipalName)}
+    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
+    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($liveobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
+    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
+    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
+    }
+}
+
+#Complete Objectives
+$allcompleteobjectives = Get-PnPListItem -List "POP Completed Objectives (UK)"
+ForEach($completeobjective in $allcompleteobjectives){
+$thisuserManager = ""
+$thisuserManager = Get-AzureADUserManager -ObjectId "$($completeobjective.FieldValues.Employee_x0020_Name.Email)"
+    #Check it matches the Manager on the Objective
+    If($completeobjective.FieldValues.Line_x0020_Manager.Email -ne $thisuserManager.UserPrincipalName){
+    Write-Host "Manager has changed from $($completeobjective.FieldValues.Line_x0020_Manager.Email)  ->  $($thisuserManager.UserPrincipalName). Updating Complete Objective: $($completeobjective.Id)" -ForegroundColor Yellow
+    Set-PnPListItem -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -Values @{"Line_x0020_Manager" = $($thisuserManager.UserPrincipalName)}    
+    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
+    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($completeobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
+    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
+    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
+    }
+}
+
+####################################
+#POP cleaning for Leavers          #
+####################################
+
+$allliveobjectives = Get-PnPListItem -List "POP Objectives List (UK)"
+$allcompleteobjectives = Get-PnPListItem -List "POP Completed Objectives (UK)"
+
+#Live List
+$deactivatedUserObjectives = $allliveobjectives.where({$_.FieldValues.Employee_x0020_Name.LookupValue -match "Ω_"})
+If($deactivatedUserObjectives){
+
+    ForEach($deactivatedUserObjective in $deactivatedUserObjectives){
+    #Move them to the archive list where only People Services has access
+    Add-PnPListItem -List "POP Archive (UK)" -Values @{
+
+    "Employee_x0020_Name" = $deactivatedUserObjective.FieldValues.Employee_x0020_Name.Email;
+    "Line_x0020_Manager" = $deactivatedUserObjective.FieldValues.Line_x0020_Manager.Email;
+    "Review_x0020_Period" = $deactivatedUserObjective.FieldValues.Review_x0020_Period;                                                                                                                                                                                                                                                                                                           
+    "Objective" = $deactivatedUserObjective.FieldValues.Objective;                                                                                                       
+    "ObjectiveDescription" = $deactivatedUserObjective.FieldValues.ObjectiveDescription;
+    "ManagerAssessment" = $deactivatedUserObjective.FieldValues.ManagerAssessment;                                                                                                                               
+    "EmployeeAssessment" = $deactivatedUserObjective.FieldValues.EmployeeAssessment;                                                                                                                               
+    "Status" = $deactivatedUserObjective.FieldValues.Status;                                                                                                                                              
+    "Cluster" = $deactivatedUserObjective.FieldValues.Cluster;                                                                                                                                      
+    "ManagerComments" = $deactivatedUserObjective.FieldValues.ManagerComments;                                                                                                                                                             
+    "EmployeeComments" = $deactivatedUserObjective.FieldValues.EmployeeComments;
+        }
+    Remove-PnPListItem -List "POP Objectives List (UK)" -Identity $deactivatedUserObjective.Id -Force
+    }
+}
+
+$deactivatedUserObjectives = ""
+#Complete List
+$deactivatedUserObjectives = $allcompleteobjectives.where({$_.FieldValues.Employee_x0020_Name.LookupValue -match "Ω_"})
+If($deactivatedUserObjectives){
+
+    ForEach($deactivatedUserObjective in $deactivatedUserObjectives){
+    #Move them to the archive list where only People Services has access
+    Add-PnPListItem -List "POP Archive (UK)" -Values @{
+
+    "Employee_x0020_Name" = $deactivatedUserObjective.FieldValues.Employee_x0020_Name.Email;
+    "Line_x0020_Manager" = $deactivatedUserObjective.FieldValues.Line_x0020_Manager.Email;
+    "Review_x0020_Period" = $deactivatedUserObjective.FieldValues.Review_x0020_Period;                                                                                                                                                                                                                                                                                                           
+    "Objective" = $deactivatedUserObjective.FieldValues.Objective;                                                                                                       
+    "ObjectiveDescription" = $deactivatedUserObjective.FieldValues.ObjectiveDescription;
+    "ManagerAssessment" = $deactivatedUserObjective.FieldValues.ManagerAssessment;                                                                                                                               
+    "EmployeeAssessment" = $deactivatedUserObjective.FieldValues.EmployeeAssessment;                                                                                                                               
+    "Status" = $deactivatedUserObjective.FieldValues.Status;                                                                                                                                              
+    "Cluster" = $deactivatedUserObjective.FieldValues.Cluster;                                                                                                                                      
+    "ManagerComments" = $deactivatedUserObjective.FieldValues.ManagerComments;                                                                                                                                                             
+    "EmployeeComments" = $deactivatedUserObjective.FieldValues.EmployeeComments;
+    "Complete_x0020_Date" =  $deactivatedUserObjective.FieldValues.EmployeeComments;
+        }
+    
+    Remove-PnPListItem -List "POP Completed Objectives (UK)" -Identity $deactivatedUserObjective.Id -Force
+    }
+}
 
 Stop-Transcript
