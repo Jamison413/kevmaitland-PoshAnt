@@ -79,7 +79,7 @@ function get-atpMachines(){
             [psobject]$tokenResponse        
         )
 
-    invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines" -Verbose:$VerbosePreference
+    invoke-atpGet -tokenResponse $tokenResponse -atpQuery "/machines" -Verbose:$VerbosePreference
     }
 function get-atpSoftware(){
      [cmdletbinding()]

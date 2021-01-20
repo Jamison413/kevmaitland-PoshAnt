@@ -176,46 +176,64 @@ function process-folder(){
         }
     
     #region Get Folder
-    if([string]::IsNullOrWhiteSpace($oppProjTerm.CustomProperties.DriveItemId)){
+    if(![string]::IsNullOrWhiteSpace($oppProjTerm.CustomProperties.DriveItemId)){
         try{
-            $driveFolder = search-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $oppProjTerm -clientTerm $clientTerm -arrayOfAllClientTerms $arrayOfAllClientTerms -updateTermIfFound -moveFolderIfFound
-            }
-        catch{
-            Write-Error "Error searching for $($thisIsA)Folder (no ID available) [$($oppProjTerm.Name)][$($oppProjTerm.Id)] by Name  | Retrying with -Verbose"
-            search-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $oppProjTerm -clientTerm $clientTerm -arrayOfAllClientTerms $arrayOfAllClientTerms -updateTermIfFound -moveFolderIfFound -Verbose
-            }
-        }
-    else{
-        try{
+            Write-Host "`t`tRetrieving Folder [$($oppProjTerm.CustomProperties.DriveItemId)] for [$thisIsA] Term [$($oppProjTerm.Name)][$($oppProjTerm.CustomProperties.NetSuiteOppId)]/[$($oppProjTerm.CustomProperties.NetSuiteProjectId)] for Client [$($clientTerm.Name)][$($oppProjTerm.CustomProperties.NetSuiteClientId)]"
             $driveFolder = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $clientTerm.CustomProperties.GraphDriveId -itemGraphId $oppProjTerm.CustomProperties.DriveItemId -returnWhat Item -ErrorAction stop
             }
         catch{
             if($_.Exception -match "(404)"){ #If the folder is missing, look through any previous client drives the Opp/Proj was associated with
-                Write-Host "`t$($thisIsA)Folder for $($thisIsA) [$($oppProjTerm.Name)][$($oppProjTerm.Id)] is missing from Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)]."
+                Write-Warning "`t$($thisIsA)Folder [$($oppProjTerm.CustomProperties.DriveItemId)] for $($thisIsA) [$($oppProjTerm.Name)][$($oppProjTerm.Id)] is missing from Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.NetSuiteId)][$($clientTerm.CustomProperties.GraphDriveId)]: Searching for possible matches"
                 try{
                     $driveFolder = search-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $oppProjTerm -clientTerm $clientTerm -arrayOfAllClientTerms $arrayOfAllClientTerms -updateTermIfFound -moveFolderIfFound
                     }
                 catch{
-                    Write-Error "Error searching for $($thisIsA)Folder [$($oppProjTerm.CustomProperties.DriveItemId)] [$($oppProjTerm.Name)][$($oppProjTerm.Id)] by Name | Retrying with -Verbose"
-                    search-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $oppProjTerm -clientTerm $clientTerm -arrayOfAllClientTerms $arrayOfAllClientTerms -updateTermIfFound -moveFolderIfFound -Verbose
+                    Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+                    Return
                     }
                 }
             else{
-                Write-Error "Error retrieving $($thisIsA)Folder for $($thisIsA) [$($oppProjTerm.Name)][$($oppProjTerm.id)][$($oppProjTerm.CustomProperties.DriveItemId)] for for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)] |  Retrying with Verbose"
-                get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $clientTerm.CustomProperties.GraphDriveId -itemGraphId $oppProjTerm.CustomProperties.DriveItemId -returnWhat Item -Verbose
+                Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+                Return
                 }
             }
         }
-    #endregion
+    else{
+        try{
+            Write-Warning "[$thisIsA] Term [$($oppProjTerm.Name)][$($oppProjTerm.CustomProperties.NetSuiteOppId)]/[$($oppProjTerm.CustomProperties.NetSuiteProjectId)] for Client [$($clientTerm.Name)][$($oppProjTerm.CustomProperties.NetSuiteClientId)] has no DriveItemId set: Searching for possible matches"
+            $driveFolder = search-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $oppProjTerm -clientTerm $clientTerm -arrayOfAllClientTerms $arrayOfAllClientTerms -updateTermIfFound -moveFolderIfFound
+            }
+        catch{
+            Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+            if($VerbosePreference -ne 2){
+                $oldVerbosePreference = $VerbosePreference
+                Write-Error "Error searching for $($thisIsA)Folder (no ID available) [$($oppProjTerm.Name)][$($oppProjTerm.Id)] by Name | Retrying with -Verbose for detailedlogging"
+                $VerbosePreference = 2
+                search-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $oppProjTerm -clientTerm $clientTerm -arrayOfAllClientTerms $arrayOfAllClientTerms -updateTermIfFound -moveFolderIfFound -Verbose
+                $VerbosePreference = $oldVerbosePreference
+                }
+            return
+            }
+        }
+                        #endregion
 
     #region Update Folder
         #Update Name (if changed)
         #Reassign to new Client (if changed)
         #Notify if neither
     if($driveFolder){
+        Write-Host "`t`t`tDriveFolder [$($driveFolder.name)][$($driveFolder.webUrl)][$($driveFolder.id)] found!"
         #Notify if neither - do this first, otherwise the Names/ClientIds will always match (because we'll have fixed them) :)
         if(($oppProjTerm.Name -eq $driveFolder.name) -and ($driveFolder.parentReference.driveId -eq $clientTerm.CustomProperties.GraphDriveId)){
-            Write-Host "`tNothing significant has changed for $($thisIsA) Term [$($oppProjTerm.Name)][$($oppProjTerm.id)][$($oppProjTerm.CustomProperties.DriveItemId)]"
+            Write-Host "`t`t`tNothing significant has changed for $($thisIsA) Term [$($oppProjTerm.Name)][$($oppProjTerm.id)][$($oppProjTerm.CustomProperties.DriveItemId)]: Unflagging to prevent futher processing"
+            try{
+                $oppProjTerm.SetCustomProperty("flagForReprocessing",$false) 
+                $oppProjTerm.Context.ExecuteQuery()
+                return
+                }
+            catch{
+                Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+                }
             $flagForReprocessing = $false #If this worked, mark the Term as clean
             }
         #region Update Name (if changed)
@@ -225,18 +243,18 @@ function process-folder(){
                 Write-Host "`t$($thisIsA)Folder Name [$($driveFolder.name)] is out-of-date, but that's becasue it's been converted to a Project. Skipping this discrepency."
                 }
             else{
-                Write-Host "`t$($thisIsA)Folder Name [$($driveFolder.name)] is out-of-date - updating $($thisIsA)Folder name to [$($oppProjTerm.Name)]"
+                Write-Host "`t`t`t$($thisIsA)Folder Name [$($driveFolder.name)][$($driveFolder.webUrl)][$($driveFolder.id)] is out-of-date - updating $($thisIsA)Folder name to [$($oppProjTerm.Name)]"
                 try{
                     $updatedFolder = set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $clientTerm.CustomProperties.GraphDriveId -driveItemId $oppProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$oppProjTerm.Name} -ErrorAction Stop
                     if($updatedFolder){
                         $driveFolder = $updatedFolder
                         $flagForReprocessing = $false #If this worked, mark the Term as clean
                         }
-                    else{Write-Host "`t`test-graphDriveItem didn't return the updated Folder, but didn't produce an error either :/"}
+                    else{Write-Host "`t`t`t`tset-graphDriveItem didn't return the updated Folder, but didn't produce an error either :/"}
                     }
                 catch{
                     if($_.Exception -match "(409)"){ #Folder already exists
-                        Write-Host "`t`tA different $($thisIsA)Folder with the name [$($oppProjTerm.Name)] already exists. Attempting simple Merge."
+                        Write-Host "`t`t`tA different $($thisIsA)Folder with the name [$($oppProjTerm.Name)] already exists. Attempting simple Merge."
                         try{
                             $updatedFolder = merge-folders -tokenResponse $tokenResponseSharePointBot -sourceDriveItem $driveFolder -oppProjTerm $oppProjTerm -sourceClientTerm $clientTerm -updateOppProjTerm
                             if($updatedFolder){
@@ -251,8 +269,10 @@ function process-folder(){
                             }
                         }
                     else{
-                        Write-Error "Error updating Name of $($thisIsA)Folder [$($driveFolder.name)][$($driveFolder.webUrl)] for $thisIsA [$($oppProjTerm.Name)][$($oppProjTerm.CustomProperties.DriveItemId)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)] | Retrying with Verbose"
-                        set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $clientTerm.CustomProperties.GraphDriveId -driveItemId $oppProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$oppProjTerm.Name} -Verbose
+                        Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+                        #Write-Error $_
+                        #Write-Error "Error updating Name of $($thisIsA)Folder [$($driveFolder.name)][$($driveFolder.webUrl)] for $thisIsA [$($oppProjTerm.Name)][$($oppProjTerm.CustomProperties.DriveItemId)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)] | Retrying with Verbose"
+                        #set-graphDriveItem -tokenResponse $tokenResponseSharePointBot -driveId $clientTerm.CustomProperties.GraphDriveId -driveItemId $oppProjTerm.CustomProperties.DriveItemId -driveItemPropertyHash @{name=$oppProjTerm.Name} -Verbose
                         Return #Exit early - we don't want *more* folders being created if we've already got name collisions.
                         }
                     }
@@ -340,11 +360,11 @@ function process-folder(){
             }
 
         #If we didn't find the Opp Folder anywhere, we want to create new folders in the current Client Drive
-        Write-Host "`tCreating new $($thisIsA)Folders for [$($oppProjTerm.Name)]"
+        Write-Host "`tCreating new $($thisIsA)Folders for [$($oppProjTerm.Name)] in [$($clientTerm.Name)][$($clientTerm.CustomProperties.NetSuiteId)][$($clientTerm.CustomProperties.GraphDriveId)]"
         [array]$customisedFolderList = $oppProjTerm.Name
         $customisedFolderList += $arrayOfLeadProjSubFolders | % {"$($oppProjTerm.Name)\$_"}
         try{
-            $newFolders = add-graphArrayOfFoldersToDrive -graphDriveId $clientTerm.CustomProperties.GraphDriveId -foldersAndSubfoldersArray $customisedFolderList -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail #-ErrorAction SilentlyContinue
+            $newFolders = add-graphArrayOfFoldersToDrive -graphDriveId $clientTerm.CustomProperties.GraphDriveId -foldersAndSubfoldersArray $customisedFolderList -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail -ErrorAction Stop
             if($newFolders){
                 $oppProjTerm.SetCustomProperty("DriveItemId",$newFolders[1].id)
                 $oppProjTerm.Context.ExecuteQuery()
@@ -353,8 +373,10 @@ function process-folder(){
             else{Write-Host "`t`tadd-graphArrayOfFoldersToDrive didn't return the new Folders, but didn't produce an error either :/"}
             }
         catch{
-            Write-Error "Error creating $($thisIsA)Folders for [$($oppProjTerm.Name)][$($oppProjTerm.id)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)] | Retrying with Verbose"
-            add-graphArrayOfFoldersToDrive -graphDriveId $clientTerm.CustomProperties.GraphDriveId -foldersAndSubfoldersArray $customisedFolderList -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail -Verbose
+            Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+            Write-Error $_
+            #Write-Error "Error creating $($thisIsA)Folders for [$($oppProjTerm.Name)][$($oppProjTerm.id)] for Client [$($clientTerm.Name)][$($clientTerm.CustomProperties.GraphDriveId)] | Retrying with Verbose"
+            #add-graphArrayOfFoldersToDrive -graphDriveId $clientTerm.CustomProperties.GraphDriveId -foldersAndSubfoldersArray $customisedFolderList -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail -Verbose
             }
         }
     #endregion
@@ -449,7 +471,7 @@ function search-folder(){
             }
         else{#If something weird has gone wrong, we want to know about it though.
             Write-Error "Error getting $($thisIsA)Folder for [$($oppProjTerm.Name)][$($oppProjTerm.Id)] for primary client [$($clientTerm.Name)][$($clientTerm.Id)] in search-folder()"
-            $_
+            Write-Host -ForegroundColor Red "`t`t`t$(get-errorSummary -errorToSummarise $_)"
             }
         } 
 
@@ -495,117 +517,130 @@ $fullSyncTime = Measure-Command {
         #############################
         #Create new Prospects/Clients
         #############################
-        $missingFromSpo = Compare-Object -ReferenceObject @($clientTermsToCheck | Sort-Object DriveId | Select-Object) -DifferenceObject @($allClientDrives | Sort-Object DriveId | Select-Object) -Property DriveId -PassThru -IncludeEqual | ? {$_.SideIndicator -eq "<="}
-        Write-Host "Creating [$($missingFromSpo.Count)] new Client DocLibs"
-        $missingFromSpo | Select-Object | % {
+        $newClientTerms = $clientTermsToCheck | ? {[string]::IsNullOrWhiteSpace($_.DriveId)}
+        Write-Host "`tCreating [$($newClientTerms.Count)] new Client DocLibs"
+        $newClientTerms | % {
             $thisNewClient = $_
-            Write-Host "Creating new GraphList [$($thisNewClient.Name)]"
+            Write-Host "`t`tTerm [$($thisNewClient.Name)][$($thisNewClient.CustomProperties.NetSuiteId)] has no DriveId: Creating new GraphList"
             try{
-                $newGraphList = new-graphList -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId -listDisplayName $thisNewClient.Name -listType documentLibrary
+                $newGraphList = new-graphList -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId -listDisplayName $(sanitise-forSql $thisNewClient.Name) -listType documentLibrary
                 } #Graph doesn't support creating Drives, so we need to create a List
             catch{
                 if($_.Exception -match "(409)"){ #Folder already exists
-                    Write-Warning "`tClient DocLib for [$($thisNewClient.Name)] already exists!"
+                    Write-Warning "`t`tClient DocLib for [$($thisNewClient.Name)] already exists!"
+                    $newGraphList = get-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -listName $(sanitise-forSql $thisNewClient.Name) -Verbose
                     }
                 else{
-                    Write-Error "Error creating new DocLib for Client [$($thisNewClient.Name)] - retrying with Verbose"
-                    $oldVerbosePreference = $VerbosePreference
-                    $VerbosePreference = 2
-                    new-graphList -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId -listDisplayName $thisNewClient.Name -listType documentLibrary -Verbose
-                    $VerbosePreference = $oldVerbosePreference
+                    Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+                    if($VerbosePreference -ne 2){
+                        $oldVerbosePreference = $VerbosePreference
+                        Write-Error "Error creating new DocLib for Client [$($thisNewClient.Name)][$($thisNewClient.CustomProperties.NetSuiteId)] - retrying with Verbose for detailedlogging"
+                        $VerbosePreference = 2
+                        new-graphList -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId -listDisplayName $thisNewClient.Name -listType documentLibrary -Verbose
+                        $VerbosePreference = $oldVerbosePreference
+                        }
                     }
                 }
-            if(!$newGraphList){$newGraphList = get-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -listName $thisNewClient.Name}
             if(!$newGraphList){
                 Write-Error "Could not retrieve Graph List for Client [$($thisNewClient.Name)] - not checking for Drive"
-                continue
+                return #Exit early out of this foreach-object iteration for $thisNewClient 
                 }
             else{
-                Write-Host "`tGetting new GraphDrive from GraphList [$($newGraphList.name)][$($newGraphList.id)]"
+                Write-Host "`t`t`tGetting new GraphDrive from GraphList [$($newGraphList.name)][$($newGraphList.id)]"
                 $newGraphListDrive = get-graphDrives -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId -listGraphId $newGraphList.id #Then get the new Drive object form the List
-                Write-Host "`tCreating standard Client folders in Drive [$($newGraphListDrive.name)][$($newGraphListDrive.id)]"
+                Write-Host "`t`t`tCreating standard Client folders in Drive [$($newGraphListDrive.name)][$($newGraphListDrive.id)]"
                 $newFolders = add-graphArrayOfFoldersToDrive -graphDriveId $newGraphListDrive.id -foldersAndSubfoldersArray $listOfClientFolders -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail
-                Write-Host "`tUpdating Term [$($thisNewClient.Name)] with CustomProperties @{DocLibId=$($newGraphList.id);GraphDriveId=$($newGraphListDrive.id)}"
+                Write-Host "`t`t`tUpdating Term [$($thisNewClient.Name)][$($thisNewClient.CustomProperties.NetSuiteId)]  with CustomProperties @{DocLibId=$($newGraphList.id);GraphDriveId=$($newGraphListDrive.id)}"
                 $thisNewClient.SetCustomProperty("DocLibId",$newGraphList.id)
                 $thisNewClient.SetCustomProperty("GraphDriveId",$newGraphListDrive.id)
                 }
             try{
-                Write-Verbose "`tTrying to update Term [$($thisNewClient.Name)] with CustomProperties @{DocLibId=$($newGraphList.id);GraphDriveId=$($newGraphListDrive.id)}"
+                Write-Verbose "`t`t`tTrying to update Term [$($thisNewClient.Name)][$($thisNewClient.CustomProperties.NetSuiteId)] with CustomProperties @{DocLibId=$($newGraphList.id);GraphDriveId=$($newGraphListDrive.id)}"
                 $thisNewClient.Context.ExecuteQuery()
                 $thisNewClient.SetCustomProperty("flagForReprocessing",$false) #If the previous ExecuteQuery() worked, deflag the Term so it doesn;t get processed next time
                 $thisNewClient.Context.ExecuteQuery()
+                $newClientTerms = $newClientTerms | ? {$_.Id -notcontains $thisNewClient.Id} #Pop this Term for the to-process stack so we can see any failures at the end
                 }
             catch{
-                Write-Error "Error updating Term [$($thisNewClient.Name)] with CustomProperties @{DocLibId=$($newGraphList.id);GraphDriveId=$($newGraphListDrive.id)} in sync-netsuiteManagedMetaDataToSharePoint()"
+                Write-Host -ForegroundColor Red "`t`t`t$(get-errorSummary -errorToSummarise $_)"
                 [array]$flagForReprocessing += $thisNewClient
                 }
             }
+
+        if($newClientTerms.Count -gt 0){
+            Write-Warning "[$($newClientTerms.Count)] clients failed to create correctly: $(($newClientTerms | % {"$($_.Name),$($_.CustomProperties.NetSuiteId)"}) -join "; ")"
+            }
+
 
 
         #############################
         #Update any Clients Drives that have changed their names in NetSuite
         #############################
-        $matchedGraphId = Compare-Object -ReferenceObject $clientTermsToCheck -DifferenceObject $allClientDrives -Property DriveId -IncludeEqual -ExcludeDifferent -PassThru #We find out which $clientTermsToCheck records already have valid GraphDriveId values
+        #As we already have a full list of both Terms and Drive Objects, it's more efficient to compare the names in-memory and only update the discrepencies
+        $matchedGraphId = Compare-Object -ReferenceObject $($clientTermsToCheck | ? {![String]::IsNullOrWhiteSpace($_.DriveId)}) -DifferenceObject $allClientDrives -Property DriveId -IncludeEqual -ExcludeDifferent -PassThru #We find out which $clientTermsToCheck records already have valid GraphDriveId values
         $matchedGraphIdReversed = Compare-Object -ReferenceObject $allClientDrives -DifferenceObject @($matchedGraphId | Select-Object) -Property DriveId -IncludeEqual -ExcludeDifferent -PassThru #We then use $matchedGraphId to filter only the Drive objects with corresponding $clientTermsToCheck records
         $deltaName = Compare-Object -ReferenceObject @($matchedGraphId | Select-Object) -DifferenceObject @($matchedGraphIdReversed | Select-Object) -Property DriveId,Name2 -PassThru -IncludeEqual #We compare the two equal sets on both DriveId and Name2 to see which pairs have mismatched Name values
         $clientsWithChangedNames = $deltaName | ? {$_.SideIndicator -eq "<="} #Anything on this side has a different Name2 in NetSuite
         Write-Host "Updating [$($clientsWithChangedNames.Count)] Client name changes"
         $clientsWithChangedNames | Select-Object | % {
-            $thisUpdatedClient = $_
-            Write-Host "Company name [$($thisUpdatedClient.Name)][$($thisUpdatedClient.id)] seems to have changed. Investigating further."
-            if([string]::IsNullOrWhiteSpace($thisUpdatedClient.CustomProperties.DocLibId)){ #If it's missing it's DocLibID, try to fix it
-                Write-Host "[$($thisUpdatedClient.Name)][$($thisUpdatedClient.id)] is missing its .CustomProperties.DocLibId value - attempting repair"
-                $graphList = get-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -graphDriveId $thisUpdatedClient.CustomProperties.GraphDriveId
-                if($graphList){
-                    $thisUpdatedClient.SetCustomProperty("DocLibId",$graphList.id)
+            $thisUpdatedClientTerm = $_
+            $correspondingClientDrive = $matchedGraphIdReversed | ? {$_.DriveId -eq $thisUpdatedClientTerm.DriveId}
+            Write-Host "`tCompany Term name [$($thisUpdatedClientTerm.Name)][$($thisUpdatedClientTerm.CustomProperties.NetSuiteId)] seems to have changed. Drive Name is [$($correspondingClientDrive.name)][$($correspondingClientDrive.webUrl)] (this was matched via DriveId [$($thisUpdatedClientTerm.DriveId)] -eq [$($correspondingClientDrive.DriveId)])"
+            Write-Host "`t`tGetting corresponding GraphList (DisplayName cannot be updated via the Drive Object)"
+            $correspondingClientList = get-graphList -tokenResponse $tokenResponseSharePointBot -graphDriveId $thisUpdatedClientTerm.CustomProperties.GraphDriveId
+            try{
+                Write-Host "`t`tUpdating corresponding GraphList [$($correspondingClientList.displayName)][$($correspondingClientList.id)][$($correspondingClientList.webUrl)] with @{displayName=$($thisUpdatedClientTerm.Name)}. List was originally named [$($correspondingClientList.name)] at creation on [$($correspondingClientList.createdDateTime)]"
+                $updatedGraphList = set-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -graphListId $thisUpdatedClientTerm.CustomProperties.DocLibId -listPropertyHash @{displayName=$thisUpdatedClientTerm.Name}
+                if($updatedGraphList.name -eq $thisUpdatedClientTerm.Name){
+                    Write-Host "`t`t`tGraphList [$($updatedGraphList.displayName)][$($updatedGraphList.id)][$($updatedGraphList.webUrl)] updated succesfully - updating Term [$($thisUpdatedClientTerm.Name)][$($thisUpdatedClientTerm.CustomProperties.NetSuiteId)]"
                     try{
-                        Write-Verbose "`tTrying: [$($thisUpdatedClient.Name)].SetCustomProperty(`"DocLibId`",$($graphList.id))"
-                        $thisUpdatedClient.Context.ExecuteQuery()
-                        $thisUpdatedClient.SetCustomProperty("flagForReprocessing",$false) #If the previous ExecuteQuery() worked, deflag the Term so it doesn;t get processed next time
-                        $thisUpdatedClient.Context.ExecuteQuery()
-                        $thisUpdatedClient = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Identity $thisUpdatedClient.Id -Includes CustomProperties
+                        $thisUpdatedClientTerm.SetCustomProperty("flagForReprocessing",$false) #If the update worked, deflag the Term so it doesn't get processed next time
+                        $thisUpdatedClientTerm.Context.ExecuteQuery()
+                        $clientsWithChangedNames = $clientsWithChangedNames | ? {$_.Id -notcontains $thisUpdatedClientTerm.Id}
                         }
                     catch{
-                        Write-Error "Error setting [$($thisUpdatedClient.Name)].SetCustomProperty(`"DocLibId`",$($graphList.id)) on Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisUpdatedClient.Name)] in sync-netsuiteManagedMetaDataToSharePoint()"
+                        Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
                         }
                     }
-                else{
-                    Write-Warning "Could not retrive GraphList for [$($thisUpdatedClient.Name)][$($thisUpdatedClient.id)][$($thisUpdatedClient.CustomProperties.GraphDriveId)] - cannot repair Term. Something weird is going on here."
-                    }
                 }
-            if($thisUpdatedClient.CustomProperties.DocLibId){
-                Write-Verbose "[$($thisUpdatedClient.Name)][$($thisUpdatedClient.id)] has .CustomProperties.DocLibId value [$($thisUpdatedClient.CustomProperties.DocLibId)] - attempting to rename List to match Term name"
-                try{
-                    Write-Verbose "`tTrying: set-graphList -graphSiteId $clientSiteId -graphListId $($thisUpdatedClient.CustomProperties.DocLibId) -listPropertyHash @{displayName=$($thisUpdatedClient.Name)}"
-                    $updatedGraphList = set-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -graphListId $thisUpdatedClient.CustomProperties.DocLibId -listPropertyHash @{displayName=$thisUpdatedClient.Name}
-                    }
-                catch{
-                    Write-Error "Error setting List [$($clientSiteId)][$($thisUpdatedClient.CustomProperties.DocLibId)] DisplayName to [$($thisUpdatedClient.Name)] in sync-netsuiteManagedMetaDataToSharePoint() | Retrying with Verbose"
+            catch{
+                Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+                if($VerbosePreference -ne 2){
                     $oldVerbosePreference = $VerbosePreference
+                    Write-Error "Error setting List [$($clientSiteId)][$($thisUpdatedClientTerm.CustomProperties.DocLibId)] DisplayName to [$($thisUpdatedClientTerm.Name)] - retrying with Verbose for detailedlogging"
                     $VerbosePreference = 2
-                    set-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -graphListId $thisUpdatedClient.CustomProperties.DocLibId -listPropertyHash @{displayName=$thisUpdatedClient.Name} -Verbose
+                    set-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -graphListId $thisUpdatedClientTerm.CustomProperties.DocLibId -listPropertyHash @{displayName=$thisUpdatedClientTerm.Name} -Verbose
                     $VerbosePreference = $oldVerbosePreference
                     }
-        
-                if($updatedGraphList.displayName -ne $thisUpdatedClient.Name){#If this didn;t work, it might be because of a DisplayName collision, but it'll need investigating by a human for now as no errors are returned for us to handle
-                    Write-Warning "Failed to update List [$($updatedGraphList.displayName)][$($updatedGraphList.CustomProperties.DocLibId)][$($updatedGraphList.id)] DisplayName to [$($thisUpdatedClient.Name)] in sync-netsuiteManagedMetaDataToSharePoint()"
-                    [array]$problemChilds += ,@($thisUpdatedClient,$updatedGraphList,"Failed to update List DisplayName via graph") 
-                    }
-                else{
-                    Write-Verbose "`tSuccess! List renamed to [$($thisUpdatedClient.Name)]"
-                    }
                 }
-            else{
-                Write-Error "Term [$($pnpTermGroup)][$($pnpTermSet)][$($thisUpdatedClient.Name)] does not have a .CustomProperties.DocLibId value, and one could not be determined - cannot update DisplayName."
-                [array]$problemChilds += ,@($thisUpdatedClient,$updatedGraphList,"Failed to update List DisplayName via graph") 
-                }
+            }
+
+        if($clientsWithChangedNames.Count -gt 0){
+            Write-Warning "[$($clientsWithChangedNames.Count)] clients failed to rename correctly: $(($clientsWithChangedNames | % {"$($_.Name),$($_.CustomProperties.NetSuiteId)"}) -join "; ")"
             }
         }
 
+        #############################
+        #Deflag any Clients that don't need processing
+        #############################
+        [array]$clientTermsWithNoChanges = $clientTermsToCheck | ? {$newClientTerms.id -notcontains $_.id}
+        $clientTermsWithNoChanges = $clientTermsWithNoChanges | ? {$clientsWithChangedNames.id -notcontains $_.id}
+        if($clientTermsWithNoChanges.Count -gt 0){
+            Write-Warning "[$($clientTermsWithNoChanges.Count)] Client Terms were flagged for reprocessing, but don't seem to have any changes. This shouldn't happen as sync-netsuiteToManagedMetaData should only flag Clients that actually need processing. Deflagging and notifying Kev"
+            Send-MailMessage -To kevin.maitland@anthesisgroup.com -Subject "Warning in sync-netSuiteManagedMetaDataToSharePoint: [$($clientTermsWithNoChanges.Count)] Client(s) incorrectly flagged for (re)processing" -BodyAsHtml "<UL><LI>$($($clientTermsWithNoChanges | % {"[$($_.Name)][<A HREF='https://3487287.app.netsuite.com/app/common/entity/custjob.nl?id=$($_.CustomProperties.NetSuiteId)'>$($_.CustomProperties.NetSuiteId)</A>]"}) -join '</LI><LI>')</LI></UL>" -From netpointbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+            $clientTermsWithNoChanges | % {
+                $thisBorkedClient = $_
+                Write-Host "`tDeflagging [$($thisBorkedClient.Name)][$($thisBorkedClient.CustomProperties.NetSuiteId)]"
+                $thisBorkedClient.SetCustomProperty("flagForReprocessing",$false) #Deflag the Term so it doesn't get processed next time
+                $thisBorkedClient.Context.ExecuteQuery()
+                }
+            }
+        
+        
     #endregion
     
     #region Opportunities
-    if($missingFromSpo){ #Refresh $allClientTerms if we've created new Clients
+    if($clientTermsToCheck | ? {[string]::IsNullOrWhiteSpace($_.DriveId)}){ #Refresh $allClientTerms if we've created new Clients
         $pnpTermGroup = "Kimble"
         $pnpTermSet = "Clients"
         $allClientTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.IsDeprecated -eq $false}
@@ -614,7 +649,7 @@ $fullSyncTime = Measure-Command {
     $pnpTermSet = "Opportunities"
     $allOppTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.IsDeprecated -eq $false}
     #Filter these client-side (CSOM, eh?) to get only the changes since this script last completed successfully
-    [array]$oppTermsToCheck = $allOppTerms | ? {($_.LastModifiedDate -gt $lastSpoSyncRun -or $_.CustomProperties.flagForReprocessing -eq $true) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteOppId) -and [string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjId)}
+    [array]$oppTermsToCheck = $allOppTerms | ? {($_.LastModifiedDate -gt $lastSpoSyncRun -or $_.CustomProperties.flagForReprocessing -eq $true) -and ![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteOppId) -and [string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjectId)}
     
     Write-Host "Processing [$($oppTermsToCheck.Count)] Opportunities"
     if($oppTermsToCheck){
@@ -624,7 +659,11 @@ $fullSyncTime = Measure-Command {
             $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -aadAppCreds $sharePointBotDetails -renewTokenExpiringInSeconds 30
             $thisOppTerm = $_
             Write-Host "Processing Opp Term [$($thisOppTerm.Name)][$($thisOppTerm.id)][$($thisOppTerm.CustomProperties.DriveItemId)] for NetSuiteClientId [$($thisOppTerm.CustomProperties.NetSuiteClientId)]"
-            process-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $thisOppTerm -arrayOfAllClientTerms $allClientTerms -arrayOfLeadProjSubFolders $listOfLeadProjSubFolders -arrayOfAllOppTerms $allOppTerms
+            try{
+                process-folder -tokenResponse $tokenResponseSharePointBot -oppProjTerm $thisOppTerm -arrayOfAllClientTerms $allClientTerms -arrayOfLeadProjSubFolders $listOfLeadProjSubFolders -arrayOfAllOppTerms $allOppTerms -ErrorAction Stop -Verbose
+                $oppTermsToCheck = $oppTermsToCheck | ? {$_.Id -notcontains $thisOppTerm.Id}
+                }
+            catch{} #This Try Block is just to weed out the problematic Opps
             } 
         }
 
@@ -655,7 +694,8 @@ $fullSyncTime = Measure-Command {
     #If the script hasn't borked completely, update the LastSpoSyncRun timestamp
     Write-Host "Setting Term [Anthesis][IT][LastModified] CustomProperty LastSpoSyncRun = [$(Get-Date $now -f s)]"
     $lastProcessedTerm = Get-PnPTerm -TermGroup "Anthesis" -TermSet "IT" -Identity "LastModified" -Includes CustomProperties
-    $lastProcessedTerm.SetCustomProperty("LastSpoSyncRun",$(Get-Date $now -f s))
+    #$lastProcessedTerm.SetCustomProperty("LastSpoSyncRun",$(Get-Date $now -f s))
+    $lastProcessedTerm.SetCustomProperty("LastSpoSyncRun",$(Get-Date -f s))
     try{
         $lastProcessedTerm.Context.ExecuteQuery()
         }

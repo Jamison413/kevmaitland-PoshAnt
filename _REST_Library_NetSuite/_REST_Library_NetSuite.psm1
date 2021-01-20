@@ -1252,7 +1252,6 @@ function invoke-netSuiteRestMethod(){
         ,[parameter(Mandatory=$false)]
         [hashtable]$requestBodyHashTable
         )
-
     if(!$netsuiteParameters){$netsuiteParameters = get-netsuiteParameters}
     
     if($url -match "\?"){
@@ -1302,8 +1301,11 @@ function invoke-netSuiteRestMethod(){
                 $nextUrl = [uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href) #Check if there are more results to retrieve
                 if([string]::IsNullOrWhiteSpace($nextUrl)){}#$partialDataset.links.rel | % {Write-Verbose $_}}
                 else{
+                    Write-Verbose "`tNext URL: [$($nextUrl)] (parameters [$($parameters)])"
+                    if($nextUrl -match "limit=" -and $parameters -match "limit="){$parameters = $($parameters -replace '(?<=(^limit=))\w*(?=(&))','').Replace("limit=","") -replace '^&',''} #Trim off any leading limit parameter from the previous iteration
+                    if($nextUrl -match "limit=" -and $parameters -match "offset="){$parameters = $($parameters -replace '(?<=(^offset=))\w*(?=(&))','').Replace("offset=","") -replace '^&',''} #Trim off any leading offset parameter from the previous iteration
                     if(![string]::IsNullOrWhiteSpace($parameters)){$nextUrl = "$nextUrl&$parameters"} #Weirldy links.next.href doesn't include the original query, so this will [Index was outside the bounds of the array.] if we don't resupply it manually
-                    Write-Verbose "`tNext URL: [$($nextUrl)]"
+                    Write-Verbose "`tUpdated URL: [$($nextUrl)] (parameters [$($parameters)])"
                     $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $nextUrl -netsuiteParameters $netsuiteParameters
                     }
                 }

@@ -1,4 +1,12 @@
-﻿#region Get records to reconcile
+﻿if($PSCommandPath){
+    $VerbosePreference = 0
+    $logFileLocation = "C:\ScriptLogs\"
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))`_Transcript_$(Get-Date -Format "yyyy-MM-dd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
+
+
+#region Get records to reconcile
 #Get UK Users from AAD
 $tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
 $ukUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis (UK) Ltd (GBR)' -filterNone
@@ -88,6 +96,7 @@ $allAadDevices | % {
 $ukAadDevices = $allAadDevices | ? {$_.intune.userId -match $($ukUsers.id -join "|")}
 $ukAadDevices = $ukAadDevices | Group-Object {$_.intune.serialNumber} | % {$_.Group | Sort-Object approximateLastSignInDateTime | Select-Object -Last 1} #DeDupe and keep only the most recent
 
+<#
 #Find any assets that are missing from AAD (for gap analysis)
 $extraAssets = @()
 $assetRegisterComputersUseful = $assetRegisterComputers | ? {$_.fields.AssetStatus -notmatch "Dispose" -and $_.fields.AssetStatus -notmatch "Retire"}
@@ -117,6 +126,7 @@ $assetRegisterPhonesUseful | % {
         else{write-host "[$($thisAsset.fields.ComputerName)] matched to [$($matchedDevice.displayName)]"}
         }
     }
+    #>
 #endregion
 
 #region Report stuff
@@ -163,6 +173,9 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
     }
 
 #endregion
+
+
+<#
 #region Report detailed hardware CSV
 #Make the final objects for exporting
 $prettyObjects = @()
@@ -327,3 +340,6 @@ $prettyObjects | Export-Csv  -Path 'C:\Users\KevMaitland\OneDrive - Anthesis LLC
 #endregion
 #endregion
 
+#>
+
+Stop-Transcript

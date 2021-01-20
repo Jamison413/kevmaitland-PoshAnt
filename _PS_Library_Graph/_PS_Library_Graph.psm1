@@ -18,10 +18,22 @@
         )
 
     switch ($PsCmdlet.ParameterSetName){
+        'DriveId'     {
+            #Test that graphDriveId is valid
+            try{$drive = get-graphDrives -tokenResponse $tokenResponse -driveId $graphDriveId}
+            catch{
+                if($_.Exception -match "(404)"){
+                    Write-Error "Drive Object with Id [$($graphDriveId)] does not exist"
+                    return
+                    }
+                }
+            }
         'DriveObject' {$graphDriveId = $graphDriveObject.Id}
         }
     Write-Verbose "add-graphArrayOfFoldersToDrive [$($graphDriveId)]"    
     
+
+
     #Prep the folders array (in case the user has provided junk like $foldersAndSubfoldersArray = @("Test","test\test2\test3\test4","test","/test/TeSt2\","tEST #3","Test | #4")
     $expandedFoldersAndSubfoldersArray = ,@()
     $foldersAndSubfoldersArray | % {
@@ -914,7 +926,6 @@ function get-graphList(){
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
-            [parameter(Mandatory = $true,ParameterSetName = "driveId")]
             [string]$graphSiteId
         ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
@@ -931,8 +942,9 @@ function get-graphList(){
 
     switch ($PsCmdlet.ParameterSetName){
         "driveId" {
-            $drive = get-graphDrives -tokenResponse $tokenResponse -driveId $graphDriveId
-            get-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $graphSiteId -listName $drive.name
+            #$drive = get-graphDrives -tokenResponse $tokenResponse -driveId $graphDriveId
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/list"
+            #get-graphList -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listName $drive.name
             return
             }
         {$_ -match "URL"} { #If we've got a URL to the Site, we'll need to get the Id
@@ -1587,6 +1599,7 @@ function invoke-graphGet(){
             [switch]$useBetaEndPoint = $false
         )
     $sanitisedGraphQuery = $graphQuery.Trim("/")
+    #$sanitisedGraphQuery = [uri]::EscapeDataString($(sanitise-forSql $([uri]::UnescapeDataString($graphQuery).Trim("/"))))
     $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
     if($additionalHeaders){
         $additionalHeaders.GetEnumerator() | %{
@@ -1598,7 +1611,7 @@ function invoke-graphGet(){
     else{$endpoint = "v1.0"}
     do{
         Write-Verbose "https://graph.microsoft.com/$endpoint/$sanitisedGraphQuery"
-        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/$endpoint/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET #-Verbose:$VerbosePreference -ErrorAction:$ErrorActionPreference
+        $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/$endpoint/$sanitisedGraphQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET  #-Verbose:$VerbosePreference -ErrorAction:$ErrorActionPreference
         if($response.value){
             $results += $response.value
             Write-Verbose "[$([int]$response.value.count)] results returned on this cycle, [$([int]$results.count)] in total"
