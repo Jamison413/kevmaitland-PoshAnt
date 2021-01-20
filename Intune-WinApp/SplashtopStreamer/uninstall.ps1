@@ -1,0 +1,1 @@
+get-package | ? {$_.Name -eq "Splashtop Streamer"} | uninstall-package
