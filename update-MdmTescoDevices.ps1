@@ -12,6 +12,9 @@ if([string]::IsNullOrWhiteSpace($currentTescoDevices.Id)){$currentTescoDevices =
 
 $delta = Compare-Object -ReferenceObject $currentTescoDevices -DifferenceObject $tescoWindowsDevices -Property Id -PassThru
 
+#Remove personal devices with workplace trust replationship
+$delta = $delta.Where({$_.trustType -ne "Workplace"})
+
 $toAdd = $delta | ? {$_.SideIndicator -eq "=>"}
 If($toAdd){add-graphUsersToGroup -tokenResponse $teamBotTokenResponse -graphGroupId $tescoDevicesGroupId -memberType Members -graphUserIds $toAdd.id -Verbose}
 
