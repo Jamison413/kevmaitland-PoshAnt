@@ -1031,7 +1031,8 @@ function get-netSuiteOpportunityFromNetSuite(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
+        [AllowEmptyString()] 
+        [ValidatePattern('^?[\w+][=][\w+]|^$')]
         [string]$query
 
         ,[parameter(Mandatory=$false)]
@@ -1131,7 +1132,7 @@ function get-netSuiteProjectFromNetSuite(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
+        [ValidatePattern('^?[\w+][=][\w+]|^$')]
         [string]$query
 
         ,[parameter(Mandatory=$false)]

@@ -1,32 +1,4 @@
-﻿
-
-
-#NetSuiteClient #ClientTerm #ClientDrive
-$ClientReconcile = Measure-Command {
-    $netQuery =  "?q=companyName CONTAIN_NOT `"Anthesis`"" #Excludes any Companies with "Anthesis" in the companyName
-    $netQuery += " AND companyName CONTAIN_NOT `"intercompany project`"" #Excludes any Companies with "(intercompany project)" in the companyName
-    $netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
-    $netQuery += " AND entityStatus ANY_OF_NOT [6, 7]" #Excludes LEAD-Unqualified and LEAD-Qualified (https://XXX.app.netsuite.com/app/crm/sales/customerstatuslist.nl?whence=)
-    [array]$allNetSuiteClients = get-netSuiteClientsFromNetSuite -query $netQuery -netsuiteParameters $(get-netSuiteParameters -connectTo Production)
-    @($allNetSuiteClients | Select-Object) | % {
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteClientId -Value $($_.Id) -Force
-        }
-
-    $sharePointAdmin = "kimblebot@anthesisgroup.com"
-    #convertTo-localisedSecureString "KimbleBotPasswordHere"
-    $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
-    $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-    Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
-    $pnpTermGroup = "Kimble"
-    $pnpTermSet = "Clients"
-    $allClientTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.IsDeprecated -eq $false}
-    $allClientTerms | % {
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteClientId -Value $($_.CustomProperties.NetSuiteId) -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientId -Value $($_.CustomProperties.GraphDriveId) -Force
-        }
-    $relevantClientTerms = $allClientTerms | ? {![string]::isnullorwhitespace($_.CustomProperties.NetSuiteId)}
-
-    $sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot
+﻿ $sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot
     $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $sharePointBotDetails
     $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
     #$supplierSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,9fb8ecd6-c87d-485d-a488-26fd18c62303"
@@ -34,11 +6,14 @@ $ClientReconcile = Measure-Command {
     $allClientDrives = get-graphDrives -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId
     $allClientDrives | % {
         Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientId -Value $($_.id) -Force
+        Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientName -Value $($_.Name) -Force
+        Add-Member -InputObject $_ -MemberType NoteProperty -Name UnifiedClientName -Value $($_.Name) -Force
         }
+
 
     $combinedClients = @($null) * $allNetSuiteClients.Count
     for($i=0; $i -lt $allNetSuiteClients.Count; $i++){
-        $combinedClients[$i] = New-Object PSObject -Property @{
+        $combinedClients[$i] = New-Object PSObject -Property ([ordered]@{
             NetSuiteClientId=$allNetSuiteClients[$i].id
             NetSuiteClientName=$allNetSuiteClients[$i].companyName
             TermClientId=$null
@@ -47,7 +22,7 @@ $ClientReconcile = Measure-Command {
             DriveClientName=$null
             DriveClientUrl=$null
             Problems=$null
-            }
+            })
         }
     for ($i=0; $i -lt $combinedClients.count; $i++){
         write-progress -activity "Processing NetSuite Clients" -Status "[$i/$($combinedClients.count)]" -PercentComplete ($i/ $combinedClients.count *100)
@@ -82,42 +57,12 @@ $ClientReconcile = Measure-Command {
     $now = $(Get-Date -f FileDateTimeUniversal)
     $combinedClients = $combinedClients | ? {![string]::IsNullOrWhiteSpace($_.NetSuiteClientId)}
     $combinedClients |  % {Export-Csv -InputObject $_ -Path "$env:USERPROFILE\Desktop\NetRec_Clients_$now.csv" -Append -NoTypeInformation -Encoding UTF8}
-    }
-Write-Host "Client reconcilliation completed in [$($ClientReconcile.TotalMinutes)] minutes"
-#NetSuiteOpp #ClientTerm #ClientDrive #OppTerm #ProjTerm #OppFolder #ProjFolder
 
 
-
-$oppsReconcile = measure-command {
-    [array]$allNetSuiteOpps = get-netSuiteOpportunityFromNetSuite -netsuiteParameters $(get-netSuiteParameters -connectTo Production)
-    $allNetSuiteOpps = $allNetSuiteOpps | ? {![string]::IsNullOrWhiteSpace($_.id)}
-    @($allNetSuiteOpps | Select-Object) | % {
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteClientId -Value $($_.entity.id) -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteOppId -Value $($_.id) -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.custbody_project_created.id) -Force
-        }
-    $pnpTermGroup = "Kimble"
-    $pnpTermSet = "Opportunities"
-    $allOppTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.IsDeprecated -eq $false}
-    $allOppTerms | % {
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteOppId -Value $($_.CustomProperties.NetSuiteOppId) -Force
-        #Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.CustomProperties.NetSuiteProjectId) -Force
-        }
-
-    [array]$allNetSuiteProjs = get-netSuiteProjectFromNetSuite -netsuiteParameters $(get-netSuiteParameters -connectTo Production)
-    $allNetSuiteProjs = $allNetSuiteProjs | ? {![string]::IsNullOrWhiteSpace($_.id)}
-    $allNetSuiteProjs | % {
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.id) -Force
-        }
-    $pnpTermSet = "Projects"
-    $allProjTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes CustomProperties | ? {$_.IsDeprecated -eq $false -and $(![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteClientId))}
-    $allProjTerms | % {
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.CustomProperties.NetSuiteProjId) -Force
-        }
 
     $combinedOpps = @($null) * $allNetSuiteOpps.Count
     for($i=0; $i -lt $allNetSuiteOpps.Count; $i++){
-        $combinedOpps[$i] = New-Object PSObject -Property @{
+        $combinedOpps[$i] = New-Object PSObject -Property ([ordered]@{
             NetSuiteOppId = $allNetSuiteOpps[$i].Id
             NetSuiteOppLabel = "$($allNetSuiteOpps[$i].tranId) $($allNetSuiteOpps[$i].title)"
             NetSuiteClientId=$allNetSuiteOpps[$i].entity.id
@@ -134,14 +79,14 @@ $oppsReconcile = measure-command {
             TermOppId = $null
             TermOppLabel = $null
             TermProjId = $null
-            TermProjLabel = $null
+            TermProjName = $null
             DriveItemOppId = $null
             DriveItemOppName = $null
             DriveItemOppUrl = $null
             DriveItemProjId = $null
             DriveItemProjName = $null
             DriveItemProjUrl = $null
-            }
+            })
         }
     for ($i=0; $i -lt $combinedOpps.count; $i++){
         write-progress -activity "Processing NetSuite Opps" -Status "[$i/$($combinedOpps.count)]" -PercentComplete ($i/ $combinedOpps.count *100)
@@ -262,7 +207,7 @@ $enumerateFolders = Measure-Command {
         }
     $combinedFolders = import-csv "$env:USERPROFILE\Desktop\NetRec_AllFolders_$now.csv"
     }
-Write-Host "ClientDrive folders enumerated in [$($enumerateFolders.TotalMinutes)]"
+Write-Host "ClientDrive folders enumerated in [$($enumerateFolders.TotalMinutes)] minutes"
 
 $allOppProjFolders = $combinedFolders | ? {$_.DriveItemFirstWord -match '^[OP]-10'}
 $allOppFolders = $combinedFolders | ? {$_.DriveItemFirstWord -match '^O-10'}
@@ -292,7 +237,7 @@ $validateOppFolders = Measure-Command {
         $thisOppFolder | Export-Csv -Path "$env:USERPROFILE\Desktop\NetRec_ValidatedOppFolders_$now.csv" -Append -NoTypeInformation -Encoding UTF8 -Force
         }
     }
-Write-Host "ClientDrive Opp folders validated in [$($validateOppFolders.TotalMinutes)]"
+Write-Host "ClientDrive Opp folders validated in [$($validateOppFolders.TotalMinutes)] minutes"
 $validatedOppFolders = Import-Csv "$env:USERPROFILE\Desktop\NetRec_ValidatedOppFolders_$now.csv"
 
 
@@ -302,7 +247,7 @@ $validateProjFolders = Measure-Command {
     for($i=0; $i-lt $allProjFolders.Count; $i++){
         write-progress -activity "Validating Proj folders" -Status "[$i/$($allProjFolders.count)]" -PercentComplete ($i/ $allProjFolders.count *100)
         $thisProjFolder = $allProjFolders[$i]
-         $correspondingProj = $combinedOpps | ? {($_. -split " ")[0] -eq $thisProjFolder.DriveItemFirstWord}
+        $correspondingProj = $combinedOpps | ? {($_.NetSuiteProjectName -split " ")[0] -eq $thisProjFolder.DriveItemFirstWord}
         $thisProjFolder | Add-Member -MemberType NoteProperty -Name "ClientDriveIdMatches" -Value $null -Force
         $thisProjFolder | Add-Member -MemberType NoteProperty -Name "ProjDriveItemIdMatches" -Value $null -Force
         if($correspondingProj){
@@ -311,11 +256,11 @@ $validateProjFolders = Measure-Command {
             if($correspondingProj.DriveItemProjId -eq $thisProjFolder.DriveItemId){$thisProjFolder.ProjDriveItemIdMatches = $true}
             else{$thisProjFolder.ProjDriveItemIdMatches = $false}
             }
-        else{write-warning "[$($thisProjFolder.DriveItemName)] did not have a corresponding Opp"}
+        else{write-warning "[$($thisProjFolder.DriveItemName)] did not have a corresponding Project"}
         $thisProjFolder | Export-Csv -Path "$env:USERPROFILE\Desktop\NetRec_ValidatedProjFolders_$now.csv" -Append -NoTypeInformation -Encoding UTF8 -Force
         }
     }
-Write-Host "ClientDrive Proj folders validated in [$($validateProjFolders.TotalMinutes)]"
+Write-Host "ClientDrive Proj folders validated in [$($validateProjFolders.TotalMinutes)] minutes"
 $validatedProjFolders = Import-Csv "$env:USERPROFILE\Desktop\NetRec_ValidatedProjFolders_$now.csv"
 
 
@@ -421,9 +366,44 @@ $urlMismatches |  % {Export-Csv -InputObject $_ -Path "$env:USERPROFILE\Desktop\
 #These DocLibs have duplicated names
 $uniqueNames = $allClientDrives.name | Sort-Object | select -Unique
 $duplicates = Compare-Object -ReferenceObject ($allClientDrives.name | Sort-Object) -DifferenceObject $uniqueNames -PassThru
+#>
+
+#These Terms have no NetSuiteId:
+$preNetsuiteClients = $allClientTerms |  ? {[string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteId)}
+for($i=0; $i -lt $preNetsuiteClients.Count; $i++){
+    $thisPreNetsuiteClient = $preNetsuiteClients[$i]
+    $thisPreNetsuiteClient.Deprecate($true)
+    if($i%100 -eq 0){$thisPreNetsuiteClient.Context.ExecuteQuery()}
+    }
+$thisPreNetsuiteClient.Context.ExecuteQuery()        
+
+
+$allDeprecatedTerms = $allClientTerms  | ? {$_.IsDeprecated -eq $true}
+$termStore = Get-PnPTermGroup
+for($i=0; $i -lt $allDeprecatedTerms.Count; $i++){
+    $thisDeprecatedTerm = $allDeprecatedTerms[$i]
+    $thisDeprecatedTerm.Move("c0403def-ffcb-4fee-9c5b-2c5453cbb08e")
+    }
 
 #These Terms have duplicate NetSuiteIds
+$duplicates = $allClientTermsNet | Group-Object -Property {$_.CustomProperties.NetSuiteId} | Where-Object -FilterScript {
+    $_.Count -gt 1
+    } | Select-Object -ExpandProperty Group
 
+$allOppTerms | Group-Object -Property {$_.CustomProperties.NetSuiteOppId} | Where-Object -FilterScript {
+    $_.Count -gt 1
+    } | Select-Object -ExpandProperty Group
+
+$duplicateProjectsInOpps = $allOppTerms | ? {![string]::IsNullOrWhiteSpace($_.CustomProperties.NetSuiteProjectId)} | Group-Object -Property {$_.CustomProperties.NetSuiteProjectId} | Where-Object -FilterScript {
+    $_.Count -gt 1
+    } | Select-Object -ExpandProperty Group
+$duplicateProjectsInOpps | select Name,{$_.CustomProperties.NetSuiteProjectId},{$_.CustomProperties.NetSuiteOppId}
+$realNetsuiteOpps = $allNetSuiteOpps | ? {@($duplicateProjectsInOpps.CustomProperties.NetSuiteProjectId | Select-Object -Unique) -contains $_.custbody_project_created.id}
+$realNetsuiteOpps | select tranId, title, {$_.custbody_project_created.id}, id
+
+$allProjTerms | Group-Object -Property {$_.CustomProperties.NetSuiteProjId} | Where-Object -FilterScript {
+    $_.Count -gt 1
+    } | Select-Object -ExpandProperty Group
 
 #These Terms have duplicate GraphDriveIds
 
@@ -465,3 +445,11 @@ $termsWithNoNetSuiteIdOrDriveId | % {
     #These P- folders do not have Projects associated with them
 
 #>
+
+
+$deprecatedTerms | % {
+    $thisDeprecatedTerm = $_
+    if($(process-archivedTerm -orphanedTerm $thisDeprecatedTerm) -eq $false){
+        [array]$duffArchivedTerms += $thisDeprecatedTerm
+        }
+    }

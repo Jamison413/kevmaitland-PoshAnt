@@ -1202,6 +1202,16 @@ function sanitise-forMicrosoftEmailAddress(){
     $cleanString = $cleanString.Replace("@.","@")
     $cleanString
     }
+function sanitise-forNetsuiteIntegration(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory =$true)]
+        [string]$dodgyString
+        )
+    $lessDodgyString = remove-diacritics -String $dodgyString
+    $prettyGoodString = $lessDodgyString -replace "[^A-Za-z0-9_ ]",""
+    $prettyGoodString.Replace(" ","").Replace(" ","").Replace(" ","")
+    }
 function sanitise-forPnpSharePoint($dirtyString){ 
     if([string]::IsNullOrWhiteSpace($dirtyString)){return}
     $cleanerString = sanitise-forSharePointStandard -dirtyString $dirtyString
