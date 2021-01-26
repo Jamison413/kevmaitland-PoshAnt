@@ -1,4 +1,99 @@
-﻿ $sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot
+﻿function bodgeArchive-ClientTerm(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+            [Microsoft.SharePoint.Client.Taxonomy.TermSetItem]$orphanedTerm 
+        )
+
+    do{
+        try{
+            #Copy Term to OrphanedTerms
+            Write-Host "`t`tBacking up orphaned Term [$($orphanedTerm.TermSet.Group.Name)][$($orphanedTerm.TermSet.Name)][$($orphanedTerm.Name)][$($orphanedTerm.id)] to [$($orphanedTerm.TermSet.Group.Name)][Archived$($orphanedTerm.TermSet.Name)][$($orphanedTerm.Name)$i]"
+            $backedUpTerm = New-PnPTerm -TermGroup $($orphanedTerm.TermSet.Group.Name) -TermSet "Archived$($orphanedTerm.TermSet.Name)" -Name $("$($orphanedTerm.Name)$i")  -Lcid 1033 -CustomProperties $([hashtable]::new($orphanedTerm.CustomProperties)) -ErrorAction Stop
+            if(![string]::IsNullOrWhiteSpace($backedUpTerm.Name)){
+                $success = $true
+                }
+            }
+        catch{
+            if($_.Exception -match "TermStoreErrorCodeEx:There is already a term with the same default label and parent term."){
+                Write-Verbose $_.Exception
+                #Do nothing - just continue through the loop, incrementing $i until we find an empty value
+                }
+            else{ #If we get a different error, report it and move on
+                return $(get-errorSummary -errorToSummarise $_)
+                }
+            }
+        if($backedUpTerm){
+            if($backedUpTerm.Name -match [Regex]::Escape($orphanedTerm.Name)){
+                #Delete original Term
+                try{
+                    Write-Host "`t`tDeleting Archived Term [$($orphanedTerm.TermSet.Group.Name)][$($orphanedTerm.TermSet.Name)][$($orphanedTerm.Name)][$($orphanedTerm.id)][$($orphanedTerm.NetSuiteClientId)]"
+                    Remove-PnPTaxonomyItem -TermPath "$($orphanedTerm.TermSet.Group.Name)|$($orphanedTerm.TermSet.Name)|$($orphanedTerm.Name)" -Confirm:$false -Force -Verbose
+                    return $true
+                    }
+                catch{
+                    return $(get-errorSummary -errorToSummarise $_)
+                    }
+                }
+            }
+        else{$duffArchivedTerms += $orphanedTerm }
+        $i++
+        }
+    until($success -eq $true)
+    }
+
+$sharePointAdmin = "kimblebot@anthesisgroup.com"
+#convertTo-localisedSecureString "KimbleBotPasswordHere"
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
+$pnpTermGroup = "Kimble"
+$pnpTermSet = "Clients"
+$allClientTermsIncludingDeprecated = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes TermSet,TermSet.Group,TermStore,CustomProperties #| ? {$_.IsDeprecated -eq $false}
+$allClientTerms = $allClientTermsIncludingDeprecated | ? {$_.IsDeprecated -eq $false}
+
+        $pnpTermGroup = "Kimble"
+        $pnpTermSet = "Opportunities"
+        $allOppTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes TermSet,TermSet.Group,TermStore,CustomProperties | ? {$_.IsDeprecated -eq $false}
+        $allOppTerms | % {
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteOppId -Value $($_.CustomProperties.NetSuiteOppId) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteClientId -Value $($_.CustomProperties.NetSuiteClientId) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteOppLastModifiedDate -Value $($_.CustomProperties.NetSuiteOppLastModifiedDate) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name TermOppLabel -Value $($_.name) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name TermOppCode -Value $($_.name) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name TermProjId -Value $($_.CustomProperties.NetSuiteProjectId) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveItemId -Value $($_.CustomProperties.DriveItemId) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalOppName -Value $($_.name) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalOppNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.CustomProperties.NetSuiteProjectId) -Force
+            }
+        $pnpTermGroup = "Kimble"
+        $pnpTermSet = "Projects"
+        $allProjTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes TermSet,TermSet.Group,TermStore,CustomProperties | ? {$_.IsDeprecated -eq $false}
+        $allProjTerms | % {
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.CustomProperties.NetSuiteProjId) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteClientId -Value $($_.CustomProperties.NetSuiteClientId) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjLastModifiedDate -Value $($_.CustomProperties.NetSuiteProjLastModifiedDate) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name TermProjName -Value $($_.name) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name TermProjCode -Value $(($_.name -split " ")[0]) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name TermProjId -Value $($_.Id) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveItemId -Value $($_.CustomProperties.DriveItemId) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjName -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
+            }
+
+
+
+@($allClientTerms | Select-Object) | % {
+    Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteClientId -Value $($_.CustomProperties.NetSuiteId) -Force
+    Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientId -Value $($_.CustomProperties.GraphDriveId) -Force
+    Add-Member -InputObject $_ -MemberType NoteProperty -Name TermClientId -Value $($_.Id) -Force
+    Add-Member -InputObject $_ -MemberType NoteProperty -Name TermClientName -Value $($_.name) -Force
+    Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteLastModifiedDate -Value $($_.CustomProperties.NetSuiteLastModifiedDate) -Force
+    Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientName -Value $($_.Name) -Force
+    Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.Name) -Force #This helps to avoid weird encoding, diacritic and special character problems when comparing strings
+    }
+
+ $sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot
     $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $sharePointBotDetails
     $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
     #$supplierSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,9fb8ecd6-c87d-485d-a488-26fd18c62303"
@@ -378,11 +473,11 @@ for($i=0; $i -lt $preNetsuiteClients.Count; $i++){
 $thisPreNetsuiteClient.Context.ExecuteQuery()        
 
 
-$allDeprecatedTerms = $allClientTerms  | ? {$_.IsDeprecated -eq $true}
-$termStore = Get-PnPTermGroup
+$allDeprecatedTerms = $allClientTermsIncludingDeprecated  | ? {$_.IsDeprecated -eq $true}
+$duffArchivedTerms = @()
 for($i=0; $i -lt $allDeprecatedTerms.Count; $i++){
-    $thisDeprecatedTerm = $allDeprecatedTerms[$i]
-    $thisDeprecatedTerm.Move("c0403def-ffcb-4fee-9c5b-2c5453cbb08e")
+    write-progress -activity "Archiving old clients" -Status "[$i/$($allDeprecatedTerms.count)]" -PercentComplete ($i/ $allDeprecatedTerms.count *100)
+    bodgeArchive-ClientTerm $allDeprecatedTerms[$i]
     }
 
 #These Terms have duplicate NetSuiteIds
@@ -446,10 +541,30 @@ $termsWithNoNetSuiteIdOrDriveId | % {
 
 #>
 
+$archivedClients = Get-PnPTermSet -TermGroup "Kimble" -Identity ArchivedClients
 
-$deprecatedTerms | % {
+$allDeprecatedTerms | % {
+    $i++
     $thisDeprecatedTerm = $_
-    if($(process-archivedTerm -orphanedTerm $thisDeprecatedTerm) -eq $false){
-        [array]$duffArchivedTerms += $thisDeprecatedTerm
+    write-host "Moving [$($thisDeprecatedTerm.Name)]"
+    $thisDeprecatedTerm.Move($archivedClients)
+    if($i -eq 20){
+        Write-Host "`tExecuting Query"
+        $thisDeprecatedTerm.Context.ExecuteQuery()
+        $i=0
+        }
+    }
+
+ $duffers = $allOppTerms | ? {$_.CustomProperties.flagForReprocessing -ne $true -and $_.CustomProperties.flagForReprocessing -ne $false}
+ $duffers = $allProjTerms | ? {$_.CustomProperties.flagForReprocessing -ne $true -and $_.CustomProperties.flagForReprocessing -ne $false}
+ $duffers | % {
+    $i++
+    $thisDuffTerm = $_
+    write-host "Updating [$($thisDuffTerm.Name)]"
+    $thisDuffTerm.SetCustomProperty("flagForReprocessing",$true)
+    if($i -eq 20){
+        Write-Host "`tExecuting Query"
+        $thisDuffTerm.Context.ExecuteQuery()
+        $i=0
         }
     }

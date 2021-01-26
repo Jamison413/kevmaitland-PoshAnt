@@ -2705,10 +2705,10 @@ function test-graphBearerAccessTokenStillValid(){
         ,[parameter(Mandatory = $true,ParameterSetName = "TestAndRenew")]
             [PSCustomObject]$aadAppCreds
         )
-    if($tokenResponse.OriginalExpiryTime -ge $(Get-Date).AddSeconds($renewTokenExpiringInSeconds)){$tokenResponse} #If the token  is still valid, just return it
+    if($(get-date $tokenResponse.OriginalExpiryTime) -ge $(Get-Date).AddSeconds($renewTokenExpiringInSeconds)){$tokenResponse} #If the token  is still valid, just return it
     else{
         if($renewTokenExpiringInSeconds){
-            get-graphTokenResponse -aadAppCreds $aadAppCreds -grant_type client_credentials #If it's expired (or will expire within the supplied limit), renew it
+            get-graphTokenResponse -aadAppCreds $aadAppCreds -grant_type client_credentials -verbose #If it's expired (or will expire within the supplied limit), renew it
             }
         else{$false}#Otherwise return False
         }

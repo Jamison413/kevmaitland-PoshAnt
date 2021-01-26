@@ -32,7 +32,7 @@ function process-comparison(){
             [switch]$validate
         )
 
-    #compare-object jiggery-pokery documented with pictures on IT Site
+    #compare-object jiggery-pokery documented with pictures on IT Site: https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-266
     #Prerequisite: $subsetOfNetObjects, $allTermObjects
     [array]$correspondingSubsetOfTermObjects = Compare-Object -ReferenceObject @($allTermObjects | Select-Object) -DifferenceObject @($subsetOfNetObjects | Select-Object) -Property $idInCommon -PassThru -IncludeEqual -ExcludeDifferent
     [array]$comparisonOfPropertyToTest = Compare-Object -ReferenceObject @($subsetOfNetObjects | Select-Object) -DifferenceObject @($correspondingSubsetOfTermObjects | Select-Object) -Property $idInCommon,$propertyToTest -PassThru -IncludeEqual
@@ -128,10 +128,11 @@ $ClientReconcile = Measure-Command {
     Write-Host "[$($allClientTerms.Count)] clients retrieved from TermStore in [$($termClientRetrieval.TotalSeconds)] seconds"
 
     $netClientRetrieval = Measure-Command {
-        $netQuery =  "?q=companyName CONTAIN_NOT `"Anthesis`"" #Excludes any Companies with "Anthesis" in the companyName
-        $netQuery += " AND companyName CONTAIN_NOT `"intercompany project`"" #Excludes any Companies with "(intercompany project)" in the companyName
-        $netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
-        $netQuery += " AND isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them)
+        #$netQuery =  "?q=companyName CONTAIN_NOT `"Anthesis`"" #Excludes any Companies with "Anthesis" in the companyName
+        #$netQuery += " AND companyName CONTAIN_NOT `"intercompany project`"" #Excludes any Companies with "(intercompany project)" in the companyName
+        #$netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
+        #$netQuery += " AND isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them)
+        $netQuery += "?q=isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them)
         $netQuery += " AND entityStatus ANY_OF_NOT [6, 7]" #Excludes LEAD-Unqualified and LEAD-Qualified (https://XXX.app.netsuite.com/app/crm/sales/customerstatuslist.nl?whence=)
         if($deltaSync -eq $true){
             [datetime]$lastProcessed = $($allClientTerms | sort {$_.CustomProperties.NetSuiteLastModifiedDate} | select -Last 1).CustomProperties.NetSuiteLastModifiedDate
@@ -542,7 +543,7 @@ $projReconcile = Measure-Command{
         }
     Write-Host "[$($netSuiteProjsToCheck.Count)] Projects retrieved from NetSuite in [$($netProjRetrieval.TotalSeconds)] seconds ([$($netProjRetrieval.TotalMinutes)] minutes)"
     $netSuiteProjsToCheck = @($netSuiteProjsToCheck | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
-    if($deltaSync){
+    if($deltaSync -eq $true){
         [array]$processedAtExactlyLastTimestamp = $netSuiteProjsToCheck | ? {$(Get-Date $_.lastModifiedDate) -ge $(Get-Date $lastProcessed)} #Find how many Clients match the $lastProcessed timestamp exactly
         if($processedAtExactlyLastTimestamp.Count -eq 1){$netSuiteProjsToCheck = $netSuiteProjsToCheck | ? {$netSuiteProjsToCheck.id -notcontains $processedAtExactlyLastTimestamp[0].id}} #If it's exactly one, exclude it from processing (as we've already processed it on a previous cycle)
         }

@@ -21,7 +21,14 @@ if($PSCommandPath){
 $termClientRetrieval = Measure-Command {
     $sharePointAdmin = "kimblebot@anthesisgroup.com"
     #convertTo-localisedSecureString "KimbleBotPasswordHere"
-    $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+    try{$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt)}
+    catch{
+        if($_.Exception -match "Key not valid for use in specified state"){
+            Write-Error "[$env:USERPROFILE\Desktop\KimbleBot.txt] Key not valid for use in specified state."
+            exit
+            }
+        else{get-errorSummary -errorToSummarise $_}
+        }
     $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
     Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
     $pnpTermGroup = "Kimble"
@@ -40,13 +47,14 @@ $termClientRetrieval = Measure-Command {
 Write-Host "[$($allClientTerms.Count)] clients retrieved from TermStore in [$($termClientRetrieval.TotalSeconds)] seconds"
 
 $driveClientRetrieval = Measure-Command {
-    $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName SharePointBot )
+    $appCredsSharePointBot = $(get-graphAppClientCredentials -appName SharePointBot)
+    $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $appCredsSharePointBot
     $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
     $allClientDrives = get-graphDrives -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId
     $allClientDrives | % {
         Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientName -Value $_.name -Force
         Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
-        Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteClientId -Value $_.id -Force
+        Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientId -Value $_.id -Force
         Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientName -Value $_.name -Force
         }
     }
@@ -85,7 +93,7 @@ $topLevelFolderRetrieval = Measure-Command {
     for($i=0; $i-lt $allClientDrives.Count; $i++){
         write-progress -activity "Enumerating Drives contents" -Status "[$i/$($allClientDrives.count)]" -PercentComplete ($i/ $allClientDrives.count *100)
         $thisClientDrive = $allClientDrives[$i]
-        $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 60 -aadAppCreds $sharePointBotDetails
+        $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 60 -aadAppCreds $appCredsSharePointBot
         try{
             $theseTopLevelFolders = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisClientDrive.DriveClientId -returnWhat Children
             }
