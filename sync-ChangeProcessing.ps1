@@ -14,10 +14,21 @@ Start-Transcript $transcriptLogName -Append
 
 Import-Module _PNP_Library_SPO
 
+<#
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
+#>
+
+
+$Admin = "kimblebot@anthesisgroup.com"
+#convertTo-localisedSecureString "KimbleBotPasswordHere"
+$AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+
+
+#Jira
 $credential = Import-CliXml -Path 'C:\Users\Admin\Desktop\JiraPS.xml'
 
 
@@ -170,6 +181,8 @@ write-host "$($Item.FieldValues.Employee_x0020_Preferred_x0020_N): Looks like I'
 
 <#Connect to the confidential HR team site with Graph#> #Kimblebot is currently not allowed to connect to this site
 
+<# Stop for now - People services are creating folders before the new starter form is filled out and its duplicating
+
 
 #Get salted credentials and get an Accesstoken
 $teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
@@ -193,12 +206,13 @@ Connect-PnPOnline -AccessToken $tokenResponse.access_token
 
 
 <#--------Create the Employee Folder Structure--------#>
-
+<#
 ForEach($folder in $Folderstocreate){
 
 $foldername = ($folder.'Candidate Name'.Trim())
 
 <#--------create the initial Parent folder--------#>
+<#
 write-host "Creating initial parent folder for $($foldername)" -ForegroundColor Yellow
 $body = "{
     `"name`": `"$foldername`",
@@ -210,6 +224,7 @@ $CandidateNameResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.
 
 
 <#--------create the subfolders within the parent folder created above--------#>
+<#
 write-host "Creating subfolders within the parent folder for $($foldername)" -ForegroundColor Yellow
 write-host "1. Onboarding" -ForegroundColor Yellow
 #Subfolder 1.Onboarding
@@ -279,11 +294,10 @@ catch{
             Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "thehelpfulpeopleservicesrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 
 
 }
-
 }
 
 <#--------------Move Employee Folder from Future Employees to Current Employees on New Starter start date---------------#>
-
+<#
 ForEach($item in $AllNewStartersitems){
     
 #Format the relevant fields - Sharepoint gets confused with DateTime

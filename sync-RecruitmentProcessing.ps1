@@ -121,7 +121,7 @@ write-host "Setting item as processed in Recruitment Area: $($Role.'Role Name').
     #Send a failure email
             $subject = "Failure: Recruitment Processing - a Candidate Tracker has *not* been made for role " + "ID$($ListTitle)"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team,`r`n`r`n<BR><BR>"
-            $body += "This email is just to let you know that it looks like a Candidate Tracker <b>has not been successfully created:</b> " + "ID$($ListTitle)`r`n`r`n<BR><BR>"
+            $body += "This email is just to let you know that it looks like a Candidate Tracker <b>has not been successfully created:</b> " + "ID$($ListTitle)" + "`r`n`r`n<BR><BR>"
             $body += "Timestamp: " + "<b>$datetime</b>`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>"
             $body += "The People Services Robot<BR><BR><BR><BR>"
