@@ -2,22 +2,16 @@
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
-
 Import-Module _PNP_Library_SPO
 
-<#
+
 $Admin = "kimblebot@anthesisgroup.com"
 $AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
-$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
-#>
-
-$Admin = "emily.pressey@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 connect-ToExo -credential $exoCreds
-
+Connect-AzureAD -credential $adminCreds
 connect-toAAD -credential $adminCreds
 
 function get-POPReviewPeriod(){
@@ -70,9 +64,9 @@ If($objective.FieldValues.Status -eq "Open"){
     }
     #Set the permissions to just the manager and the employee, People Services will have full control anyway
     Try{
-    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
-    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -User $($objective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
-    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -User $($objective.FieldValues.Line_x0020_Manager.Email) -AddRole Contribute
+    $1 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
+    $2 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -User $($objective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
+    $3 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -User $($objective.FieldValues.Line_x0020_Manager.Email) -AddRole Contribute
     }
     Catch{
     $error
@@ -80,7 +74,7 @@ If($objective.FieldValues.Status -eq "Open"){
     }
     #Finally in the live list, change the objective name to make it available to the user - not "ignore"
     Try{
-    Set-PnPListItem -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Values @{"Objective" = $($objective.FieldValues.Objective)}
+    $4 = Set-PnPListItem -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Values @{"Objective" = $($objective.FieldValues.Objective)}
     }
     Catch{
     $error
@@ -88,7 +82,7 @@ If($objective.FieldValues.Status -eq "Open"){
     }
     #Finally in the processing list, if there is a corresponding newobjective.id, delete the objective to be processed
     If($($newobjective.Id)){
-    Remove-PnPListItem -List "POP Objectives Processing (UK)" -Identity $($objective.Id) -Force
+    $5 = Remove-PnPListItem -List "POP Objectives Processing (UK)" -Identity $($objective.Id) -Force
     }
 }
 Else{
@@ -103,9 +97,9 @@ Else{
     }
     #Set the permissions to just the manager and the employee, People Services will have full control anyway
     Try{
-    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
-    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
-    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Line_x0020_Manager.Email) -AddRole Contribute
+    $6 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
+    $7 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
+    $8 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Line_x0020_Manager.Email) -AddRole Contribute
     }
     Catch{
     $error
@@ -113,13 +107,13 @@ Else{
     }
     #Finally in the complete list, change the objective name to make it available to the user - not "ignore"
     Try{
-    Set-PnPListItem -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Values @{"Objective" = $($objective.FieldValues.Objective)}
+    $9 = Set-PnPListItem -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Values @{"Objective" = $($objective.FieldValues.Objective)}
     }
     Catch{
     }
     #Finally in the processing list, if there is a corresponding completeobjective.id, delete the objective to be processed
     If($($completeobjective.Id)){
-    Remove-PnPListItem -List "POP Objectives Processing (UK)" -Identity $($objective.Id) -Force
+    $10 = Remove-PnPListItem -List "POP Objectives Processing (UK)" -Identity $($objective.Id) -Force
     }
 
 
@@ -163,8 +157,8 @@ Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 
     }
     Else{
-    Set-PnPListItem -List $masterModuleList -Identity $moduleitem.Id -Values @{"ModuleCode" = $($generatemodulecode)}
-    Add-PnPListItem -List $modulecompletelist -Values @{"ModuleName" = $moduleitem.FieldValues.ModuleName; "ModuleCode" = $generatemodulecode}
+    $11 = Set-PnPListItem -List $masterModuleList -Identity $moduleitem.Id -Values @{"ModuleCode" = $($generatemodulecode)}
+    $12 = Add-PnPListItem -List $modulecompletelist -Values @{"ModuleName" = $moduleitem.FieldValues.ModuleName; "ModuleCode" = $generatemodulecode}
     }
 
   }
@@ -178,18 +172,17 @@ Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 #On approval, Flow also sets the Powershell 'processed' column to 1, which we will pick up below, process it and set it to 0 if nothing went wrong.
 
 
-$allnewregistrants = Get-PnPListItem -List $registrantProcessingList  -Query "<View><Query><Where><Eq><FieldRef Name='Processed'/><Value Type='Text'>1</Value></Eq></Where></Query></View>"
+$allnewregistrants = Get-PnPListItem -List $registrantProcessingList  -Query "<View><Query><Where><Eq><FieldRef Name='Processed'/><Value Type='Text'>Approved - Waiting to be Processed as Registrant</Value></Eq></Where></Query></View>"
 ForEach($newregistrant in $allnewregistrants){
 
 #Doublecheck we aren't processing a non-approved registrant (looking at the Flow column)
-If($newregistrant.FieldValues.FlowProcessed -eq "1"){
+If(($newregistrant.FieldValues.FlowProcessed -eq "Approval Denied") -or ($newregistrant.FieldValues.FlowProcessed -eq "Waiting for Approval")){
 Write-Host "We shouldn't be processing this registrant, they are unapproved by line manager: $($newregistrant.FieldValues.RegistrantName.Email)" -ForegroundColor Red
         $report = @()
         $report += "***************Errors found in Anthesis Academy Sync: Powershell is trying to process an Unapproved Registrant***************" + "<br><br>"
         $report += "Weird - it's $($newregistrant.FieldValues.RegistrantName.Email). ID $($newregistrant.Id). This shouldn't be happening!" + "<br><br>"       
         $report = $report | out-string
-Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-Exit
+#Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
 }
 
 
@@ -214,7 +207,6 @@ Write-Host "Something has gone very wrong, too many people have signed up to thi
         $report += "Errors found on this Module: $($thismodule.fieldvalues.ModuleName). The number of registered people has exceeded the maximum number of allowed registrants." + "<br><br>"       
         $report = $report | out-string
 Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-Exit
 }
     #Check for count - equal to
 If($currentregistrants.Count -eq $thismodule.fieldvalues.MaxRegistrantAmount){
@@ -224,7 +216,6 @@ Write-Host "Something has gone wrong in powerapps, we shouldn't be processing ne
         $report += "Errors found on this Module: $($thismodule.fieldvalues.ModuleName). We shouldn't be processing any more people as they shouldn't have had the option to sign up. This might have been a timing issue (unlikely though)." + "<br><br>"
         $report = $report | out-string
     Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-Exit
 }
 
 
@@ -252,16 +243,16 @@ Else{
     #New Registrant in Module Registrant list
     If(($moduleUpdate.FieldValues.RegistrantList.Email -contains $newregistrant.FieldValues.RegistrantName.Email) -and (($registrants | Measure-Object).Count -eq $thenewregistrantlist.FieldValues.RegistrantCount)){
     write-host "Success! $($newregistrant.FieldValues.RegistrantName.Email) now registered for $($thismodule.fieldvalues.ModuleName)" -ForegroundColor Yellow
-    Set-PnPListItem -List $registrantProcessingList -Identity $newregistrant.Id -Values @{"Processed" = "0"}
+    $27 = Set-PnPListItem -List $registrantProcessingList -Identity $newregistrant.Id -Values @{"Processed" = "Approved - Processed as Registrant"}
     
     #Send the Registrant an email confirming (still can't send user messages via Graph, only channel messages :(....)
                 $body = "<HTML><BODY><p>Hi $($newregistrant.FieldValues.RegistrantName.Email),</p>
-                <p>We just wanted to let you know that you have been successfully signed up for the Anthesis Academy Module <b>$($thismodule.fieldvalues.ModuleName)<\b><\p>
-                <p>You don't need to do anything else - keep an eye on your Teams and Inbox for next steps from the Module Leader ($($thismodule.fieldvalues.ModuleLeader.LookupValue))<\b><br><br><\p>
+                <p>We just wanted to let you know that you have been successfully signed up for the Anthesis Academy Module <b>$($thismodule.fieldvalues.ModuleName)</b></p>
+                <p>You don't need to do anything else - keep an eye on your Teams and Inbox for next steps from the Module Leader ($($thismodule.fieldvalues.ModuleLeader.LookupValue))</b><br><br></p>
                 <p></p>
                 <p>The Anthesis Academy</p>
                 </BODY></HTML>"
-                Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to "emily.pressey@anthesisgroup.com" -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+                Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
     }
     Else{
     Write-Host "Something went wrong registering $($newregistrant.FieldValues.RegistrantName.Email) to module: $($thismodule.fieldvalues.ModuleName). Messaging Emily." -ForegroundColor Red
@@ -295,11 +286,11 @@ $thisuserManager = Get-AzureADUserManager -ObjectId "$($liveobjective.FieldValue
     #Check it matches the Manager on the Objective
     If($liveobjective.FieldValues.Line_x0020_Manager.Email -ne $thisuserManager.UserPrincipalName){
     Write-Host "Manager has changed from $($liveobjective.FieldValues.Line_x0020_Manager.Email)  ->  $($thisuserManager.UserPrincipalName). Updating live Objective: $($liveobjective.Id)" -ForegroundColor Yellow
-    Set-PnPListItem -List "POP Objectives List (UK)" -Identity $liveobjective.Id -Values @{"Line_x0020_Manager" = $($thisuserManager.UserPrincipalName)}
-    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
-    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($liveobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
-    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
-    Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
+    $13 = Set-PnPListItem -List "POP Objectives List (UK)" -Identity $liveobjective.Id -Values @{"Line_x0020_Manager" = $($thisuserManager.UserPrincipalName)}
+    $14 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
+    $15 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($liveobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
+    $16 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
+    $17 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
     }
 }
 
@@ -311,11 +302,11 @@ $thisuserManager = Get-AzureADUserManager -ObjectId "$($completeobjective.FieldV
     #Check it matches the Manager on the Objective
     If($completeobjective.FieldValues.Line_x0020_Manager.Email -ne $thisuserManager.UserPrincipalName){
     Write-Host "Manager has changed from $($completeobjective.FieldValues.Line_x0020_Manager.Email)  ->  $($thisuserManager.UserPrincipalName). Updating Complete Objective: $($completeobjective.Id)" -ForegroundColor Yellow
-    Set-PnPListItem -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -Values @{"Line_x0020_Manager" = $($thisuserManager.UserPrincipalName)}    
-    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
-    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($completeobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
-    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
-    Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
+    $18 = Set-PnPListItem -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -Values @{"Line_x0020_Manager" = $($thisuserManager.UserPrincipalName)}    
+    $19 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
+    $20 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($completeobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
+    $21 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
+    $22 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
     }
 }
 
@@ -332,7 +323,7 @@ If($deactivatedUserObjectives){
 
     ForEach($deactivatedUserObjective in $deactivatedUserObjectives){
     #Move them to the archive list where only People Services has access
-    Add-PnPListItem -List "POP Archive (UK)" -Values @{
+    $23 = Add-PnPListItem -List "POP Archive (UK)" -Values @{
 
     "Employee_x0020_Name" = $deactivatedUserObjective.FieldValues.Employee_x0020_Name.Email;
     "Line_x0020_Manager" = $deactivatedUserObjective.FieldValues.Line_x0020_Manager.Email;
@@ -346,7 +337,7 @@ If($deactivatedUserObjectives){
     "ManagerComments" = $deactivatedUserObjective.FieldValues.ManagerComments;                                                                                                                                                             
     "EmployeeComments" = $deactivatedUserObjective.FieldValues.EmployeeComments;
         }
-    Remove-PnPListItem -List "POP Objectives List (UK)" -Identity $deactivatedUserObjective.Id -Force
+    $24 = Remove-PnPListItem -List "POP Objectives List (UK)" -Identity $deactivatedUserObjective.Id -Force
     }
 }
 
@@ -357,7 +348,7 @@ If($deactivatedUserObjectives){
 
     ForEach($deactivatedUserObjective in $deactivatedUserObjectives){
     #Move them to the archive list where only People Services has access
-    Add-PnPListItem -List "POP Archive (UK)" -Values @{
+    $25 = Add-PnPListItem -List "POP Archive (UK)" -Values @{
 
     "Employee_x0020_Name" = $deactivatedUserObjective.FieldValues.Employee_x0020_Name.Email;
     "Line_x0020_Manager" = $deactivatedUserObjective.FieldValues.Line_x0020_Manager.Email;
@@ -373,7 +364,7 @@ If($deactivatedUserObjectives){
     "Complete_x0020_Date" =  $deactivatedUserObjective.FieldValues.EmployeeComments;
         }
     
-    Remove-PnPListItem -List "POP Completed Objectives (UK)" -Identity $deactivatedUserObjective.Id -Force
+    $26 = Remove-PnPListItem -List "POP Completed Objectives (UK)" -Identity $deactivatedUserObjective.Id -Force
     }
 }
 
