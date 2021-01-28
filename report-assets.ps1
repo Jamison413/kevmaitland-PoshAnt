@@ -5,7 +5,6 @@
     Start-Transcript $transcriptLogName -Append
     }
 
-
 #region Get records to reconcile
 #Get UK Users from AAD
 $tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
@@ -26,9 +25,13 @@ $intuneDevices = get-graphIntuneDevices -tokenResponse $tokenResponseIntuneBot
 $tokenResponseIntuneBotAtp = get-atpTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName IntuneBot) -grant_type client_credentials 
 $atpDevices = get-atpMachines -tokenResponse $tokenResponseIntuneBotAtp
 $allAadDevices = get-graphDevices -tokenResponse $tokenResponseTeamsBot
+
+#Get encryption state report - we can't pull this by 
+$deviceEncryptionStates = get-DeviceEncryptionStates -tokenResponse $tokenResponseIntuneBot -Verbose
+
 #endregion
 
-#region Do stuff
+#region Find stuff
 #Match records and add Intune/ATP/Asset data onto the AAD device record (assuming that all devices exist in AAD, which isn;t 100% accurate for ATP)
 
 #Iteration steps: #Get Aad device as main interation object -> Try to find the Atp device -> try to find the Intune device -> try to find the asset register device -> #~Add all the info onto the Aad object as properties~#
@@ -63,6 +66,17 @@ $allAadDevices | % {
             $intuneHash.Add($_.Name, $correspondingIntuneDevice.$($_.Name))
             }
         $_ | Add-Member -MemberType NoteProperty -Name intune -Value $intuneHash -Force
+
+    ##Do the above for advanced encryption state information stored *somewhere* in Intune and not on the direct Intune device object, using the Aad device id
+     $correspondingEncryptionDevice = $deviceEncryptionStates | ? {$_.Id -eq $thisAadDevice.intune.id}
+     if($correspondingEncryptionDevice){
+        Write-Host "`tAdding Encryption information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
+        $encryptionHash = @{}
+        Get-Member -InputObject $correspondingEncryptionDevice -MemberType Properties | % {
+            $encryptionHash.Add($_.Name, $correspondingEncryptionDevice.$($_.Name))
+            }
+        $_ | Add-Member -MemberType NoteProperty -Name encryptiondata -Value $encryptionHash -Force
+        }
 
     ##Then try matching the Asset using the manufacturer serial number - this lives on the Intune object which we found using the Aad device id
         $correspondingAsset = $assetRegisterItems | ? {$_.fields.ManufacturerSerialNumber -eq $correspondingIntuneDevice.serialNumber}
@@ -147,6 +161,7 @@ $assetRegisterPhonesUseful | % {
 #region Report stuff
 #region Update the Computers Asset Register with data fron AAD, Intune & ATP
 $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
+
     $thisComputer = $_
     $thisUserId = $thisComputer.physicalIds | ? {$_ -match "USER-GID"} | % {$($_ -split ":")[1]}
     $thisUser = $ukUsers | ? {$_.id -eq $thisUserId}
@@ -176,6 +191,15 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
         Computer_IntuneLastUserBusinessU = $thisUser.anthesisgroup_employeeInfo.businessUnit
         Computer_IntuneSerialNumber = $thisComputer.intune.serialNumber
         Computer_IntuneWiFiMacAddress = $thisComputer.intune.wiFiMacAddress
+        #Em's fields to add
+        Computer_AadID = $thisComputer.id
+        Computer_AtpID = $thisComputer.atp.id
+        Computer_IntuneID = $thisComputer.Intune.id
+        Computer_IntuneEncryptionState = $thisComputer.encryptiondata.encryptionState 
+        Computer_IntuneTpmPresent = if($thisComputer.encryptiondata.tpmSpecificationVersion){"Yes"}` else{"No"}
+        Computer_IntuneAdvancedBitLocker = $thisComputer.encryptiondata.advancedBitLockerStates
+        Computer_EncryptionPolicyDetails = [string]$thisComputer.encryptiondata.policyDetails.policyName
+        #
         PresentInAad = $true
         }
     if(![string]::IsNullOrWhiteSpace($thisComputer.atp)){$updateHash.Add("PresentInAtp",$true)}
@@ -358,3 +382,5 @@ $prettyObjects | Export-Csv  -Path 'C:\Users\KevMaitland\OneDrive - Anthesis LLC
 #>
 
 Stop-Transcript
+
+
