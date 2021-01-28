@@ -59,7 +59,7 @@ function get-DeviceEncryptionStates(){
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-            [psobject]$tokenResponse
+            [pscustomobject]$tokenResponse
         )
         invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/deviceManagement/managedDeviceEncryptionStates" -useBetaEndPoint
 }

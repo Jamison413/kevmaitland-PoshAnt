@@ -30,13 +30,21 @@ $allAadDevices = get-graphDevices -tokenResponse $tokenResponseTeamsBot
 
 #region Do stuff
 #Match records and add Intune/ATP/Asset data onto the AAD device record (assuming that all devices exist in AAD, which isn;t 100% accurate for ATP)
+
+#Iteration steps: #Get Aad device as main interation object -> Try to find the Atp device -> try to find the Intune device -> try to find the asset register device -> #~Add all the info onto the Aad object as properties~#
+
 $allAadDevices | % { 
     $thisAadDevice = $_
+    ##Clear any existing variables ready to go for the next run
     if($correspondingAtpDevice){rv correspondingAtpDevice}
     if($correspondingIntuneDevice){rv correspondingIntuneDevice}
     if($correspondingAsset){rv correspondingAsset}
+
+    ##Grab atp device by filtering all atp machines for this device's aad DEVICE id - atp object has aad record on it
     Write-Host "Processing [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
     $correspondingAtpDevice = $atpDevices| ? {$_.aadDeviceId -eq $thisAadDevice.deviceId}
+
+    ##If we find a corresponding atp device that lives in aad, add the atp object info into a hash table and add add it to the $thisAadDevice object as a propery/element (whatever, it's on there somewhere and its query-able)
     if($correspondingAtpDevice){
         Write-Host "`tAdding ATP information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
         $atpHash = @{}
@@ -45,6 +53,8 @@ $allAadDevices | % {
             }
         $_ | Add-Member -MemberType NoteProperty -Name atp -Value $atpHash -Force
         }
+
+    ##Do the above for Intune as well to see if we can find an Intune device, using the Aad device id
     $correspondingIntuneDevice = $intuneDevices | ? {$_.azureADDeviceId -eq $thisAadDevice.deviceId}
     if($correspondingIntuneDevice){
         Write-Host "`tAdding Intune information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
@@ -54,14 +64,18 @@ $allAadDevices | % {
             }
         $_ | Add-Member -MemberType NoteProperty -Name intune -Value $intuneHash -Force
 
-        #Then try matching the Asset using the serial number
+    ##Then try matching the Asset using the manufacturer serial number - this lives on the Intune object which we found using the Aad device id
         $correspondingAsset = $assetRegisterItems | ? {$_.fields.ManufacturerSerialNumber -eq $correspondingIntuneDevice.serialNumber}
+        ##If we can't find it by serial number, try product code against the Intune serial number
         if(!$correspondingAsset){
             $correspondingAsset = $assetRegisterComputers | ? {$_.fields.IT_x0020_Product_x0020_Code -eq $correspondingIntuneDevice.serialNumber}
+            ##If we can't find it by product tag, try matching with MAC addresses (also lives on the Intune object)
             if(!$correspondingAsset){
                 $correspondingAsset = $assetRegisterComputers | ? {![string]::IsNullOrWhiteSpace($_.fields.MACAddresses)} | ? {$_.fields.MACAddresses.Replace(":","").Replace("-","") -match $correspondingIntuneDevice.wiFiMacAddress}
+                ##If we STILL can't find it, try using the computer name against the Aad display name as a last ditch attempt
                 if(!$correspondingAsset){
                     $correspondingAsset = $assetRegisterComputers | ? {$_.fields.ComputerName -eq $thisAadDevice.displayName}
+                    ##If it's a mobile, we can match using the IMEI if its in the asset register
                     if(!$correspondingAsset){
                         $correspondingAsset = $assetRegisterPhones | ? {$_.fields.IMEI -eq $correspondingIntuneDevice.imei}
                         if(!$correspondingAsset){}
@@ -77,10 +91,11 @@ $allAadDevices | % {
 
         }
     else{
+        ##If we can't find it in Intune, add it to a running list in $notInIntune - we won't check the asset register
         Write-Warning "No Intune device found for [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
         [array]$notInIntune += $thisAadDevice
         }
-
+    #If we find the corresponding asset, add the asset info into a hash table and add to the Aad device object
     if($correspondingAsset){
         Write-Host "`tAdding Asset information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
         $assetHash = @{}
