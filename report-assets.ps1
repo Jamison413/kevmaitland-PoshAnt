@@ -165,7 +165,8 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
     $thisComputer = $_
     $thisUserId = $thisComputer.physicalIds | ? {$_ -match "USER-GID"} | % {$($_ -split ":")[1]}
     $thisUser = $ukUsers | ? {$_.id -eq $thisUserId}
-
+    
+  
     $updateHash = [ordered]@{
         Computer_AadDeviceName = $thisComputer.displayName
         Computer_AadLastUser = $thisUser.userPrincipalName
@@ -191,7 +192,6 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
         Computer_IntuneLastUserBusinessU = $thisUser.anthesisgroup_employeeInfo.businessUnit
         Computer_IntuneSerialNumber = $thisComputer.intune.serialNumber
         Computer_IntuneWiFiMacAddress = $thisComputer.intune.wiFiMacAddress
-        #Em's fields to add
         Computer_AadID = $thisComputer.id
         Computer_AtpID = $thisComputer.atp.id
         Computer_IntuneID = $thisComputer.Intune.id
@@ -199,7 +199,6 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
         Computer_IntuneTpmPresent = if($thisComputer.encryptiondata.tpmSpecificationVersion){"Yes"}` else{"No"}
         Computer_IntuneAdvancedBitLocker = $thisComputer.encryptiondata.advancedBitLockerStates
         Computer_EncryptionPolicyDetails = [string]$thisComputer.encryptiondata.policyDetails.policyName
-        #
         PresentInAad = $true
         }
     if(![string]::IsNullOrWhiteSpace($thisComputer.atp)){$updateHash.Add("PresentInAtp",$true)}
@@ -209,7 +208,35 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
     if($thisComputer.physicalIds -match "ZTDID"){$updateHash.Add("PresentInAutopilot",$true)}
     else{$updateHash.Add("PresentInAutopilot",$false)}
     update-graphListItem -tokenResponse $tokenResponseSharePointBot -graphSiteId $itTeamAllSite.id -listId $assetRegister.id -listitemId $thisComputer.asset.id -fieldHash $updateHash -Verbose
+    
+    #Tag atp device with the asset register status if not already there to help reduce admin time :)
+
+    #get any current status options from It Asset Register AssetStatus column
+    $possibleAssetTags = $assetRegisterItems.fields.AssetStatus | select -Unique
+
+    If(($thisComputer.atp) -and ($thisComputer.asset) -and ($thisComputer.atp.machineTags -notcontains $thisComputer.asset.AssetStatus)){
+
+    #Remove any old status
+    $thisTag = Compare-Object -ReferenceObject $thisComputer.atp.machineTags -differenceobject $possibleAssetTags -IncludeEqual | Where-Object -Property "SideIndicator" -EQ "==" 
+    ForEach($tag in $thisTag){
+    remove-atpDeviceTag -tokenResponse $tokenResponseIntuneBotAtp -deviceid $thisComputer.atp.id -tagstring $tag.InputObject
+    }    
+    #Add new status
+    add-atpDeviceTag -tokenResponse $tokenResponseIntuneBotAtp -deviceid $thisComputer.atp.id -tagstring $thisComputer.asset.AssetStatus
     }
+    
+
+    #Update status with maternity/paternity leave, leavers - so we have some sort of update
+    #-get lists
+    #-find current users from lists
+    #-update it asset register
+    #-update atp?    
+    
+    }
+        
+
+
+
 
 #endregion
 
