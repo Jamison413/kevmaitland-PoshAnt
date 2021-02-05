@@ -17,11 +17,18 @@ Import-Module _PNP_Library_SPO
 #Set Variables to connect to Sharepoint
 
 $SiteURL = "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365"
+<#
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
+#>
 
+
+$Admin = "kimblebot@anthesisgroup.com"
+#convertTo-localisedSecureString "KimbleBotPasswordHere"
+$AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt")  
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 
 #Connect to Sharepoint People Services Team (All)
@@ -29,9 +36,6 @@ Connect-PnPOnline -Url $SiteURL -Credentials $adminCreds
 $context = Get-PnPContext
 
  
-
-
-
 
 ###############################################################################                                      
 #                                                                             #

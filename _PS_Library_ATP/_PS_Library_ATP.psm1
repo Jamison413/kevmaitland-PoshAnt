@@ -1,4 +1,23 @@
-﻿function get-atpTokenResponse{
+﻿function add-atpDeviceTag(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$deviceid
+       ,[parameter(Mandatory = $true)]
+            [string]$tagstring             
+        )
+    
+#Create tag value 
+$tag = @{
+  "Value" = "$($tagstring)";
+  "Action"= "Add"
+}
+$tokenResponseIntuneBotAtp = get-atpTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName IntuneBot) -grant_type client_credentials 
+invoke-atpPost -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines/$($deviceid)/tags" -atpBodyHashtable $tag -Verbose:$true
+}
+function get-atpTokenResponse{
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
@@ -78,8 +97,19 @@ function get-atpMachines(){
         [parameter(Mandatory = $true)]
             [psobject]$tokenResponse        
         )
+    $tokenResponseIntuneBotAtp = get-atpTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName IntuneBot) -grant_type client_credentials 
+    invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines" -Verbose:$VerbosePreference
+    }
+function get-atpSecurityRecommendations(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$machineID        
+        )
 
-    invoke-atpGet -tokenResponse $tokenResponse -atpQuery "/machines" -Verbose:$VerbosePreference
+    invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines/$($machineID)/recommendations" -Verbose:$VerbosePreference
     }
 function get-atpSoftware(){
      [cmdletbinding()]
@@ -140,3 +170,50 @@ function invoke-atpGet(){
     if($returnEntireResponse){$response}
     else{$results}
     }
+function invoke-atpPost(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$atpQuery
+        ,[parameter(Mandatory = $true)]
+            [Hashtable]$atpBodyHashtable
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$additionalHeaders
+        )
+
+    $sanitisedatpQuery = $atpQuery.Trim("/")
+    $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    if($additionalHeaders){
+        $additionalHeaders.GetEnumerator() | %{
+            $headers.Add($_.Key,$_.Value)
+            }
+        }
+    Write-Verbose "https://api.securitycenter.microsoft.com/api/$sanitisedatpQuery"
+        
+    $atpBodyJson = ConvertTo-Json -InputObject $atpBodyHashtable -Depth 10
+    Write-Verbose $atpBodyJson
+    $atpBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($atpBodyJson)
+    
+    Invoke-RestMethod -Uri "https://api.securitycenter.microsoft.com/api/$sanitisedatpQuery" -Body $atpBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers $headers -Method Post
+    }
+function remove-atpDeviceTag(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$deviceid
+       ,[parameter(Mandatory = $true)]
+            [string]$tagstring             
+        )
+    
+#Create tag value 
+$tag = @{
+  "Value" = $($tagstring);
+  "Action"= "Remove"
+}
+$tokenResponseIntuneBotAtp = get-atpTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName IntuneBot) -grant_type client_credentials 
+invoke-atpPost -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines/$($deviceid)/tags" -atpBodyHashtable $tag -Verbose:$true
+}
