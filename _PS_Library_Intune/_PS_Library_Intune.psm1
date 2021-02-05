@@ -55,6 +55,14 @@ function disable-legacyMailboxProtocols(){
         else{Write-Error $_;$_}
         }
     }
+function get-DeviceEncryptionStates(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [pscustomobject]$tokenResponse
+        )
+        invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/deviceManagement/managedDeviceEncryptionStates" -useBetaEndPoint
+}
 function get-mdmByodDistributionGroup(){
     [cmdletbinding()]
     Param (

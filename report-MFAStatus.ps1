@@ -15,9 +15,11 @@ Import-Module _PS_Library_MSOL
 Import-Module _PS_Library_Graph
 Import-Module _PS_Library_MFA
 
-$Admin = "emily.pressey@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
-$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+$groupAdmin = "newgroupbot@anthesisgroup.com"
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\NewGroupBot.txt) 
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
+connect-ToExo -credential $adminCreds
+
 
 connect-ToMsol -credential $adminCreds
 
@@ -55,13 +57,15 @@ $userswithnomfa += $user
 }
 }
 
-#Remove boxes and bots
+#Remove boxes and bots, and admin accounts we can't manage
 $userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "acsmailboxaccess@anthesisgroup.com"
 $userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "ACSSupport@anthesisgroup.com"
 $userswithnomfa = $userswithnomfa | where-object -Property "UserPrincipalName" -NE "NewGroupBot@anthesisgroup.com"
 $usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "acsmailboxaccess@anthesisgroup.com"
 $usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "ACSSupport@anthesisgroup.com"
 $usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "NewGroupBot@anthesisgroup.com"
+$usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "T1-Emily.Pressey@anthesisgroup.com"
+$usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "t1-andrew.ost@anthesisgroup.com"
 
 #Enable it for anyone in Spain, remove them from the list
 ForEach($user in $userswithnomfa){

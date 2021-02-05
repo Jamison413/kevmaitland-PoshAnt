@@ -1,7 +1,10 @@
 ﻿$365creds = set-MsolCredentials
 connect-ToExo -credential $365creds
 
-
+Remove-Module PnP.PowerShell
+Import-Module SharePointPnPPowerShellOnline
+Remove-Module SharePointPnPPowerShellOnline
+import-Module PnP.PowerShell
 $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt" -Verbose
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
@@ -16,7 +19,6 @@ $allSupplierSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl
 $requests = @()
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients" -Credentials $365creds
 $requests += Get-PnPListItem -List "External Client Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
-if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.ClientName.Label},{$_.FieldValues.Site_x0020_Admin.LookupValue},{$_.FieldValues.Site_x0020_Owners.LookupValue -join ", "},{$_.FieldValues.Site_x0020_Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
 #subs
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/subs" -Credentials $365creds
 $requests += Get-PnPListItem -List "External Subcontractor Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
@@ -67,7 +69,7 @@ foreach ($currentRequest in $selectedRequests){
         $new365Group = new-365Group -displayName $("External - $($fullRequest.FieldValues.Title)".Trim(" ")) -managerUpns $managers -teamMemberUpns $members -memberOf $null -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType Private -autoSubscribe $autoSubscribe -groupClassification $groupClassification -membershipManagedBy 365 -tokenResponse $tokenResponse -pnpCreds $365creds -ownersAreRealManagers $false -alsoCreateTeam $alsoCreateTeam -Verbose
         
         Write-Verbose "Getting PnPUnifiedGroup [$($new365Group.displayName)] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
-        Connect-PnPOnline -AccessToken $tokenResponse.access_token
+        Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
         $newPnpTeam = Get-PnPUnifiedGroup -Identity $new365Group.id
 
         Write-Verbose "Adding Navigation to External Hub"
@@ -104,7 +106,8 @@ foreach ($currentRequest in $selectedRequests){
 
         #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
         if($addExecutingUserAsTemporaryOwner){
-            $executingUserAlreadySiteCollectionAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true
+            Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
+            $executingUserAlreadySiteCollectionAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -pnpAppCreds $teamBotDetails -pnpCreds $365creds -addPermissionsIfMissing $true
             }
         Write-Host -f DarkYellow "`tCopying new homepage"
         copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/External-Site-Template-Candidate.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" | Out-Null
@@ -131,7 +134,8 @@ foreach ($currentRequest in $selectedRequests){
 
         Write-Host -f DarkYellow "`tset-standardSitePermissions [$($new365Group.DisplayName)]"
         try{
-            set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $new365Group -pnpCreds $365creds -Verbose:$VerbosePreference -suppressEmailNotifications -ErrorAction Continue
+            Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
+            set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $new365Group -pnpAppCreds $teamBotDetails -pnpCreds $365creds -Verbose:$VerbosePreference -suppressEmailNotifications -ErrorAction Continue
             }
         catch{$_}
 

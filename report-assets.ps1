@@ -5,7 +5,6 @@
     Start-Transcript $transcriptLogName -Append
     }
 
-
 #region Get records to reconcile
 #Get UK Users from AAD
 $tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
@@ -26,17 +25,29 @@ $intuneDevices = get-graphIntuneDevices -tokenResponse $tokenResponseIntuneBot
 $tokenResponseIntuneBotAtp = get-atpTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName IntuneBot) -grant_type client_credentials 
 $atpDevices = get-atpMachines -tokenResponse $tokenResponseIntuneBotAtp
 $allAadDevices = get-graphDevices -tokenResponse $tokenResponseTeamsBot
+
+#Get encryption state report - we can't pull this by 
+$deviceEncryptionStates = get-DeviceEncryptionStates -tokenResponse $tokenResponseIntuneBot -Verbose
+
 #endregion
 
-#region Do stuff
+#region Find stuff
 #Match records and add Intune/ATP/Asset data onto the AAD device record (assuming that all devices exist in AAD, which isn;t 100% accurate for ATP)
+
+#Iteration steps: #Get Aad device as main interation object -> Try to find the Atp device -> try to find the Intune device -> try to find the asset register device -> #~Add all the info onto the Aad object as properties~#
+
 $allAadDevices | % { 
     $thisAadDevice = $_
+    ##Clear any existing variables ready to go for the next run
     if($correspondingAtpDevice){rv correspondingAtpDevice}
     if($correspondingIntuneDevice){rv correspondingIntuneDevice}
     if($correspondingAsset){rv correspondingAsset}
+
+    ##Grab atp device by filtering all atp machines for this device's aad DEVICE id - atp object has aad record on it
     Write-Host "Processing [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
     $correspondingAtpDevice = $atpDevices| ? {$_.aadDeviceId -eq $thisAadDevice.deviceId}
+
+    ##If we find a corresponding atp device that lives in aad, add the atp object info into a hash table and add add it to the $thisAadDevice object as a propery/element (whatever, it's on there somewhere and its query-able)
     if($correspondingAtpDevice){
         Write-Host "`tAdding ATP information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
         $atpHash = @{}
@@ -45,6 +56,8 @@ $allAadDevices | % {
             }
         $_ | Add-Member -MemberType NoteProperty -Name atp -Value $atpHash -Force
         }
+
+    ##Do the above for Intune as well to see if we can find an Intune device, using the Aad device id
     $correspondingIntuneDevice = $intuneDevices | ? {$_.azureADDeviceId -eq $thisAadDevice.deviceId}
     if($correspondingIntuneDevice){
         Write-Host "`tAdding Intune information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
@@ -54,14 +67,29 @@ $allAadDevices | % {
             }
         $_ | Add-Member -MemberType NoteProperty -Name intune -Value $intuneHash -Force
 
-        #Then try matching the Asset using the serial number
+    ##Do the above for advanced encryption state information stored *somewhere* in Intune and not on the direct Intune device object, using the Aad device id
+     $correspondingEncryptionDevice = $deviceEncryptionStates | ? {$_.Id -eq $thisAadDevice.intune.id}
+     if($correspondingEncryptionDevice){
+        Write-Host "`tAdding Encryption information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
+        $encryptionHash = @{}
+        Get-Member -InputObject $correspondingEncryptionDevice -MemberType Properties | % {
+            $encryptionHash.Add($_.Name, $correspondingEncryptionDevice.$($_.Name))
+            }
+        $_ | Add-Member -MemberType NoteProperty -Name encryptiondata -Value $encryptionHash -Force
+        }
+
+    ##Then try matching the Asset using the manufacturer serial number - this lives on the Intune object which we found using the Aad device id
         $correspondingAsset = $assetRegisterItems | ? {$_.fields.ManufacturerSerialNumber -eq $correspondingIntuneDevice.serialNumber}
+        ##If we can't find it by serial number, try product code against the Intune serial number
         if(!$correspondingAsset){
             $correspondingAsset = $assetRegisterComputers | ? {$_.fields.IT_x0020_Product_x0020_Code -eq $correspondingIntuneDevice.serialNumber}
+            ##If we can't find it by product tag, try matching with MAC addresses (also lives on the Intune object)
             if(!$correspondingAsset){
                 $correspondingAsset = $assetRegisterComputers | ? {![string]::IsNullOrWhiteSpace($_.fields.MACAddresses)} | ? {$_.fields.MACAddresses.Replace(":","").Replace("-","") -match $correspondingIntuneDevice.wiFiMacAddress}
+                ##If we STILL can't find it, try using the computer name against the Aad display name as a last ditch attempt
                 if(!$correspondingAsset){
                     $correspondingAsset = $assetRegisterComputers | ? {$_.fields.ComputerName -eq $thisAadDevice.displayName}
+                    ##If it's a mobile, we can match using the IMEI if its in the asset register
                     if(!$correspondingAsset){
                         $correspondingAsset = $assetRegisterPhones | ? {$_.fields.IMEI -eq $correspondingIntuneDevice.imei}
                         if(!$correspondingAsset){}
@@ -77,10 +105,11 @@ $allAadDevices | % {
 
         }
     else{
+        ##If we can't find it in Intune, add it to a running list in $notInIntune - we won't check the asset register
         Write-Warning "No Intune device found for [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
         [array]$notInIntune += $thisAadDevice
         }
-
+    #If we find the corresponding asset, add the asset info into a hash table and add to the Aad device object
     if($correspondingAsset){
         Write-Host "`tAdding Asset information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
         $assetHash = @{}
@@ -132,10 +161,12 @@ $assetRegisterPhonesUseful | % {
 #region Report stuff
 #region Update the Computers Asset Register with data fron AAD, Intune & ATP
 $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
+
     $thisComputer = $_
     $thisUserId = $thisComputer.physicalIds | ? {$_ -match "USER-GID"} | % {$($_ -split ":")[1]}
     $thisUser = $ukUsers | ? {$_.id -eq $thisUserId}
-
+    
+  
     $updateHash = [ordered]@{
         Computer_AadDeviceName = $thisComputer.displayName
         Computer_AadLastUser = $thisUser.userPrincipalName
@@ -161,6 +192,13 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
         Computer_IntuneLastUserBusinessU = $thisUser.anthesisgroup_employeeInfo.businessUnit
         Computer_IntuneSerialNumber = $thisComputer.intune.serialNumber
         Computer_IntuneWiFiMacAddress = $thisComputer.intune.wiFiMacAddress
+        Computer_AadID = $thisComputer.id
+        Computer_AtpID = $thisComputer.atp.id
+        Computer_IntuneID = $thisComputer.Intune.id
+        Computer_IntuneEncryptionState = $thisComputer.encryptiondata.encryptionState 
+        Computer_IntuneTpmPresent = if($thisComputer.encryptiondata.tpmSpecificationVersion){"Yes"}` else{"No"}
+        Computer_IntuneAdvancedBitLocker = $thisComputer.encryptiondata.advancedBitLockerStates
+        Computer_EncryptionPolicyDetails = [string]$thisComputer.encryptiondata.policyDetails.policyName
         PresentInAad = $true
         }
     if(![string]::IsNullOrWhiteSpace($thisComputer.atp)){$updateHash.Add("PresentInAtp",$true)}
@@ -170,7 +208,35 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
     if($thisComputer.physicalIds -match "ZTDID"){$updateHash.Add("PresentInAutopilot",$true)}
     else{$updateHash.Add("PresentInAutopilot",$false)}
     update-graphListItem -tokenResponse $tokenResponseSharePointBot -graphSiteId $itTeamAllSite.id -listId $assetRegister.id -listitemId $thisComputer.asset.id -fieldHash $updateHash -Verbose
+    
+    #Tag atp device with the asset register status if not already there to help reduce admin time :)
+
+    #get any current status options from It Asset Register AssetStatus column
+    $possibleAssetTags = $assetRegisterItems.fields.AssetStatus | select -Unique
+
+    If(($thisComputer.atp) -and ($thisComputer.asset) -and ($thisComputer.atp.machineTags -notcontains $thisComputer.asset.AssetStatus)){
+
+    #Remove any old status
+    $thisTag = Compare-Object -ReferenceObject $thisComputer.atp.machineTags -differenceobject $possibleAssetTags -IncludeEqual | Where-Object -Property "SideIndicator" -EQ "==" 
+    ForEach($tag in $thisTag){
+    remove-atpDeviceTag -tokenResponse $tokenResponseIntuneBotAtp -deviceid $thisComputer.atp.id -tagstring $tag.InputObject
+    }    
+    #Add new status
+    add-atpDeviceTag -tokenResponse $tokenResponseIntuneBotAtp -deviceid $thisComputer.atp.id -tagstring $thisComputer.asset.AssetStatus
     }
+    
+
+    #Update status with maternity/paternity leave, leavers - so we have some sort of update
+    #-get lists
+    #-find current users from lists
+    #-update it asset register
+    #-update atp?    
+    
+    }
+        
+
+
+
 
 #endregion
 
@@ -343,3 +409,5 @@ $prettyObjects | Export-Csv  -Path 'C:\Users\KevMaitland\OneDrive - Anthesis LLC
 #>
 
 Stop-Transcript
+
+

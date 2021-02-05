@@ -1218,6 +1218,14 @@ function sanitise-forPnpSharePoint($dirtyString){
     $cleanerString.Replace(":","").Replace("/","")
     if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
     }
+function sanitise-forSharePointFolderName(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$dirtyString
+        )
+    $dirtyString.Replace("`"","").Replace("*","").Replace(":","").Replace("<","").Replace(">","").Replace("?","").Replace("/","").Replace("\","").Replace("|","").TrimEnd(".")
+    }
 function sanitise-forSharePointStandard($dirtyString){
     $dirtyString = $dirtyString.Trim()
     $dirtyString = $dirtyString.Replace(" "," ") #Weird instance where a space character is not a space character...

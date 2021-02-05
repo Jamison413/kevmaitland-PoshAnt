@@ -40,12 +40,12 @@
         $thisFolder = $_.Replace("\","/").Trim("/")
         $expandingFolderPath = ""
         $thisFolder.Split("/") | % {
-            $expandingFolderPath += "$(sanitise-forSharePointGroupName $_)/"
+            $expandingFolderPath += "$(sanitise-forSharePointFolderName $_)/"
             $expandedFoldersAndSubfoldersArray += $expandingFolderPath.Trim("/")
             }
         }
 
-    $driveItemsToReturn = ,@()
+    $driveItemsToReturn = @()
     #Iterate through our sanitised folder array and create the folders
     $expandedFoldersAndSubfoldersArray | Sort-Object -Unique | ? {![string]::IsNullOrWhiteSpace($_)} | % {
         $folderName = Split-Path $_ -Leaf
@@ -55,7 +55,7 @@
                 $driveItemsToReturn += $newFolder
                 }
             catch{
-                if($_.Exception.Message -eq "The remote server returned an error: (409) Conflict."){ #If the folder already existed, get and return it
+                if($_.Exception -match "(409)" -or $_.InnerException -match "(409)"){ #If the folder already existed, get and return it
                     $existingFolder = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/root:/$folderName"
                     $driveItemsToReturn += $existingFolder
                     }
@@ -69,7 +69,7 @@
                 $driveItemsToReturn += $newFolder
                 }
             catch{
-                if($_.Exception.Message -eq "The remote server returned an error: (409) Conflict."){ #If the folder already existed, get and return it
+                if($_.Exception -match "(409)" -or $_.InnerException -match "(409)"){ #If the folder already existed, get and return it
                     $existingFolder = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$graphDriveId/root:/$relativePath/$folderName"
                     $driveItemsToReturn += $existingFolder
                     }
@@ -1728,7 +1728,7 @@ function invoke-graphPut(){
 
     Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/$sanitisedGraphQuery" -Body $bodyData -ContentType $contentType -Headers $headers -Method Put
     }
-function move-driveItem(){
+function move-graphDriveItem(){
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]

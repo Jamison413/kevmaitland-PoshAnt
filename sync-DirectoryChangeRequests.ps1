@@ -142,7 +142,7 @@ ForEach($change in $livechanges){
 
 
 #Get the graphuser, their entry in the staff list and the POP Reporting Lines list first
-$graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $change.AnthesianEmail -selectAllProperties:$true
+$graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpn $change.AnthesianEmail -selectAllProperties:$true
 $thisanthesian = $allanthesians  | Where-Object {$_.fields.Email -eq "$($change.AnthesianEmail)"}
 $thisreport = $allPOPreports | Where-Object {$_.fields.Email -eq "$($change.AnthesianEmail)"}
 
@@ -180,7 +180,7 @@ If($($change.JobTitle) -ne $($graphuser.jobTitle)){
     write-host "Job title has been changed...amending 365" -ForegroundColor White
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change by Request' -logstring "Updating the job title for [$($graphuser.userPrincipalName)]: $($graphuser.jobtitle) to $($change.JobTitle)"
     set-graphuser -tokenResponse $tokenResponse -userIdOrUpn  $graphuser.id -userPropertyHash @{"jobTitle" = $($change.JobTitle)} -Verbose
-    $jobtitlecheck = get-graphUsers -tokenResponse $tokenResponse -filterUpns $graphuser.userPrincipalName
+    $jobtitlecheck = get-graphUsers -tokenResponse $tokenResponse -filterUpn $graphuser.userPrincipalName
     #Check graph user was changed 
     If($jobtitlecheck.jobtitle -eq $($change.JobTitle)){
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(365) Updated the job title for [$($graphuser.userPrincipalName)]: $($graphuser.jobtitle) to $($jobtitlecheck.jobTitle)"
@@ -206,7 +206,7 @@ If($($change.CellPhone) -ne $($graphuser.mobilePhone) -and ("no number" -ne $cha
     write-host "Mobile number has been changed...amending 365" -ForegroundColor White
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change by Request' -logstring "Updating the mobile number for [$($graphuser.userPrincipalName)]: $($graphuser.mobilePhone) to $($change.CellPhone)"
     set-graphuser -tokenResponse $tokenResponse -userIdOrUpn  $graphuser.id -userPropertyHash @{"mobilePhone" = $($change.CellPhone)}
-    $mobilecheck = get-graphUsers -tokenResponse $tokenResponse -filterUpns $graphuser.userPrincipalName
+    $mobilecheck = get-graphUsers -tokenResponse $tokenResponse -filterUpn $graphuser.userPrincipalName
     #Check graph user was changed 
     If($mobilecheck.mobilePhone -eq $($change.CellPhone)){
        #Update Directory List (reporting list only has name of employee and manager fields, so we won't update this one)
@@ -233,7 +233,7 @@ If($($change.Office_x0020_Number) -ne $($graphuser.businessPhones) -and ("no num
     write-host "Office number has been changed...amending 365" -ForegroundColor White
     $businessnumberhash = @{businessPhones=@(“$($change.Office_x0020_Number)”)}
     set-graphuser -tokenResponse $tokenResponse -userIdOrUpn  $graphuser.id -userPropertyHash $businessnumberhash -Verbose
-    $officenumbercheck = get-graphUsers -tokenResponse $tokenResponse -filterUpns $graphuser.userPrincipalName
+    $officenumbercheck = get-graphUsers -tokenResponse $tokenResponse -filterUpn $graphuser.userPrincipalName
     #Check graph user was changed
     If($officenumbercheck.businessPhones -eq $change.Office_x0020_Number){
        #Update Directory List (reporting list only has name of employee and manager fields, so we won't update this one)
@@ -259,7 +259,7 @@ If($($change.Community) -ne $($graphuser.department) -and "Select one" -ne ($cha
     write-host "Community has been changed...amending 365" -ForegroundColor White
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change by Request' -logstring "Updating the community for [$($graphuser.userPrincipalName)]: $($graphuser.department) to $($change.Community)"
     set-graphuser -tokenResponse $tokenResponse -userIdOrUpn  $graphuser.id -userPropertyHash @{"department" = $($change.Community)}
-    $communitycheck = get-graphUsers -tokenResponse $tokenResponse -filterUpns $graphuser.userPrincipalName -selectAllProperties:$true
+    $communitycheck = get-graphUsers -tokenResponse $tokenResponse -filterUpn $graphuser.userPrincipalName -selectAllProperties:$true
     #Check graph user was changed
     If($communitycheck.department -eq $change.Community){
        #Update Directory List (reporting list only has name of employee and manager fields, so we won't update this one)
@@ -409,7 +409,7 @@ If($($change.City) -ne $($graphuser.city) -and ("Select one" -ne $change.City)){
     write-host "City has been changed...amending 365" -ForegroundColor White
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change by Request' -logstring "Updating the city for [$($graphuser.userPrincipalName)]: $($graphuser.city) to $($change.City)"
     set-graphuser -tokenResponse $tokenResponse -userIdOrUpn  $graphuser.id -userPropertyHash @{"city" = $($change.City)}
-    $citycheck = get-graphUsers -tokenResponse $tokenResponse -filterUpns $graphuser.userPrincipalName -selectAllProperties:$true
+    $citycheck = get-graphUsers -tokenResponse $tokenResponse -filterUpn $graphuser.userPrincipalName -selectAllProperties:$true
     #Check graph user was changed
     If($citycheck.city -eq $change.City){
         #Update Directory List (reporting list only has name of employee and manager fields, so we won't update this one)
@@ -435,7 +435,7 @@ If($($change.Business_x0020_Unit) -ne $($graphuser.anthesisgroup_employeeInfo.bu
     write-host "Business Unit has been changed...amending 365" -ForegroundColor White
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change by Request' -logstring "Updating the Business Unit for [$($graphuser.userPrincipalName)]: $($graphuser.anthesisgroup_employeeInfo.businessUnit) to $($change.Business_x0020_Unit)"
     set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $graphuser.id -userEmployeeInfoExtensionHash @{"businessUnit" = $($change.Business_x0020_Unit)}
-    $businessunitcheck = get-graphUsers -tokenResponse $tokenResponse -filterUpns $graphuser.userPrincipalName -selectAllProperties:$true
+    $businessunitcheck = get-graphUsers -tokenResponse $tokenResponse -filterUpn $graphuser.userPrincipalName -selectAllProperties:$true
     #Check graph user was changed
     If($businessunitcheck.anthesisgroup_employeeInfo.businessUnit -eq $change.Business_x0020_Unit){
         #Update Directory List (reporting list only has name of employee and manager fields, so we won't update this one)

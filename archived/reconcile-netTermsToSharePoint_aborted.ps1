@@ -35,7 +35,7 @@ function new-clientDocLib(){
         } 
     catch{
         if($_.Exception -match "409" -or $_.InnerException -match "409"){ #Already exists
-            $newClientList = get-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -listName $(sanitise-forSql $clientTerm.Name) #Should this really be sanitised? YES! 
+            $newClientList = get-graphList -tokenResponse $tokenResponseSharePointBot -graphSiteId $clientSiteId -listName $clientTerm.Name #$(sanitise-forSql $clientTerm.Name) #Should this really be sanitised? NO! 
             }
         else{
             Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
@@ -260,38 +260,14 @@ function process-folders(){
         }
     
     }
-function set-standardisedClientDriveProperties(){
+function test-validNameForSharePointIntegration(){
     [cmdletbinding()]
     param(
-         [Parameter(Mandatory = $true,Position=0,ParameterSetName="clientDrive")]
-            [psobject]$rawClientDrive
-         ,[Parameter(Mandatory = $true,Position=0,ParameterSetName="opp")]
-            [psobject]$rawOppOrProjTerm
-         ,[Parameter(Mandatory = $true,Position=1,ParameterSetName="opp")]
-            [psobject]$allClientTerms
+         [Parameter(Mandatory = $true,Position=0)]
+            [string]$stringToTest
         )
-    switch ($PsCmdlet.ParameterSetName){
-        "clientDrive" {
-            $rawClientDrive | % {
-                Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientName -Value $_.name -Force
-                Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
-                Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientId -Value $_.id -Force
-                Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientName -Value $_.name -Force
-                }
-            $rawClientDrive
-            }
-        
-        "opp" {
-            $correspondingClient = Compare-Object -ReferenceObject $allClientTerms -DifferenceObject $rawOppOrProjTerm -Property NetSuiteClientId -IncludeEqual -ExcludeDifferent -PassThru
-            $rawOppOrProjTerm | % {
-                Add-Member -InputObject $_ -MemberType NoteProperty -Name "DriveClientId" -Value $correspondingClient.DriveClientId -Force
-                Add-Member -InputObject $_ -MemberType NoteProperty -Name "UniversalClientName" -Value $correspondingClient.UniversalClientName -Force
-                }
-            $rawOppOrProjTerm
-            }
-
-        }
-
+    if($stringToTest -eq $(sanitise-forPnpSharePoint $stringToTest)){$true}
+    else{$false}
     }
 function test-validNameForSharePointFolder(){
     [cmdletbinding()]
@@ -302,22 +278,26 @@ function test-validNameForSharePointFolder(){
     if($stringToTest -eq $(sanitise-forSharePointFolderName $stringToTest)){$true}
     else{$false}
     }
+
 $timeForFullCycle = Measure-Command {
-cls
-    
     #region GetData
     #region getDriveData
-    $appCredsSharePointBot = $(get-graphAppClientCredentials -appName SharePointBot)
-    $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $appCredsSharePointBot
-    if($deltaSync -eq $false){
-        $driveClientRetrieval = Measure-Command {
-            $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
-            $allClientDrives = get-graphDrives -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId
-            $allClientDrives = $allClientDrives | % {set-standardisedClientDriveProperties -rawClientDrive $_}
+    $driveClientRetrieval = Measure-Command {
+        $appCredsSharePointBot = $(get-graphAppClientCredentials -appName SharePointBot)
+        $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $appCredsSharePointBot
+        $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
+        $allClientDrives = get-graphDrives -tokenResponse $tokenResponseSharePointBot -siteGraphId $clientSiteId
+        $allClientDrives | % {
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientName -Value $_.name -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientId -Value $_.id -Force
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveClientName -Value $_.name -Force
             }
-        Write-Host "[$($allClientDrives.Count)] Client Drives retrieved from SharePoint in [$($driveClientRetrieval.TotalSeconds)] seconds ([$($driveClientRetrieval.totalMinutes)] minutes)"
+        }
+    Write-Host "[$($allClientDrives.Count)] Client Drives retrieved from SharePoint in [$($driveClientRetrieval.TotalSeconds)] seconds ([$($driveClientRetrieval.totalMinutes)] minutes)"
 
-        $now = $(Get-Date -f FileDateTimeUniversal) #USed to create a temp file to speed up the enumeration
+    if($deltaSync -eq $false){
+        $now = $(Get-Date -f FileDateTimeUniversal)
         $topLevelFolderRetrieval = Measure-Command {
             for($i=0; $i-lt $allClientDrives.Count; $i++){
                 write-progress -activity "Enumerating Drives contents" -Status "[$i/$($allClientDrives.count)]" -PercentComplete ($i/ $allClientDrives.count *100)
@@ -551,60 +531,18 @@ cls
         #endregion
 
         #region Existing Clients
-        if($deltaSync -eq $true){
-            $appCredsSharePointBot = $(get-graphAppClientCredentials -appName SharePointBot)
-            $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $appCredsSharePointBot
-            Write-Host "`tProcessing [$($thisExistingClient.Count)] existing Clients"
-            $existingClients | % {
-                $thisExistingClient = $_
-                try{
-                    $thisClientDrive = get-graphDrives -tokenResponse $tokenResponseSharePointBot -driveId $thisExistingClient.DriveClientId -ErrorAction Stop
-                    $thisClientDrive = set-standardisedClientDriveProperties -rawClientDrive $thisClientDrive
-                    if($thisExistingClient.UniversalClientNameSanitised -ne $thisClientDrive.UniversalClientNameSanitised){
-                        Write-Host "`t`t`Updating DriveClientName `t[$($thisClientDrive.DriveClientName)] for Drive [$($thisClientDrive.DriveClientId)][$($thisClientDrive.webUrl)]"
-                        Write-Host "`t`tto:`t`t`t`t`t`t`t[$($thisExistingClient.UniversalClientName)] from Term [$($thisExistingClient.NetSuiteClientId)][$($thisExistingClient.Id)]"
-                        try{
-                            $docLibUpdatedCorrectly = process-docLibs -tokenResponse $tokenResponseSharePointBot -standardisedSourceDocLib $thisClientDrive -renameAs $thisExistingClient.UniversalClientName -ErrorAction Stop
-                            if($docLibUpdatedCorrectly -eq $true){
-                                $thisExistingClient.SetCustomProperty("flagForReprocessing",$false)
-                                try{
-                                    Write-Verbose "`tTrying to deflag processed Client [$($thisExistingClient.UniversalClientName)]"
-                                    $thisExistingClient.Context.ExecuteQuery()
-                                    }
-                                catch{Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"}
-                                }
-                            }
-                        catch{
-                            Write-Host -ForegroundColor Red "`t`t`t$(get-errorSummary -errorToSummarise $_)"
-                            [array]$duffUpdatedOpps += @($thisClientDrive,$(get-errorSummary -errorToSummarise $_))
-                            }
-                        }
-                    else{
-                        Write-Host "`t`tThe Client Name for [$($thisExistingClient.UniversalClientName)][$($thisExistingClient.NetSuiteClientId)] doesn't seem to have changed. Not sure why this was flagForReprocessing, but deflagging now."
-                        $thisExistingClient.SetCustomProperty("flagForReprocessing",$false)
-                        try{
-                            Write-Verbose "`tTrying to deflag processed Client [$($thisExistingClient.UniversalClientName)]"
-                            $thisExistingClient.Context.ExecuteQuery()
-                            }
-                        catch{Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"}
-                        }
-                    }
-                catch{return}
 
-                }
-            }
-
-        if($deltaSync -eq $false){        
-            $existingClientsNameComparison = process-comparison -subsetOfNetObjects $existingClients -allTermObjects $allClientDrives -idInCommon DriveClientId -propertyToTest UniversalClientNameSanitised -validate 
-            [array]$existingTermClientsWithChangedName  = $existingClientsNameComparison["<="]
-            [array]$existingDriveClientsWithChangedName = $existingClientsNameComparison["=>"]
-                        #Yes: Update the DriveItemName, & set flagForReproccessing = $false
-            $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 600 -aadAppCreds $appCredsSharePointBot
-            Write-Host "`tProcessing [$($existingDriveClientsWithChangedName.Count)] existing Clients with changed Names"
-            for($i=0;$i -lt $existingDriveClientsWithChangedName.Count; $i++){
-                Write-Host "`t`t`Updating DriveClientName `t[$($existingDriveClientsWithChangedName[$i].DriveClientName)] for Drive [$($existingDriveClientsWithChangedName[$i].DriveClientId)][$($existingDriveClientsWithChangedName[$i].webUrl)]"
-                Write-Host "`t`tto:`t`t`t`t`t`t`t[$($existingTermClientsWithChangedName[$i].UniversalClientName)] from Term [$($existingTermClientsWithChangedName[$i].NetSuiteClientId)][$($existingTermClientsWithChangedName[$i].Id)]"
-                try{
+        #As we need $allClientDrives for Opps & Projs, we can awlays Full reconcile Clients
+        $existingClientsNameComparison = process-comparison -subsetOfNetObjects $existingClients -allTermObjects $allClientDrives -idInCommon DriveClientId -propertyToTest UniversalClientNameSanitised -validate 
+        [array]$existingTermClientsWithChangedName  = $existingClientsNameComparison["<="]
+        [array]$existingDriveClientsWithChangedName = $existingClientsNameComparison["=>"]
+                    #Yes: Update the DriveItemName, & set flagForReproccessing = $false
+        $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 600 -aadAppCreds $appCredsSharePointBot
+        Write-Host "`tProcessing [$($existingDriveClientsWithChangedName.Count)] existing Clients with changed Names"
+        for($i=0;$i -lt $existingDriveClientsWithChangedName.Count; $i++){
+            Write-Host "`t`t`Updating DriveClientName `t[$($existingDriveClientsWithChangedName[$i].DriveClientName)] for Drive [$($existingDriveClientsWithChangedName[$i].DriveClientId)][$($existingDriveClientsWithChangedName[$i].webUrl)]"
+            Write-Host "`t`tto:`t`t`t`t`t`t`t[$($existingTermClientsWithChangedName[$i].UniversalClientName)] from Term [$($existingTermClientsWithChangedName[$i].NetSuiteClientId)][$($existingTermClientsWithChangedName[$i].Id)]"
+            try{
                     $docLibUpdatedCorrectly = process-docLibs -tokenResponse $tokenResponseSharePointBot -standardisedSourceDocLib $existingDriveClientsWithChangedName[$i] -renameAs $existingTermClientsWithChangedName[$i].UniversalClientName -ErrorAction Stop
                     if($docLibUpdatedCorrectly -eq $true){
                         $existingTermClientsWithChangedName[$i].SetCustomProperty("flagForReprocessing",$false)
@@ -623,33 +561,32 @@ cls
                             }
                         }
                     }
-                catch{
+            catch{
                     Write-Host -ForegroundColor Red "`t`t`t$(get-errorSummary -errorToSummarise $_)"
                     [array]$duffUpdatedOpps += @($existingDriveClientsWithChangedName[$i],$(get-errorSummary -errorToSummarise $_))
                     }
-                }
+            }
 
-                        #No: Set flagForReproccessing = $false
-            [array]$existingTermClientsWithOriginalName = $existingClientsNameComparison["=="] #We'll updated these once we've finished the deltaClients ones too.
-            [array]$existingClientsIncorrectlyFlaggedForProcessing = $existingTermClientsWithOriginalName | ? {$_.CustomProperties.flagForReprocessing -eq $true}
-            if($existingClientsIncorrectlyFlaggedForProcessing.Count -gt 0){
-                Write-Host "`t`t[$($existingClientsIncorrectlyFlaggedForProcessing.Count)] seems to have been flagged for reprocessing, but they don't seem to have changed. Deflagging them."
-                $existingClientsIncorrectlyFlaggedForProcessing | % {
-                    $thisIncorrectlyFlaggedClient = $_
-                    $thisIncorrectlyFlaggedClient.SetCustomProperty("flagForReprocessing",$false)
-                    try{
-                        Write-Verbose "`tTrying to deflag processed Client [$($thisIncorrectlyFlaggedClient.UniversalClientName)]"
-                        Write-Host "`t`t`tDeflagging [$($thisIncorrectlyFlaggedClient.UniversalClientName)][$($thisIncorrectlyFlaggedClient.NetSuiteClientId)]"
-                        $thisIncorrectlyFlaggedClient.Context.ExecuteQuery()
+                    #No: Set flagForReproccessing = $false
+        [array]$existingTermClientsWithOriginalName = $existingClientsNameComparison["=="] #We'll updated these once we've finished the deltaClients ones too.
+        [array]$existingClientsIncorrectlyFlaggedForProcessing = $existingTermClientsWithOriginalName | ? {$_.CustomProperties.flagForReprocessing -eq $true}
+        if($existingClientsIncorrectlyFlaggedForProcessing.Count -gt 0){
+            Write-Host "`t`t[$($existingClientsIncorrectlyFlaggedForProcessing.Count)] seems to have been flagged for reprocessing, but they don't seem to have changed. Deflagging them."
+            $existingClientsIncorrectlyFlaggedForProcessing | % {
+                $thisIncorrectlyFlaggedClient = $_
+                $thisIncorrectlyFlaggedClient.SetCustomProperty("flagForReprocessing",$false)
+                try{
+                    Write-Verbose "`tTrying to deflag processed Client [$($thisIncorrectlyFlaggedClient.UniversalClientName)]"
+                    Write-Host "`t`t`tDeflagging [$($thisIncorrectlyFlaggedClient.UniversalClientName)][$($thisIncorrectlyFlaggedClient.NetSuiteClientId)]"
+                    $thisIncorrectlyFlaggedClient.Context.ExecuteQuery()
+                    }
+                catch{
+                    if($deltaSync -eq $false -and $_.Exception -match "Term update failed because of save conflict"){
+                        #Do nothing - a deltaSync=$true iteration has probably already processed this
                         }
-                    catch{
-                        if($deltaSync -eq $false -and $_.Exception -match "Term update failed because of save conflict"){
-                            #Do nothing - a deltaSync=$true iteration has probably already processed this
-                            }
-                        else{
-                            Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
-                            [array]$duffUpdatedClients += @($thisIncorrectlyFlaggedClient,$(get-errorSummary -errorToSummarise $_))
-                            }
+                    else{
+                        Write-Host -ForegroundColor Red "`t`t$(get-errorSummary -errorToSummarise $_)"
+                        [array]$duffUpdatedClients += @($thisIncorrectlyFlaggedClient,$(get-errorSummary -errorToSummarise $_))
                         }
                     }
                 }
@@ -670,105 +607,116 @@ cls
     #region ProcessOpportunities
         #region Prepare Opps datasets
     $matchingOppsToClients = Measure-Command {
-        if($deltaSync -eq $true){
-            [array]$newOpps = $allOppTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
-            [array]$existingOpps = $allOppTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -eq $true}
+        for($i=0; $i -lt $allOppTerms.Count; $i++){
+            Write-Progress -Activity "Matching Opps to Clients" -Status "[$i/$($allOppTerms.count)]" -PercentComplete ($i / $allOppTerms.count *100)
+            #Find ClientDrive 
+            $thisOppTerm = $allOppTerms[$i]
+            $correspondingClient = Compare-Object -ReferenceObject $allClientTerms -DifferenceObject $thisOppTerm -Property NetSuiteClientId -IncludeEqual -ExcludeDifferent -PassThru
+            Add-Member -InputObject $thisOppTerm -MemberType NoteProperty -Name "DriveClientId" -Value $correspondingClient.DriveClientId -Force
+            Add-Member -InputObject $thisOppTerm -MemberType NoteProperty -Name "UniversalClientName" -Value $correspondingClient.UniversalClientName -Force
             }
-
-        if($deltaSync -eq $false){
-            $oppComparison = Compare-Object -ReferenceObject @($allOppTerms | Select-Object) -DifferenceObject @($driveItemsOppFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
-            [array]$newOpps = $oppComparison | ? {$_.SideIndicator -eq "<=" -and [string]::IsNullOrWhiteSpace($_.NetSuiteProjectId)} #Exclude any Opps already converted to a Project
-            [array]$existingOpps = $oppComparison | ? {$_.SideIndicator -eq "=="}
-            #[array]$orphanedOppFolders = $oppComparison | ? {$_.SideIndicator -eq "=>"}
-            }
-
-        $orphanedOppFolders = @($orphanedOppFolders | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $newOpps            = @($newOpps            | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $existingOpps       = @($existingOpps       | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        [array]$misplacedOpps = $orphanedOppFolders | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedOpps += $newOpps           | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedOpps += $existingOpps      | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        if($($misplacedOpps.Count) -gt 0){
-            if($deltaSync -eq $false){@($misplacedOpps | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalOppName)][$($_.NetSuiteOppId)][$($_.NetSuiteClientId)]"}}
-            $orphanedOppFolders = $orphanedOppFolders | ? {$misplacedProjs.id -notcontains $_.id}
-            $newOpps            = $newOpps            | ? {$misplacedProjs.id -notcontains $_.id}
-            $existingOpps       = $existingOpps       | ? {$misplacedProjs.id -notcontains $_.id}
-            }
+        $oppsMatchedToClients = $allOppTerms | ? {![string]::IsNullOrWhiteSpace($_.DriveClientId)}
         }
-    Write-Host "`t[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)]/[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count)] Opps matched to Client Terms ([$($($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)*100/$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count))]%) in [$($matchingOppsToClients.TotalSeconds)] seconds. [$($misplacedOpps.Count)] Opps don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term)"
-        #endregion
-
-        #region orphanedOpps
-    $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 3000 -aadAppCreds $appCredsSharePointBot
-    Write-Host "`tProcessing [$($orphanedOppFolders.Count)] orphaned Opportunities"
-    @($orphanedOppFolders | Select-Object) | % {
-        $thisOrphanedFolder = $_#orphanedOppFolders[0]
-        $result = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $thisOrphanedFolder -confirmDeleteEmptyFolders
-        if($result -eq $true){$orphanedOppFolders = $orphanedOppFolders | ? {$_.DriveItemId -notcontains $thisOrphanedFolder.DriveItemId}}
-        }
-    if($orphanedOppFolders.Count -ge 1){
-        Write-Host "`t`t[$($orphanedOppFolders.Count)] Orphaned Opportunity folders failed to process"
-        [array]$nonEmptyOppFolders = $($($orphanedOppFolders | Group-Object -Property {$_.DriveItemSize -gt 0}) | ? {$_.Name -eq "True"}).Group
-        Write-Host "`t`t`t[$($nonEmptyOppFolders.Count)] Orphaned Opportunity folders contain data and will need resolving manually:"
-        $orphanedOppFolders | % {Write-Host "`t`t`t`t[$($_.DriveItemName)][$($_.DriveItemId)][$($_.DriveItemUrl)][$($_.DriveClientName)][$($_.DriveClientId)]"}
-        #Report this via e-mail too
-        }
-        #endregion
-
-        #region newOpps
-    Write-Host "`tProcessing [$($newOpps.Count)] new Opportunities"
-    [array]$newOppsWithProjectIds = $newOpps | ? {![string]::IsNullOrWhiteSpace($_.NetSuiteProjectId)}
-    if($newOppsWithProjectIds.Count -gt 0){
-        Write-Host "`t`tExcluding [$($newOppsWithProjectIds.Count)] Opps because they already have Projects (not recreating Opp Folders), [$($newOpps.Count - $newOppsWithProjectIds.Count)] Opps remaining"
-        [array]$newOpps = $newOpps | ? {$newOppsWithProjectIds.id -notcontains $_.id}
-        }
-    [array]$newOppsWithoutClientDriveIds = $newOpps | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-    if($newOppsWithoutClientDriveIds.Count -gt 0){
-        Write-Host "`t`tExcluding [$($newOppsWithoutClientDriveIds.Count)] Opps because they do not have a ClientDriveId (the Client Term creating is _probably_ being blocked by a duplicate name in NetSuite), [$($newOpps.Count - $newOppsWithoutClientDriveIds.Count)] Opps remaining"
-        [array]$newOpps = $newOpps | ? {$newOppsWithoutClientDriveIds.id -notcontains $_.id}
-        }
-    @($newOpps| Select-Object) | % {
-        $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 30 -aadAppCreds $appCredsSharePointBot
-        $thisNewOppTerm = $_
-        try{
-            [array]$newOppFolders = new-oppProjFolders -tokenResponse $tokenResponseSharePointBot -oppProjTermWithClientInfo $thisNewOppTerm #-Verbose
-            if($newOppFolders.Count -ge 1 -and ![string]::IsNullOrWhiteSpace($newOppFolders[0].id)){
-                $thisNewOppTerm.SetCustomProperty("DriveItemId",$newOppFolders[0].id)
-                $thisNewOppTerm.SetCustomProperty("flagForReprocessing",$false)
-                try{
-                    $thisNewOppTerm.Context.ExecuteQuery()
-                    [array]$newOpps = $newOpps | ? {$_.DriveItemId -notcontains $thisNewOppTerm.DriveItemId}
-                    }
-                catch{get-errorSummary -errorToSummarise $_}
-                }
-            }
-        catch{get-errorSummary -errorToSummarise $_}
-
+    Write-Host "`t[$($oppsMatchedToClients.Count)]/[$($allOppTerms.Count)] Opps matched to Client Terms ([$($($oppsMatchedToClients.Count)*100/$($allOppTerms.Count))]%) in [$($matchingOppsToClients.TotalSeconds)] seconds"
+    if($($oppsMatchedToClients.Count) -lt $($allOppTerms.Count)){
+        [array]$misplacedOpps = $allOppTerms | ? {$oppsMatchedToClients.id -notcontains $_.id}
+        Write-Host "`t`tThese [$($misplacedOpps.Count)] Opps don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term):"
+        @($misplacedOpps | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalOppName)][$($_.NetSuiteOppId)][$($_.NetSuiteClientId)]"}
         }
 
-    if($newOpps.Count -ge 1){
-        Write-Host "`t`t[$($newOpps.Count)] New Opportunity folders failed to create:"
-        $newOpps | % {Write-Host "`t`t`t[$($_.UniversalOppName)][$($_.Id)][$($_.NetSuiteOppId)] for NetSuiteClientId [$($_.NetSuiteClientId)]"}
-        #Report this via e-mail too
+
+    if($deltaSync -eq $true){
+        [array]$newOpps = $oppsMatchedToClients | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
+        [array]$existingOpps = $oppsMatchedToClients | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -eq $true}
         }
 
     if($deltaSync -eq $false){
-        #Deflag the stragglers
-        Write-Host "`t[$($newOppsWithProjectIds.Count)] Opps were excluded because they already have Projects (not recreating Opp Folders):"
-        $newOppsWithProjectIds | % {
-            Write-Host "`t`tDeflagging [$($_.UniversalOppName)][$($_.UniversalClientName)]"
-            $_.SetCustomProperty("flagForReprocessing",$false)
-            try{$_.Context.ExecuteQuery()}
-            catch{get-errorSummary -errorToSummarise $_}
+        $oppComparison = Compare-Object -ReferenceObject @($oppsMatchedToClients | Select-Object) -DifferenceObject @($driveItemsOppFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
+        [array]$newOpps = $oppComparison | ? {$_.SideIndicator -eq "<=" -and [string]::IsNullOrWhiteSpace($_.NetSuiteProjectId)} #Exclude any Opps already converted to a Project
+        [array]$existingOpps = $oppComparison | ? {$_.SideIndicator -eq "=="}
+        #[array]$orphanedOppFolders = $oppComparison | ? {$_.SideIndicator -eq "=>"}
+
+        <#Do some clever self-healing first
+        $oppFoldersWithMatchingCodes = Compare-Object -ReferenceObject $driveItemsOppFolders -DifferenceObject $allOppTerms -Property UniversalOppCode -PassThru -IncludeEqual -ExcludeDifferent
+        $oppFolderCodeComparison = process-comparison -subsetOfNetObjects $oppFoldersWithMatchingCodes -allTermObjects $allOppTerms -idInCommon UniversalOppCode -propertyToTest DriveItemId -validate -Verbose
+        $additionalOrphanedOppFolders = $oppFolderCodeComparison["<="]
+        $additionalOrphanedOppTerms   = $oppFolderCodeComparison["=>"]
+        $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 600 -aadAppCreds $appCredsSharePointBot
+        for($i=0;$i -lt $additionalOrphanedOppTerms.Count;$i++){
+           #if($additionalOrphanedOppTerms[$i].name -match "O-1002467"){Write-Host -f Yellow $i;break}
+            if($additionalOrphanedOppTerms[$i].DriveClientId -eq $additionalOrphanedOppFolders[$i].DriveClientId){
+                if([string]::IsNullOrEmpty($additionalOrphanedOppTerms[$i].DriveItemId)){
+                    #Link
+                    Write-Host "[$($additionalOrphanedOppFolders[$i].DriveItemName)][$($additionalOrphanedOppFolders[$i].DriveItemId)] is in the correct Drive [$($additionalOrphanedOppTerms[$i].UniversalClientName)][$($additionalOrphanedOppTerms[$i].NetSuiteClientId)][$($additionalOrphanedOppTerms[$i].DriveClientId)], and the Term has no DriveItemId - linking to this folder"
+                    $additionalOrphanedOppTerms[$i].SetCustomProperty("DriveItemId",$additionalOrphanedOppFolders[$i].DriveItemId)
+                    $additionalOrphanedOppTerms[$i].Context.ExecuteQuery()
+                    }
+                else{
+                    $testPath = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $additionalOrphanedOppTerms[$i].DriveClientId -itemGraphId $additionalOrphanedOppTerms[$i].DriveItemId -returnWhat Item -ErrorAction SilentlyContinue
+                    #Test & 
+                    if([string]::IsNullOrEmpty($testPath)){
+                        Write-Host "[$($additionalOrphanedOppFolders[$i].DriveItemName)][$($additionalOrphanedOppFolders[$i].DriveItemId)] is in the correct Drive [$($additionalOrphanedOppTerms[$i].UniversalClientName)][$($additionalOrphanedOppTerms[$i].NetSuiteClientId)][$($additionalOrphanedOppTerms[$i].DriveClientId)], and the Term's current DriveItemId is invalid - linking to this folder"
+                        $additionalOrphanedOppTerms[$i].SetCustomProperty("DriveItemId",$additionalOrphanedOppFolders[$i].DriveItemId)
+                        $additionalOrphanedOppTerms[$i].Context.ExecuteQuery()
+                        }
+                    else{
+                        Write-Host "[$($additionalOrphanedOppFolders[$i].DriveItemName)][$($additionalOrphanedOppFolders[$i].DriveItemId)][$($additionalOrphanedOppFolders[$i].DriveItemUrl)] is in the correct Drive [$($additionalOrphanedOppTerms[$i].UniversalClientName)][$($additionalOrphanedOppTerms[$i].NetSuiteClientId)][$($additionalOrphanedOppTerms[$i].DriveClientId)], but the Term's current DriveItemId is valid - deleting this incorrect folder"
+                        $result = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $additionalOrphanedOppFolders[$i] -confirmDeleteEmptyFolders
+                        }
+                    }
+                }
+            else{
+                Write-Host "[$($additionalOrphanedOppFolders[$i].DriveItemName)][$($additionalOrphanedOppFolders[$i].DriveItemId)] is in the wrong Drive [$($additionalOrphanedOppTerms[$i].UniversalClientName)][$($additionalOrphanedOppTerms[$i].NetSuiteClientId)][$($additionalOrphanedOppTerms[$i].DriveClientId)] - deleting this incorrect folder"
+                $result = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $additionalOrphanedOppFolders[$i] -confirmDeleteEmptyFolders
+                }
             }
-        Write-Host "`t[$($newOppsWithoutClientDriveIds.Count)] Opps were excluded because they have no Client, or their Client has no ClientDriveId (the Client Term creating is _probably_ being blocked by a duplicate name in NetSuite)(cannot create Opp Folders) :"
-        $newOppsWithoutClientDriveIds | % {
-            Write-Host "`t`tDeflagging [$($_.UniversalOppName)][$($_.UniversalClientName)][$($_.NetSuiteClientId)]"
-            $_.SetCustomProperty("flagForReprocessing",$false)
-            try{$_.Context.ExecuteQuery()}
-            catch{get-errorSummary -errorToSummarise $_}
-            }
+        }#>
         }
+        #endregion
+
+        #region orphanedOpps
+        $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 3000 -aadAppCreds $appCredsSharePointBot
+        Write-Host "`tProcessing [$($orphanedOppFolders.Count)] orphaned Opportunities"
+        @($orphanedOppFolders | Select-Object) | % {
+            $thisOrphanedFolder = $_#orphanedOppFolders[0]
+            $result = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $thisOrphanedFolder -confirmDeleteEmptyFolders
+            if($result -eq $true){$orphanedOppFolders = $orphanedOppFolders | ? {$_.DriveItemId -notcontains $thisOrphanedFolder.DriveItemId}}
+            }
+        if($orphanedOppFolders.Count -ge 1){
+            Write-Host "`t`t[$($orphanedOppFolders.Count)] Orphaned Opportunity folders failed to process"
+            [array]$nonEmptyOppFolders = $($($orphanedOppFolders | Group-Object -Property {$_.DriveItemSize -gt 0}) | ? {$_.Name -eq "True"}).Group
+            Write-Host "`t`t`t[$($nonEmptyOppFolders.Count)] Orphaned Opportunity folders contain data and will need resolving manually:"
+            $orphanedOppFolders | % {Write-Host "`t`t`t`t[$($_.DriveItemName)][$($_.DriveItemId)][$($_.DriveItemUrl)][$($_.DriveClientName)][$($_.DriveClientId)]"}
+            #Report this via e-mail too
+            }
+        #endregion
+
+        #region newOpps
+        Write-Host "`tProcessing [$($newOpps.Count)] new Opportunities"
+        @($newOpps| Select-Object) | % {
+            $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 30 -aadAppCreds $appCredsSharePointBot
+            $thisNewOppTerm = $_
+            try{
+                [array]$newOppFolders = new-oppProjFolders -tokenResponse $tokenResponseSharePointBot -oppProjTermWithClientInfo $thisNewOppTerm #-Verbose
+                if($newOppFolders.Count -ge 1 -and ![string]::IsNullOrWhiteSpace($newOppFolders[0].id)){
+                    $thisNewOppTerm.SetCustomProperty("DriveItemId",$newOppFolders[0].id)
+                    $thisNewOppTerm.SetCustomProperty("flagForReprocessing",$false)
+                    try{
+                        $thisNewOppTerm.Context.ExecuteQuery()
+                        [array]$newOpps = $newOpps | ? {$_.DriveItemId -notcontains $thisNewOppTerm.DriveItemId}
+                        }
+                    catch{get-errorSummary -errorToSummarise $_}
+                    }
+                }
+            catch{get-errorSummary -errorToSummarise $_}
+
+            }
+
+        if($newOpps.Count -ge 1){
+            Write-Host "`t`t[$($newOpps.Count)] New Opportunity folders failed to create:"
+            $newOpps | % {Write-Host "`t`t`t[$($_.UniversalOppName)][$($_.Id)][$($_.NetSuiteOppId)] for NetSuiteClientId [$($_.NetSuiteClientId)]"}
+            #Report this via e-mail too
+            }
         #endregion
 
         #region existingOpps
@@ -803,8 +751,8 @@ cls
             @($existingOppTermsWithoutProject | Select-Object) | % {
                 $thisExistingOpp = $_
                 try{
-                    try{$thisExistingOppDriveItem = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisExistingOpp.DriveClientId -itemGraphId $thisExistingOpp.DriveItemId -returnWhat Item -ErrorAction Stop}         #Try to get the link DriveItem so we can test whether it needs updating. -ErrorAction SilentlyContinue is ignored inside the outer Try/Catch block,s o we need another one just for this command :/
-                    catch{$thisExistingOppDriveItem = $null} #This is required to prevent the next itreration getting cross-linked with this DriveItem
+                    try{$thisExistingOppDriveItem = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisExistingOpp.DriveClientId -itemGraphId $thisExistingOpp.DriveItemId -returnWhat Item -ErrorAction SilentlyContinue}         #Try to get the link DriveItem so we can test whether it needs updating. -ErrorAction SilentlyContinue is ignored inside the outer Try/Catch block,s o we need another one just for this command :/
+                    catch{}
                     if([string]::IsNullOrEmpty($thisExistingOppDriveItem.id)){Write-Warning "`t`tOppDriveItem [$($thisExistingOpp.UniversalOppName)][$($thisExistingOpp.NetSuiteOppId)][$($thisExistingOpp.Id)] for [$($thisExistingOpp.UniversalClientName)][$($thisExistingOpp.NetSuiteClientId)] is missing. It might have been assigned to a different Client (which will be fixed on the next Full Reconcile), or it may have been manually moved/deleted."}
                     elseif($(sanitise-forNetsuiteIntegration $thisExistingOppDriveItem.name) -ne $thisExistingOpp.UniversalOppNameSanitised){
                         $thisExistingOppDriveItem | Add-Member -MemberType NoteProperty -Name DriveItemName -Value $thisExistingOppDriveItem.name -Force
@@ -924,37 +872,40 @@ cls
     #region ProcessProjectsData
         #region Prepare Projs datasets
     $matchingProjsToClients = Measure-Command {
-        if($deltaSync -eq $true){
-            [array]$newProjs = $allProjTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
-            [array]$existingProjs = $allProjTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -eq $true}
+        for($i=0; $i -lt $allProjTerms.Count; $i++){
+            Write-Progress -Activity "Matching Projects to Clients" -Status "[$i/$($allProjTerms.count)]" -PercentComplete ($i / $allProjTerms.count *100)
+            #Find ClientDrive 
+            $thisProjTerm = $allProjTerms[$i]
+            $correspondingClient = Compare-Object -ReferenceObject $allClientTerms -DifferenceObject $thisProjTerm -Property NetSuiteClientId -IncludeEqual -ExcludeDifferent -PassThru
+            Add-Member -InputObject $thisProjTerm -MemberType NoteProperty -Name "DriveClientId" -Value $correspondingClient.DriveClientId -Force
+            Add-Member -InputObject $thisProjTerm -MemberType NoteProperty -Name "UniversalClientName" -Value $correspondingClient.UniversalClientName -Force
             }
-
-
-        if($deltaSync -eq $false){
-            $projComparison = Compare-Object -ReferenceObject @($ProjsMatchedToClients | Select-Object) -DifferenceObject @($driveItemsProjFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
-            [array]$newProjs = $allProjTerms | ? {$_.SideIndicator -eq "<="} 
-            [array]$existingProjs = $allProjTerms | ? {$_.SideIndicator -eq "=="}
-            #[array]$orphanedProjFolders = $projComparison | ? {$_.SideIndicator -eq "=>"}
-            }
-
-        $orphanedProjFolders = @($orphanedProjFolders | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $newProjs            = @($newProjs            | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $existingProjs       = @($existingProjs       | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        [array]$misplacedProjs = $orphanedProjFolders | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedProjs += $newProjs           | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedProjs += $existingProjs      | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
+        $ProjsMatchedToClients = $allProjTerms | ? {![string]::IsNullOrWhiteSpace($_.DriveClientId)}
         }
-    Write-Host "`t[$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count-$misplacedProjs.Count)]/[$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count)] Projs matched to Client Terms ([$($($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count-$misplacedProjs.Count)*100/$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count))]%) in [$($matchingProjsToClients.TotalSeconds)] seconds. [$($misplacedProjs.Count)] Projs don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term)"
-    if($($misplacedProjs.Count) -gt 0){
-        if($deltaSync -eq $false){@($misplacedProjs | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalProjName)][$($_.NetSuiteProjId)][$($_.NetSuiteClientId)]"}}
-        $orphanedProjFolders = $orphanedProjFolders | ? {$misplacedProjs.id -notcontains $_.id}
-        $newProjs            = $newProjs            | ? {$misplacedProjs.id -notcontains $_.id}
-        $existingProjs       = $existingProjs       | ? {$misplacedProjs.id -notcontains $_.id}
+    Write-Host "`t[$($ProjsMatchedToClients.Count)]/[$($allProjTerms.Count)] Projs matched to Client Terms ([$($($ProjsMatchedToClients.Count)*100/$($allProjTerms.Count))]%) in [$($matchingProjsToClients.TotalSeconds)] seconds"
+    if($($ProjsMatchedToClients.Count) -lt $($allProjTerms.Count)){
+        [array]$misplacedProjs = $allProjTerms | ? {$ProjsMatchedToClients.id -notcontains $_.id}
+        Write-Host "`t`tThese [$($misplacedProjs.Count)] Projects don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term):"
+        @($misplacedProjs | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalProjName)][$($_.TermProjId)][$($_.NetSuiteClientId)]"}
         }
 
+
+    if($deltaSync -eq $true){
+        [array]$newProjs = $ProjsMatchedToClients | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
+        [array]$existingProjs = $ProjsMatchedToClients | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -eq $true}
+        }
+
+
+    if($deltaSync -eq $false){
+        $projComparison = Compare-Object -ReferenceObject @($ProjsMatchedToClients | Select-Object) -DifferenceObject @($driveItemsProjFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
+        [array]$newProjs = $projComparison | ? {$_.SideIndicator -eq "<="} 
+        [array]$existingProjs = $projComparison | ? {$_.SideIndicator -eq "=="}
+        #[array]$orphanedProjFolders = $projComparison | ? {$_.SideIndicator -eq "=>"}
+        }
         #endregion
 
         #region Orphaned Projects
+
     if($deltaSync -eq $false){
         $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 3000 -aadAppCreds $appCredsSharePointBot
 
@@ -1024,8 +975,7 @@ cls
             $thisNewProjTerm = $_
             $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 30 -aadAppCreds $appCredsSharePointBot
                 #Can we find a corresponding Opp?
-            $correspondingOpp = Compare-Object -ReferenceObject $allOppTerms -DifferenceObject $thisNewProjTerm -Property NetSuiteProjectId -ExcludeDifferent -IncludeEqual -PassThru
-            $correspondingOpp = set-standardisedClientDriveProperties -rawOppOrProjTerm $correspondingOpp -allClientTerms $allClientTerms
+            $correspondingOpp = Compare-Object -ReferenceObject $oppsMatchedToClients -DifferenceObject $thisNewProjTerm -Property NetSuiteProjectId -ExcludeDifferent -IncludeEqual -PassThru
             if(![string]::IsNullOrEmpty($correspondingOpp.DriveItemId)){
                 Write-Host "`t`tCorresponding Opp [$($correspondingOpp.UniversalOppName)][$($correspondingOpp.DriveClientId)][$($correspondingOpp.DriveItemId)] found for [$($thisNewProjTerm.UniversalProjName)][$($thisNewProjTerm.NetSuiteProjectId)][$($thisNewProjTerm.NetSuiteClientId)]"
                 try{
@@ -1113,9 +1063,9 @@ cls
             @($existingProjs | Select-Object) | % {
                 $thisExistingProj = $_
                 try{
-                    try{$thisExistingProjDriveItem = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisExistingProj.DriveClientId -itemGraphId $thisExistingProj.DriveItemId -returnWhat Item -ErrorAction Stop}        #Try to get the link DriveItem so we can test whether it needs updating
-                    catch{$thisExistingProjDriveItem = $null} #This is required to prevent the next itreration getting cross-linked with this DriveItem
-                    if([string]::IsNullOrEmpty($thisExistingProjDriveItem.id)){Write-Warning "`t`tOppDriveItem [$($thisExistingProj.UniversalProjName)][$($thisExistingProj.NetSuiteProjectId)] for [$($thisExistingProj.UniversalClientName)][$($thisExistingProj.NetSuiteClientId)] is missing. It might have been assigned to a different Client (which will be fixed on the next Full Reconcile), or it may have been manually moved/deleted."}
+                    try{$thisExistingProjDriveItem = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisExistingProj.DriveClientId -itemGraphId $thisExistingProj.DriveItemId -returnWhat Item -ErrorAction SilentlyContinue}        #Try to get the link DriveItem so we can test whether it needs updating
+                    catch{}
+                    if([string]::IsNullOrEmpty($thisExistingProjDriveItem.id)){Write-Warning "`t`tOppDriveItem [$($thisExistingProj.UniversalProjName)][$($thisExistingProj.NetSuiteProjectId)][$($thisExistingProj.Id)] for [$($thisExistingProj.UniversalClientName)][$($thisExistingProj.NetSuiteClientId)] is missing. It might have been assigned to a different Client (which will be fixed on the next Full Reconcile), or it may have been manually moved/deleted."}
                     elseif($(sanitise-forNetsuiteIntegration $thisExistingProjDriveItem.name) -ne $thisExistingProj.UniversalProjNameSanitised){
                         $thisExistingProjDriveItem | Add-Member -MemberType NoteProperty -Name DriveItemName -Value $thisExistingProjDriveItem.name -Force
                         $thisExistingProjDriveItem | Add-Member -MemberType NoteProperty -Name DriveItemId -Value $thisExistingProjDriveItem.id -Force
