@@ -164,3 +164,20 @@ Write-Host "Error: Too many modules were found, we couldn't find the one needed!
 }
 }
 
+#Update each module with emails of Registrant
+$allmodules = Get-PnPListItem -List $masterModuleList
+ForEach($module in $allmodules){
+
+#Get emails
+$registrantEmails = $module.FieldValues.RegistrantList.Email
+If($registrantEmails){
+$emailArray = convertTo-arrayOfEmailAddresses $registrantEmails
+    $formattedemails = @()
+    ForEach($email in $emailArray){
+    $emailtoadd = $email + ";"
+    $formattedemails += $emailtoadd
+    }
+    $formated
+Set-PnPListItem -List $masterModuleList -Identity $module.Id -Values @{"Registrant_x0020_Emails" = "$($formattedemails)"}
+}
+}
