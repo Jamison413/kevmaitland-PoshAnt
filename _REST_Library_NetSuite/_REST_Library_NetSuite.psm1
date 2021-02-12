@@ -995,7 +995,7 @@ function get-netSuiteEmployeesFromNetSuite(){
         [psobject]$netsuiteParameters
         )
 
-    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
+    Write-Verbose "`tget-netSuiteEmployeesFromNetSuite([$($query)])"
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
         $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
@@ -1003,8 +1003,8 @@ function get-netSuiteEmployeesFromNetSuite(){
 
     $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/" -netsuiteParameters $netsuiteParameters #-Verbose 
     $employeesEnumerated = [psobject[]]::new($employees.count)
-    for ($i=0; $i -lt $projects.count;$i++) {
-        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
         }
     $employeesEnumerated
     }
