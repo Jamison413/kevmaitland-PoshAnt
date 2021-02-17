@@ -91,7 +91,7 @@ $spmembers = Remove-PnPUserFromGroup -LoginName $($removedmember.InputObject) -I
 #                           #
 #############################
 
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients/" -UseWebLogin #-Credentials $adminCreds
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients/" -Credentials $adminCreds
 $DataManagerSPOGroupName = "External - SPO Authorised Data Managers"
 $MembersSPOGroupName = "External - Authorised Client Members"
 
