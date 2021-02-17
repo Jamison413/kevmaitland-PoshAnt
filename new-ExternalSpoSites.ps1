@@ -385,7 +385,7 @@ foreach ($currentRequest in $selectedRequests){
     }
     catch{$_}
     
-}
+
 
 
 <#Testing Jira Ticket#>
@@ -425,7 +425,7 @@ New-JiraIssue -Project ITC -IssueType 'Service Request' -Summary "$($summary)" -
 
 New-JiraServiceRequest -ITTeam Bristol -summary "New External Site Request: $($fullRequest.FieldValues.Title)" -description "External Site Requested by $($fullRequest.FieldValues.Site_x0020_Admin.Email)" -Verbose
     
- }
+}
 
 
 
