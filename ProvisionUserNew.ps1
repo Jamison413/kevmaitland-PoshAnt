@@ -212,6 +212,7 @@ Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor Whit
 #update employee extension info with graph
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"extensionType" = "employeeInfo"}
 
 #Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
 if($thisUser.FieldValues.WorkPhone){

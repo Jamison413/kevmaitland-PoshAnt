@@ -72,17 +72,31 @@ Import-Module _PNP_Library_SPO.psm1
 Import-Module _CSOM_Library-SPO.psm1
 Import-Module _PS_Library_UserManagement.psm1
 
+$Admin = "kimblebot@anthesisgroup.com"
+#convertTo-localisedSecureString "KimbleBotPasswordHere"
+$AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
 
-$groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
-$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
+$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+
+$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 connect-ToExo -credential $exoCreds
 
 
 #Conn - CSOM for SharepointUserID
+<#
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
 $spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
+#>
+#$sharePointAdmin = "emily.pressey@anthesisgroup.com"
+#$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
+$sharePointAdmin = "kimblebot@anthesisgroup.com"
+#convertTo-localisedSecureString "KimbleBotPasswordHere"
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
+
+
+$spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
+
 $peopleservicessite = "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/"
 $conn = Connect-PnPOnline -Url $peopleservicessite -Credentials $spoCreds
 $ctx = Get-PnPContext

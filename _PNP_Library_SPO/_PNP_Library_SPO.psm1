@@ -865,6 +865,9 @@ function set-standardSitePermissions(){
             [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
             [PSCustomObject]$tokenResponse
         ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
+            [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+            [PSCustomObject]$pnpAppCreds
+        ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupObject")]
             [PSCustomObject]$graphGroupExtended
         ,[parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
             [string]$groupId
@@ -884,31 +887,32 @@ function set-standardSitePermissions(){
             $graphGroupExtended = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId $unifiedGroupId
             if(!$graphGroupExtended){
                 Write-Error "Could not retrieve Unified Group from ID [$unifiedGroupId]"
-                break
+                return
                 }
             }
         }
     try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $graphGroupExtended.id -ErrorAction Stop -WarningAction Stop}
     catch{#Connect to the root site if we're not connected to anything
         Write-Verbose "Connecting to Graph"
-        Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
+        #Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
+         Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret
         $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $graphGroupExtended.id
         }
 
     if([string]::IsNullOrWhiteSpace([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))){ #This is a more reliable test than the UnifiedGroup.SharePointSiteUrl property as it populates /much/ faster
         Write-Error "Could not retrieve 365 Group URL from Group [$($graphGroupExtended.DisplayName)][$($graphGroupExtended.id)]. Exiting without attempting to check/set permissions"
-        break
+        return
         }
     else{Write-Verbose "SiteUrl for [$($graphGroupExtended.DisplayName)] is [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))] via Get-PnpUnifiedGroup"}
 
     #region Get connected to the Site
     try{
-        $userWasAlreadyASiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -accessToken $tokenResponse.access_token -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose:$VerbosePreference
+        $userWasAlreadyASiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -pnpAppCreds $teamBotDetails -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose:$VerbosePreference
         }
     catch{
         Write-Verbose "Error connecting to [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))] - cannot continue"
         $_
-        break
+        return
         }
     #endregion
 
@@ -994,22 +998,22 @@ function test-isUserSiteCollectionAdmin(){
             [string]$pnpSiteId
 
         ,[parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
-        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
-        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
-        [string]$accessToken = $true
+            [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+            [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+            [parameter(Mandatory = $true,ParameterSetName="SiteId")]
+            [psobject]$pnpAppCreds = $true
 
         ,[parameter(Mandatory = $true,ParameterSetName="pnpGroupObject")]
-        [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
-        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
-        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
-        [pscredential]$pnpCreds
+            [parameter(Mandatory = $true,ParameterSetName="UnifiedGroupId")]
+            [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+            [parameter(Mandatory = $true,ParameterSetName="SiteId")]
+            [pscredential]$pnpCreds
 
         ,[parameter(Mandatory = $false,ParameterSetName="pnpGroupObject")]
-        [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
-        [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
-        [parameter(Mandatory = $true,ParameterSetName="SiteId")]
-        [bool]$addPermissionsIfMissing = $false
+            [parameter(Mandatory = $false,ParameterSetName="UnifiedGroupId")]
+            [parameter(Mandatory = $true,ParameterSetName="pnpSiteObject")]
+            [parameter(Mandatory = $true,ParameterSetName="SiteId")]
+            [bool]$addPermissionsIfMissing = $false
         )
 
     Write-Verbose "test-isUserSiteCollectionAdmin [$($pnpUnifiedGroupObject.GroupId+$unifiedGroupId)]"
@@ -1019,7 +1023,8 @@ function test-isUserSiteCollectionAdmin(){
             Write-Verbose "`ttest-isUserSiteCollectionAdmin | We've been given a 365 Id, so we need the PnPUnifiedGroup object"
             try{$pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupId -ErrorAction Stop -WarningAction Stop}
             catch{#Connect to the root site if we're not connected to anything
-                Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
+                #Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
+                Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -ClientId $pnpAppCreds.ClientID -ClientSecret $pnpAppCreds.Secret
                 $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $unifiedGroupId
                 }
             if(!$pnpUnifiedGroupObject){

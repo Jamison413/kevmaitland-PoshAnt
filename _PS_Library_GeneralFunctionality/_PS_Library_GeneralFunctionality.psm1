@@ -1202,11 +1202,29 @@ function sanitise-forMicrosoftEmailAddress(){
     $cleanString = $cleanString.Replace("@.","@")
     $cleanString
     }
+function sanitise-forNetsuiteIntegration(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory =$true)]
+        [string]$dodgyString
+        )
+    $lessDodgyString = remove-diacritics -String $dodgyString
+    $prettyGoodString = $lessDodgyString -replace "[^A-Za-z0-9_ ]",""
+    $prettyGoodString.Replace(" ","").Replace(" ","").Replace(" ","")
+    }
 function sanitise-forPnpSharePoint($dirtyString){ 
     if([string]::IsNullOrWhiteSpace($dirtyString)){return}
     $cleanerString = sanitise-forSharePointStandard -dirtyString $dirtyString
     $cleanerString.Replace(":","").Replace("/","")
     if(@("."," ") -contains $dirtyString.Substring(($dirtyString.Length-1),1)){$dirtyString = $dirtyString.Substring(0,$dirtyString.Length-1)} #Trim trailing "."
+    }
+function sanitise-forSharePointFolderName(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$dirtyString
+        )
+    $dirtyString.Replace("`"","").Replace("*","").Replace(":","").Replace("<","").Replace(">","").Replace("?","").Replace("/","").Replace("\","").Replace("|","").TrimEnd(".")
     }
 function sanitise-forSharePointStandard($dirtyString){
     $dirtyString = $dirtyString.Trim()

@@ -1,15 +1,7 @@
-﻿<#
-
-This script is a part of the Anthesis Directory scripts, it will re-build both the staff directory list and POP: reporting lines list in Sharepoint.
-
-It's a good idea to halt the two scheduled tasks "Ant - Sync Directory 365 Changes" and "Ant - Sync Directory Change Requests" while the lists are rebuilding to stop the logs from being filled with errors. It should take around 20 minutes to rebuild both lists currently.
-
-#>
-
-
-Import-Module _PS_Library_Graph.psm1
+﻿Import-Module _PS_Library_Graph.psm1
 Import-Module _PNP_Library_SPO.psm1
 Import-Module _CSOM_Library-SPO.psm1
+Import-Module MicrosoftTeams
 Import-Module _PS_Library_UserManagement.psm1
 
 
@@ -52,13 +44,12 @@ ForEach($item in $allanthesians){
     delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $graphItemId
 
 }
-
-
-
 Write-Host "Getting all graph users..." -ForegroundColor Yellow
 #Get all graph users
 $usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true -Verbose
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
+
+
 
 #Iterate through each graph and Sharepoint profile to get key details, we will iterate through the Exchange profile at the end for efficiency (for timezone early)
 Write-Host "Getting key user details..." -ForegroundColor Yellow
@@ -135,7 +126,7 @@ $exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity 
 #Philippine's uses several timezone names
 If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
 $exoTimezone = New-Object -TypeName psobject @{
-"DisplayName" = "(UTC+08:00) $($graphuser.country) Standard Time"
+"DisplayName" = "(UTC+08:00) Philippine Standard Time"
 }
 }
 Else{
@@ -225,7 +216,6 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
-    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
 
   }
 }"
@@ -248,7 +238,6 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
-    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
 
   }
 }"
@@ -260,97 +249,5 @@ $response = Invoke-RestMethod -Uri "$graphQuery" -Body $body -ContentType "appli
 
 
 
-
-Write-Host "Emptying the POP: Reporting Lines list..." -ForegroundColor Yellow
-#Empty the Reporting list first
-$graphSiteId = "anthesisllc.sharepoint.com,cd82f435-8404-4c16-9ef5-c1e357ac5b96,2373d950-6dea-4ed5-9224-dea4c41c7da3"
-$reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
-$allreports = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $reportinglinesListId -expandAllFields
-$c = 0
-ForEach($item in $allreports){
-    $c++
-    $graphItemId = $item.id
-    Write-Host "Deleting item $($c)/$($allreports.count)" -ForegroundColor White
-    delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $graphItemId
-
-}
-
-
-Write-Host "Adding each user to the Reporting List..." -ForegroundColor Yellow
-#Add each user to the Directory
-$i = 1
-ForEach($user in $fullUsers){
-
-#Reset connection on 85th run
-$i++
-If($i -eq 85){
-Write-Host "Resetting the connection!" -ForegroundColor Green
-
-#Conn - Graph for overall user profile
-$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
-$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
-$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
-$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
-$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
-
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $clientID
-    Client_Secret = $secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
-
-$i = 1
-}
-
-#Conn - Graph for overall user profile
-$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
-$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
-$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
-$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
-$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
-
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $clientID
-    Client_Secret = $secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
-
-Write-Host "Adding $($user.graphuser.userPrincipalName) to the Directory" -ForegroundColor Yellow
-If($user.linemanager.Id){
-#Line manager
-$body = "{
-  `"fields`": {
-    `"AnthesianLookupId`": `"$($user.spouser.Id)`",
-    `"ManagerLookupId`": `"$($user.linemanager.Id)`",
-    `"ManagerEmail`": `"$($user.linemanager.Email)`",
-    `"Email`": `"$($user.graphuser.userPrincipalName)`",
-    `"UserGUID`": `"$($user.graphuser.id)`",
-    `"plaintextname`": `"$($user.graphuser.displayName)`",
-
-  }
-}"
-}
-Else{
-#No line manager
-$body = "{
-  `"fields`": {
-    `"AnthesianLookupId`": `"$($user.spouser.Id)`",
-    `"Email`": `"$($user.graphuser.userPrincipalName)`",
-    `"UserGUID`": `"$($user.graphuser.id)`",
-    `"plaintextname`": `"$($user.graphuser.displayName)`",
-
-  }
-}"
-}
-$graphQuery = "https://graph.microsoft.com/v1.0/sites/anthesisllc.sharepoint.com,cd82f435-8404-4c16-9ef5-c1e357ac5b96,2373d950-6dea-4ed5-9224-dea4c41c7da3/lists/42dca4b4-170c-4caf-bcfe-62e00cb62819/items"
-$body = [System.Text.Encoding]::UTF8.GetBytes($body)
-$response = Invoke-RestMethod -Uri "$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post -verbose
-}
 
 

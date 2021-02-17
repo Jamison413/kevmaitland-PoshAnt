@@ -861,8 +861,10 @@ function get-netSuiteClientsFromNetSuite(){
             }
         default {
             $customers = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/customer$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-            $customersEnumerated = [psobject[]]::new($customers.count)
+            #$customersEnumerated = [psobject[]]::new($customers.count)
+            [array]$customersEnumerated = @($null) * $customers.count
             for ($i=0; $i -lt $customers.count;$i++) {
+                write-progress -activity "Retrieving NetSuite Client details..." -Status "[$($i)]/[$($customers.count)]" -PercentComplete $(($i*100)/$customers.count)
                 if($i%100 -eq 0){Write-Verbose "[$($i)]/[$($customers.count)] ($($i / $customers.count)%)"}
                 $customersEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($customers.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
                 }
@@ -993,7 +995,7 @@ function get-netSuiteEmployeesFromNetSuite(){
         [psobject]$netsuiteParameters
         )
 
-    Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
+    Write-Verbose "`tget-netSuiteEmployeesFromNetSuite([$($query)])"
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
         $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
@@ -1001,8 +1003,8 @@ function get-netSuiteEmployeesFromNetSuite(){
 
     $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/" -netsuiteParameters $netsuiteParameters #-Verbose 
     $employeesEnumerated = [psobject[]]::new($employees.count)
-    for ($i=0; $i -lt $projects.count;$i++) {
-        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
         }
     $employeesEnumerated
     }
@@ -1031,7 +1033,8 @@ function get-netSuiteOpportunityFromNetSuite(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
+        [AllowEmptyString()] 
+        [ValidatePattern('^?[\w+][=][\w+]|^$')]
         [string]$query
 
         ,[parameter(Mandatory=$false)]
@@ -1045,8 +1048,10 @@ function get-netSuiteOpportunityFromNetSuite(){
         }
 
     $opportunities = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/opportunity$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $opportunitiesEnumerated = [psobject[]]::new($opportunities.count)
+    #$opportunitiesEnumerated = [psobject[]]::new($opportunities.count)
+    [array]$opportunitiesEnumerated = @($null) * $opportunities.count
     for ($i=0; $i -lt $opportunities.count;$i++) {
+        write-progress -activity "Retrieving NetSuite Opportunity details..." -Status "[$($i)]/[$($opportunities.count)]" -PercentComplete $(($i*100)/$opportunities.count)
         $opportunitiesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $opportunities.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
         }
     $opportunitiesEnumerated
@@ -1131,7 +1136,7 @@ function get-netSuiteProjectFromNetSuite(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
+        [ValidatePattern('^?[\w+][=][\w+]|^$')]
         [string]$query
 
         ,[parameter(Mandatory=$false)]
@@ -1145,8 +1150,10 @@ function get-netSuiteProjectFromNetSuite(){
         }
 
     $projects = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/job$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $projectsEnumerated = [psobject[]]::new($projects.count)
+    #$projectsEnumerated = [psobject[]]::new($projects.count)
+    [array]$projectsEnumerated = @($null) * $projects.Count
     for ($i=0; $i -lt $projects.count;$i++) {
+        write-progress -activity "Retrieving NetSuite Project details..." -Status "[$($i)]/[$($projects.count)]" -PercentComplete $(($i*100)/$projects.count)
         $projectsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $projects.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
         }
     $projectsEnumerated
@@ -1287,34 +1294,43 @@ function invoke-netSuiteRestMethod(){
 
     Write-Verbose "Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $(stringify-hashTable $netsuiteRestHeaders) -Method $requestType -ContentType application/swagger+json -Body $(stringify-hashTable $requestBodyHashTable)"
     if($requestType -eq "GET"){
-        $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json" #-Proxy 'http://127.0.0.1:8888'
-        if($partialDataset.totalResults -ne $partialDataset.count){ #If the query has been paginated
-            if($partialDataset.offset -eq 0){
-                $fullDataSet = New-Object object[] $partialDataSet.totalResults
-                Write-Verbose "`$fullDataSet.count = [$($fullDataSet.Count)]"
-                }
-            do{
-                for($i = 0; $i -lt $partialDataset.count; $i++){ #Fill $fullDataset with the contents of $partialDataset
-                    $fullDataset[$i+$partialDataset.offset] = $partialDataset.items[$i]
-                    if($i%100 -eq 0){Write-Verbose "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)] ($([System.Math]::Floor(($i+$partialDataset.offset)*100 / $partialDataSet.totalResults))%)"}
+        try{
+            $partialDataset = Invoke-RestMethod -Uri $([uri]::EscapeUriString($url)) -Headers $netsuiteRestHeaders -Method $requestType -ContentType "application/swagger+json" #-Proxy 'http://127.0.0.1:8888'
+            if($partialDataset.totalResults -ne $partialDataset.count){ #If the query has been paginated
+                if($partialDataset.offset -eq 0){
+                    $fullDataSet = New-Object object[] $partialDataSet.totalResults
+                    Write-Verbose "`$fullDataSet.count = [$($fullDataSet.Count)]"
                     }
-                $nextUrl = [uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href) #Check if there are more results to retrieve
-                if([string]::IsNullOrWhiteSpace($nextUrl)){}#$partialDataset.links.rel | % {Write-Verbose $_}}
-                else{
-                    Write-Verbose "`tNext URL: [$($nextUrl)] (parameters [$($parameters)])"
-                    if($nextUrl -match "limit=" -and $parameters -match "limit="){$parameters = $($parameters -replace '(?<=(^limit=))\w*(?=(&))','').Replace("limit=","") -replace '^&',''} #Trim off any leading limit parameter from the previous iteration
-                    if($nextUrl -match "limit=" -and $parameters -match "offset="){$parameters = $($parameters -replace '(?<=(^offset=))\w*(?=(&))','').Replace("offset=","") -replace '^&',''} #Trim off any leading offset parameter from the previous iteration
-                    if(![string]::IsNullOrWhiteSpace($parameters)){$nextUrl = "$nextUrl&$parameters"} #Weirldy links.next.href doesn't include the original query, so this will [Index was outside the bounds of the array.] if we don't resupply it manually
-                    Write-Verbose "`tUpdated URL: [$($nextUrl)] (parameters [$($parameters)])"
-                    $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $nextUrl -netsuiteParameters $netsuiteParameters
+                do{
+                    for($i = 0; $i -lt $partialDataset.count; $i++){ #Fill $fullDataset with the contents of $partialDataset
+                        $fullDataset[$i+$partialDataset.offset] = $partialDataset.items[$i]
+                        if($i%100 -eq 0){
+                            Write-Verbose "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)] ($([System.Math]::Floor(($i+$partialDataset.offset)*100 / $partialDataSet.totalResults))%)"
+                            write-progress -activity "Retrieving results from [$($url)]" -Status "[$($i+$partialDataset.offset)]/[$($partialDataSet.totalResults)]" -PercentComplete $(($i+$partialDataset.offset*100)/$partialDataSet.totalResults)
+                            }
+                        }
+                    $nextUrl = [uri]::EscapeUriString($($partialDataset.links | ? {$_.rel -eq "next"}).href) #Check if there are more results to retrieve
+                    if([string]::IsNullOrWhiteSpace($nextUrl)){}#$partialDataset.links.rel | % {Write-Verbose $_}}
+                    else{
+                        Write-Verbose "`tNext URL: [$($nextUrl)] (parameters [$($parameters)])"
+                        if($nextUrl -match "limit=" -and $parameters -match "limit="){$parameters = $($parameters -replace '(?<=(^limit=))\w*(?=(&))','').Replace("limit=","") -replace '^&',''} #Trim off any leading limit parameter from the previous iteration
+                        if($nextUrl -match "limit=" -and $parameters -match "offset="){$parameters = $($parameters -replace '(?<=(^offset=))\w*(?=(&))','').Replace("offset=","") -replace '^&',''} #Trim off any leading offset parameter from the previous iteration
+                        if(![string]::IsNullOrWhiteSpace($parameters)){$nextUrl = "$nextUrl&$parameters"} #Weirldy links.next.href doesn't include the original query, so this will [Index was outside the bounds of the array.] if we don't resupply it manually
+                        Write-Verbose "`tUpdated URL: [$($nextUrl)] (parameters [$($parameters)])"
+                        $partialDataset = invoke-netSuiteRestMethod -requestType $requestType -url $nextUrl -netsuiteParameters $netsuiteParameters
+                        }
                     }
-                }
-            while($partialDataset.hasMore -eq $true)
+                while($partialDataset.hasMore -eq $true)
 
-            $partialDataset.items = $fullDataset
-            $partialDataset.count = $partialDataset.items.count
+                $partialDataset.items = $fullDataset
+                $partialDataset.count = $partialDataset.items.count
+                }
+            $partialDataset
             }
-        $partialDataset            
+        catch{
+            if($_.Exception -match "401"){Write-Warning "401: Unauthorised access attempt to [$($url)]"}
+            else{get-errorSummary -errorToSummarise $_}
+            }
         }
     else{
         if($requestType -ne "DELETE"){

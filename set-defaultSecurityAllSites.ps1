@@ -7,7 +7,7 @@ if($PSCommandPath){
     }
 
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 #$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\desktop\teambotdetails.txt"
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
@@ -22,22 +22,25 @@ $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredentia
 #$sharePointCreds = set-MsolCredentials
 
 #connect-ToExo -credential $exoCreds
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $sharePointCreds
+#Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $sharePointCreds
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret
 
 $groupAdmins = get-groupAdminRoleEmailAddresses -tokenResponse $tokenResponse 
 
 $allUnifiedGroups = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -selectAllProperties #-filterDisplayName "Climate & Decarbonisation Community (GBR)"
 $excludeThese = @("teamstestingteam@anthesisgroup.com","apparel@anthesisgroup.com","AccountsPayable@anthesisgroup.com")
 $groupsToProcess = $allUnifiedGroups | ? {$excludeThese -notcontains $_.mail -and $_.Displayname -notmatch "Confidential"}
-$groupsToProcess | % {
+for($j=0; $j -lt $groupsToProcess.Count; $j++){
+    Write-Progress -Activity "Process security on 365 Groups" -Status "[$j]/[$($groupsToProcess.Count)]"
     $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails
-    $thisUnifiedGroup = $_
-    Write-Host -f Yellow "[$($thisUnifiedGroup.displayName)][$($thisUnifiedGroup.id)][$($thisUnifiedGroup.mail)]"
+    $thisUnifiedGroup = $groupsToProcess[$j]
+    Write-Host -f Yellow "[$j]/[$($groupsToProcess.Count)]: [$($thisUnifiedGroup.displayName)][$($thisUnifiedGroup.id)][$($thisUnifiedGroup.mail)]"
     Try{
         $error.Clear()
-        set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $thisUnifiedGroup -pnpCreds $sharePointCreds -ErrorVariable Whoops -Verbose #-suppressEmailNotifications -Verbose:$VerbosePreference
+        set-standardSitePermissions -tokenResponse $tokenResponse -pnpAppCreds $teamBotDetails -graphGroupExtended $thisUnifiedGroup -pnpCreds $sharePointCreds -ErrorVariable Whoops -Verbose #-suppressEmailNotifications -Verbose:$VerbosePreference
         }
     Catch{
+        Write-Host -f Red $(get-errorSummary $_)
         Write-Warning "Something went wrong processing [$($thisUnifiedGroup.displayName)][$($thisUnifiedGroup.id)][$($thisUnifiedGroup.mail)]"
         [string]$body ="<UL>"
         $thisUnifiedGroup.PSObject.Properties | ? {$_.Name -ne "anthesisgroup_UGSync"} | % {
