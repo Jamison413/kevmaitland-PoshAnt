@@ -1,6 +1,6 @@
-﻿#----- To do -----#
-
-# automated expired manager removal
+﻿$Logname = "C:\ScriptLogs" + "\report-data Managers $(Get-Date -Format "yyMMdd").log"
+Start-Transcript -Path $Logname -Append
+Write-Host "Script started:" (Get-date)
 
 
 #Try{
@@ -424,4 +424,5 @@ Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com
 #endregion
 
 
+Stop-Transcript
 

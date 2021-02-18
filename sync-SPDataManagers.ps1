@@ -1,9 +1,14 @@
-﻿$Logname = "C:\Scripts" + "\Logs" + "\sync-SPDataManagers $(Get-Date -Format "yyMMdd").log"
+﻿$Logname = "C:\ScriptsLogs" + "\sync-SPDataManagers $(Get-Date -Format "yyMMdd").log"
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
 Import-Module _PNP_Library_SPO
 Import-Module _PS_Library_Graph
+Remove-Module PnP.PowerShell
+Import-Module SharePointPnPPowerShellOnline
+Remove-Module SharePointPnPPowerShellOnline
+import-Module PnP.PowerShell
+
 
 #For pnp (Graph can't manage Sharepoint groups currently)
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
@@ -43,10 +48,10 @@ Write-Host "Clients (unrestircted) - Modify is already clean ('ish)" -Foreground
 
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub/" -Credentials $adminCreds
 $DataManagerSPOGroupName = "Internal - SPO Authorised Data Managers"
-$MembersSPOGroupName = "Internal - SPO Authorised TeamHub Members "
+$MembersSPOGroupName = "Internal - SPO Authorised TeamHub Members"
 
-$internalcurrentspdatamanagers = Get-PnPGroupMembers -Identity $DataManagerSPOGroupName
-$internalcurrentspmembers = Get-PnPGroupMembers -Identity $MembersSPOGroupName
+$internalcurrentspdatamanagers = Get-PnPGroupMember -Identity $DataManagerSPOGroupName
+$internalcurrentspmembers = Get-PnPGroupMember -Identity $MembersSPOGroupName
 
 #We just compare and add/remove any new members
 
@@ -77,7 +82,7 @@ $removedmembers = Compare-Object -ReferenceObject $clientsModifyMembers.mail -Di
 $removedmembers = $removedmembers | Where-Object -property "inputObject" -ne "T1-Emily.Pressey@anthesisgroup.com" #this account is the Group Owner (can't add domain groups)
 ForEach($removedmember in $removedmembers){
 Write-Host "Removed Member: Removing $($removedmember.InputObject) from $($MembersSPOGroupName)" -ForegroundColor Yellow
-$spmembers = Remove-PnPUserFromGroup -LoginName $($removedmember.InputObject) -Identity $MembersSPOGroupName
+$spmembers = Remove-PnPUserFromGroup  -LoginName $($removedmember.InputObject) -Identity $MembersSPOGroupName
 }
 
 
@@ -95,8 +100,8 @@ Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients/" -Credential
 $DataManagerSPOGroupName = "External - SPO Authorised Data Managers"
 $MembersSPOGroupName = "External - Authorised Client Members"
 
-$externalcurrentspdatamanagers = Get-PnPGroupMembers -Identity $DataManagerSPOGroupName
-$externalcurrentspmembers = Get-PnPGroupMembers -Identity $MembersSPOGroupName
+$externalcurrentspdatamanagers = Get-PnPGroupMember -Identity $DataManagerSPOGroupName
+$externalcurrentspmembers = Get-PnPGroupMember -Identity $MembersSPOGroupName
 
 #We just compare and add/remove any new members to the two Sharepoint groups - external
 
