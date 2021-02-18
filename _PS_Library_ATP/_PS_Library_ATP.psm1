@@ -120,6 +120,28 @@ function get-atpSoftware(){
 
     invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/software" -Verbose:$VerbosePreference
     }
+function get-atpLogonUsers(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$machineID        
+        
+        )
+    invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines/$($machineID)/logonusers" -Verbose:$VerbosePreference
+    }
+function get-atpMachinesbySoftware(){
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+       ,[parameter(Mandatory = $true)]
+            [string]$softwareID        
+        )
+
+    invoke-atpGet -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/software/$($softwareID)/machineReferences " -Verbose:$VerbosePreference
+    }
 function invoke-atpGet(){
     [cmdletbinding()]
     param(
@@ -217,3 +239,7 @@ $tag = @{
 $tokenResponseIntuneBotAtp = get-atpTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName IntuneBot) -grant_type client_credentials 
 invoke-atpPost -tokenResponse $tokenResponseIntuneBotAtp -atpQuery "/machines/$($deviceid)/tags" -atpBodyHashtable $tag -Verbose:$true
 }
+
+
+
+
