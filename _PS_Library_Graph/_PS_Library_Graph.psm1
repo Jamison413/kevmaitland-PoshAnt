@@ -1208,6 +1208,60 @@ function get-graphteamsitedetails(){
     Find id's of Sharepoint sites and Document Libraries easily to save a few clicks
     #>
     }
+function get-graphteamstructure(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $false)]
+            [string]$filter365DisplayName
+        ,[parameter(Mandatory = $false)]
+            [string]$filter365UPN
+        )
+
+if(![string]::IsNullOrWhiteSpace($filter365DisplayName)){
+
+    $365 = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName $filter365DisplayName
+    If($365){
+        $managers = @( get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.dataManagerGroupId -memberType Members)
+        $members = @(get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.memberGroupId -memberType Members)
+    
+        Write-Host -f Cyan "$($team)"
+        Write-Host -f White "Data Managers:"
+        ForEach($manager in $managers){
+        Write-Host -f DarkYellow "$($manager.userPrincipalName)"
+        }
+        Write-Host -f White "Members:"
+        ForEach($member in $members){
+        Write-Host -f DarkYellow "$($member.userPrincipalName)"
+        }
+    }
+    Else{
+        Write-Host "$($filter365DisplayName): 365 group not found" -ForegroundColor Red
+    }
+}
+if(![string]::IsNullOrWhiteSpace($filter365UPN)){
+    $365 = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $filter365UPN
+    If($365){
+        $managers = @( get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.dataManagerGroupId -memberType Members)
+        $members = @(get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.memberGroupId -memberType Members)
+    
+        Write-Host -f Cyan "$($team)"
+        Write-Host -f DarkYellow "Data Managers:"
+        ForEach($manager in $managers){
+        Write-Host -f White "$($manager.userPrincipalName)"
+        }
+        Write-Host -f DarkYellow "Members:"
+        ForEach($member in $members){
+        Write-Host -f White "$($member.userPrincipalName)"
+        }
+    }
+    Else{
+        Write-Host "$($filter365UPN): group not found" -ForegroundColor Red
+    }
+
+}
+}
 function get-graphTokenResponse{
      [cmdletbinding()]
     param(
