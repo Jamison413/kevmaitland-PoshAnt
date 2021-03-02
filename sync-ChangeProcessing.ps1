@@ -1,5 +1,5 @@
 ﻿$logFileLocation = "C:\ScriptLogs\"
-$transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))_Transcript_$(Get-Date -Format "yyMMdd").log"
+$transcriptLogName = "$($logFileLocation)"+"Sync-ChangeProcessing_Transcript_$(Get-Date -Format "yyMMdd").log"
 if ([string]::IsNullOrEmpty($MyInvocation.ScriptName)){
     $fullLogPathAndName = $logFileLocation+"PeopleServices_FullLog_$(Get-Date -Format "yyMMdd").log"
     $errorLogPathAndName = $logFileLocation+"PeopleServices_ErrorLog_$(Get-Date -Format "yyMMdd").log"
