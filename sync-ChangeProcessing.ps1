@@ -29,13 +29,14 @@ $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 
 
 #Jira
-$credential = Import-CliXml -Path 'C:\Users\Admin\Desktop\JiraPS.xml'
+$jiraCreds = import-encryptedCsv -pathToEncryptedCsv 'C:\Users\Netmin\Desktop\JiraDetails.txt'
+$jiraPsCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $jiraCreds.UserName, $(ConvertTo-SecureString -AsPlainText $jiraCreds.Password -Force)
+Set-JiraConfigServer 'https://anthesisit.atlassian.net'
+New-JiraSession -Credential $jiraPsCreds 
 
 
 <#--------------Connect to Jira--------------#>
 
-Set-JiraConfigServer 'https://anthesisit.atlassian.net'
-New-JiraSession -Credential $credential
 
 
 #######################################################################################
