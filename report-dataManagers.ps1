@@ -6,7 +6,7 @@ Write-Host "Script started:" (Get-date)
 #Try{
 #We need Groupbot to manage Mail-Enabled Distribution Group membership (still unavailable via Graph [https://microsoftgraph.uservoice.com/forums/920506-microsoft-graph-feature-requests/suggestions/39551191-add-an-endpoint-to-allow-managing-mail-enabled-sec])
 $groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$groupAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\GroupBot.txt") 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $exoCreds
 
@@ -213,7 +213,7 @@ $newauthorisedDataManagers | % {
 #Notify authorised Data Managers who don't own any sites that they can own sites, and to get in touch with the IT Team.
 $authorisedButUnassignedDataManagers | ? {$newAuthorisedDataManagers.mail -notcontains $_.mail} | % { #Don't double-message new recruits
     $thisUser = $_
-    if($thisUser.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddMonths(-1)){ #Stop spamming users who trained > 1 month ago
+    if($thisUser.FieldValues.Date_x0020_of_x0020_training -ge $(Get-Date).AddDays(-1)){ #Stop spamming users who trained > 1 month ago
         write-host "Emailing $($thisUser.FieldValues.User.Email) that they don't own any sites that they can own sites, and to get in touch with the IT Team" -ForegroundColor Yellow
         $nudgeBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
         $nudgeBodyTrunk += "It looks like you attended Data Manager training on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy") but you haven't been allocated as a Data Manager of any teams yet.<BR><BR>`r`n`r`n"
@@ -246,7 +246,7 @@ $expiringSoonDataManagers | % {
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
     Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To $thisUser.FieldValues.User.Email  -Encoding UTF8
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To "emily.pressey@anthesisgroup.com"  -Encoding UTF8
-    #Set-PnPListItem -List "User Training Records" -Identity $thisUser.Id -Values @{"LastReminderEmailSent" = "$(get-date)"}
+    Set-PnPListItem -List "User Training Records" -Identity $thisUser.Id -Values @{"LastReminderEmailSent" = "$(get-date)"}
     }
 
     #1 month and 2 weeks remaining message
@@ -265,7 +265,7 @@ $expiringSoonDataManagers | % {
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
     Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To $thisUser.FieldValues.User.Email  -Encoding UTF8
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To "emily.pressey@anthesisgroup.com"  -Encoding UTF8
-    #Set-PnPListItem -List "User Training Records" -Identity $thisUser.Id -Values @{"LastReminderEmailSent" = "$(get-date)"}        
+    Set-PnPListItem -List "User Training Records" -Identity $thisUser.Id -Values @{"LastReminderEmailSent" = "$(get-date)"}        
     }
         
     }
