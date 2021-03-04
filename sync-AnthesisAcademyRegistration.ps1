@@ -9,6 +9,11 @@ Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
 Import-Module _PNP_Library_SPO
+Remove-Module PnP.PowerShell
+Import-Module SharePointPnPPowerShellOnline
+Remove-Module SharePointPnPPowerShellOnline
+import-Module PnP.PowerShell
+
 
 
 $Admin = "kimblebot@anthesisgroup.com"
@@ -21,7 +26,7 @@ Connect-AzureAD -credential $adminCreds
 connect-toAAD -credential $adminCreds
 
 #Connect to the People Services site
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/" -Credentials $adminCreds
+$pnpconnect = Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/" -Credentials $adminCreds
 
 $registrantProcessingList = "Anthesis Academy: Registrant Processing List"
 $masterModuleList = "Anthesis Academy: Master Module List" 
@@ -35,6 +40,7 @@ ForEach($moduleitem in $allmodules){
   If(!($moduleitem.FieldValues.ModuleCode)){
     
     #Generate code
+    Write-Host "Generating new module code for $($moduleitem.FieldValues.ModuleName)" -ForegroundColor Yellow
     $generatemodulecode = "$($moduleitem.Id)" + "_" + (($moduleitem.FieldValues.Created_x0020_Date).Split("T")[0]) + "_" + (($moduleitem.FieldValues.ModuleName).Replace(" ",""))
 
     #If no module code, check no duplicates and add one, add to complete list also
@@ -56,15 +62,57 @@ Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
   }
 }
 
+#There is a race condition from the Flow as it will overwrite a Powershell change to a field if it gets approved after (we can't cancel approval flows...), so we process Closed Modules first if they've reached their max registrant count > then registrants for closed modules > then anyone waiting to be processed
+
+#close modules that have hit their max registrant count
+$allmodules = Get-PnPListItem -List $masterModuleList
+ForEach($module in $allmodules){
+
+#If they've hit their max registrant count
+$isMaxCount = $module.FieldValues.MaxRegistrantAmount -eq $module.FieldValues.RegistrantCount
+If(($isMaxCount -eq "True") -and ($module.FieldValues.Status -eq "Sign Up Live")){
+#close the module
+Write-Host "$($module.FieldValues.ModuleName): Max registrant count reached...Closing sign up" -ForegroundColor Cyan
+$closemodule = Set-PnPListItem -list $masterModuleList -Identity $module.Id -Values @{"Status" = "Closed"} 
+}
+
+}
 
 #Sync Anthesis Academy Registrants
 
 
-#Just a note: on the Registrant prcoessing list there are two 'trigger' columns, Processed (Powershell) and FlowProcessed (Flow). On Flow, if there is a 1 we are still waiting for the Line Manager to approve registration, after approval this column will be set to 0 indicating no outstanding actions waiting.
-#On approval, Flow also sets the Powershell 'processed' column to 1, which we will pick up below, process it and set it to 0 if nothing went wrong.
+#Just a note: on the Registrant processing list there are two 'trigger' columns, Processed (Powershell) and FlowProcessed (Flow).
+
+#Clean out registrants for closed modules (might have been waiting for approval)
+$allmodules = Get-PnPListItem -List $masterModuleList #re-get the modules we might have processed above so its up to date
+$allregistrants = Get-PnPListItem -List $registrantProcessingList
+$allnonwaitingregistrants = $allregistrants.Where({($_.FieldValues.FlowProcessed -eq "Waiting for Approval") -or ($_.FieldValues.FlowProcessed -eq "Approved - Waiting to be Processed as Registrant")})
+ForEach($nonwaitingregistrant in $allnonwaitingregistrants){
+
+#Find the corresponding module for the registrant
+$thisRegistrantModule = $allmodules.where({$_.FieldValues.ModuleCode -eq $nonwaitingregistrant.FieldValues.ModuleCode})
+    #If the Module is closed, reject it
+    If($thisRegistrantModule.FieldValues.Status -eq "Closed"){
+    Write-Host "Rejecting $($nonwaitingregistrant.FieldValues.RegistrantName.Email) for Module $($thisRegistrantModule.FieldValues.ModuleName), Module code $($thisRegistrantModule.FieldValues.ModuleCode): Module $($thisRegistrantModule.FieldValues.Status)" -ForegroundColor Yellow
+    $rejectRegistrant = Set-PnPListItem -List $registrantProcessingList -Identity $nonwaitingregistrant.Id -Values @{"Processed" = "Module Closed - Cannot Process"; "FlowProcessed" = "Module Closed - Cannot Process"}
+
+    #For those who were waiting approval or got caught waiting for processing and were addedd too late
+    $body = "<HTML><BODY><p>Hi $($nonwaitingregistrant.FieldValues.RegistrantName.LookupValue),</p>
+    <p>Unfortunately, we couldn't sign you up for the Anthesis Academy module <b>$($thisRegistrantModule.fieldvalues.ModuleName)</b> as we didn't receive Line Manager approval before sign up close.</p>
+    <p>The module may be re-run in the future, please keep visiting the <a href='https://anthesisllc.sharepoint.com/sites/Resources-HR/SitePages/Anthesis-Academy.aspx?source=https%3a//anthesisllc.sharepoint.com/sites/Resources-HR/SitePages/Forms/ByAuthor.aspx'>Anthesis Academy page</a> to see newly listed Modules.<br><br></p>
+    <p></p>
+    <p>The Anthesis Academy</p>
+    </BODY></HTML>"
+     Send-MailMessage  -BodyAsHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+     #Send-MailMessage  -BodyAsHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)" -to "emily.pressey@anthesisgroup.com" -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+    }
+
+}
 
 
-$allnewregistrants = Get-PnPListItem -List $registrantProcessingList  -Query "<View><Query><Where><Eq><FieldRef Name='Processed'/><Value Type='Text'>Approved - Waiting to be Processed as Registrant</Value></Eq></Where></Query></View>"
+$allnewregistrants = Get-PnPListItem -List $registrantProcessingList  -Query "<View><Query><Where><Eq><FieldRef Name='FlowProcessed'/><Value Type='Text'>Approved - Waiting to be Processed as Registrant</Value></Eq></Where></Query></View>"
+#$allnewregistrants = $allnewregistrants.where({$_.FieldValues.Processed -ne "Module Full - Cannot Process"})
+
 ForEach($newregistrant in $allnewregistrants){
 
 #Doublecheck we aren't processing a non-approved registrant (looking at the Flow column)
@@ -74,14 +122,14 @@ Write-Host "We shouldn't be processing this registrant, they are unapproved by l
         $report += "***************Errors found in Anthesis Academy Sync: Powershell is trying to process an Unapproved Registrant***************" + "<br><br>"
         $report += "Weird - it's $($newregistrant.FieldValues.RegistrantName.Email). ID $($newregistrant.Id). This shouldn't be happening!" + "<br><br>"       
         $report = $report | out-string
-#Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
 }
 
 
 ###Update the list item in the Anthesis Academy: Master Module List by looking up the Module Code###
 
 #Get the Module list each time we iterate to get the most up to date registrant list and count
-$alllivemodules = Get-PnPListItem -List $masterModuleList
+$alllivemodules = Get-PnPListItem -List $masterModuleList -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='Text'>Sign Up Live</Value></Eq></Where></Query></View>"
 
 #Get the module (check we only brought back 1) and check it's live and as a last ditch attempt check that the Max registration count hasn't been reached - if so something is wrong in PowerApps
 $thismodule = $alllivemodules.where({$_.FieldValues.ModuleCode -eq $newregistrant.FieldValues.ModuleCode})
@@ -160,7 +208,7 @@ Else{
 }
 }
 Else{
-Write-Host "Error: Too many modules were found, we couldn't find the one needed! There are likely to be duplicate Module Codes in the list" -ForegroundColor Red
+Write-Host "Error: $($thismodule) Too many modules were found, we couldn't find the one needed! There are likely to be duplicate Module Codes in the list" -ForegroundColor Red
 }
 }
 
@@ -178,6 +226,8 @@ $emailArray = convertTo-arrayOfEmailAddresses $registrantEmails
     $formattedemails += $emailtoadd
     }
     $formated
-Set-PnPListItem -List $masterModuleList -Identity $module.Id -Values @{"Registrant_x0020_Emails" = "$($formattedemails)"}
+$updateModuleEmailList = Set-PnPListItem -List $masterModuleList -Identity $module.Id -Values @{"Registrant_x0020_Emails" = "$($formattedemails)"}
 }
 }
+
+
