@@ -31,7 +31,7 @@ $pnpconnect = Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/P
 $registrantProcessingList = "Anthesis Academy: Registrant Processing List"
 $masterModuleList = "Anthesis Academy: Master Module List" 
 $modulecompletelist = "Anthesis Academy: Module Completion Record"
-
+$ITTraininglist = "Anthesis Academy: IT Training"
 
 #Generate new module codes
 $allmodules = Get-PnPListItem -List $masterModuleList
@@ -77,6 +77,23 @@ $closemodule = Set-PnPListItem -list $masterModuleList -Identity $module.Id -Val
 }
 
 }
+
+#Clean up old events in IT Training (as we have no team management of this in SPO, this will save some time)
+$ITTrainingEvents = Get-PnPListItem -List $ITTraininglist
+ForEach($currentevent in $ITTrainingEvents){
+
+$isitaftertheevent = New-TimeSpan -Start (get-date) -End $currentevent.FieldValues.Start_x0020_Time
+    If($isitaftertheevent.Minutes -lt -5){
+    Write-Host "$($currentevent.FieldValues.Training_x0020_Session): $($currentevent.FieldValues.Start_x0020_Time) - looks like this event is old and has passed, we'll remove it" -ForegroundColor Yellow
+    $isitaftertheevent.Minutes
+    $removepastevent = Remove-PnPListItem -List $ITTraininglist -Identity $currentevent.Id -Recycle -Force
+    }
+
+}
+
+
+
+
 
 #Sync Anthesis Academy Registrants
 
@@ -229,5 +246,4 @@ $emailArray = convertTo-arrayOfEmailAddresses $registrantEmails
 $updateModuleEmailList = Set-PnPListItem -List $masterModuleList -Identity $module.Id -Values @{"Registrant_x0020_Emails" = "$($formattedemails)"}
 }
 }
-
 
