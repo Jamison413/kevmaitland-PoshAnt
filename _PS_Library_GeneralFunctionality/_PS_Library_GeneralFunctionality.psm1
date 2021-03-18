@@ -931,7 +931,7 @@ function get-microsoftProductInfo(){
         @("DYNAMICS 365 FOR SALES ENTERPRISE EDITION","DYNAMICS 365 FOR SALES ENTERPRISE EDITION","DYN365_ENTERPRISE_SALES","1e1a282c-9c54-43a2-9310-98ef728faace","DYNAMICS 365 FOR SALES ENTERPRISE EDITION"),
         @("DYNAMICS 365 FOR TEAM MEMBERS ENTERPRISE EDITION","DYNAMICS 365 FOR TEAM MEMBERS ENTERPRISE EDITION","DYN365_ENTERPRISE_TEAM_MEMBERS","8e7a3d30-d97d-43ab-837c-d7701cef83dc","DYNAMICS 365 FOR TEAM MEMBERS ENTERPRISE EDITION"),
         @("DYNAMICS 365 UNF OPS PLAN ENT EDITION","DYNAMICS 365 UNF OPS PLAN ENT EDITION","Dynamics_365_for_Operations","ccba3cfe-71ef-423a-bd87-b6df3dce59a9","DYNAMICS 365 UNF OPS PLAN ENT EDITION"),
-        @("Security","ENTERPRISE MOBILITY + SECURITY E3","EMS","efccb6f7-5641-4e0e-bd10-b4976e1bf68e","Enterprise Mobility + Security (E3) (CSP)"),
+        @("EMS","ENTERPRISE MOBILITY + SECURITY E3","EMS","efccb6f7-5641-4e0e-bd10-b4976e1bf68e","Enterprise Mobility + Security (E3) (CSP)"),
         @("ENTERPRISE MOBILITY + SECURITY E5","ENTERPRISE MOBILITY + SECURITY E5","EMSPREMIUM","b05e124f-c7cc-45a0-a6aa-8cf78c946968","ENTERPRISE MOBILITY + SECURITY E5"),
         @("EXCHANGE ONLINE (PLAN 1)","EXCHANGE ONLINE (PLAN 1)","EXCHANGESTANDARD","4b9405b0-7788-4568-add1-99614e613b69","EXCHANGE ONLINE (PLAN 1)"),
         @("EXCHANGE ONLINE (PLAN 2)","EXCHANGE ONLINE (PLAN 2)","EXCHANGEENTERPRISE","19ec0d23-8335-4cbd-94ac-6050e30712fa","EXCHANGE ONLINE (PLAN 2)"),
@@ -1054,6 +1054,53 @@ function get-unformattedTimeZone ($pFormattedTimeZone){
     else{
         #$pFormattedTimeZone.Split("(")[1].Replace(")","").Trim()
         [regex]::Match($pFormattedTimeZone,"\(([^)]+)\)").Groups[1].Value #Get everything between "(" and ")"
+        }
+    }
+function grant-ownership {
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+		    [string]$fullPath
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet(“File”,”Folder”)] 
+		    [string]$itemType
+        ,[parameter(Mandatory = $true)]
+            [string[]]$securityPrincipalsToGrantOwnershipTo
+        ,[parameter(Mandatory = $false)]
+            [switch]$alsoGrantSystemAccountOwnership
+        ,[parameter(Mandatory = $false)]
+            [switch]$recursive
+        ,[parameter(Mandatory = $false)]
+            [switch]$seizeFilesIndividually
+        )
+    Write-Verbose "Seizing ownership of [$itemType] [$fullPath]"
+    switch($itemType){
+        “File”   {$fullControlPermissions = "FullControl","Allow"}
+        ”Folder” {$fullControlPermissions = "FullControl","ContainerInherit,ObjectInherit","None","Allow"}
+        default  {}
+        }
+            
+	& "$env:SystemRoot\system32\takeown.exe" /A /F $fullPath | Out-Null
+    
+    if($alsoGrantSystemAccountOwnership){
+        $securityPrincipalsToGrantOwnership.Add("NT AUTHORITY\SYSTEM")
+        }
+
+	$currentAcl = Get-Acl $fullPath
+    $securityPrincipalsToGrantOwnershipTo | % {
+        $thisSecurityPrincipal = $_
+        Write-Verbose "Granting FullControl to [$($thisSecurityPrincipal)] on [$itemType] [$($fullPath)]"
+        $aclPermission = @($thisSecurityPrincipal)
+        $fullControlPermissions | % {$aclPermission += $_}
+        $aclAccessRule = new-object System.Security.AccessControl.FileSystemAccessRule $aclPermission
+        $currentAcl.AddAccessRule($aclAccessRule)
+        } 
+    Set-Acl -Path $fullPath -AclObject $currentAcl 
+    if($recursive){
+        Get-ChildItem -Path $fullPath | % {
+            if($_.Mode -match "d"){grant-ownership -fullPath $_.FullName -itemType Folder -securityPrincipalsToGrantOwnershipTo $securityPrincipalsToGrantOwnershipTo -recursive -seizeFilesIndividually:$seizeFilesIndividually -Verbose:$VerbosePreference}
+            elseif($siezeFilesIndividually){grant-ownership -fullPath $_.FullName -itemType File -securityPrincipalsToGrantOwnershipTo $securityPrincipalsToGrantOwnershipTo -seizeFilesIndividually:$seizeFilesIndividually -Verbose:$VerbosePreference}
+            }
         }
     }
 function guess-languageCodeFromCountry($p3LetterCountryIsoCode){
