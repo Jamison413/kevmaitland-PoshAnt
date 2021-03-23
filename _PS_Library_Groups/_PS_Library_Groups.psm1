@@ -475,7 +475,10 @@ function new-365Group(){
         Write-Verbose ""
         if(!$sharedMailbox){
             Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName -displayName $sharedMailboxDisplayName) -ErrorAction Continue -WhatIf:$WhatIfPreference "
-            try{$sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference }
+            try{
+            $sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference 
+            Set-User -Identity $sharedMailbox.UserPrincipalName -AuthenticationPolicy "Allow IMAP"
+            }
             catch{$Error}
             }
 

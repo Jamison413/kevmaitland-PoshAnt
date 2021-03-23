@@ -94,8 +94,8 @@ If($msoluser){
         set-mailboxPermissions -upn $upn -managerSAM $managerSAM -businessunit $businessunit
         }
         catch{
-        Write-host "Failed to update MSOL account mailbox premissions" -ForegroundColor Red
-        log-Error "Failed to update MSOL account mailbox premissions"
+        Write-host "Failed to update MSOL account mailbox permissions" -ForegroundColor Red
+        log-Error "Failed to update MSOL account mailbox permissions"
         log-Error $Error
         }
         try{
@@ -106,6 +106,19 @@ If($msoluser){
         log-Error "Failed to update MSOL account licensing"
         log-Error $Error
         }
+        try{
+        Set-User -Identity $upn -AuthenticationPolicy "Block Basic Auth"
+        }
+        catch{
+        Write-host "Failed to update authentication policy to Block Basic Auth" -ForegroundColor Red
+        log-Error "Failed to update authentication policy to Block Basic Auth"
+        log-Error $Error
+        }
+
+
+
+                
+
 }
 Else{
 write-host "*****************Failed to retrieve msol user account in time: $($upn)*****************" -ForegroundColor red
@@ -214,6 +227,9 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoE
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"extensionType" = "employeeInfo"}
 
+#Set hire date from start date
+#set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"employeeHireDate" = $($thisUser.FieldValues.StartDate)} -not available yet?
+
 #Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
 if($thisUser.FieldValues.WorkPhone){
 $businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.WorkPhone).Trim())")}
@@ -319,6 +335,9 @@ Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor Whit
 #update employee extension info with graph
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
+
+#Set hire date from start date
+#set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"employeeHireDate" = $($thisUser.FieldValues.Start_x0020_Date)} -not available yet?
 
 #Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
 If($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe){
