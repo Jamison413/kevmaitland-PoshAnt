@@ -609,7 +609,7 @@ $usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "grou
 $usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "SustainMailboxAccess@anthesisgroup.com"
 $usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "barry.holt@anthesisgroup.com"
 $usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "AnthesisUKFinance@anthesisgroup.com"
-
+$usersarray = $usersarray | Where-Object -Property "userPrincipalName" -NE "Call-Q_WalesCDSurvey@anthesisgroup.com"
 
 
 $usersarray
