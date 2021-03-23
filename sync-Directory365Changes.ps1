@@ -75,7 +75,6 @@ Import-Module _PS_Library_UserManagement.psm1
 $Admin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
 $AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
-
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
@@ -235,7 +234,8 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
-    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
+    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`",
+    `"TenureDays`": `"0`"
 
   }
 }"
@@ -258,7 +258,8 @@ $body = "{
     `"TeamsLink`": `"$($user.teamslink)`",
     `"UserGUID`": `"$($user.graphuser.id)`",
     `"plaintextname`": `"$($user.graphuser.displayName)`",
-    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`"
+    `"Contract`": `"$($user.graphuser.anthesisgroup_employeeInfo.contractType)`",
+    `"TenureDays`": `"0`"
   }
 }"
 }
@@ -679,6 +680,62 @@ ForEach($missingpop in $missingpops){
 }
 
 
+<#------------------------------------------------------------------------------------------Calculate Hire date (if empty) and Tenure-----------------------------------------------------------------------------------------------------#>
+
+#Update Hire date on People Services list item
+
+#This is a real pain - we can't update HireDate at the moment on the graph object, so we're searching the two new starter request lists for an entry. I've used pnp for my sanity here just to differentiate processing from the two lists we're processing with Graph 
+$allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -UseWebLogin #-Credentials $msolCredentials
+$oldrequests = Get-PnPListItem -List "New User Requests"
+
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -UseWebLogin #-Credentials $msolCredentials
+$newrequests = Get-PnPListItem -List "New Starter Details"
+
+
+ForEach($anthesian in $allanthesians){
+    If($anthesian.fields.HireDate -eq $null){
+    
+    #Try to find them in the old list
+    $thisFoundUser = ""
+    $thisFoundUser = $oldrequests | ? {($(remove-diacritics $($_.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
+        If(($thisFoundUser | Measure-Object).count -eq 1){
+        write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
+        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.StartDate | get-date -format "o")} -Verbose
+        }
+        Else{
+        Write-Host "Not found in old user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
+        }
+
+    #if not in old list, connect and pull all requests from the new list and try to find them
+        If($thisFoundUser -eq $null){
+        $thisFoundUser = $newrequests | ? {($(remove-diacritics $($_.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
+        If(($thisFoundUser | Measure-Object).count -eq 1){
+        write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
+        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.StartDate | get-date -format "o")} -Verbose
+        }
+        Else{
+        Write-Host "Not found in new user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
+        }
+
+    }
+
+    #If we can't find them at all - not much we can do - it will need to be updated manually
+}
+}
+
+#Calculate tenure in days and update People Directory list item
+ForEach($anthesian in $allanthesians){
+If($anthesian.fields.HireDate){
+$TenureinDays = New-TimeSpan -Start $anthesian.fields.HireDate -End $(get-date) | Select-Object -Property "Days"
+$TenureinDays = $TenureinDays.Days + 1
+[int]$currentListItemTenure = $anthesian.fields.TenureDays
+    If($currentListItemTenure -ne $TenureinDays.Days){
+    write-host "Updating tenure for $($anthesian.Fields.Email): $($TenureinDays.Days)" -foregroundcolor Cyan
+    update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"TenureDays" = $($TenureinDays).days} -Verbose
+    }
+}
+}
 
 
 <#------------------------------------------------------------------------------------------Teams Report for 365 amends-----------------------------------------------------------------------------------------------------#>
@@ -700,7 +757,6 @@ Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 
 #Finish run
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype END -logstring "End of run for sync-Directory365Changes"
-
 
 
 

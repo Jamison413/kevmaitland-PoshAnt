@@ -316,18 +316,16 @@ Send-MailMessage -To "paul.crewe@anthesisgroup.com" -From "buddy.system@anthesis
 
 
 
-If($todaysdate -eq "0"){
 
 <#---Process Re-Sign Up List---#>
 
 #Get all the current users in the waiting list
-Connect-PnPOnline -url "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -Credentials $adminCreds
+$connect = Connect-PnPOnline -url "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -Credentials $adminCreds
 $allwaiting = Get-PnPListItem -List "Buddy System Waiting List"
 
 ForEach($person in $allwaiting){
-Add-PnPListItem -List "Buddy System Repeat Sign Up" -Values @{"Yourname" = $($person.FieldValues.Yourname.LookupValue); "Yourcommunity_x0028_ifapplicable" = $($person.FieldValues.Yourcommunity_x0028_ifapplicable); "Youtimezone" = $($person.FieldValues.Youtimezone); "Yourcountry" = $($person.FieldValues.Yourcountry)} 
-Remove-PnPListItem -List "Buddy System Waiting List" -Identity $($person.Id) -Force
-}
+$a = Add-PnPListItem -List "Buddy System Repeat Sign Up" -Values @{"Yourname" = $($person.FieldValues.Yourname.LookupValue); "Yourcommunity_x0028_ifapplicable" = $($person.FieldValues.Yourcommunity_x0028_ifapplicable); "Youtimezone" = $($person.FieldValues.Youtimezone); "Yourcountry" = $($person.FieldValues.Yourcountry)} 
+$b = Remove-PnPListItem -List "Buddy System Waiting List" -Identity $($person.Id) -Force
 }
 
 Write-host "**********************" -ForegroundColor White
