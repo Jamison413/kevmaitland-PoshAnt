@@ -28,6 +28,16 @@ function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hid
 
 new-sharedMailbox -displayName $displayName -arrayOfFullAccessMembers $arrayOfFullAccessMembers -hideFromGal $hideFromGal -owner $owner -grantSendAsToo $grantSendAsToo
 
+#Set current shared mailbox authentication policy
+$newsharedmailbox = get-user -Identity $primaryEmail
+If($newsharedmailbox){
+Set-User -Identity $newsharedmailbox.UserPrincipalName -AuthenticationPolicy "Allow IMAP"
+}
+Else{
+Write-Host "Couldn't find new shared mailbox $($primaryEmail), this could be a time delay - try again in a few minutes" -ForegroundColor Red
+}
+
+
 #Add-MailboxPermission -AccessRights fullaccess -Identity nigel.arnott -User mary.short -AutoMapping $true
 #$members | %{Add-DistributionGroupMember -Identity "iONA Capital Team" -Member $_}
 #$members | % {Add-DistributionGroupMember -Identity "Clients - Chinook UM Team" -Member $_}
