@@ -127,7 +127,7 @@ $reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
 
 
 #Get all licensed graph users
-$usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true -Verbose
+$usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
 #Get all current Anthesians in the list
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
@@ -185,7 +185,7 @@ $graphmanager = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graph
     }
 
 #Exchange timezone
-$exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)" -Verbose
+$exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)"
 #Philippine's uses several timezone names
 If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
 $exoTimezone = New-Object -TypeName psobject @{
@@ -701,7 +701,7 @@ ForEach($anthesian in $allanthesians){
     $thisFoundUser = $oldrequests | ? {($(remove-diacritics $($_.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
         If(($thisFoundUser | Measure-Object).count -eq 1){
         write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
-        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.StartDate | get-date -format "o")} -Verbose
+        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.Start_x0020_Date | get-date -format "o")}
         }
         Else{
         Write-Host "Not found in old user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
@@ -712,7 +712,7 @@ ForEach($anthesian in $allanthesians){
         $thisFoundUser = $newrequests | ? {($(remove-diacritics $($_.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
         If(($thisFoundUser | Measure-Object).count -eq 1){
         write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
-        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.StartDate | get-date -format "o")} -Verbose
+        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.StartDate | get-date -format "o")}
         }
         Else{
         Write-Host "Not found in new user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
@@ -728,10 +728,11 @@ ForEach($anthesian in $allanthesians){
 ForEach($anthesian in $allanthesians){
 If($anthesian.fields.HireDate){
 $TenureinDays = New-TimeSpan -Start $anthesian.fields.HireDate -End $(get-date) | Select-Object -Property "Days"
+$TenureinDays = $TenureinDays.Days + 2
 [int]$currentListItemTenure = $anthesian.fields.TenureDays
-    If($currentListItemTenure -ne $TenureinDays.Days){
-    write-host "Updating tenure for $($anthesian.Fields.Email): $($TenureinDays.Days)" -foregroundcolor Cyan
-    update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"TenureDays" = $($TenureinDays).days} -Verbose
+    If($currentListItemTenure -ne $TenureinDays){
+    write-host "Updating tenure for $($anthesian.Fields.Email): $($TenureinDays)" -foregroundcolor Cyan
+    update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"TenureDays" = $($TenureinDays)} -Verbose
     }
 }
 }
