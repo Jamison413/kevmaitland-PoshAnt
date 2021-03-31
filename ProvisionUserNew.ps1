@@ -348,6 +348,7 @@ Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor Whit
 #update employee extension info with graph
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"extensionType" = "employeeInfo"}
 
 #Set hire date from start date
 #set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"employeeHireDate" = $($thisUser.FieldValues.Start_x0020_Date)} -not available yet?
