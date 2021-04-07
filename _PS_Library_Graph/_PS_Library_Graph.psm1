@@ -1262,6 +1262,34 @@ if(![string]::IsNullOrWhiteSpace($filter365UPN)){
 
 }
 }
+function get-graphTeamsPrivateChannels(){
+    [cmdletbinding()]
+    param(
+         [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $false)]
+            [string]$serverRelativeUrl
+        ,[parameter(Mandatory = $false)]
+            [string]$graphUnifiedGroupId
+        )
+
+If($serverRelativeUrl){
+$graphSite = get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl $($serverRelativeUrl) -Verbose
+}
+If($graphSite){
+$filter  = "`$filter=membershipType eq 'private'"
+$unifiedgroup = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName $($graphSite.displayName)
+$PrivateChannels = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$($unifiedgroup.id)/channels?$($filter)" -useBetaEndPoint
+$privatechannels
+}
+
+If($graphUnifiedGroupId){
+$filter  = "`$filter=membershipType eq 'private'"
+$PrivateChannels = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$($graphUnifiedGroupId)/channels?$($filter)" -Verbose -useBetaEndPoint
+$privatechannels
+}
+
+}
 function get-graphTokenResponse{
      [cmdletbinding()]
     param(
@@ -1375,7 +1403,7 @@ function get-graphUsers(){
         $select = ",id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,companyName,country,department,anthesisgroup_employeeInfo"
         }
     if($selectAllProperties){
-        $select = ",anthesisgroup_employeeInfo,accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"
+        $select = ",anthesisgroup_employeeInfo,accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,employeeHireDate,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"
         if($useBetaEndPoint){$select = $select+",infoCatalogs,preferredDataLocation,signInActivity"}
         } #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
     $selectCustomProperties | % {
@@ -2718,7 +2746,7 @@ function set-graphUser(){
         )
       
     $validProperties = @("accountEnabled","assignedLicenses","assignedPlans","businessPhones","city","companyName","country","createdDateTime","creationType","deletedDateTime","department","displayName","employeeId","faxNumber","givenName","id","identities","imAddresses","isResourceAccount","jobTitle","lastPasswordChangeDateTime","legalAgeGroupClassification","licenseAssignmentStates","mail","mailNickname","manager","mobilePhone","officeLocation","onPremisesDistinguishedName","onPremisesDomainName","onPremisesExtensionAttributes","onPremisesImmutableId","onPremisesLastSyncDateTime","onPremisesProvisioningErrors","onPremisesSamAccountName","onPremisesSecurityIdentifier","onPremisesSyncEnabled","onPremisesUserPrincipalName","otherMails","passwordPolicies","passwordProfile","postalCode","preferredDataLocation","preferredLanguage","provisionedPlans","proxyAddresses","refreshTokensValidFromDateTime","showInAddressList","signInSessionsValidFromDateTime","state","streetAddress","surname","usageLocation","userPrincipalName","userType")
-    $dubiousProperties = @("aboutMe","birthday","hireDate","interests","mailboxSettings","mySite","pastProjects","preferredName","responsibilities","schools","skills")
+    $dubiousProperties = @("aboutMe","birthday","interests","mailboxSettings","hireDate","mySite","pastProjects","preferredName","responsibilities","schools","skills")
     $validExtensionProperties = @("extensionType","businessUnit","employeeId","contractType")
 
     $duffProperties = @()
