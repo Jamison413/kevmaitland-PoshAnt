@@ -37,7 +37,7 @@ for($j=0; $j -lt $groupsToProcess.Count; $j++){
     Write-Host -f Yellow "[$j]/[$($groupsToProcess.Count)]: [$($thisUnifiedGroup.displayName)][$($thisUnifiedGroup.id)][$($thisUnifiedGroup.mail)]"
     Try{
         $error.Clear()
-        set-standardSitePermissions -tokenResponse $tokenResponse -pnpAppCreds $teamBotDetails -graphGroupExtended $thisUnifiedGroup -pnpCreds $sharePointCreds -ErrorVariable Whoops -Verbose #-suppressEmailNotifications -Verbose:$VerbosePreference
+        set-standardSitePermissions -tokenResponse $tokenResponse -pnpAppCreds $teamBotDetails -graphGroupExtended $thisUnifiedGroup -pnpCreds $sharePointCreds #-suppressEmailNotifications -Verbose:$VerbosePreference
         }
     Catch{
         Write-Host -f Red $(get-errorSummary $_)

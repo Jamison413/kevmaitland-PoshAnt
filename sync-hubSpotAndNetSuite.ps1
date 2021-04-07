@@ -1,9 +1,43 @@
-﻿
+﻿[cmdletbinding()]
+param(
+    [Parameter(Mandatory = $false, Position = 0)]
+        [string]$deltaSync = $true #Specifies whether we are doing a full or incremental sync.
+    )
+
+if($PSCommandPath){
+    $InformationPreference = 2
+    $VerbosePreference = 0
+    $logFileLocation = "C:\ScriptLogs\"
+    if($deltaSync -eq $true){$suffix = "_deltaSync"}
+    else{$suffix = "_fullSync"}
+    #$suffix = "_fullSync"
+    $transcriptLogName = "$($logFileLocation+$(split-path $PSCommandPath -Leaf))$suffix`_Transcript_$(Get-Date -Format "yyyy-MM-dd").log"
+    Start-Transcript $transcriptLogName -Append
+    }
+function test-hubSpotTimeStampIsCloseEnough(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+            [datetime]$updatedAt
+        ,[Parameter(Mandatory = $true, Position = 0)]
+            [datetime]$lastmodifiedinhubspot
+        )
+    $allowedDiscrepencyInSeconds = 5
+
+    if([Math]::Abs(([datetime]$updatedAt - [datetime]$lastmodifiedinhubspot).TotalSeconds) -lt $allowedDiscrepencyInSeconds){$true}
+    else{$false}
+
+    }
+
 #region Get HubSpot Companies
 $apiKey = get-hubSpotApiKey
 $filterCompanyFlaggedForSync = [ordered]@{
     propertyName="netsuite_sync_company_"
     operator="HAS_PROPERTY"
+    }
+$filterCompanyNotBroken = [ordered]@{
+    propertyName="netsuite_company_has_been_merged_or_deleted"
+    operator="NOT_HAS_PROPERTY"
     }
 $filterExcludeCompaniesCalledAnthesis = [ordered]@{
     propertyName="name"
@@ -14,7 +48,7 @@ $hubSortMaxlastmodifiedinhubspotbysync = [ordered]@{
     propertyName = "lastmodifiedinhubspot"
     direction = "DESCENDING"
     }
-$hubspotCompanyMaxlastmodifiedinhubspotbysync = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync)} -sortPropertyNameAndDirection $hubSortMaxlastmodifiedinhubspotbysync -pageSize 1 -firstPageOnly
+$hubspotCompanyMaxlastmodifiedinhubspotbysync = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync,$filterCompanyNotBroken)} -sortPropertyNameAndDirection $hubSortMaxlastmodifiedinhubspotbysync -pageSize 1 -firstPageOnly
 
 $filterCompanyUpdatedSinceLastSync = [ordered]@{
     propertyName="hs_lastmodifieddate"
@@ -22,11 +56,18 @@ $filterCompanyUpdatedSinceLastSync = [ordered]@{
     #value = [Math]::Floor([decimal](Get-Date(Get-Date "2000-10-20T08:34:48.887Z").ToUniversalTime()-uformat "%s"))*1000 #Convert to UNIX Epoch time and add Milliseconds
     value = [Math]::Floor([decimal](Get-Date(Get-Date $hubspotCompanyMaxlastmodifiedinhubspotbysync.properties.lastmodifiedinhubspot).ToUniversalTime()-uformat "%s"))*1000 #Convert to UNIX Epoch time and add Milliseconds
     }
-[array]$hubSpotCompaniesToCheck = get-hubspotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync,$filterCompanyUpdatedSinceLastSync,$filterExcludeCompaniesCalledAnthesis)} -pageSize 100 #-firstPageOnly 
+if($deltaSync -eq $false){
+    [array]$hubSpotCompaniesToCheck = get-hubspotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync,$filterCompanyNotBroken,$filterExcludeCompaniesCalledAnthesis)} -pageSize 100 #-firstPageOnly 
+    }
+else{
+    [array]$hubSpotCompaniesToCheck = get-hubspotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync,$filterCompanyUpdatedSinceLastSync,$filterExcludeCompaniesCalledAnthesis)} -pageSize 100 #-firstPageOnly 
+    $hubSpotCompaniesToCheck = $hubSpotCompaniesToCheck | ? {$_.properties.netsuite_company_has_been_merged_or_deleted -ne $true} #We can only provide 3 Filters in the group above, so we have to do any additional filtering Client-Side
+    }
 $hubSpotCompaniesToCheck | Select-Object | % { #Prep the objects for compare-object later
     Add-Member -InputObject $_ -MemberType NoteProperty -Name HubSpotId -Value $_.Id
     Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.properties.netsuiteid
     }
+$hubSpotCompaniesToCheckForContacts = $hubSpotCompaniesToCheck
 #endregion
 
 #region Get NetSuite Companies
@@ -39,7 +80,8 @@ $hubspotCompanyMaxLastModifiedInNetSuite = get-hubSpotObjects -apiKey $apiKey.Hu
 $netQuery =  "?q=companyName CONTAIN_NOT `"Anthesis`"" #Excludes any Companies with "Anthesis" in the companyName
 $netQuery += " AND companyName CONTAIN_NOT `"intercompany project`"" #Excludes any Companies with "(intercompany project)" in the companyName
 $netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
-$netQuery += " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $hubspotCompanyMaxLastModifiedInNetSuite.properties.lastmodifiedinnetsuite -Format g))`"" #Excludes any Companies that haven't been updated since X
+if($deltaSync -eq $true){$netQuery += " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $hubspotCompanyMaxLastModifiedInNetSuite.properties.lastmodifiedinnetsuite -Format g))`""} #Excludes any Companies that haven't been updated since X
+
 $netSuiteParameters = get-netSuiteParameters -connectTo Production
 [array]$netSuiteCompaniesToCheck = get-netSuiteClientsFromNetSuite -query $netQuery -netsuiteParameters $netSuiteParameters #-Verbose
 $netSuiteCompaniesToCheck | % { #Prep the objects for compare-object later
@@ -47,7 +89,6 @@ $netSuiteCompaniesToCheck | % { #Prep the objects for compare-object later
     Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteId -Value $_.Id
     }
 #endregion
-
 
 #region Process changes, starting with NetSuite companies
 $netSuiteCompaniesToCheck | % {
@@ -168,12 +209,12 @@ $netSuiteCompaniesToCheck | % {
             }
         if($thisNetSuiteCompany.lastModifiedDate -ne $correspondingHubSpotCompany.properties.lastmodifiedinnetsuite){ #Has the NetSuite object been updated since the last sync?
             Write-Host -ForegroundColor DarkCyan "`tNetSuite company has been modified."
-            if($correspondingHubSpotCompany.updatedAt -ne $correspondingHubSpotCompany.properties.lastmodifiedinhubspot){ #Has the HubSpot object been updated since the last sync?
+            if($(test-hubSpotTimeStampIsCloseEnough -updatedAt $correspondingHubSpotCompany.updatedAt -lastmodifiedinhubspot $correspondingHubSpotCompany.properties.lastmodifiedinhubspot) -eq $false){ #Has the HubSpot object been updated since the last sync?
                 Write-Host -ForegroundColor DarkCyan "`tHubSpot company has also been modified."
                 #Both objects modified - in the event of a conflict, Leads are overwritten by HubSpot and Prospects/Clients are overwritten by NetSuite
                 if($thisNetSuiteCompany.entityStatus.refName -match "LEAD"){
                     #***Update NetSuite record based on HubSpot data
-                    Write-Host -ForegroundColor Cyan "NetSuite Client [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] is set to [$($thisNetSuiteCompany.entityStatus.refName)] - updating NetSuite object based on HubSpot object"
+                    Write-Host -ForegroundColor Cyan "`t`tNetSuite Client [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] is set to [$($thisNetSuiteCompany.entityStatus.refName)] - updating NetSuite object based on HubSpot object"
                     try{
                         $updatedNetSuiteCompany = update-netSuiteClientFromHubSpotObject -hubSpotCompanyObject $correspondingHubSpotCompany -netsuiteParameters $netSuiteParameters -hubSpotApiKey $apiKey.HubApiKey
                         }
@@ -189,7 +230,7 @@ $netSuiteCompaniesToCheck | % {
                     $hubSpotCompaniesToCheck = $hubSpotCompaniesToCheck | ? {$_.id -ne $correspondingHubSpotCompany.id} #Remove this company from $hubSpotCompaniesToCheck as we've already processed it
                     }
                 elseif($thisNetSuiteCompany.entityStatus.refName -match "PROSPECT" -or $thisNetSuiteCompany.entityStatus.refName -match "CLIENT"){
-                    Write-Host -ForegroundColor Cyan "`tNetSuite Client [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] is set to [$($thisNetSuiteCompany.entityStatus.refName)] - updating HubSpot object based on NetSuite object"
+                    Write-Host -ForegroundColor Cyan "`t`tNetSuite Client [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] is set to [$($thisNetSuiteCompany.entityStatus.refName)] - updating HubSpot object based on NetSuite object"
                     #***Update HubSpot record based on NetSuite data
                     try{
                         $updatedHubSpotCompany = update-hubSpotObjectFromNetSuiteObject -apiKey $apiKey.HubApiKey -objectType companies -netSuiteObject $thisNetSuiteCompany
@@ -224,12 +265,13 @@ $netSuiteCompaniesToCheck | % {
         }
     }
 
-$hubSpotCompaniesToCheck | ? { #Check the remaining HubSpot companies to see whether any need updating/creating
+$hubSpotCompaniesToCheck | % { #Check the remaining HubSpot companies to see whether any need updating/creating
     $thisHubSpotCompany = $_
     if([string]::IsNullOrWhiteSpace($thisHubSpotCompany.NetSuiteId)){ #$netSuite.NetSuiteId -eq $null
         #Check this HUbSpotId isn't already in NetSuite (as we imported a load during the migration)
-        $correspondingNetSuiteCompany = get-netSuiteClientsFromNetSuite -query "?q=custentitycustentity_hubspotid IS $($thisHubSpotCompany.id)" -netsuiteParameters $netSuiteParameters
-        if($correspondingNetSuiteCompany){
+        $correspondingNetSuiteCompany = get-netSuiteClientsFromNetSuite -query "?q=custentitycustentity_hubspotid IS $($thisHubSpotCompany.id)" -netsuiteParameters $netSuiteParameters #Match by immutable Id first
+        if( [string]::IsNullOrEmpty($correspondingNetSuiteCompany.id)){$correspondingNetSuiteCompany = get-netSuiteClientsFromNetSuite -query "?q=companyName IS `"$($thisHubSpotCompany.properties.name)`"" -netsuiteParameters $netSuiteParameters} #Try again by companyName as this would collide when we try to create a new Client anyway
+        if(![string]::IsNullOrEmpty($correspondingNetSuiteCompany.id)){
             Write-Host -ForegroundColor Yellow "Unlinked HubSpot company found [$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.id)], but corresponding company found in NetSuite [$($correspondingNetSuiteCompany.companyName)][$($correspondingNetSuiteCompany.id)] (probably due to the migration)"
             Write-Host -f DarkYellow "`tupdating NetSuiteId in HubSpot"
             try{$updatedHubSpotCompany = update-hubSpotObject -apiKey $apiKey.HubApiKey -objectType companies -objectId $thisHubSpotCompany.id -fieldHash @{netsuiteid=$correspondingNetSuiteCompany.id}}
@@ -238,7 +280,7 @@ $hubSpotCompaniesToCheck | ? { #Check the remaining HubSpot companies to see whe
         else{
             #***Create new record in NetSuite
             try{ 
-                Write-Host -ForegroundColor Yellow "`tAdding [$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.id)] to NetSuite"
+                Write-Host -ForegroundColor Yellow "[$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.id)] not found - Adding to NetSuite"
                 $neNetSuiteClient = add-netSuiteClientToNetSuiteFromHubSpotObject -hubSpotCompanyObject $thisHubSpotCompany -hubSpotApiKey $apiKey.HubApiKey -netsuiteParameters $netSuiteParameters
                 }
             catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
@@ -250,18 +292,30 @@ $hubSpotCompaniesToCheck | ? { #Check the remaining HubSpot companies to see whe
         if($correspondingNetSuiteCompany){Write-Host -ForegroundColor DarkCyan "`tCorresponding NetSuite company found [$($correspondingNetSuiteCompany.companyName)][$($correspondingNetSuiteCompany.id)]"}
         else{#Error checking
             Write-Host -ForegroundColor DarkCyan "`tCorresponding NetSuite company not found in cache - checking NetSuite"
-            $correspondingNetSuiteCompany = get-netSuiteClientsFromNetSuite -clientId $thisHubSpotCompany.NetSuiteId -netsuiteParameters $netSuiteParameters
-            if($correspondingNetSuiteCompany){Write-Host -ForegroundColor DarkCyan "`tCorresponding NetSuite company found [$($correspondingNetSuiteCompany.companyName)][$($correspondingNetSuiteCompany.id)]"}
-            else{
-                Write-Warning "NetSuite company [$($thisHubSpotCompany.NetSuiteId)] (HubSpot name:[$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.HubSpotId)]) could not be retrieved from NetSuite - it may have been deleted from NetSuite?"
+            try{
+                $correspondingNetSuiteCompany = get-netSuiteClientsFromNetSuite -clientId $thisHubSpotCompany.NetSuiteId -netsuiteParameters $netSuiteParameters -ErrorAction Stop
+                if($correspondingNetSuiteCompany){Write-Host -ForegroundColor DarkCyan "`tCorresponding NetSuite company found [$($correspondingNetSuiteCompany.companyName)][$($correspondingNetSuiteCompany.id)]"}
+                }
+            catch{
+                if($_.Exception -match "404" -or $_.InnerException -match "404"){
+                    Write-Warning "NetSuite company [$($thisHubSpotCompany.NetSuiteId)] (HubSpot name:[$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.HubSpotId)]) could not be retrieved from NetSuite - it may have been deleted from NetSuite?"
+                    #Write-Host -ForegroundColor DarkCyan "`tRemoving invalid NetSuiteId from HubSpot Company [$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.HubSpotId)]"
+                    #$updatedHubSpotCompany = update-hubSpotObject -apiKey $apiKey.HubApiKey -objectType companies -objectId $thisHubSpotCompany.id -fieldHash @{netsuiteid=""} #HubSpot won't let us $null this
+                    #Nah - this'll just recreate the merged Company in NetSuite and piss everyone off.
+                    Write-Host -ForegroundColor DarkCyan "`tFlagging HubSpot Company [$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.HubSpotId)] as having an invalid NetSuiteId"
+                    $updatedHubSpotCompany = update-hubSpotObject -apiKey $apiKey.HubApiKey -objectType companies -objectId $thisHubSpotCompany.id -fieldHash @{netsuite_company_has_been_merged_or_deleted=$true} 
+                    $hubSpotCompaniesToCheck = $hubSpotCompaniesToCheck |? {$hubSpotCompaniesToCheck.id -notcontains $_.id} #Remove this duffer from the array
+                    }
+                else{Write-Host -f Red $(get-errorSummary $_)}
                 return #Break out of current $thisHubSpotCompany loop if no $correspondingNetSuiteCompany exists
                 }
+            
             }
-        if([string]::IsNullOrWhiteSpace($thisHubSpotCompany.properties.lastmodifiedinhubspot) -or [Math]::Abs(([datetime]$thisHubSpotCompany.updatedAt - [datetime]$thisHubSpotCompany.properties.lastmodifiedinhubspot).TotalSeconds) -gt 5){ #Has the HubSpot object been updated since the last sync? Specifically: is lastmodifiedinhubspot missing a value (suggesting that it's never been synced) or is the value more than 5 seconds either side of updatedAt (suggesting that it's been edited in HubSpot since the last sync)? The reason we can't compare with -eq here is because lastmodifiedinhubspot and updatedat can never match exactly: whenever we write the current value of updatedat into lastmodifiedinhubspotbysync, it updates the HubSpot record and generates a new value for updatedat (which no longer matches the value we've just writted to lastmodifiedinhubspotbysync). We have to be a little fuzzy and allow the timestamps to be "close enough". We have to ensure that the last time we update the HubSpot record, we get lastmodifiedinhubspot and updatedat within this window.
+        if([string]::IsNullOrWhiteSpace($thisHubSpotCompany.properties.lastmodifiedinhubspot) -or $(test-hubSpotTimeStampIsCloseEnough -updatedAt $thisHubSpotCompany.updatedAt -lastmodifiedinhubspot $thisHubSpotCompany.properties.lastmodifiedinhubspot) -eq $false){ #Has the HubSpot object been updated since the last sync? Specifically: is lastmodifiedinhubspot missing a value (suggesting that it's never been synced) or is the value more than 5 seconds either side of updatedAt (suggesting that it's been edited in HubSpot since the last sync)? The reason we can't compare with -eq here is because lastmodifiedinhubspot and updatedat can never match exactly: whenever we write the current value of updatedat into lastmodifiedinhubspotbysync, it updates the HubSpot record and generates a new value for updatedat (which no longer matches the value we've just writted to lastmodifiedinhubspotbysync). We have to be a little fuzzy and allow the timestamps to be "close enough". We have to ensure that the last time we update the HubSpot record, we get lastmodifiedinhubspot and updatedat within this window.
             Write-Host -ForegroundColor DarkCyan "`t[$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.id)] has been updated"
             if($correspondingNetSuiteCompany.entityStatus.refName -match "LEAD"){
                 #***Update HubSpot record based on NetSuite data
-                Write-Host -ForegroundColor Cyan "`tNetSuite Client [$($correspondingNetSuiteCompany.companyName)][$($correspondingNetSuiteCompany.id)] is set to [$($correspondingNetSuiteCompany.entityStatus.refName)] - updating NetSuite object based on HubSpot object"
+                Write-Host -ForegroundColor Cyan "`t`tNetSuite Client [$($correspondingNetSuiteCompany.companyName)][$($correspondingNetSuiteCompany.id)] is set to [$($correspondingNetSuiteCompany.entityStatus.refName)] - updating NetSuite object based on HubSpot object"
                 try{$updatedHubSpotCompany = update-netSuiteClientFromHubSpotObject -hubSpotCompanyObject $thisHubSpotCompany -netsuiteParameters $netSuiteParameters -hubSpotApiKey $apiKey.HubApiKey}
                 catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                 }
@@ -277,7 +331,7 @@ $hubSpotCompaniesToCheck | ? { #Check the remaining HubSpot companies to see whe
                     }
                 else{
                     Write-Host -ForegroundColor Cyan "`tNetSuite Client [$($correspondingNetSuiteCompany.companyName)][$($correspondingNetSuiteCompany.id)] is set to [$($correspondingNetSuiteCompany.entityStatus.refName)] - we're not allowed to write changes to these, so updating HubSpot object based on NetSuite object to get everything else back in Sync"
-                    try{update-hubSpotObjectFromNetSuiteObject -apiKey $apiKey.HubApiKey -objectType companies -netSuiteObject $correspondingNetSuiteCompany}
+                    try{$updatedHubSpotCompany = update-hubSpotObjectFromNetSuiteObject -apiKey $apiKey.HubApiKey -objectType companies -netSuiteObject $correspondingNetSuiteCompany}
                     catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                     }
                 }
@@ -287,6 +341,7 @@ $hubSpotCompaniesToCheck | ? { #Check the remaining HubSpot companies to see whe
                 }
             #***Update $correspondingNetSuiteCompany.properties.lastmodifiedinnetsuite to $thisHubSpotCompany.lastModifiedDate to exclude it from future syncs (until it is updated again) /*-+This should be part of the Update X record based on Y data functinos/*-+
             }
+        else{Write-Host -f DarkCyan "`t`t[$($thisHubSpotCompany.properties.name)][$($thisHubSpotCompany.id)] is unchanged and did not require updating"}
         }
     }
 
@@ -327,30 +382,47 @@ $hubSpotCompaniesToCheck | ? { #Check the remaining HubSpot companies to see whe
 
 #endregion
 
-#region Get NetSuite Contacts
-$netSuiteContactsToCheck = 
-#endregion
 
 #region Process Contacts
-$hubSpotCompaniesToCheck | Select-Object | % {
-    $thisHubSpotCompany = $_
-    if($thisHubSpotCompany.properties.num_associated_contacts -gt 0){
-        $theseHubSpotContacts = get-hubSpotContactsFromCompanyId -apiKey $apiKey.HubApiKey -hubspotCompanyId $thisHubSpotCompany.id
-        $theseHubSpotContacts | Select-Object | % {
-            $thisHubSpotContact = $_
-            #Does this Hubspot Contact have a NetSuiteId?
-                #No - Does this Contact's HubSpotId appear in NetSuite?
-                    #Yes - Cross-reference the Contacts
-                    #No  - Does this Contact's e-mail address appear in NetSuite?
-                        #Yes - Cross-reference the Contacts
-                        #No  - Create a new NetSuite Contact based ont he HubSpot Contact
-                #Yes - Has the client been updated more recently in NetSuite?
-                    #Yes - Update NetSuite > HubSpot
-                    #No  - Update HubSpot > NetSuite
+#region Get NetSuite Contacts
+$netContactQuery = "?q=email EMPTY_NOT"
+if($deltaSync -eq $true){
+    $dummyFilter = [ordered]@{
+        propertyName="id"
+        operator="HAS_PROPERTY"
+        }
+    $hubspotContactMaxLastModifiedInNetSuite = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType contacts -filterGroup1 @{filters=@($dummyFilter)} -sortPropertyNameAndDirection $hubSortLastModifiedInNetSuite -pageSize 1 -firstPageOnly #Sorting only works alongside a Filter :/
+    $netContactQuery +=  " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $hubspotContactMaxLastModifiedInNetSuite.properties.lastmodifiedinnetsuite -Format g))`"" #Excludes any Contacts that haven't been updated since X
+    }
+$netSuiteContactsToCheck = get-netSuiteContactFromNetSuite -netsuiteParameters $netSuiteParameters -query $netContactQuery 
+#endregion
 
-            Write-Host -ForegroundColor Green "Processing HubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)]"
-            #Does this Hubspot Contact have a NetSuiteId?
-            if([string]::IsNullOrWhiteSpace($thisHubSpotContact.properties.netsuiteid)){
+#region Process HubSpot Contacts
+@($hubSpotCompaniesToCheckForContacts | ? {$_.properties.num_associated_contacts -gt 0} | Select-Object) | % {
+    $thisHubSpotCompany = $_
+    if([string]::IsNullOrWhiteSpace($hubspotContactMaxLastModifiedInNetSuite.properties.lastmodifiedinhubspot)){
+        $theseHubSpotContacts = get-hubSpotContactsFromCompanyId -apiKey $apiKey.HubApiKey -hubspotCompanyId $thisHubSpotCompany.id -includeContactsWithNoTimeStamp #-Verbose
+        } 
+    else{
+        $theseHubSpotContacts = get-hubSpotContactsFromCompanyId -apiKey $apiKey.HubApiKey -hubspotCompanyId $thisHubSpotCompany.id -updatedAfter $hubspotContactMaxLastModifiedInNetSuite.properties.lastmodifiedinhubspot -includeContactsWithNoTimeStamp #-Verbose
+        } 
+    $theseHubSpotContacts | Select-Object | % {
+        $thisHubSpotContact = $_
+        #Does this Hubspot Contact have a NetSuiteId?
+            #No - Does this Contact's HubSpotId appear in NetSuite?
+                #Yes - Cross-reference the Contacts
+                #No  - Does this Contact's e-mail address appear in NetSuite?
+                    #Yes - Cross-reference the Contacts
+                    #No  - Create a new NetSuite Contact based ont he HubSpot Contact
+            #Yes - Has the client been updated more recently in NetSuite?
+                #Yes - Update NetSuite > HubSpot
+                #No  - Update HubSpot > NetSuite
+
+        Write-Host -ForegroundColor Green "Processing HubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)]"
+        $thisHubSpotContactsEvents = get-hubSpotEvents -apiKey $apiKey.HubApiKey -hubspotContactId $thisHubSpotContact.id
+        $thisHubSpotContact = add-hubSpoteventDataToContact -contactObject $thisHubSpotContact -eventsArray $thisHubSpotContactsEvents
+        #Does this Hubspot Contact have a NetSuiteId?
+        if([string]::IsNullOrWhiteSpace($thisHubSpotContact.properties.netsuiteid)){
                 #No - Does this Contact's HubSpotId appear in NetSuite?
                 Write-Host -ForegroundColor DarkGreen "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] has no NetSuiteId - searching for Contact in NetSuite"
                 $correspondingNetSuiteContact = get-netSuiteContactFromNetSuite -query "?q=custentitycustentity_hubspotid IS $($thisHubSpotContact.id)" -netsuiteParameters $netSuiteParameters
@@ -370,7 +442,7 @@ $hubSpotCompaniesToCheck | Select-Object | % {
                         catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                         if([string]::IsNullOrWhiteSpace($correspondingNetSuiteContact.custentitycustentity_hubspotid)){
                             Write-Host -ForegroundColor DarkGreen "`tCorresponding NetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] was missing custentitycustentity_hubspotid - UPDATING that too"
-                            try{$updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $correspondingNetSuiteContact.id -fieldHash @{custentitycustentity_hubspotid=$thisHubSpotContact.id}}
+                            try{$updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $correspondingNetSuiteContact.id -fieldHash @{custentitycustentity_hubspotid=$thisHubSpotContact.id} -netsuiteParameters $netSuiteParameters} 
                             catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                             }
                         }
@@ -391,59 +463,176 @@ $hubSpotCompaniesToCheck | Select-Object | % {
                             }
 
                         try{
-                            $newNetSuiteContact = add-netSuiteContactToNetSuiteFromHubSpotObject -hubSpotContactObject $thisHubSpotContact -hubSpotApiKey $apiKey.HubApiKey -companyNetSuiteId $thisHubSpotCompany.properties.netsuiteid -subsidiary $thisHubSpotCompany.properties.netsuite_subsidiary -netsuiteParameters $netSuiteParameters
-                            $newNetSuiteContact = get-netSuiteContactFromNetSuite -query "?q=custentitycustentity_hubspotid IS $($thisHubSpotContact.id)" -netsuiteParameters $netSuiteParameters
-                            Write-Host -ForegroundColor DarkGreen "`tNew NetSuite Contact [$($newNetSuiteContact.entityId)][$($newNetSuiteContact.id)] CREATED"
+                            $newNetSuiteContact = add-netSuiteContactToNetSuiteFromHubSpotObject -hubSpotContactObject $thisHubSpotContact -hubSpotApiKey $apiKey.HubApiKey -companyNetSuiteId $thisHubSpotCompany.properties.netsuiteid -subsidiary $thisHubSpotCompany.properties.netsuite_subsidiary -netsuiteParameters $netSuiteParameters #-Verbose
+                            Write-Host -ForegroundColor DarkGreen "`tNew NetSuite Contact [$($newNetSuiteContact.entityId)][$($newNetSuiteContact.id)][$($newNetSuiteContact.company.refName)][$($newNetSuiteContact.company.id)] CREATED"
                             }
                         catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                         
                         }
                     }
                 }
-            else{
-                $correspondingNetSuiteContact = get-netSuiteContactFromNetSuite -contactId $thisHubSpotContact.properties.netsuiteid -netsuiteParameters $netSuiteParameters
-                if($correspondingNetSuiteContact){
-                    #Yes - Has the client been updated more recently in NetSuite?
-                    Write-Host -ForegroundColor DarkGreen "`tCorresponding NetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] found by NetSuiteId"
-                    if((Get-Date $correspondingNetSuiteContact.lastModifiedDate) -gt (Get-Date $thisHubSpotContact.updatedAt)){
-                        #Yes - Update NetSuite > HubSpot
-                        Write-Host -ForegroundColor Green "`tNetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] updated more recently than HubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] - UPDATING NetSuite -> HubSpot"
-                        if([string]::IsNullOrWhiteSpace($correspondingNetSuiteContact.custentitycustentity_hubspotid)){
+        else{
+            $correspondingNetSuiteContact = get-netSuiteContactFromNetSuite -contactId $thisHubSpotContact.properties.netsuiteid -netsuiteParameters $netSuiteParameters
+            if($correspondingNetSuiteContact){
+                #Yes - Has the client been updated more recently in NetSuite?
+                Write-Host -ForegroundColor DarkGreen "`tCorresponding NetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] found by NetSuiteId"
+                if((Get-Date $correspondingNetSuiteContact.lastModifiedDate) -gt (Get-Date $thisHubSpotContact.updatedAt)){
+                    #Yes - Update NetSuite > HubSpot
+                    Write-Host -ForegroundColor Green "`tNetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] updated more recently than HubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] - UPDATING NetSuite -> HubSpot"
+                    if([string]::IsNullOrWhiteSpace($correspondingNetSuiteContact.custentitycustentity_hubspotid)){
                             Write-Warning "NetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] is missing its custentitycustentity_hubspotid - fixing this first"
                             $updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $correspondingNetSuiteContact -fieldHash @{custentitycustentity_hubspotid = $thisHubSpotContact.id}
                             $correspondingNetSuiteContact = get-netSuiteContactFromNetSuite -contactId $correspondingNetSuiteContact.id -netsuiteParameters $netSuiteParameters
                             }
-                        try{
-                            $updatedHubSpotContact = update-hubSpotObjectFromNetSuiteObject -apiKey $apiKey.HubApiKey -objectType contacts -netSuiteObject $correspondingNetSuiteContact
-                            Write-Host -ForegroundColor DarkGreen "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] updated"
-                            #Pop this update from $netSuiteContactsToCheck to prevent it the update running again when we 
-                            $netSuiteContactsToCheck = $netSuiteContactsToCheck | ? {$_.id -ne $correspondingNetSuiteContact.id}
-                            }
-                        catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
+                    try{
+                        $updatedHubSpotContact = update-hubSpotObjectFromNetSuiteObject -apiKey $apiKey.HubApiKey -objectType contacts -netSuiteObject $correspondingNetSuiteContact
+                        Write-Host -ForegroundColor DarkGreen "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] updated"
+                        $netSuiteContactsToCheck = $netSuiteContactsToCheck | ? {$_.id -ne $correspondingNetSuiteContact.id} #Pop this update from $netSuiteContactsToCheck to prevent it being updated again when we process $netSuiteContactsToCheck in a moment
+                        }
+                    catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                         
-                        }
-                    elseif([Math]::Abs(([datetime]$thisHubSpotContact.updatedAt - [datetime]$thisHubSpotContact.properties.lastmodifiedinhubspot).TotalSeconds) -gt 5){ #Has the HubSpot object been updated since the last sync? Specifically: is lastmodifiedinhubspot missing a value (suggesting that it's never been synced) or is the value more than 5 seconds either side of updatedAt (suggesting that it's been edited in HubSpot since the last sync)? The reason we can't compare with -eq here is because lastmodifiedinhubspot and updatedat can never match exactly: whenever we write the current value of updatedat into lastmodifiedinhubspotbysync, it updates the HubSpot record and generates a new value for updatedat (which no longer matches the value we've just writted to lastmodifiedinhubspotbysync). We have to be a little fuzzy and allow the timestamps to be "close enough". We have to ensure that the last time we update the HubSpot record, we get lastmodifiedinhubspot and updatedat within this window.
-                        #No  - Update HubSpot > NetSuite
-                        Write-Host -ForegroundColor Green "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] updated more recently than NetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] - UPDATING HubSpot -> NetSuite"
-                        try{
-                            $updatedNetSuiteContact = update-netSuiteContactInNetSuiteFromHubSpotObject -hubSpotContactObject $thisHubSpotContact -hubSpotApiKey $apiKey.HubApiKey -netsuiteParameters $netSuiteParameters
-                            }
-                        catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
-                        }
-                    else{
-                        #HubSpot Contact has not been updated at all! (Because we've just grabbed all contacts at this Company, we'll probably find quite a few of these)
-                        }
                     }
-                else{
-                    Write-Warning "NetSuite Contact with NetSuiteId [$($thisHubSpotContact.properties.netsuiteid)] is missing from NetSuite (probably deleted) - REMOVING NetSuiteId from HubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)]"
-                    try{update-hubSpotObject -apiKey $apiKey.HubApiKey -objectType contacts -objectId $thisHubSpotContact.id -fieldHash @{netsuiteid=$null}}
+                elseif($(test-hubSpotTimeStampIsCloseEnough -updatedAt $thisHubSpotContact.updatedAt -lastmodifiedinhubspot $thisHubSpotContact.properties.lastmodifiedinhubspot) -eq $false){ #Has the HubSpot object been updated since the last sync? Specifically: is lastmodifiedinhubspot missing a value (suggesting that it's never been synced) or is the value more than 5 seconds either side of updatedAt (suggesting that it's been edited in HubSpot since the last sync)? The reason we can't compare with -eq here is because lastmodifiedinhubspot and updatedat can never match exactly: whenever we write the current value of updatedat into lastmodifiedinhubspotbysync, it updates the HubSpot record and generates a new value for updatedat (which no longer matches the value we've just writted to lastmodifiedinhubspotbysync). We have to be a little fuzzy and allow the timestamps to be "close enough". We have to ensure that the last time we update the HubSpot record, we get lastmodifiedinhubspot and updatedat within this window.
+                    #No  - Update HubSpot > NetSuite
+                    Write-Host -ForegroundColor Green "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] updated more recently than NetSuite Contact [$($correspondingNetSuiteContact.entityId)][$($correspondingNetSuiteContact.id)] - UPDATING HubSpot -> NetSuite"
+                    try{
+                        $updatedNetSuiteContact = update-netSuiteContactInNetSuiteFromHubSpotObject -hubSpotContactObject $thisHubSpotContact -hubSpotApiKey $apiKey.HubApiKey -netsuiteParameters $netSuiteParameters
+                        $netSuiteContactsToCheck = $netSuiteContactsToCheck | ? {$_.id -ne $updatedNetSuiteContact.id} #Pop this update from $netSuiteContactsToCheck to prevent it being updated again when we process $netSuiteContactsToCheck in a moment
+                        }
                     catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                     }
+                else{
+                    #HubSpot Contact has not been updated at all! (now we filter Contacts based on lastmodified
+                    Write-Host -ForegroundColor DarkGreen "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] updated"
+                    }
+                }
+            else{
+                Write-Warning "NetSuite Contact with NetSuiteId [$($thisHubSpotContact.properties.netsuiteid)] is missing from NetSuite (probably deleted) - REMOVING NetSuiteId from HubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)]"
+                try{update-hubSpotObject -apiKey $apiKey.HubApiKey -objectType contacts -objectId $thisHubSpotContact.id -fieldHash @{netsuiteid=""}} #HUbSpot won't let us $null this
+                catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
                 }
             }
         }
     
     }
+
+#endregion
+
+#region Process remaining NetSuite Contacts
+@($netSuiteContactsToCheck | Select-Object) | % {
+    #Does this NetSuite Contact have a HubSpotId?
+        #No - Does this Contact's NetSuiteId appear in HubSpot?
+            #Yes - Cross-reference the Contacts
+            #No  - Does this Contact's e-mail address appear in HubSpot?
+                #Yes - Cross-reference the Contacts
+                #No  - Create a new HubSpot Contact based on the NetSuite Contact
+        #Yes - Has the client been updated more recently in HubSpot?
+            #Yes - Update HubSpot > NetSuite
+            #No  - Update NetSuite > HubSpot
+    $thisNetSuiteContact = $_
+    #Does this NetSuite Contact have a HubSpotId?
+    Write-Host -ForegroundColor Green "Processing NetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)]"
+    if([string]::IsNullOrEmpty($thisNetSuiteContact.custentitycustentity_hubspotid)){
+        #No - Does this Contact's NetSuiteId appear in HubSpot?
+        $hubContactIdFilter = [ordered]@{
+            propertyName="netsuiteid"
+            operator="EQ"
+            value=$thisNetSuiteContact.id
+            }
+        $correspondingHubSpotContact = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType contacts -filterGroup1 @{filters=@($hubContactIdFilter)}
+        if(![string]::IsNullOrEmpty($correspondingHubSpotContact.id)){
+            #Yes - Cross-reference the Contacts
+            Write-Host -f DarkGreen "`tHubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] matched by Id"
+            try{
+                $updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $thisNetSuiteContact.id -fieldHash @{custentitycustentity_hubspotid=$correspondingHubSpotContact.id} -netsuiteParameters $netSuiteParameters -ErrorAction Stop
+                Write-Host -f Green "`tHubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] and NetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] CROSS-REFERENCED by HubSpotId"
+                }
+            catch{Write-Host -f Red $(get-errorSummary -errorToSummarise $_)}
+            }
+            #No  - Does this Contact's e-mail address appear in HubSpot?
+        if( [string]::IsNullOrEmpty($correspondingHubSpotContact.id)){ 
+            $hubContactEmailFilter = [ordered]@{
+                propertyName="email"
+                operator="EQ"
+                value=$thisNetSuiteContact.email
+                }
+            $correspondingHubSpotContact = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType contacts -filterGroup1 @{filters=@($hubContactEmailFilter)}
+                #Yes - Cross-reference the Contacts
+            if(![string]::IsNullOrEmpty($correspondingHubSpotContact.id)){
+                Write-Host -f DarkGreen "`tHubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] matched by Email"
+                try{
+                    $updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $thisNetSuiteContact.id -fieldHash @{custentitycustentity_hubspotid=$correspondingHubSpotContact.id} -netsuiteParameters $netSuiteParameters -ErrorAction Stop 
+                    Write-Host -f Green "`tHubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] and NetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] CROSS-REFERENCED by email"
+                    }
+                catch{Write-Host -f Red $(get-errorSummary -errorToSummarise $_)}
+                }
+                #No  - Create a new HubSpot Contact based on the NetSuite Contact
+            else{
+                Write-Host -ForegroundColor Green "`tCould not match NetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] to any HubSpot Contact: CREATING new HubSpot Contact"
+                $parentHubSpotCompanyId = $($netSuiteCompaniesToCheck | ? {$_.id -eq $thisNetSuiteContact.company.id}).HubSpotId #Try to save a query to NetSuite by checking the cache. This could be improved with a compare-object
+                if([string]::IsNullOrEmpty($parentHubSpotCompanyId)){
+                    try{
+                        $newHubSpotContact = new-hubspotContactFromNetsuiteContact -apiKey $apiKey.HubApiKey -netSuiteContact $thisNetSuiteContact -netSuiteParams $netSuiteParameters -ErrorAction Stop
+                        Write-Host -f Green "`t`tNew HubSpot Contact [$($newHubSpotContact.properties.email)][$($newHubSpotContact.id)] created!"
+                        $null = update-netSuiteContactInNetSuite -netSuiteContactId $thisNetSuiteContact.id -fieldHash @{custentitycustentity_hubspotid = $newHubSpotContact.id; custentity_marketing_originalsourcesyste = "NetSuite"} -netsuiteParameters $netSuiteParameters
+                        $thisNetSuiteContact = get-netSuiteContactFromNetSuite -contactId $thisNetSuiteContact.id -netsuiteParameters $netSuiteParameters
+                        Write-Host -f DarkGreen "`t`tNetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] updated with new HobSpotId [$($newHubSpotContact.id)]"
+                        }
+                    catch{Write-Host -f Red $(get-errorSummary -errorToSummarise $_)}
+                    
+                    }
+                else{
+                    try{
+                        $newHubSpotContact = new-hubspotContactFromNetsuiteContact -apiKey $apiKey.HubApiKey -netSuiteContact $thisNetSuiteContact -hubSpotCompanyId $parentHubSpotCompanyId -ErrorAction Stop
+                        Write-Host -f Green "`t`tNew HubSpot Contact [$($newHubSpotContact.properties.email)][$($newHubSpotContact.id)] created!"
+                        $null = update-netSuiteContactInNetSuite -netSuiteContactId $thisNetSuiteContact.id -fieldHash @{custentitycustentity_hubspotid = $newHubSpotContact.id} -netsuiteParameters $netSuiteParameters
+                        $thisNetSuiteContact = get-netSuiteContactFromNetSuite -contactId $thisNetSuiteContact.id -netsuiteParameters $netSuiteParameters
+                        Write-Host -f DarkGreen "`t`tNetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] updated with new HobSpotId [$($newHubSpotContact.id)]"
+                        }
+                    catch{Write-Host -f Red $(get-errorSummary -errorToSummarise $_)}
+                    }
+                
+                }
+            }
+        }
+    else{
+        #Yes - Has the Contact been updated more recently in HubSpot?
+        $correspondingHubSpotContact = get-hubSpotContactById -apiKey $apiKey.HubApiKey -contactId $thisNetSuiteContact.custentitycustentity_hubspotid -ErrorAction SilentlyContinue
+        if(![string]::IsNullOrWhiteSpace($correspondingHubSpotContact.id)){
+            Write-Host -ForegroundColor DarkGreen "`tCorresponding HubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] found by HubSpotId"
+            if((Get-Date $correspondingHubSpotContact.updatedAt) -gt (Get-Date $thisNetSuiteContact.lastModifiedDate)){
+            #Yes - Update HubSpot > NetSuite
+                Write-Host -ForegroundColor Green "`tHubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] updated more recently than NetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] - UPDATING HubSpot -> NetSuite"
+                try{
+                    $updatedNetSuiteContact = update-netSuiteContactInNetSuiteFromHubSpotObject -hubSpotContactObject $correspondingHubSpotContact -hubSpotApiKey $apiKey.HubApiKey -netsuiteParameters $netSuiteParameters -ErrorAction Stop #-Verbose
+                    Write-Host -ForegroundColor DarkGreen "`tNetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] updated"
+                    }
+                catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
+                }
+
+            #No  - Update NetSuite > HubSpot
+            elseif(($thisNetSuiteContact.lastModifiedDate -gt $correspondingHubSpotContact.properties.lastmodifiedinnetsuite) -and (Get-Date $thisNetSuiteContact.lastModifiedDate) -gt (Get-Date $correspondingHubSpotContact.updatedAt)){
+                Write-Host -ForegroundColor Green "`tNetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] updated more recently than HubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] - UPDATING NetSuite -> HubSpot"
+                try{
+                    $updatedHubSpotContact = update-hubSpotObjectFromNetSuiteObject -apiKey $apiKey.HubApiKey -objectType contacts -netSuiteObject $thisNetSuiteContact -ErrorAction Stop
+                    Write-Host -ForegroundColor DarkGreen "`tHubSpot Contact [$($correspondingHubSpotContact.properties.email)][$($correspondingHubSpotContact.id)] updated"
+                    }
+                catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
+                }
+            else{
+                Write-Host -f DarkGreen "NetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)] doesn't seem to have changed."
+                }
+            }
+
+        else{
+            Write-Warning "HubSpot Contact with HubSpotId [$($thisNetSuiteContact.custentitycustentity_hubspotid)] is missing from HubSpot (probably deleted) - REMOVING HubSpotId from NetSuite Contact [$($thisNetSuiteContact.email)][$($thisNetSuiteContact.id)][$($thisNetSuiteContact.company.refName)][$($thisNetSuiteContact.company.id)]"
+            try{update-netSuiteContactInNetSuite -netSuiteContactId $thisNetSuiteContact.id -fieldHash @{custentitycustentity_hubspotid=$null} -netsuiteParameters $netSuiteParameters}
+            catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
+            }
+        
+        }
+    }
+#endregion
 
 #endregion
 
@@ -527,3 +716,5 @@ $hubSpotCompaniesToCheck | Select-Object | % {
         #Check $netSuite.hubSpotId
             #-eq $null - Create new HubSpot record
             #-ne $null - $netSuite.HubSpotId = $hubSpot.id
+
+Stop-Transcript

@@ -895,7 +895,7 @@ function set-standardSitePermissions(){
     catch{#Connect to the root site if we're not connected to anything
         Write-Verbose "Connecting to Graph"
         #Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -AccessToken $tokenResponse.access_token
-         Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret
+         Connect-PnPOnline -Url "https://anthesisllc-admin.sharepoint.com/" -ClientId $pnpAppCreds.ClientID -ClientSecret $pnpAppCreds.Secret
         $pnpUnifiedGroupObject = Get-PnPUnifiedGroup -Identity $graphGroupExtended.id
         }
 
@@ -907,7 +907,7 @@ function set-standardSitePermissions(){
 
     #region Get connected to the Site
     try{
-        $userWasAlreadyASiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -pnpAppCreds $teamBotDetails -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose:$VerbosePreference
+        $userWasAlreadyASiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $pnpUnifiedGroupObject -pnpAppCreds $pnpAppCreds -pnpCreds $pnpCreds -addPermissionsIfMissing $true -ErrorAction Stop -Verbose:$VerbosePreference
         }
     catch{
         Write-Verbose "Error connecting to [$([uri]::UnescapeDataString($pnpUnifiedGroupObject.SiteUrl))] - cannot continue"

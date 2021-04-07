@@ -108,13 +108,9 @@ foreach ($currentRequest in $selectedRequests){
         $new365Group = new-365Group -displayName $("External - $($fullRequest.FieldValues.Title)".Trim(" ")) -managerUpns $managers -teamMemberUpns $members -memberOf $null -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType Private -autoSubscribe $autoSubscribe -groupClassification $groupClassification -membershipManagedBy 365 -tokenResponse $tokenResponse -pnpCreds $365creds -ownersAreRealManagers $false -alsoCreateTeam $alsoCreateTeam -Verbose
         
         Write-Verbose "Getting PnPUnifiedGroup [$($new365Group.displayName)] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
-        #this gets getting stuck
         
-        $i = 0
-        While($i -lt 2){
-        $connectpnponline = Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
-        $i ++
-        }
+        #this gets getting stuck
+        Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com" -RetryCount 2 -ReturnConnection
         $newPnpTeam = Get-PnPUnifiedGroup -Identity $new365Group.id
         write-host "We found site $($NewPnpTeam.DisplayName)" -ForegroundColor DarkYellow
         
@@ -241,8 +237,6 @@ foreach ($currentRequest in $selectedRequests){
 
         #Admin has training
         If($thisAdminisAuthorised){
-        #test
-        Write-Host "I should be sending for sites A and D" -ForegroundColor Magenta
         try{
             $body = "<HTML><BODY><p>Hi $($fullRequest.FieldValues.Site_x0020_Admin.LookupValue.Split(" ")[0]),</p>
                 <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">External
@@ -291,7 +285,6 @@ foreach ($currentRequest in $selectedRequests){
         Else{
         #Admin has no training and there are no other owners
         If((!($fullRequest.FieldValues.Site_x0020_Owners.Email)) -and (!$thisAdminisAuthorised)){
-        Write-Host "I should be sending to site B" -ForegroundColor Magenta
         try{
             $body = "<HTML><BODY><p>Hi $($fullRequest.FieldValues.Site_x0020_Admin.LookupValue.Split(" ")[0]),</p>
                 <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">External
@@ -338,7 +331,6 @@ foreach ($currentRequest in $selectedRequests){
         }
         #Admin has no training and there ARE other owners
         If(($fullRequest.FieldValues.Site_x0020_Owners) -and (!$thisAdminisAuthorised)){
-        Write-Host "I should be sending for sites C" -ForegroundColor Magenta
         try{
             $body = "<HTML><BODY><p>Hi $($fullRequest.FieldValues.Site_x0020_Admin.LookupValue.Split(" ")[0]),</p>
                 <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">External

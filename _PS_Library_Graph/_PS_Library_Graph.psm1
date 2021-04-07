@@ -427,7 +427,8 @@ function get-graphAppClientCredentials{
         }
     
     $placesToLook = @( #Figure out where to look
-        "$env:USERPROFILE\Desktop\$encryptedCredsFile"
+        "$env:USERPROFILE\Downloads\$encryptedCredsFile"
+        ,"$env:USERPROFILE\Desktop\$encryptedCredsFile"
         ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\$encryptedCredsFile"
         )
 

@@ -10,7 +10,7 @@ function friendlyLogWrite(){
        ,[parameter(Mandatory = $true)]
             [string]$logstring
        ,[parameter(Mandatory = $true)]
-            [validateset("WARNING","SUCCESS","ERROR","ERROR DETAILS","MESSAGE","Change in 365","Change by Request","END","START")]
+            [validateset("WARNING","SUCCESS","ERROR","ERROR DETAILS","MESSAGE","Change in 365","Change by Request","END","START","PROCESSING")]
             [String]$messagetype
         )
 If($messagetype -eq "MESSAGE"){
@@ -60,10 +60,16 @@ If($messagetype -eq "Change in 365"){
 $value = $("<>" + " Change in 365: " + "$($logstring)" + "<>")
 Add-content $friendlyLogname -value $value
 }
+
+If($messagetype -eq "Processing"){
+$value = $("<>" + " Processing: " + "$($logstring)" + "<>")
+Add-content $friendlyLogname -value $value
+}
+
 }
 $TeamsLog = @()
 
-$Logname = "C:\ScriptLogs" + "\sync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
+$Logname = "C:\ScriptLogs" + "\sync-PeopleDirectoryTranscript $(Get-Date -Format "yyMMdd").log"
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
@@ -127,7 +133,7 @@ $reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
 
 
 #Get all licensed graph users
-$usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true -Verbose
+$usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
 #Get all current Anthesians in the list
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
@@ -185,7 +191,7 @@ $graphmanager = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graph
     }
 
 #Exchange timezone
-$exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)" -Verbose
+$exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)"
 #Philippine's uses several timezone names
 If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
 $exoTimezone = New-Object -TypeName psobject @{
@@ -374,6 +380,7 @@ Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 
 
 <#------------------------------------------------------------------------------------Process Changes by 365 amend--------------------------------------------------------------------------------------------#>
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "Line383"
 
 ForEach($graphuser in $allgraphusers){
 $TeamsReport = @()
@@ -592,6 +599,7 @@ If($($thisanthesian.fields.BusinessUnit) -ne $($graphuser.anthesisgroup_employee
 
 
 <#------------------------------------------------------------------------------------Something for Dupe Checking--------------------------------------------------------------------------------------------#>
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "Line602"
 
 #Get all current Anthesians in the list
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
@@ -656,6 +664,7 @@ Write-Host "No dupes found in POP Reporting List" -ForegroundColor Yellow
 
 
 <#------------------------------------------------------------------------------------------Sync checking between the two lists/Cleaning Up POP Reporting List for Mismatches-----------------------------------------------------------------------------------------------------#>
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "Line667"
 
 #If graph is interrupted pulling graph users back, the lists can become misaligned.
 $unsyncedanthesians = Compare-Object -ReferenceObject $allanthesiansDetails.UserGUID -DifferenceObject $allPOPreportsDetails.UserGUID | where-object -Property "SideIndicator" -EQ "<="
@@ -681,27 +690,26 @@ ForEach($missingpop in $missingpops){
 
 
 <#------------------------------------------------------------------------------------------Calculate Hire date (if empty) and Tenure-----------------------------------------------------------------------------------------------------#>
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "Line693"
 
 #Update Hire date on People Services list item
 
 #This is a real pain - we can't update HireDate at the moment on the graph object, so we're searching the two new starter request lists for an entry. I've used pnp for my sanity here just to differentiate processing from the two lists we're processing with Graph 
 $allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -UseWebLogin #-Credentials $msolCredentials
-$oldrequests = Get-PnPListItem -List "New User Requests"
+$oldrequests = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/hr" -listName "New User Requests" -expandAllFields
+$newrequests = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -listName "New Starter Details" -expandAllFields
 
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -UseWebLogin #-Credentials $msolCredentials
-$newrequests = Get-PnPListItem -List "New Starter Details"
-
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "705"
 
 ForEach($anthesian in $allanthesians){
     If($anthesian.fields.HireDate -eq $null){
     
     #Try to find them in the old list
     $thisFoundUser = ""
-    $thisFoundUser = $oldrequests | ? {($(remove-diacritics $($_.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
+    $thisFoundUser = $oldrequests | ? {($(remove-diacritics $($_.Fields.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
         If(($thisFoundUser | Measure-Object).count -eq 1){
         write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
-        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.StartDate | get-date -format "o")} -Verbose
+        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.Fields.Start_x0020_Date | get-date -format "o")} -Verbose
         }
         Else{
         Write-Host "Not found in old user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
@@ -709,10 +717,10 @@ ForEach($anthesian in $allanthesians){
 
     #if not in old list, connect and pull all requests from the new list and try to find them
         If($thisFoundUser -eq $null){
-        $thisFoundUser = $newrequests | ? {($(remove-diacritics $($_.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
+        $thisFoundUser = $newrequests | ? {($(remove-diacritics $($_.Fields.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
         If(($thisFoundUser | Measure-Object).count -eq 1){
         write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
-        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.FieldValues.StartDate | get-date -format "o")} -Verbose
+        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.Fields.StartDate | get-date -format "o")} -verbose
         }
         Else{
         Write-Host "Not found in new user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
@@ -724,15 +732,17 @@ ForEach($anthesian in $allanthesians){
 }
 }
 
+friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "Updating Tenure"
 #Calculate tenure in days and update People Directory list item
 ForEach($anthesian in $allanthesians){
 If($anthesian.fields.HireDate){
 $TenureinDays = New-TimeSpan -Start $anthesian.fields.HireDate -End $(get-date) | Select-Object -Property "Days"
 $TenureinDays = $TenureinDays.Days + 1
 [int]$currentListItemTenure = $anthesian.fields.TenureDays
-    If($currentListItemTenure -ne $TenureinDays.Days){
-    write-host "Updating tenure for $($anthesian.Fields.Email): $($TenureinDays.Days)" -foregroundcolor Cyan
-    update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"TenureDays" = $($TenureinDays).days} -Verbose
+    If($currentListItemTenure -ne $TenureinDays){
+    write-host "Updating tenure for $($anthesian.Fields.Email): $($TenureinDays) (from $($currentListItemTenure))" -foregroundcolor Cyan
+    friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype PROCESSING -logstring "Tenure Update: $($anthesian.Fields.Email): $($TenureinDays) (from $($currentListItemTenure))"
+    update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"TenureDays" = $($TenureinDays)} -Verbose
     }
 }
 }
@@ -759,5 +769,5 @@ Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleSer
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype END -logstring "End of run for sync-Directory365Changes"
 
 
-
+Stop-Transcript
 
