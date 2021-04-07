@@ -281,10 +281,23 @@ Switch($selection){
 "B" {$contracttype = "Subcontractor"}
 }
 
+
+#Use Secondary Office location if homeworker - primary for anything else
+If($thisUser.fieldvalues.Primary_x0020_Workplace.Label -eq "Home worker"){
+    #If there is actually data in the secondary workplace field - we can't make it mandatory
+    If($thisUser.fieldvalues.Nearest_x0020_Office.Label){
+    $officeterm = Get-PnPTerm -Identity $($thisUser.fieldvalues.Nearest_x0020_Office.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
+    $country = $officeTerm.CustomProperties.Country
+    $regionalgroup = $officeterm
+    }
+}
+Else{
 #Get secondary geographic data from the term store
 $officeterm = Get-PnPTerm -Identity $($thisUser.fieldvalues.Primary_x0020_Workplace.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
 $country = $officeTerm.CustomProperties.Country
 $regionalgroup = $officeterm
+}
+
 
 #365 user account: Create the 365 user
 write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) first, which will create the unliscensed 365 E1 user"    
@@ -335,6 +348,10 @@ Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor Whit
 #update employee extension info with graph
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"businessUnit" = $($businessunit)}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"contractType" = $($contracttype)}
+set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoExtensionHash @{"extensionType" = "employeeInfo"}
+
+#Set hire date from start date
+#set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"employeeHireDate" = $($thisUser.FieldValues.Start_x0020_Date)} -not available yet?
 
 #Set hire date from start date
 #set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"employeeHireDate" = $($thisUser.FieldValues.Start_x0020_Date)} -not available yet?
