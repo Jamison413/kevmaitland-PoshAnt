@@ -135,6 +135,12 @@ Write-Host "Removed Member: Removing $($removedmember.InputObject) from $($Membe
 $spmembers = Remove-PnPUserFromGroup -LoginName $($removedmember.InputObject) -Identity $MembersSPOGroupName
 }
 
+#Add members
+$newmembers = Compare-Object -ReferenceObject $clientsModifyMembers.mail -DifferenceObject $externalcurrentspmembers.Email | where-object -Property "SideIndicator" -EQ "<="
+ForEach($newmember in $newmembers){
+Write-Host "New Member: Adding $($newmember.InputObject) to $($MembersSPOGroupName)" -ForegroundColor Yellow
+$spmembers = Add-PnPUserToGroup -LoginName $($newmember.InputObject) -Identity $MembersSPOGroupName
+}
 
 #Reports
 If(!($error)){
@@ -150,5 +156,12 @@ $syncSPDataManagersHash = @{
 "LastRun" = "$(get-date)"
 }
 Update-graphListItem -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 14  -fieldHash $syncSPDataManagersHash 
+#Remove members
+$removedmembers = Compare-Object -ReferenceObject $clientsModifyMembers.mail -DifferenceObject $externalcurrentspmembers.Email | where-object -Property "SideIndicator" -EQ "=>"
+$removedmembers = $removedmembers | Where-Object -property "inputObject" -ne "T1-Emily.Pressey@anthesisgroup.com" #this account is the Group Owner (can't add domain groups)
+ForEach($removedmember in $removedmembers){
+Write-Host "Removed Member: Removing $($removedmember.InputObject) from $($MembersSPOGroupName)" -ForegroundColor Yellow
+$spmembers = Remove-PnPUserFromGroup -LoginName $($removedmember.InputObject) -Identity $MembersSPOGroupName
+}			   
 
 Stop-Transcript
