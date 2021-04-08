@@ -77,7 +77,7 @@ $closemodule = Set-PnPListItem -list $masterModuleList -Identity $module.Id -Val
 }
 
 }
-
+<#
 #Clean up old events in IT Training (as we have no team management of this in SPO, this will save some time)
 $ITTrainingEvents = Get-PnPListItem -List $ITTraininglist
 ForEach($currentevent in $ITTrainingEvents){
@@ -90,7 +90,7 @@ $isitaftertheevent = New-TimeSpan -Start (get-date) -End $currentevent.FieldValu
     }
 
 }
-
+#>
 
 
 

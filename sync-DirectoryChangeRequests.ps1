@@ -2,7 +2,7 @@
 #This is the second half of the Anthesis Directory Sync Scripts. This just handles change requests via the People Services and Administration Teams, which writes back to 365 and to the Anthesis Directory and Reporting Lists.
 
 
-$friendlyLogname = "C:\ScriptLogs" + "\friendlylogsync-PeopleDirectory $(Get-Date -Format "yyMMdd").log"
+$friendlyLogname = "C:\ScriptLogs" + "\friendlylogsync-ChangeRequests $(Get-Date -Format "yyMMdd").log"
 function friendlyLogWrite(){
     [cmdletbinding()]
     param(

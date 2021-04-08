@@ -208,7 +208,10 @@ function add-netSuiteClientToNetSuite{
         subsidiary = @{id=$subsidiaryId}
         }
     switch($newDataOriginatedFrom){
-        "HubSpot" {$bodyHash.Add("custentitycustentity_hubspotid",$externalId)}
+        "HubSpot" {
+            $bodyHash.Add("custentitycustentity_hubspotid",$externalId)
+            $bodyHash.Add("custentity_marketing_originalsourcesyste","HubSpot") 
+            }
         }
     
     invoke-netSuiteRestMethod -requestType POST -url "$($netsuiteParameters.uri)/customer" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $bodyHash
@@ -256,8 +259,6 @@ function add-netSuiteContactToNetSuite{
             [ValidateSet("HubSpot")]
             [string]$newDataOriginatedFrom
         ,[parameter(Mandatory = $true)]
-            [string]$contactFullName 
-        ,[parameter(Mandatory = $true)]
             [string]$companyNetSuiteId 
         ,[parameter(Mandatory = $true)]
             [AllowNull()]
@@ -265,6 +266,10 @@ function add-netSuiteContactToNetSuite{
         ,[parameter(Mandatory = $true)]
             [ValidatePattern(".[@].")]
             [string]$email
+        ,[parameter(Mandatory = $true)]
+            [string]$contactFirstName 
+        ,[parameter(Mandatory = $true)]
+            [string]$contactLastName 
         ,[parameter(Mandatory = $false)]
             [string]$mainPhone
         ,[parameter(Mandatory = $false)]
@@ -277,8 +282,11 @@ function add-netSuiteContactToNetSuite{
             #[ValidateSet("Anthesis (UK) Ltd","Anthesis Canada Inc.","Anthesis Consulting (USA) Inc.","Anthesis Consulting Group Limited","Anthesis Consulting UK Ltd","Anthesis Consultoria Ambiental ltda","Anthesis Energy UK Ltd","Anthesis Enveco AB","Anthesis Finland OY","Anthesis GmBh","Anthesis Ireland Ltd","Anthesis LLC","Anthesis Middle East","Anthesis Philippines Inc.","Caleb Management Services Ltd","Lavola 1981 SAU","Lavola Andora SA","Lavola Columbia","The Goodbrand Works Ltd","X-Elimination ACUS","X-Elimination AUK","X-Elimination LSA","X-Elimination PC")]
             [string]$subsidiary 
         ,[parameter(Mandatory=$false)]
+            [string]$originalSourceOfContact
+        ,[parameter(Mandatory=$false)]
             [psobject]$netsuiteParameters
         )
+    $fullContactName = "$($hubSpotContactObject.properties.firstname) $($hubSpotContactObject.properties.lastname)".Trim(" ")
     Write-Verbose "add-netSuiteContactToNetSuite [$($contactFullName)]"
 
     try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $subsidiary}
@@ -288,9 +296,10 @@ function add-netSuiteContactToNetSuite{
         $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
+
     
     $bodyHash = [ordered]@{
-        entityId = $contactFullName
+        entityId = $fullContactName
         externalId = $externalId
         email = $email
         phone = $mainPhone
@@ -301,11 +310,16 @@ function add-netSuiteContactToNetSuite{
         company = @{id=$companyNetSuiteId}
         }
     switch($newDataOriginatedFrom){
-        "HubSpot" {$bodyHash.Add("custentitycustentity_hubspotid",$externalId)}
+        "HubSpot" {
+            $bodyHash.Add("custentitycustentity_hubspotid",$externalId)
+            $bodyHash.Add("custentity_marketing_originalsourcesyste","HubSpot") 
+            }
         }
     
-    invoke-netSuiteRestMethod -requestType POST -url "$($netsuiteParameters.uri)/contact" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $bodyHash
+    $result = invoke-netSuiteRestMethod -requestType POST -url "$($netsuiteParameters.uri)/contact" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $bodyHash
 
+    $newNetSuiteContact = get-netSuiteContactFromNetSuite -query "?q=externalId IS $($externalId)" -netsuiteParameters $netSuiteParameters #invoke above doesn't return the new object :(
+    $newNetSuiteContact
     }
 function add-netSuiteContactToNetSuiteFromHubSpotObject{
     [cmdletbinding()]
@@ -336,9 +350,11 @@ function add-netSuiteContactToNetSuiteFromHubSpotObject{
     if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.phone)){$mainPhone = $hubSpotContactObject.properties.phone}
     if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.mobilephone)){$mainPhone = $hubSpotContactObject.properties.mobilephone} #Prefer mobiles over landlines as primary phone
     
+    #Create a Stub record in NetSuite
     $newNetSuiteContact = add-netSuiteContactToNetSuite `
         -newDataOriginatedFrom HubSpot `
-        -contactFullName $fullContactName `
+        -contactFirstName $($hubSpotContactObject.properties.firstname).Trim() `
+        -contactLastName $($hubSpotContactObject.properties.lastname).Trim() `
         -companyNetSuiteId $companyNetSuiteId `
         -externalId $hubSpotContactObject.id `
         -email $hubSpotContactObject.properties.email `
@@ -349,8 +365,12 @@ function add-netSuiteContactToNetSuiteFromHubSpotObject{
         -subsidiary $subsidiary `
         -netsuiteParameters $netsuiteParameters
 
+    #Then update it with all the Marketing Bells & Whistles
+    $hubSpotContactObject.properties.netsuiteid = $newNetSuiteContact.id
+    $updatedNetSuiteContact = update-netSuiteContactInNetSuiteFromHubSpotObject -hubSpotContactObject $hubSpotContactObject -hubSpotApiKey $hubSpotApiKey -companyNetSuiteId $companyNetSuiteId -netsuiteParameters $netsuiteParameters 
     $updatedHubSpotContact = update-hubSpotObject -apiKey $hubSpotApiKey -objectType contacts -objectId $hubSpotContactObject.id -fieldHash @{netsuiteid=$newNetSuiteContact.id; lastmodifiedinnetsuite=$newNetSuiteContact.lastModifiedDate; lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)}
     $newNetSuiteContact
+    #$updatedNetSuiteContact 
     }
 function add-netSuiteProjectToSharePoint{
     [cmdletbinding()]
@@ -898,18 +918,18 @@ function get-netSuiteClientFromSqlCache{
     $result
     }
 function get-netSuiteContactFromNetSuite(){
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true,ParameterSetName="Query")]
-            [ValidatePattern('^?[\w+][=][\w+]')]
-            [string]$query
-        ,[parameter(Mandatory=$true,ParameterSetName="Id")]
-            [string]$contactId
-        ,[parameter(Mandatory=$false,ParameterSetName="Query")]
-            [parameter(Mandatory = $false,ParameterSetName="GetAll")]
-            [parameter(Mandatory = $false,ParameterSetName="Id")]
-            [psobject]$netsuiteParameters
-        )
+[cmdletbinding()]
+Param (
+    [parameter(Mandatory = $false,ParameterSetName="Query")]
+        [ValidatePattern('^?[\w+][=][\w+]|^$')]
+        [string]$query
+    ,[parameter(Mandatory=$true,ParameterSetName="Id")]
+        [string]$contactId
+    ,[parameter(Mandatory=$false,ParameterSetName="Query")]
+        [parameter(Mandatory = $false,ParameterSetName="GetAll")]
+        [parameter(Mandatory = $false,ParameterSetName="Id")]
+        [psobject]$netsuiteParameters
+    )
 
     Write-Verbose "`tget-netSuiteContactFromNetSuite([$($query)])"
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
@@ -923,8 +943,9 @@ function get-netSuiteContactFromNetSuite(){
             }
         default {
             $contacts = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/contact$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-            $contactsEnumerated = [psobject[]]::new($contacts.count)
+            [array]$contactsEnumerated = [psobject[]]::new($contacts.count)
             for ($i=0; $i -lt $contacts.count;$i++) {
+                write-progress -activity "Retrieving NetSuite Contact details..." -Status "[$($i)]/[$($contactsEnumerated.count)]" -PercentComplete $(($i*100)/$contactsEnumerated.count)
                 $url = "$($contacts.items[$i].links[0].href)" + "/?expandSubResources=True"
                 if($i%100 -eq 0){Write-Verbose "[$($i)]/[$($contacts.count)] ($($i / $contacts.count)%)"}
                 $contactsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $url -netsuiteParameters $netsuiteParameters 
@@ -990,24 +1011,84 @@ function get-netSuiteEmployeesFromNetSuite(){
         [parameter(Mandatory = $false)]
         [ValidatePattern('^?[\w+][=][\w+]')]
         [string]$query
-
         ,[parameter(Mandatory=$false)]
         [psobject]$netsuiteParameters
+        ,[parameter(Mandatory=$false)]
+        [ValidateSet('True','False')]
+        [string]$allNetsuiteEmployees
+        ,[parameter(Mandatory=$false)]
+        [ValidateSet('Actively Employed','Probation','Terminated')]
+        [string]$employeestatus
         )
-
     Write-Verbose "`tget-netSuiteEmployeesFromNetSuite([$($query)])"
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
         $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
+    Write-Host "Getting all @anthesisgroup.com employees - please use allNetsuiteEmployees switch to pull everything back with no filters" -ForegroundColor Cyan
+    
+    #employeestatus
+    If($employeestatus){
+    $Netquery = "?q=email CONTAIN `"@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"netsuitebot@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"purchasing@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"noemail@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"group.finance@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"pieface@anthesisgroup.com`""
+    $Netquery += "AND employeestatus CONTAIN `"$($employeestatus)`""
 
-    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters #-Verbose 
     $employeesEnumerated = [psobject[]]::new($employees.count)
     for ($i=0; $i -lt $employees.count;$i++) {
         $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
         }
     $employeesEnumerated
     }
+
+    #customquery
+    If($query){
+    $Netquery = "?q=email CONTAIN `"@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"netsuitebot@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"purchasing@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"noemail@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"group.finance@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"pieface@anthesisgroup.com`""
+    $Netquery += " AND $($query)`""
+
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
+        }
+    $employeesEnumerated
+    }
+
+    #allAnthesisemployees
+    If(!($query) -and !($employeestatus)){
+    $Netquery = "?q=email CONTAIN `"@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"netsuitebot@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"purchasing@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"noemail@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"group.finance@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"pieface@anthesisgroup.com`""
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
+        }
+    $employeesEnumerated
+    }
+    
+    #allNetsuiteemployees
+    If($allNetsuiteEmployees){
+        $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
+        }
+    $employeesEnumerated
+    }
+}
 function get-netSuiteMetadata(){
     [cmdletbinding()]
     Param (
@@ -1329,7 +1410,7 @@ function invoke-netSuiteRestMethod(){
             }
         catch{
             if($_.Exception -match "401"){Write-Warning "401: Unauthorised access attempt to [$($url)]"}
-            else{get-errorSummary -errorToSummarise $_}
+            else{Write-Error $_}
             }
         }
     else{
@@ -1755,6 +1836,12 @@ function update-netSuiteClientFromHubSpotObject(){
         shipCountry = $hubSpotCompanyObject.properties.country
         shipState = $hubSpotCompanyObject.properties.state
         shipZip = $hubSpotCompanyObject.properties.zip
+        custentity_marketing_originalsourcesyste = $hubSpotCompanyObject.properties.hs_analytics_source
+        custentity_marketing_numberofpageviews   = $hubSpotCompanyObject.properties.hs_analytics_num_page_views
+        custentity_marketing_timeoflastsession   = $hubSpotCompanyObject.properties.hs_analytics_last_timestamp
+        custentity_marketing_firstconversion     = $hubSpotCompanyObject.properties.first_conversion_event_name
+        custentity_marketing_mostrecentconversio = $hubSpotCompanyObject.properties.recent_conversion_event_name 
+        custentity_marketing_mostrecentconvdate   = $hubSpotCompanyObject.properties.recent_conversion_date
         }
 
         if(![string]::IsNullOrEmpty($hubSpotCompanyObject.properties.netsuite_sector)){
@@ -1813,8 +1900,6 @@ function update-netSuiteContactInNetSuiteFromHubSpotObject(){
         ,[parameter(Mandatory = $true)]
             [string]$hubSpotApiKey
         ,[parameter(Mandatory=$false)]
-            [string]$subsidiary
-        ,[parameter(Mandatory=$false)]
             [string]$companyNetSuiteId
         ,[parameter(Mandatory=$false)]
             [psobject]$netsuiteParameters
@@ -1829,7 +1914,9 @@ function update-netSuiteContactInNetSuiteFromHubSpotObject(){
     if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.mobilephone)){$mainPhone = $hubSpotContactObject.properties.mobilephone} #Prefer mobiles over landlines as primary phone
 
     $bodyHash = @{
-        entityId = $fullContactName
+        entityId = $fullContactName #Is NetSuite really going to let us update this? Looks like it...
+        firstname = $hubSpotContactObject.properties.firstname
+        lastname = $hubSpotContactObject.properties.lastname
         email = $hubSpotContactObject.properties.email
         phone = $mainPhone
         mobilePhone = $hubSpotContactObject.properties.mobilephone
@@ -1837,23 +1924,63 @@ function update-netSuiteContactInNetSuiteFromHubSpotObject(){
         title = $hubSpotContactObject.properties.jobtitle
         }
 
-    if(![string]::IsNullOrWhiteSpace($subsidiary)){
-        try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $subsidiary}
-        catch{Write-Error $_;return}
-        $bodyHash.Add("subsidiary",@{id=$subsidiaryId})
-        }
     if(![string]::IsNullOrWhiteSpace($companyNetSuiteId)){
         $bodyHash.Add("company",@{id=$companyNetSuiteId})
         }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.first_conversion_event_name)){
+        $bodyHash.Add("custentity_marketing_firstconversion",$hubSpotContactObject.properties.first_conversion_event_name)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.hs_analytics_first_referrer)){
+        $bodyHash.Add("custentity_marketing_firstreferringsite",$hubSpotContactObject.properties.hs_analytics_first_referrer)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.formSubmissionHistory)){
+        $bodyHash.Add("custentity_marketing_formsubmission",$hubSpotContactObject.formSubmissionHistory)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.last_webinar_attended_date)){
+        $bodyHash.Add("custentity_marketing_lastwebinardate",$(get-dateInIsoFormat -dateTime $hubSpotContactObject.properties.last_webinar_attended_date -precision Milliseconds))
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.message)){
+        $bodyHash.Add("custentity_marketing_message",$hubSpotContactObject.properties.message)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.recent_conversion_date)){
+        $bodyHash.Add("custentity_marketing_mostrecentconvdate",$(get-dateInIsoFormat -dateTime $hubSpotContactObject.properties.recent_conversion_date -precision Milliseconds))
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.recent_conversion_event_name)){
+        $bodyHash.Add("custentity_marketing_mostrecentconversio",$hubSpotContactObject.properties.recent_conversion_event_name)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.hs_analytics_num_page_views)){
+        $bodyHash.Add("custentity_marketing_numberofpageviews",$hubSpotContactObject.properties.hs_analytics_num_page_views)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.opted_out_of_some_marketing_emails)){
+        $bodyHash.Add("custentity_marketing_optoutany",$(if($hubSpotContactObject.properties.opted_out_of_some_marketing_emails -eq $true){$true}else{$false}))
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.hs_analytics_source_data_1)){
+        $bodyHash.Add("custentity_marketing_originalsourcedril1",$hubSpotContactObject.properties.hs_analytics_source_data_1)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.hs_analytics_source_data_2)){
+        $bodyHash.Add("custentity_marketing_originalsourcedril2",$hubSpotContactObject.properties.hs_analytics_source_data_2)  #This is stored ina a different format!!
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.hs_analytics_source)){
+        $bodyHash.Add("custentity_marketing_originalsourcetype",$hubSpotContactObject.properties.hs_analytics_source)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.pageViewHistory)){
+        $bodyHash.Add("custentity_marketing_pageview",$hubSpotContactObject.pageViewHistory)
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.hs_analytics_last_visit_timestamp)){
+        $bodyHash.Add("custentity_marketing_timeoflastsession",$(get-dateInIsoFormat -dateTime $hubSpotContactObject.properties.hs_analytics_last_visit_timestamp -precision Milliseconds))
+        }
+    if(![string]::IsNullOrWhiteSpace($hubSpotContactObject.properties.webinarHistory)){
+        $bodyHash.Add("custentity_marketing_webinarhistory",$hubSpotContactObject.properties.webinarHistory)
+        }
 
     
-    if([string]::IsNullOrEmpty($hubSpotCompanyObject.properties.netsuiteid)){
+    if([string]::IsNullOrEmpty($hubSpotContactObject.properties.netsuiteid)){
         Write-Error "HubSpot Contact [$($hubSpotContactObject.properties.firstname)][$($hubSpotContactObject.properties.lastname)][$($hubSpotContactObject.id)] has no NetSuiteId. Cannot update this object using a HubSpot object"
         }
     else{
-        $updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $hubSpotContactObject.properties.netsuiteid -fieldHash $fieldHash -netsuiteParameters $netsuiteParameters
+        $updatedNetSuiteContact = update-netSuiteContactInNetSuite -netSuiteContactId $hubSpotContactObject.properties.netsuiteid -fieldHash $bodyHash -netsuiteParameters $netsuiteParameters
         $updatedNetSuiteContact = get-netSuiteContactFromNetSuite -contactId $hubSpotContactObject.properties.netsuiteid -netsuiteParameters $netsuiteParameters
-        $updatedHubSpotClient = update-hubSpotObject -apiKey $hubSpotApiKey -objectType companies -objectId $hubSpotContactObject.id -fieldHash @{lastmodifiedinnetsuite=$updatedNetSuiteContact.lastModifiedDate; lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)}
+        $updatedHubSpotContact = update-hubSpotObject -apiKey $hubSpotApiKey -objectType contacts -objectId $hubSpotContactObject.id -fieldHash @{lastmodifiedinnetsuite=$updatedNetSuiteContact.lastModifiedDate; lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)} -Verbose:$VerbosePreference
         $updatedNetSuiteContact
         }
 

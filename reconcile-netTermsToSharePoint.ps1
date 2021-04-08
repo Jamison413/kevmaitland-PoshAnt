@@ -486,7 +486,7 @@ cls
 
     if($deltaSync -eq $true){
         [array]$newClients = $allClientTerms | ? {[string]::IsNullOrEmpty($_.DriveClientId)}
-        [array]$existingClients = $allClientTerms | ? {![string]::IsNullOrEmpty($_.DriveClientId) -and $_.CustomProperties.flagForReprocessing -eq $true}
+        [array]$existingClients = $allClientTerms | ? {![string]::IsNullOrEmpty($_.DriveClientId) -and $_.CustomProperties.flagForReprocessing -ne $false}
         }
 
     if($deltaSync -eq $false){
@@ -631,7 +631,7 @@ cls
 
                         #No: Set flagForReproccessing = $false
             [array]$existingTermClientsWithOriginalName = $existingClientsNameComparison["=="] #We'll updated these once we've finished the deltaClients ones too.
-            [array]$existingClientsIncorrectlyFlaggedForProcessing = $existingTermClientsWithOriginalName | ? {$_.CustomProperties.flagForReprocessing -eq $true}
+            [array]$existingClientsIncorrectlyFlaggedForProcessing = $existingTermClientsWithOriginalName | ? {$_.CustomProperties.flagForReprocessing -ne $false}
             if($existingClientsIncorrectlyFlaggedForProcessing.Count -gt 0){
                 Write-Host "`t`t[$($existingClientsIncorrectlyFlaggedForProcessing.Count)] seems to have been flagged for reprocessing, but they don't seem to have changed. Deflagging them."
                 $existingClientsIncorrectlyFlaggedForProcessing | % {
@@ -672,7 +672,7 @@ cls
     $matchingOppsToClients = Measure-Command {
         if($deltaSync -eq $true){
             [array]$newOpps = $allOppTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
-            [array]$existingOpps = $allOppTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -eq $true}
+            [array]$existingOpps = $allOppTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -ne $false}
             }
 
         if($deltaSync -eq $false){
@@ -783,7 +783,7 @@ cls
                     #No: Dedupe & set flagForReproccessing = $false
 
         #Does Term have a TermProjId?
-        $existingOppTermsWithProject = $existingOpps    | ? {![string]::IsNullOrWhiteSpace($_.NetSuiteProjectId) -and $_.CustomProperty.flagForReprocessing -eq $true}
+        $existingOppTermsWithProject = $existingOpps    | ? {![string]::IsNullOrWhiteSpace($_.NetSuiteProjectId) -and $_.CustomProperty.flagForReprocessing -ne $false}
             #Yes: Do nothing to Opps that have been won & set flagForReproccessing = $false
         Write-Host "`tProcessing [$($existingOppTermsWithProject.Count)] existing Opportunities with Projects"
         @($existingOppTermsWithProject | Select-Object) | % {
@@ -901,7 +901,7 @@ cls
                     #No: Dedupe & set flagForReprocessing = $false
             [array]$existingDriveOppsWithoutProjectWithOriginalClient = $oppExpectedDriveIdComparion["=="] 
             $dedupedOppsWithOriginalClientAndOriginalName = [System.Collections.Generic.Hashset[Microsoft.SharePoint.Client.Taxonomy.TermSetItem]] ($existingDriveOppsWithoutProjectWithOriginalName + $existingDriveOppsWithoutProjectWithOriginalClient)
-            [array]$dedupedOppsStillFlaggedForProcessing = $dedupedOppsWithOriginalClientAndOriginalName | ? {$_.CustomProperties.flagForReprocessing -eq $true}
+            [array]$dedupedOppsStillFlaggedForProcessing = $dedupedOppsWithOriginalClientAndOriginalName | ? {$_.CustomProperties.flagForReprocessing -ne $false}
             if($dedupedOppsStillFlaggedForProcessing.Count -gt 0){
                 Write-Host "`t[$($dedupedOppsStillFlaggedForProcessing.Count)] Opportunity Terms were flagged for reprocessing, but they don't seem to have any changes. This isn't specifically a _problem_, but it's an indication that reconcile-netSuiteToTermStore() is incorrectly flagging Opportunities as requiring processing when they don't"
                 $dedupedOppsStillFlaggedForProcessing | % {
@@ -926,12 +926,12 @@ cls
     $matchingProjsToClients = Measure-Command {
         if($deltaSync -eq $true){
             [array]$newProjs = $allProjTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
-            [array]$existingProjs = $allProjTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -eq $true}
+            [array]$existingProjs = $allProjTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -ne $false}
             }
 
 
         if($deltaSync -eq $false){
-            $projComparison = Compare-Object -ReferenceObject @($ProjsMatchedToClients | Select-Object) -DifferenceObject @($driveItemsProjFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
+            $projComparison = Compare-Object -ReferenceObject @($allProjTerms | Select-Object) -DifferenceObject @($driveItemsProjFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
             [array]$newProjs = $allProjTerms | ? {$_.SideIndicator -eq "<="} 
             [array]$existingProjs = $allProjTerms | ? {$_.SideIndicator -eq "=="}
             #[array]$orphanedProjFolders = $projComparison | ? {$_.SideIndicator -eq "=>"}
@@ -1208,7 +1208,7 @@ cls
                     #No: Dedupe & set flagForReprocessing = $false
             [array]$existingTermProjsWithOriginalClient = $projExpectedDriveIdComparion["=="]
             $dedupedProjectsWithOriginalClientAndOriginalName = [System.Collections.Generic.Hashset[Microsoft.SharePoint.Client.Taxonomy.TermSetItem]] ($existingTermProjsWithOriginalName + $existingTermProjsWithOriginalClient)
-            [array]$dedupedProjectsStillFlaggedForProcessing = $dedupedProjectsWithOriginalClientAndOriginalName | ? {$_.CustomProperties.flagForReprocessing -eq $true}
+            [array]$dedupedProjectsStillFlaggedForProcessing = $dedupedProjectsWithOriginalClientAndOriginalName | ? {$_.CustomProperties.flagForReprocessing -ne $false}
             if($dedupedProjectsStillFlaggedForProcessing.Count -gt 0){
                 Write-Host "`t[$($dedupedProjectsStillFlaggedForProcessing.Count)] Project Terms were flagged for reprocessing, but they don't seem to have any changes. This isn't specifically a _problem_, but it's an indication that reconcile-netSuiteToTermStore() is incorrectly flagging Projects as requiring processing when they don't"
                 $dedupedProjectsStillFlaggedForProcessing | % {

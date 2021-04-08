@@ -353,6 +353,9 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoE
 #Set hire date from start date
 #set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"employeeHireDate" = $($thisUser.FieldValues.Start_x0020_Date)} -not available yet?
 
+#Set hire date from start date
+#set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"employeeHireDate" = $($thisUser.FieldValues.Start_x0020_Date)} -not available yet?
+
 #Update phone numbers with graph (whole thing needs re-writing like this - fastest way to make amends at the moment)
 If($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe){
 $businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}

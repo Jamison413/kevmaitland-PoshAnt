@@ -159,6 +159,7 @@ $timeForFullCycle = Measure-Command {
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name TermProjCode -Value $(($_.name -split " ")[0]) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name TermProjId -Value $($_.Id) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveItemId -Value $($_.CustomProperties.DriveItemId) -Force
+                Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjCode -Value $(($_.name -split " ")[0]) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjName -Value $_.name -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
                 }
@@ -223,6 +224,7 @@ $timeForFullCycle = Measure-Command {
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name TermOppCode -Value $($_.name) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name TermProjId -Value $($_.CustomProperties.NetSuiteProjectId) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name DriveItemId -Value $($_.CustomProperties.DriveItemId) -Force
+                Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalOppCode -Value $(($_.name -split " ")[0]) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalOppName -Value $($_.name) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalOppNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.CustomProperties.NetSuiteProjectId) -Force

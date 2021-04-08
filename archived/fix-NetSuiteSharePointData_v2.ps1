@@ -30,7 +30,7 @@ function get-duplicatesByProperty(){
             $alternativeFeedbackProperties | % {$alternativeOutput += "[$($originalTerm.$_)]"}
             Write-Host -ForegroundColor Yellow "$($alternativeOutput) (original) duplicated [$($duplicateTerms.Count)] times as:"
             }
-        else{Write-Host -ForegroundColor Yellow "[$($originalTerm.Name)][$($originalTerm.Id)][$($originalTerm.$propertyToTest)] (original) duplicated [$($propertyToTest)] [$($duplicateTerms.Count)] times as:"}
+        else{Write-Host -ForegroundColor Yellow "[$($originalTerm.Name)][$($originalTerm.Id)][$($originalTerm.$propertyToTest)] (original $propertyToTest) duplicated [$($propertyToTest)] [$($duplicateTerms.Count)] times as:"}
         $duplicateTerms | % {
             $thisDupTerm = $_
             if($alternativeFeedbackProperties){
