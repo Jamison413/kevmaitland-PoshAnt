@@ -1837,7 +1837,7 @@ function update-netSuiteClientFromHubSpotObject(){
         shipState = $hubSpotCompanyObject.properties.state
         shipZip = $hubSpotCompanyObject.properties.zip
         custentity_marketing_originalsourcesyste = $hubSpotCompanyObject.properties.hs_analytics_source
-        custentity_marketing_numberofpageviews   = $hubSpotCompanyObject.properties.hs_analytics_num_page_views
+        custentity_marketing_numberofpageviews   = [int]$hubSpotCompanyObject.properties.hs_analytics_num_page_views
         custentity_marketing_timeoflastsession   = $hubSpotCompanyObject.properties.hs_analytics_last_timestamp
         custentity_marketing_firstconversion     = $hubSpotCompanyObject.properties.first_conversion_event_name
         custentity_marketing_mostrecentconversio = $hubSpotCompanyObject.properties.recent_conversion_event_name 

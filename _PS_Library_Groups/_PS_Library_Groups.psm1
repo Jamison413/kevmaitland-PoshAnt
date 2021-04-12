@@ -550,7 +550,8 @@ function new-mailEnabledSecurityGroup(){
             [bool]$blockExternalMail
         )
     Write-Verbose "new-mailEnabledSecurityGroup([$dgDisplayName], [$description], [$($ownersUpns -join ", ")], [$($membersUpns -join ", ")], [$($memberOf -join ", ")], $hideFromGal, $blockExternalMail)"
-    $mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64
+    $mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64 -Verbose
+    write-verbose "#####Mailname: $($mailName)"
 
     #Check to see if this already exists. This is based on Alias, which is mutable :(    
     $mesg = rummage-forDistributionGroup -displayName $dgDisplayName

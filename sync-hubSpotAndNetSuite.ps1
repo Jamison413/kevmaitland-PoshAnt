@@ -19,9 +19,13 @@ function test-hubSpotTimeStampIsCloseEnough(){
     param(
         [Parameter(Mandatory = $true, Position = 0)]
             [datetime]$updatedAt
-        ,[Parameter(Mandatory = $true, Position = 0)]
-            [datetime]$lastmodifiedinhubspot
+        ,[Parameter(Mandatory = $true, Position = 1)]
+            [AllowNull()]
+            [nullable[datetime]]$lastmodifiedinhubspot
         )
+
+    if($lastmodifiedinhubspot -eq $null){return $false}
+
     $allowedDiscrepencyInSeconds = 5
 
     if([Math]::Abs(([datetime]$updatedAt - [datetime]$lastmodifiedinhubspot).TotalSeconds) -lt $allowedDiscrepencyInSeconds){$true}
@@ -95,6 +99,19 @@ $netSuiteCompaniesToCheck | % {
     $thisNetSuiteCompany = $_
     if([string]::IsNullOrWhiteSpace($thisNetSuiteCompany.HubSpotId)){ #$netSuite.HubSpotId -eq $null
         #***Create new record in HubSpot
+        #First, try to find a HubSpot Company with the corresponding NetSuiteID
+        $filterCompanyNetSuiteIdEq = [ordered]@{
+            propertyName="netsuiteid"
+            operator="EQ"
+            value=$thisNetSuiteCompany.NetSuiteId
+            }
+        $hubSortOldestCreatedInHubSpot = [ordered]@{
+            propertyName = "createdate"
+            direction = "ASCENDING"
+            }
+        $matchedHubspotCompany = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyNetSuiteIdEq)} -sortPropertyNameAndDirection $hubSortOldestCreatedInHubSpot -pageSize 1 -firstPageOnly
+        }
+    if([string]::IsNullOrWhiteSpace($matchedHubspotCompany)){
         #Try to match to generic company e-mail address (and link to that)
         if([string]::IsNullOrWhiteSpace($thisNetSuiteCompany.email) -or $thisNetSuiteCompany.email -match "@anthesisgroup.com" -or $thisNetSuiteCompany.email -match "@lavola.com"){
             Write-Host -ForegroundColor Yellow "Unlinked NetSuite company found [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)], but no generic e-mail address set. No meaningful way to identify this company in HubSpot."
@@ -503,7 +520,7 @@ $netSuiteContactsToCheck = get-netSuiteContactFromNetSuite -netsuiteParameters $
                     }
                 else{
                     #HubSpot Contact has not been updated at all! (now we filter Contacts based on lastmodified
-                    Write-Host -ForegroundColor DarkGreen "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] updated"
+                    Write-Host -ForegroundColor DarkGreen "`tHubSpot Contact [$($thisHubSpotContact.properties.firstname)][$($thisHubSpotContact.properties.lastname)][$($thisHubSpotContact.id)] did not require updating!"
                     }
                 }
             else{

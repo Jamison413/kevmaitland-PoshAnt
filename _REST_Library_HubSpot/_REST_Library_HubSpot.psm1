@@ -7,8 +7,8 @@
             [Object[]]$eventsArray
         )
     $eventsArray | Sort-Object occurredAt -Descending | % {
-        if($_.eventType -eq "e_visited_page"){$pageViewHistory += "$($_.occurredAt.Split("T")[0])`t$($_.properties.hs_url)`r`n"}
-        if($_.eventType -eq "e_submitted_form"){$formSubmissionHistory += "$($_.occurredAt.Split("T")[0])`t$($_.properties.hs_url)`r`n"} #The "Message" part of the Form submission isn't currenlty returned via the REST API: https://developers.hubspot.com/docs/api/events/web-analytics#Event%20type%20selection%20and%20filters#:~:text=Event type selection and filters
+        if($_.eventType -eq "e_visited_page"){$pageViewHistory += "$($_.occurredAt.Split("T")[0])`t$((($_.properties.hs_url -split '\?utm') -split '&utm')[0])`r`n"}
+        if($_.eventType -eq "e_submitted_form"){$formSubmissionHistory += "$($_.occurredAt.Split("T")[0])`t$((($_.properties.hs_url -split '\?utm') -split '&utm')[0])`r`n"} #The "Message" part of the Form submission isn't currenlty returned via the REST API: https://developers.hubspot.com/docs/api/events/web-analytics#Event%20type%20selection%20and%20filters#:~:text=Event type selection and filters
         if($_.eventType -eq "e_attended_marketing_event"){$webinarHistory += "$($_.occurredAt.Split("T")[0])`t$($_.properties.hs_marketing_event)`r`n"} #The "Message" part of the Form submission isn't currenlty returned via the REST API: https://developers.hubspot.com/docs/api/events/web-analytics#Event%20type%20selection%20and%20filters#:~:text=Event type selection and filters
         }
     if(![string]::IsNullOrWhiteSpace($pageViewHistory))      {$contactObject | Add-Member -MemberType NoteProperty -Name pageViewHistory       -Value $pageViewHistory -Force}
@@ -360,7 +360,7 @@ function invoke-hubSpotGet(){
             [ValidateSet("v1", "v2", "v3")]
             [string]$apiVersion = "v3"
         ,[parameter(Mandatory = $false)]
-            [ValidateSet("crm", "events", "reports","marketing","content/api","forms","form-integrations")]
+            [ValidateSet("analytics", "crm", "events", "reports","marketing","content/api","forms","form-integrations")]
             [string]$api = "crm"
         )
     $sanitisedataQuery = $query.Trim("/")
