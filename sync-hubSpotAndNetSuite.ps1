@@ -97,30 +97,62 @@ $netSuiteCompaniesToCheck | % { #Prep the objects for compare-object later
 #region Process changes, starting with NetSuite companies
 $netSuiteCompaniesToCheck | % {
     $thisNetSuiteCompany = $_
-    if([string]::IsNullOrWhiteSpace($thisNetSuiteCompany.HubSpotId)){ #$netSuite.HubSpotId -eq $null
-        #***Create new record in HubSpot
-        #First, try to find a HubSpot Company with the corresponding NetSuiteID
-        $filterCompanyNetSuiteIdEq = [ordered]@{
-            propertyName="netsuiteid"
-            operator="EQ"
-            value=$thisNetSuiteCompany.NetSuiteId
-            }
-        $hubSortOldestCreatedInHubSpot = [ordered]@{
-            propertyName = "createdate"
-            direction = "ASCENDING"
-            }
-        $matchedHubspotCompany = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyNetSuiteIdEq)} -sortPropertyNameAndDirection $hubSortOldestCreatedInHubSpot -pageSize 1 -firstPageOnly
+    $correspondingHubSpotCompany = $null
+    #***Create new record in HubSpot
+    #First, try to find a HubSpot Company with the corresponding NetSuiteID
+    $filterCompanyNetSuiteIdEq = [ordered]@{
+        propertyName="netsuiteid"
+        operator="EQ"
+        value=$thisNetSuiteCompany.NetSuiteId
         }
-    if([string]::IsNullOrWhiteSpace($matchedHubspotCompany)){
-        #Try to match to generic company e-mail address (and link to that)
+    $hubSortOldestCreatedInHubSpot = [ordered]@{
+        propertyName = "createdate"
+        direction = "ASCENDING"
+        }
+    $oldestHubspotCompanyByNetSuiteId = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyNetSuiteIdEq)} -sortPropertyNameAndDirection $hubSortOldestCreatedInHubSpot -pageSize 1 -firstPageOnly
+    if(![string]::IsNullOrWhiteSpace($oldestHubspotCompanyByNetSuiteId)){
+        Write-Host -ForegroundColor Cyan "Corresponding HubSpot Company [$($oldestHubspotCompanyByNetSuiteId.properties.name)][$($oldestHubspotCompanyByNetSuiteId.id)] retrieved from HubSpot based on NetSuiteId [$($thisNetSuiteCompany.NetSuiteId)]"
+        $correspondingHubSpotCompany = $oldestHubspotCompanyByNetSuiteId
+        }
+    if([string]::IsNullOrWhiteSpace($oldestHubspotCompanyByNetSuiteId) -and ![string]::IsNullOrWhiteSpace($thisNetSuiteCompany.HubSpotId)){
+    #If we can't find the corresponding HubSpot company by NetSuiteId, try by the HubSpotId on the NetSuite object (if there is one)
+        Write-Host -ForegroundColor Cyan "Linked NetSuite company found [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] - retrieving HubSpot Company with Id [$($thisNetSuiteCompany.HubSpotId)]"
+        $hubspotCompanyByHubSpotId = Compare-Object -ReferenceObject $hubSpotCompaniesToCheck -DifferenceObject $thisNetSuiteCompany -Property HubSpotId -ExcludeDifferent -IncludeEqual -PassThru
+        if($hubspotCompanyByHubSpotId){
+            Write-Host -ForegroundColor DarkCyan "`tCorresponding HubSpot Company [$($hubspotCompanyByHubSpotId.properties.name)][$($hubspotCompanyByHubSpotId.id)] retrieved from Companies flagged to Sync"
+            $correspondingHubSpotCompany = $hubspotCompanyByHubSpotId
+            }
+        else{ #Error checking
+            Write-Host -ForegroundColor DarkCyan "`tHubSpot Company not retrieved from Companies flagged to Sync - trying HubSpot"
+            $hubspotFilterThisId = new-hubSpotFilterById -hubSpotId $thisNetSuiteCompany.HubSpotId
+            $hubspotCompanyByHubSpotId = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($hubspotFilterThisId)}
+            if($hubspotCompanyByHubSpotId){
+                Write-Host -ForegroundColor DarkCyan "`tCorresponding HubSpot Company [$($hubspotCompanyByHubSpotId.properties.name)][$($hubspotCompanyByHubSpotId.id)] retrieved from HubSpot"
+                $correspondingHubSpotCompany = $hubspotCompanyByHubSpotId
+                }
+            elseif(!$hubspotCompanyByHubSpotId){
+                Write-Warning "HubSpot company [$($thisNetSuiteCompany.HubSpotId)] (NetSuite name:[$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.NetSuiteId)]) could not be retrieved from HubSpot - it may have been deleted from HubSpot?"
+                return #Break out of current $thisNetSuiteCompany loop if no $hubspotCompanyByHubSpotId exists
+                }
+            elseif($hubspotCompanyByHubSpotId.properties.netsuite_sync_company_ -eq $false){
+                Write-Warning "HubSpot company [$($hubspotCompanyByHubSpotId.properties.name)][$($thisNetSuiteCompany.HubSpotId)] (NetSuite name:[$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.NetSuiteId)]) is not flagged with {netsuite_sync_company_} - not syncing chamges back to HubSpot"
+                return #Break out of current $thisNetSuiteCompany loop if $hubspotCompanyByHubSpotId is not flagged netsuite_sync_company_
+                }
+            }
+        }
+    if([string]::IsNullOrWhiteSpace($oldestHubspotCompanyByNetSuiteId) -and [string]::IsNullOrWhiteSpace($hubspotCompanyByHubSpotId)){
+    #If we can't find a corresponding HubSpot company by either Id, try by e-mail address
         if([string]::IsNullOrWhiteSpace($thisNetSuiteCompany.email) -or $thisNetSuiteCompany.email -match "@anthesisgroup.com" -or $thisNetSuiteCompany.email -match "@lavola.com"){
             Write-Host -ForegroundColor Yellow "Unlinked NetSuite company found [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)], but no generic e-mail address set. No meaningful way to identify this company in HubSpot."
-            $matchedHubspotCompany = $null
+            $hubspotCompanyByEmail = $null
             }
         else{
             Write-Host -ForegroundColor Yellow "Unlinked NetSuite company found [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] - looking for match in HubSpot"
-            $matchedHubspotCompany = $hubSpotCompaniesToCheck | ? {$_.properties.generic_email_address__c -eq $thisNetSuiteCompany.email}
-            if($matchedHubspotCompany){Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] found in HubSpot records marked for Sync [$($matchedHubspotCompany.properties.name)][$($matchedHubspotCompany.id)]"}
+            $hubspotCompanyByEmail = $hubSpotCompaniesToCheck | ? {$_.properties.generic_email_address__c -eq $thisNetSuiteCompany.email}
+            if($hubspotCompanyByEmail){
+                Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] found in HubSpot records marked for Sync [$($hubspotCompanyByEmail.properties.name)][$($hubspotCompanyByEmail.id)]"
+                $correspondingHubSpotCompany = $hubspotCompanyByEmail
+                }
             else{
                 Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] not found in HubSpot records marked for Sync - searching all HubSpot records"
                 $filterCompanyGenericEmailEq = [ordered]@{
@@ -128,10 +160,13 @@ $netSuiteCompaniesToCheck | % {
                     operator="EQ"
                     value=$thisNetSuiteCompany.email
                     }
-                $matchedHubspotCompany = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyGenericEmailEq)}
+                $hubspotCompanyByEmail = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyGenericEmailEq)}
 
                 #Try to match to any contact e-mail address and deduce Company (and link to that)
-                if($matchedHubspotCompany){Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] found in HubSpot [$($matchedHubspotCompany.properties.name)][$($matchedHubspotCompany.id)]"}
+                if($hubspotCompanyByEmail){
+                    Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] found in HubSpot [$($hubspotCompanyByEmail.properties.name)][$($hubspotCompanyByEmail.id)]"
+                    $correspondingHubSpotCompany = $hubspotCompanyByEmail
+                    }
                 else{
                     Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] not found in HubSpot either - searching Contacts"
                     $filterContactEmailEq = [ordered]@{
@@ -146,37 +181,20 @@ $netSuiteCompaniesToCheck | % {
                             operator="EQ"
                             value=$matchedHubspotContact.associatedcompanyid
                             }
-                        $matchedHubspotCompany = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyIdEq)}
-                        }
-
-                    #Have one last stab via domain name
-                    if($matchedHubspotCompany){Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] matched to a Contact in HubSpot. Contact's Company is: [$($matchedHubspotCompany.properties.name)][$($matchedHubspotCompany.id)]"}
-<#                    elseif(![string]::IsNullOrWhiteSpace($thisNetSuiteCompany.email) -and $thisNetSuiteCompany.email -match "@"){
-                        Write-Host -ForegroundColor DarkYellow "`tGeneric e-mail address [$($thisNetSuiteCompany.email)] not found in any HubSpot Contacts either - seaching domain names"
-                        $filterCompanyDomainEq = [ordered]@{
-                            propertyName="domain"
-                            operator="EQ"
-                            value=$($thisNetSuiteCompany.email.Split("@")[1])
+                        $hubspotCompanyByEmail = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyIdEq)}
+                        if($hubspotCompanyByEmail){
+                            Write-Host -ForegroundColor DarkYellow "`tContact [$($matchedHubspotContact.properties.firstname)][$($matchedHubspotContact.properties.lastname)][$($matchedHubspotContact.id)] e-mail address [$($thisNetSuiteCompany.email)] found in HubSpot [$($hubspotCompanyByEmail.properties.name)][$($hubspotCompanyByEmail.id)]"
+                            $correspondingHubSpotCompany = $hubspotCompanyByEmail
                             }
-                        [array]$wildlyOptimisticSearch = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyDomainEq)}
-                        if($wildlyOptimisticSearch.Count -eq 1){
-                            $matchedHubspotCompany = $wildlyOptimisticSearch[0]
-                            Write-Host -ForegroundColor DarkYellow "`tMatched to HubSpot company [$($matchedHubspotCompany.properties.name)][$($matchedHubspotCompany.id)] on the rather flimsy basis that the generic e-mail address [$($thisNetSuiteCompany.email)] in NetSuite matches the domain name [$($matchedHubspotCompany.properties.domain)] in HubSpot"
-                            } 
-                        else{
-                            $matchedHubspotCompany = $null
-                            Write-Host -ForegroundColor DarkYellow "`tNo match for domain names either :("
-                            }#If we've not matched _exactly_ one company, abort this attempt
-                        }#>
+                        }
                     }
                 }
             }
-                
-        if($matchedHubspotCompany){#Update and cross-reference both companies (if we've matched them)
-            Write-Host -ForegroundColor Yellow "`tCross-referencing NetSuite Company [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] with HubSpot Company [$($matchedHubspotCompany.properties.name)][$($matchedHubspotCompany.id)]"
-            try{$updatedHubSpotCompany = update-hubSpotObject -apiKey $apiKey.HubApiKey -objectType companies -objectId $matchedHubspotCompany.id -fieldHash @{netsuiteid=$thisNetSuiteCompany.id; lastmodifiedinnetsuite=$(get-dateInIsoFormat -dateTime $(Get-Date $thisNetSuiteCompany.lastModifiedDate).AddYears(-100) -precision Seconds);lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)}}
+        if($hubspotCompanyByEmail){#Update and cross-reference both companies (if we've matched them)
+            Write-Host -ForegroundColor Yellow "`tCross-referencing NetSuite Company [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] with HubSpot Company [$($hubspotCompanyByEmail.properties.name)][$($hubspotCompanyByEmail.id)]"
+            try{$updatedHubSpotCompany = update-hubSpotObject -apiKey $apiKey.HubApiKey -objectType companies -objectId $hubspotCompanyByEmail.id -fieldHash @{netsuiteid=$thisNetSuiteCompany.id; lastmodifiedinnetsuite=$(get-dateInIsoFormat -dateTime $(Get-Date $thisNetSuiteCompany.lastModifiedDate).AddYears(-100) -precision Seconds);lastmodifiedinhubspot=$(get-dateInIsoFormat -dateTime $(Get-Date) -precision Ticks)}}
             catch{Write-Error $_}
-            try{$updatedNetSuiteCompany = update-netSuiteClientInNetSuite -netSuiteClientId $thisNetSuiteCompany.id -fieldHash @{custentitycustentity_hubspotid = $matchedHubspotCompany.id} -netsuiteParameters $netSuiteParameters}
+            try{$updatedNetSuiteCompany = update-netSuiteClientInNetSuite -netSuiteClientId $thisNetSuiteCompany.id -fieldHash @{custentitycustentity_hubspotid = $hubspotCompanyByEmail.id} -netsuiteParameters $netSuiteParameters}
             catch [System.Net.WebException]{
                 $json = ConvertFrom-Json -InputObject $_.ErrorDetails.Message
                 if($json.status -eq 400){
@@ -202,28 +220,10 @@ $netSuiteCompaniesToCheck | % {
                 }
             catch{Write-Host -ForegroundColor Red $(get-errorSummary -errorToSummarise $_)}
             }
-
         }
-    else{#Match to HubSpot on ForeignKey (HubSpotID)
-        Write-Host -ForegroundColor Cyan "Linked NetSuite company found [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] - retrieving HubSpot Company with Id [$($thisNetSuiteCompany.HubSpotId)]"
-        $correspondingHubSpotCompany = Compare-Object -ReferenceObject $hubSpotCompaniesToCheck -DifferenceObject $thisNetSuiteCompany -Property HubSpotId -ExcludeDifferent -IncludeEqual -PassThru
-        if($correspondingHubSpotCompany){
-            Write-Host -ForegroundColor DarkCyan "`tCorresponding HubSpot Company [$($correspondingHubSpotCompany.properties.name)][$($correspondingHubSpotCompany.id)] retrieved from Companies flagged to Sync"
-            }
-        else{ #Error checking
-            Write-Host -ForegroundColor DarkCyan "`tHubSpot Company not retrieved from Companies flagged to Sync - trying HubSpot"
-            $hubspotFilterThisId = new-hubSpotFilterById -hubSpotId $thisNetSuiteCompany.HubSpotId
-            $correspondingHubSpotCompany = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($hubspotFilterThisId)}
-            if($correspondingHubSpotCompany){Write-Host -ForegroundColor DarkCyan "`tCorresponding HubSpot Company [$($correspondingHubSpotCompany.properties.name)][$($correspondingHubSpotCompany.id)] retrieved from HubSpot"}
-            elseif(!$correspondingHubSpotCompany){
-                Write-Warning "HubSpot company [$($thisNetSuiteCompany.HubSpotId)] (NetSuite name:[$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.NetSuiteId)]) could not be retrieved from HubSpot - it may have been deleted from HubSpot?"
-                return #Break out of current $thisNetSuiteCompany loop if no $correspondingHubSpotCompany exists
-                }
-            elseif($correspondingHubSpotCompany.properties.netsuite_sync_company_ -eq $false){
-                Write-Warning "HubSpot company [$($correspondingHubSpotCompany.properties.name)][$($thisNetSuiteCompany.HubSpotId)] (NetSuite name:[$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.NetSuiteId)]) is not flagged with {netsuite_sync_company_} - not syncing chamges back to HubSpot"
-                return #Break out of current $thisNetSuiteCompany loop if $correspondingHubSpotCompany is not flagged netsuite_sync_company_
-                }
-            }
+
+    if($correspondingHubSpotCompany){
+    #If we've found a corresponding HubSpot company using any of the methods above, see if it needs updating
         if($thisNetSuiteCompany.lastModifiedDate -ne $correspondingHubSpotCompany.properties.lastmodifiedinnetsuite){ #Has the NetSuite object been updated since the last sync?
             Write-Host -ForegroundColor DarkCyan "`tNetSuite company has been modified."
             if($(test-hubSpotTimeStampIsCloseEnough -updatedAt $correspondingHubSpotCompany.updatedAt -lastmodifiedinhubspot $correspondingHubSpotCompany.properties.lastmodifiedinhubspot) -eq $false){ #Has the HubSpot object been updated since the last sync?
@@ -279,6 +279,7 @@ $netSuiteCompaniesToCheck | % {
                 }
             }
         else{Write-Host -ForegroundColor Cyan "Weird - [$($thisNetSuiteCompany.companyName)][$($thisNetSuiteCompany.id)] doesn't look like it's been updated after all - ignoring it."}
+        
         }
     }
 
