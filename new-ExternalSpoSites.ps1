@@ -295,7 +295,7 @@ foreach ($currentRequest in $selectedRequests){
                 (particularly where $externalPartyType`s don&#39;t use 365 themselves).</p>
 
                 <p><b><i>Important Information About Sharing Your Site</i></b></p>
-                <p>Unfortunately, we couldn&#39;t add you, the Site Administrator, as a Data Manager for the site as we couldn&#39;t find a Data Manager&#39;s training record for you in the last year. <p><b>This means that you won&#39;t be able to share your site with your client.</b></p> You can be added as a Data Manager after you have attended a training session,<a href=`"https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx`"> which you can sign up for here.</a></p>
+                <p>Unfortunately, we couldn&#39;t add you, the Site Administrator, as a Data Manager for the site as we couldn&#39;t find a Data Manager&#39;s training record for you in the last year. <p><b>This means that you won&#39;t be able to share your site with your client.</b></p> You can be added as a Data Manager after you have attended a training session,<a href=`"https://anthesisllc.sharepoint.com/sites/Resources-HR/SitePages/Data-Managers-Training.aspx?source=https%3A%2F%2Fanthesisllc.sharepoint.com%2Fsites%2FResources-HR%2FSitePages%2FForms%2FByAuthor.aspx`"> which you can sign up for here.</a></p>
 
                 <p>You can still add documents and edit the site, here are some additional guides to get you started if
                 you want to do anything fancier than simply sharing files:</p>
@@ -341,7 +341,7 @@ foreach ($currentRequest in $selectedRequests){
                 (particularly where $externalPartyType`s don&#39;t use 365 themselves).</p>
 
                 <p><b><i>Important Information About Sharing Your Site</i></b></p>
-                <p>Unfortunately, we couldn&#39;t add you, the Site Administrator, as a Data Manager for the site as we couldn&#39;t find a Data Manager&#39;s training record for you in the last year. <p><b>This means that you won&#39;t be able to share your site with your client.</b></p> You can be added as a Data Manager after you have attended a training session,<a href=`"https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx`"> which you can sign up for here.</a> The Owners listed on the site request (and cc'd into this email) will be able to share the site as we have a record of their training.</p>
+                <p>Unfortunately, we couldn&#39;t add you, the Site Administrator, as a Data Manager for the site as we couldn&#39;t find a Data Manager&#39;s training record for you in the last year. <p><b>This means that you won&#39;t be able to share your site with your client.</b></p> You can be added as a Data Manager after you have attended a training session,<a href=`"https://anthesisllc.sharepoint.com/sites/Resources-HR/SitePages/Data-Managers-Training.aspx?source=https%3A%2F%2Fanthesisllc.sharepoint.com%2Fsites%2FResources-HR%2FSitePages%2FForms%2FByAuthor.aspx`"> which you can sign up for here.</a> The Owners listed on the site request (and cc'd into this email) will be able to share the site as we have a record of their training.</p>
 
                 <p>You can still add documents and edit the site, here are some additional guides to get you started if
                 you want to do anything fancier than simply sharing files:</p>
