@@ -159,7 +159,7 @@ $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 #/
 
 #Create a secure credential object
-$adminCreds = get-credential
+#$adminCreds = get-credential
 #Connect to services by passing in secure credential object we set above
 connect-ToMsol -Credential $adminCreds
 connect-toAAD -Credential $adminCreds
