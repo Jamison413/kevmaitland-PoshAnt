@@ -132,7 +132,7 @@ $offices | % {
             isActive = $thisSchedulingGroup.isActive
             userIds = @($teamMembers.id) #This will automaticlly add all Team Members to each SchedulingGroup
             }
-        invoke-graphPut -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups/$($thisSchedulingGroup.id)" -graphBodyHashtable $updatedHash -additionalHeaders @{"MS-APP-ACTS-AS"="36bc6f20-feed-422d-b2f2-7758e9708604"} -Verbose:$VerbosePreference #PATCH doesn't work on schedulingGroups yet :'( But PUT works!
+        invoke-graphPut -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups/$($thisSchedulingGroup.id)" -graphBodyHashtable $updatedHash -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId} -Verbose:$VerbosePreference #PATCH doesn't work on schedulingGroups yet :'( But PUT works!
              
         $nextWeekOfShifts | % { #Add 1 week's worth of shifts 
             $thisShift = $_
