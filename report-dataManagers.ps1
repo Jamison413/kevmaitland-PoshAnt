@@ -1,4 +1,5 @@
-﻿$Logname = "C:\ScriptLogs" + "\report-data Managers $(Get-Date -Format "yyMMdd").log"
+﻿
+$Logname = "C:\ScriptLogs" + "\report-data Managers $(Get-Date -Format "yyMMdd").log"
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
@@ -18,6 +19,11 @@ $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredentia
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
+#Check connection
+If(!($tokenResponse.access_token)){
+write-host "Error getting TeamsBot Credentials, exiting." -ForegroundColor Red
+Exit
+}
 
 #Reporting
 $ITReporting = "d95c1342-cdfb-4a16-9881-4c2d6154e5a1"
@@ -78,6 +84,17 @@ if($groupChangesWereMade){#Refresh $allDataManagerSubGroups if it's changed
 
 
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/Resources-HR" -Credentials $sharePointCreds
+
+$pnpconnection = Get-PnPConnection
+
+#Check connection
+If(!($pnpConnection)){
+write-host "Error getting pnp connection, exiting." -ForegroundColor Red
+Exit
+}
+
+
+
 $dataManagerTrainingRecords = Get-PnPListItem -List "User Training Records" -Query "<View><Query><Where><Eq><FieldRef Name='Training_x0020_session' Label='True'/><Value Type='String'>Data Manager</Value></Eq></Where></Query></View>" #Get the Data Manager Training records
 $dataManagerTrainingRecords | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name mail -Value $_.FieldValues.User.Email} #Add this property so we can compare-object with Graph Users later
 $dataManagerTrainingRecords = $dataManagerTrainingRecords | Sort-Object {$_.FieldValues.User.Email}, {$_.FieldValues.Date_x0020_of_x0020_training} -Descending #Sort them by User, then by Training Date
@@ -235,10 +252,10 @@ $expiringSoonDataManagers | % {
     If(!($thisUser.FieldValues.LastReminderEmailSent)){
     write-host "Emailing $($thisUser.FieldValues.User.Email) that their Data Managers training is expiring in 2 months" -ForegroundColor Yellow
     $warningBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
-    $warningBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. Your last recorded Data Manager training session was on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy"), so it's about time to <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
+    $warningBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. Your last recorded Data Manager training session was on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy"), so it's about time to <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
     $warningBodyTrunk += "A lot has changed in the past year. You can sign up for any session that is convenient for you and we'll go through some of the improvements that we've introduced, which will help you to work <I>even more</I> efficiently. <BR><BR>`r`n`r`n"
     $warningBodyTrunk += "If there aren't any suitable sessions available for you, please contact the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> and they will arrange more. <BR><BR>`r`n`r`n"
-    $warningBodyTrunk += "If you don't renew your training, you will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
+    $warningBodyTrunk += "If you don't renew your training, you will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
     $whoOwnsWhatHash[$thisUser.FieldValues.User.Email] | Sort-Object {$_[0]} | % {
         $warningBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
         }
@@ -254,10 +271,10 @@ $expiringSoonDataManagers | % {
     If(($daysRemaining -eq 30) -or ($daysRemaining -eq 14)){
     write-host "Emailing $($thisUser.FieldValues.User.Email) that their Data Managers training is expiring in $($dayRemaning) days" -ForegroundColor Yellow
     $warningBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.FieldValues.User.LookupValue.Split(" ")[0]),<BR><BR>`r`n`r`n"
-    $warningBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. Your last recorded Data Manager training session was on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy"), so it's about time to <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
+    $warningBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. Your last recorded Data Manager training session was on $(Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training -Format "dd MMMM yyyy"), so it's about time to <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
     $warningBodyTrunk += "A lot has changed in the past year. You can sign up for any session that is convenient for you and we'll go through some of the improvements that we've introduced, which will help you to work <I>even more</I> efficiently. <BR><BR>`r`n`r`n"
     $warningBodyTrunk += "If there aren't any suitable sessions available for you, please contact the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> and they will arrange more. <BR><BR>`r`n`r`n"
-    $warningBodyTrunk += "If you don't renew your training, you will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
+    $warningBodyTrunk += "If you don't renew your training, you will automatically be changed to a Member of the following teams, and you won't be able to manage them until you join another <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>Data Manager training session</A>:<BR><BR>`r`n<UL>"
     $whoOwnsWhatHash[$thisUser.FieldValues.User.Email] | Sort-Object {$_[0]} | % {
         $warningBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
         }
@@ -277,10 +294,10 @@ $unauthorisedDataManagers | ? {$_.mail -ne "groupbot@anthesisgroup.com"} | % {
     $thisUser = $_
     Write-Host "Sending email to $($thisUser.userPrincipalName) to let them know they've been booted" -ForegroundColor Yellow
     $removedBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello $($thisUser.displayName),<BR><BR>`r`n`r`n"
-    $removedBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. We don't have a record of you attending a training session in the past year, so it's time to <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
+    $removedBodyTrunk += "To help us comply with the demands that our clients make about how we manage their data, we tell them that we train all Data Managers annually. We don't have a record of you attending a training session in the past year, so it's time to <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>book onto a refresher Data Manager training session</A>.<BR><BR>`r`n`r`n"
     $removedBodyTrunk += "A lot has changed in the past year. You can sign up for any session that is convenient for you and we'll go through some of the improvements that we've introduced, which will help you to work <I>even more</I> efficiently. <BR><BR>`r`n`r`n"
     $removedBodyTrunk += "If there aren't any suitable sessions available for you, please contact the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> and they will arrange more. <BR><BR>`r`n`r`n"
-    $removedBodyTrunk += "You have been automatically changed to a Member of the following teams, and you won't be able to manage membership of them until you join another <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>. <br><br><b>You will still have <u>edit</u> access to these sites to change any documents and any existing client/internal access will remain - you will be unable to add or remove both internal or external members to the site until you renew your training.</b><BR><BR>`r`n<UL>"
+    $removedBodyTrunk += "You have been automatically changed to a Member of the following teams, and you won't be able to manage membership of them until you join another <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>Data Manager training session</A>. <br><br><b>You will still have <u>edit</u> access to these sites to change any documents and any existing client/internal access will remain - you will be unable to add or remove both internal or external members to the site until you renew your training.</b><BR><BR>`r`n<UL>"
     $whoOwnsWhatHash[$thisUser.mail] | Sort-Object {$_[0]} | % {
         $removedBodyTrunk += "`r`n`t<LI>$($_[0].Replace(" - Data Managers Subgroup",''))</LI>" #Then sublist each Team they are a Data Manager of
         }
@@ -359,15 +376,15 @@ $reportsyncdataManagers = update-graphListItem -tokenResponse $tokenResponse -gr
 
 
 
-
+<#
 
 
 
 #region Overview report
 $overviewBodyTrunk =  "<HTML><FONT FACE=`"Calibri`">Hello User/Exchange 365 Admins,<BR><BR>`r`n`r`n"
 $overviewBodyTrunk += "This report combines information in <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>User Training Records</A>, membership in [Data Managers - Authorised (All)] and membership in the individual [XYZ Team - Data Manager Subgroup] groups to ensure that all Data Managers have received training within the past 12 months. This will allow us to embed best practices within the business, meet client security requirements more easily and prepare for 3rd party accreditation (like ISO27001). <A HREF='https://github.com/kevmaitland/PoshAnt/blob/master/report-dataManagers.ps1'>GitCode</A><BR><BR>`r`n"
-$overviewBodyTrunk += "<A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>User Training Records</A> must be completed for all people who attend a <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>. The least-unreliable approach is for the person leading the training session to add these records on behalf of the attendees.<BR><BR>`r`n"
-$overviewBodyTrunk += "Weekly nofitications are sent to users whose training will expire in the next 2 months prompting them to join a <A HREF='https://anthesisllc.sharepoint.com/sites/ResourcesHub/SitePages/Upcoming-Training-Events.aspx'>Data Manager training session</A>.<BR><BR>`r`n"
+$overviewBodyTrunk += "<A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>User Training Records</A> must be completed for all people who attend a <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>Data Manager training session</A>. The least-unreliable approach is for the person leading the training session to add these records on behalf of the attendees.<BR><BR>`r`n"
+$overviewBodyTrunk += "Weekly nofitications are sent to users whose training will expire in the next 2 months prompting them to join a <A HREF='https://apps.powerapps.com/play/e619bac3-222f-45e5-8bc4-eb045f982c02?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f'>Data Manager training session</A>.<BR><BR>`r`n"
 $overviewBodyTrunk += "Beginning 2020-07-01, users who have no valid <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-HR/Lists/User%20Training%20Records/AllItems.aspx?viewpath=%2Fsites%2FResources-HR%2FLists%2FUser%20Training%20Records%2FAllItems.aspx'>Data Manager training record</A> will be automatically removed from all Data Manager groups (and replaced with GroupBot if they were the last Data Manager).<BR><BR>`r`n"
 $overviewBodyTrunk += "The following users have recently had training records created and have been re/added into [Data Managers - Authorised (All)]:<BR><BR>`r`n<UL>"
 $newauthorisedDataManagers | Sort-Object {$_.FieldValues.User.Email} | % {
@@ -426,3 +443,4 @@ Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com
 
 Stop-Transcript
 
+#>

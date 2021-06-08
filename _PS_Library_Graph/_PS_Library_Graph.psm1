@@ -2930,7 +2930,7 @@ function Update-graphOpenShiftShared(){
            sharedOpenShift=$shiftDetails
            }
  
-        invoke-graphPut -tokenResponse $tokenResponseShiftBot -graphQuery "/teams/$teamId/schedule/openShifts/$openShiftId" -graphBodyHashtable $Shift -Verbose:$true -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
+        invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts/$openShiftId" -graphBodyHashtable $Shift -Verbose:$true -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
         }
         else{
         Write-Error -Exception "Couldn't find the Shift with the given teamId and openShiftId" -Message "Shift not found" 
