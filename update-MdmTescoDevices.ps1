@@ -15,6 +15,11 @@ $delta = Compare-Object -ReferenceObject $currentTescoDevices -DifferenceObject 
 #Remove personal devices with workplace trust replationship
 $delta = $delta.Where({$_.trustType -ne "Workplace"})
 
+#Remove any devices with Intune issues
+    #[STINKYPETE, userGUID is not in PhysicalID's of this device after Autopilot Reset - manually added to AD group, please do not remove from group while restrictions apply]
+    $delta = $delta.Where({$_.displayName -ne "STINKYPETE"})
+
+
 $toAdd = $delta | ? {$_.SideIndicator -eq "=>"}
 If($toAdd){add-graphUsersToGroup -tokenResponse $teamBotTokenResponse -graphGroupId $tescoDevicesGroupId -memberType Members -graphUserIds $toAdd.id -Verbose}
 
