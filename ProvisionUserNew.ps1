@@ -48,12 +48,16 @@ $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 
+
 <#--------Available License Check--------#>
 
 #Just in case you want to save yourself a few more clicks, this will show you currently available licensing
 
 get-available365licensecount -licensetype "all"
 
+<#--------Current Users Check--------#>
+
+$allCurrentUsers = get-graphUsers -tokenResponse $tokenResponse
 
 <#--------Create Meta-Functions--------#>
 
@@ -263,6 +267,8 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash 
 #Get the New User Requests
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -UseWebLogin #-Credentials $msolCredentials
 $requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
+
+
 if($requests){#Display a subset of Properties to help the user identify the correct account(s)
     $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.Start_x0020_Date} -Descending | select {$_.FieldValues.Title},{$_.FieldValues.Start_x0020_Date},{$_.FieldValues.Job_x0020_title},{$_.FieldValues.Primary_x0020_Workplace.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Primary_x0020_Team.LookupValue},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
     #Then return the original requests as these contain the full details
@@ -272,6 +278,9 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 
 ForEach($thisUser in $selectedRequests){
+
+$thisUser.FieldValues.Title
+$thisUser.FieldValues.Job_x0020_title
 
 #Before we start, check the contract type
 write-host "Before we start, what is the contract type?"
@@ -363,6 +372,24 @@ If($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe){
 $businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0).Trim())"}
+
+
+#Return user to check what was set
+$thisProvisionedUser = ""
+$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn -selectAllProperties
+
+#Before we start, check the contract type
+write-host "Happy with the provision outcome?"
+write-host "A: Yes"
+write-host "B: No"
+$selection = Read-Host "Type A or B"
+Switch($selection){
+"A" {$provisionOutcome = "Employee"}
+"B" {$ = "Subcontractor"}
+}
+
+
+
 }
 }
 

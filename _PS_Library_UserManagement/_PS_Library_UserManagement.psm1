@@ -169,14 +169,15 @@ function license-msolUser{
         "E1" {
             $licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:STANDARDPACK"}
             if((Get-MsolUser -UserPrincipalName $upn).Licenses.AccountSkuId -contains "AnthesisLLC:ENTERPRISEPACK"){$licenseToRemove = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:ENTERPRISEPACK"}}
+            $LO = New-MsolLicenseOptions -AccountSkuId "AnthesisLLC:STANDARDPACK" -DisabledPlans "YAMMER_ENTERPRISE" #restrict Yammer
             }
         "E3" {
             $licenseToAssign = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:ENTERPRISEPACK"}
             if((Get-MsolUser -UserPrincipalName $upn).Licenses.AccountSkuId -contains "AnthesisLLC:STANDARDPACK"){$licenseToRemove = Get-MsolAccountSku | ?{$_.AccountSkuId -eq "AnthesisLLC:STANDARDPACK"}}
+            $LO = New-MsolLicenseOptions -AccountSkuId "AnthesisLLC:ENTERPRISEPACK" -DisabledPlans "YAMMER_ENTERPRISE" #restrict Yammer
             }
         }
         Write-Host -ForegroundColor Yellow "Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $($licenseToAssign.AccountSkuId) -RemoveLicenses $($licenseToRemove.AccountSkuId)"
-        $LO = New-MsolLicenseOptions -AccountSkuId "AnthesisLLC:ENTERPRISEPACK" -DisabledPlans "YAMMER_ENTERPRISE" #restrict Yammer
         write-host "Adding licenses: $($licenseToAssign.AccountSkuId)" -ForegroundColor Yellow
         Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $($licenseToAssign.AccountSkuId)
         write-host "Removing licenses: Yammer" -ForegroundColor Yellow
@@ -676,6 +677,3 @@ Param (
 
 }
 }
-
-
-

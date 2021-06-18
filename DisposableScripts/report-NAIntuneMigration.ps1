@@ -1,8 +1,12 @@
 ﻿#Get Users from AAD
 $tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
-$allUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterNone -selectAllProperties 
-$llcUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit "Anthesis LLC (USA)" -filterNone -selectAllProperties
-$phlUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit "Anthesis Philippines Inc. (PHL)" -filterNone -selectAllProperties
+#$allUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterNone -selectAllProperties 
+#$llcUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit "Anthesis LLC (USA)" -filterNone -selectAllProperties
+#$phlUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit "Anthesis Philippines Inc. (PHL)" -filterNone -selectAllProperties
+#$chnUsers = $allUsers | ? {$_.anthesisgroup_employeeInfo.businessUnit -eq "China"} 
+$allUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterLicensedUsers -selectAllProperties
+$llcUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterCustomEq  @{"anthesisgroup_employeeInfo/businessUnit" = "Anthesis LLC (USA)"} -filterLicensedUsers -selectAllProperties
+$phlUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterCustomEq  @{"anthesisgroup_employeeInfo/businessUnit" = "Anthesis Philippines Inc. (PHL)"} -filterLicensedUsers -selectAllProperties
 $chnUsers = $allUsers | ? {$_.anthesisgroup_employeeInfo.businessUnit -eq "China"} 
 
 $naUsers = $llcUsers
