@@ -3,13 +3,11 @@ connect-to365 -credential $365creds
 
 $allAdminUGs= get-unifiedgroup -Filter "DisplayName -like 'Admin*'"  
 
-$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\teambotdetails.txt"
-$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
-$tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 30 -aadAppCreds $teamBotDetails
+$teamBotDetails = $(get-graphAppClientCredentials -appName TeamsBot)
+$tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $teamBotDetails -grant_type client_credentials 
 
-
-foreach($team in @("All (Europe)","All Homeworkers (CAN)")){
-    $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails
+foreach($team in @("All Educators & Mediators (ESP)")){
+    $tokenResponseTeamsBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseTeamsBot -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails
 
     $displayName = $team
     $areDataManagersLineManagers = $false
@@ -60,30 +58,30 @@ foreach($team in @("All (Europe)","All Homeworkers (CAN)")){
     #endregion
 
 
-    $newGroup = new-365Group -displayName $displayName -managerUpns $managers -teamMemberUpns $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $areDataManagersLineManagers -membershipmanagedBy $managedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $365creds
+    $newGroup = new-365Group -displayName $displayName -managerUpns $managers -teamMemberUpns $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $areDataManagersLineManagers -membershipmanagedBy $managedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponseTeamsBot -alsoCreateTeam $alsoCreateTeam -pnpCreds $365creds
     Write-Verbose "Getting associated PnP and Graph objects for [$($newGroup.DisplayName)] - this is a faster way to do stuff than using the UnifiedGroup object"
-    Connect-PnPOnline -AccessToken $tokenResponse.access_token
-    $newPnpTeam = Get-PnPUnifiedGroup -Identity $newGroup.ExternalDirectoryObjectId
-    $newGraphGroup = get-graphGroups -tokenResponse $tokenResponse -filterUpn $newGroup.PrimarySmtpAddress
-    $newGraphGroupDrive = get-graphDrives -tokenResponse $tokenResponse -teamUpn $newGroup.PrimarySmtpAddress -returnOnlyDefaultDocumentsLibrary
+    Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com" #-RetryCount 2 -ReturnConnection
+    $newPnpTeam = Get-PnPUnifiedGroup -Identity $newGroup.id
+    $newGraphGroup = get-graphGroups -tokenResponse $tokenResponseTeamsBot -filterUpn $newGroup.mail
+    $newGraphGroupDrive = get-graphDrives -tokenResponse $tokenResponseTeamsBot -groupGraphId $newGroup.id -returnOnlyDefaultDocumentsLibrary
 
     #Remove GroupBot if required
-    $newTeamOwners = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupUpn $newGroup.PrimarySmtpAddress -returnOnlyLicensedUsers -memberType Owners
+    $newTeamOwners = get-graphUsersFromGroup -tokenResponse $tokenResponseTeamsBot -groupUpn $newGroup.mail -returnOnlyLicensedUsers -memberType Owners
     if($newTeamOwners.userPrincipalName -contains "groupbot@anthesisgroup.com"){
         if($newTeamOwners.userPrincipalName -notcontains $365creds.UserName){
-            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $newGraphGroup.id -memberType Owners -graphUserUpns $365creds.UserName
+            add-graphUsersToGroup -tokenResponse $tokenResponseTeamsBot -graphGroupId $newGraphGroup.id -memberType Owners -graphUserUpns $365creds.UserName
             }
-        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $newGraphGroup.id -memberType Owners -graphUserIds "00aa81e4-2e8f-4170-bc24-843b917fd7cf" #This works faster with Ids, so I've hard-coded GroupBot's Id
-        remove-graphUsersFromGroup -tokenResponse $tokenResponse -graphGroupId $newGraphGroup.id -memberType Members -graphUserIds "00aa81e4-2e8f-4170-bc24-843b917fd7cf"
+        remove-graphUsersFromGroup -tokenResponse $tokenResponseTeamsBot -graphGroupId $newGraphGroup.id -memberType Owners -graphUserIds "00aa81e4-2e8f-4170-bc24-843b917fd7cf" #This works faster with Ids, so I've hard-coded GroupBot's Id
+        remove-graphUsersFromGroup -tokenResponse $tokenResponseTeamsBot -graphGroupId $newGraphGroup.id -memberType Members -graphUserIds "00aa81e4-2e8f-4170-bc24-843b917fd7cf"
         }
-    $newGraphTeam = new-graphTeam -tokenResponse $tokenResponse -groupId $newGraphGroup.id -allowMemberCreateUpdateChannels $true -allowMemberDeleteChannels $false #Create the Team if it doesn't already exist
+    $newGraphTeam = new-graphTeam -tokenResponse $tokenResponseTeamsBot -groupId $newGraphGroup.id -allowMemberCreateUpdateChannels $true -allowMemberDeleteChannels $false #Create the Team if it doesn't already exist
 
     #region Do as much as we can in Graph because it's much quicker
     ########################################
     #Create, share and delete a dummy folder in this Site to trigger the SharedWith Site Column
-    $dummyFolder = add-graphArrayOfFoldersToDrive -graphDriveId $newGraphGroupDrive.id -foldersAndSubfoldersArray "DummyFolder" -tokenResponse $tokenResponse -conflictResolution Replace
-    grant-graphSharing -tokenResponse $tokenResponse -driveId $newGraphGroupDrive.id -itemId $dummyFolder.id -sharingRecipientsUpns @($365creds.UserName) -requireSignIn $true -sendInvitation $false -role Write -Verbose
-    delete-graphDriveItem -tokenResponse $tokenResponse -graphDriveId $newGraphGroupDrive.id -graphDriveItemId $dummyFolder.id -eTag $dummyFolder.eTag 
+    $dummyFolder = add-graphArrayOfFoldersToDrive -graphDriveId $newGraphGroupDrive.id -foldersAndSubfoldersArray "DummyFolder" -tokenResponse $tokenResponseTeamsBot -conflictResolution Replace
+    grant-graphSharing -tokenResponse $tokenResponseTeamsBot -driveId $newGraphGroupDrive.id -itemId $dummyFolder.id -sharingRecipientsUpns @($365creds.UserName) -requireSignIn $true -sendInvitation $false -role Write -Verbose
+    delete-graphDriveItem -tokenResponse $tokenResponseTeamsBot -graphDriveId $newGraphGroupDrive.id -graphDriveItemId $dummyFolder.id -eTag $dummyFolder.eTag 
 
     #Create corresponding Regional Folder in associated regional Administration Team site
     $currentRegion = get-3lettersInBrackets -stringMaybeContaining3LettersInBrackets $newGroup.DisplayName
@@ -102,28 +100,28 @@ foreach($team in @("All (Europe)","All Homeworkers (CAN)")){
         Write-Error "Could not identify regional Administration Team. Cannot proceed with configuring the rest of the Site & Team." ;break
         }
 
-    $associatedRegionalAdminDrive = get-graphDrives -tokenResponse $tokenResponse -teamUpn $associatedRegionalAdminTeam.PrimarySmtpAddress -returnOnlyDefaultDocumentsLibrary
-    $newRegionalFolder = add-graphArrayOfFoldersToDrive -graphDriveId $associatedRegionalAdminDrive.id -foldersAndSubfoldersArray @($newGroup.DisplayName) -tokenResponse $tokenResponse -conflictResolution Fail
+    $associatedRegionalAdminDrive = get-graphDrives -tokenResponse $tokenResponseTeamsBot -teamUpn $associatedRegionalAdminTeam.PrimarySmtpAddress -returnOnlyDefaultDocumentsLibrary
+    $newRegionalFolder = add-graphArrayOfFoldersToDrive -graphDriveId $associatedRegionalAdminDrive.id -foldersAndSubfoldersArray @($newGroup.DisplayName) -tokenResponse $tokenResponseTeamsBot -conflictResolution Fail
 
     #Set Edit permissions for this Team on new folder
-    grant-graphSharing -tokenResponse $tokenResponse -driveId $associatedRegionalAdminDrive.id -itemId $newRegionalFolder.id -sharingRecipientsUpns @($newGroup.PrimarySmtpAddress) -requireSignIn $true -sendInvitation $false -role Write
+    grant-graphSharing -tokenResponse $tokenResponseTeamsBot -driveId $associatedRegionalAdminDrive.id -itemId $newRegionalFolder.id -sharingRecipientsUpns @($newGroup.mail) -requireSignIn $true -sendInvitation $false -role Write
 
     #Create text file explaining how this works / links to new folder from this Site
-    $textFileTemplateContent = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVCXN7JPPNRJXBB3TPRS34DU3FA3/content" #This is the content of https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/Shared%20Documents/File%20storage%20is%20disabled%20for%20this%20geographic%20team.txt
-    $newTextFile = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/Try the General»Managed Files tab - file storage is disabled for geographic team $($newGroup.DisplayName).txt:/content" -binaryFileStream $textFileTemplateContent
-    $anotherNewTextFile = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/General/Try the General»Managed Files tab - file storage is disabled for geographic team $($newGroup.DisplayName).txt:/content" -binaryFileStream $textFileTemplateContent
+    $textFileTemplateContent = invoke-graphGet -tokenResponse $tokenResponseTeamsBot -graphQuery "/drives/b!AE2tHi4uHkKRdhUoe1wizoHfHdLv_DZOlObt1vtIejFDr6vvuqdFTaTWzb63-TzY/items/01V67YTVCXN7JPPNRJXBB3TPRS34DU3FA3/content" #This is the content of https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/Shared%20Documents/File%20storage%20is%20disabled%20for%20this%20geographic%20team.txt
+    $newTextFile = invoke-graphPut -tokenResponse $tokenResponseTeamsBot -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/Try the General»Managed Files tab - file storage is disabled for geographic team $($newGroup.DisplayName).txt:/content" -binaryFileStream $textFileTemplateContent
+    $anotherNewTextFile = invoke-graphPut -tokenResponse $tokenResponseTeamsBot -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/General/Try the General»Managed Files tab - file storage is disabled for geographic team $($newGroup.DisplayName).txt:/content" -binaryFileStream $textFileTemplateContent
     $newHyperlinkContent = `
     "[InternetShortcut]
     URL=$($associatedRegionalAdminDrive.webUrl+"/"+[uri]::EscapeDataString($newGroup.DisplayName))
     "
-    $newHyperlink = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/Link to storage manged by $($associatedRegionalAdminTeam.DisplayName).url:/content" -binaryFileStream $newHyperlinkContent
-    #$anotherNewHyperlink = invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/General/Link to storage manged by $($associatedRegionalAdminTeam.DisplayName).url:/content" -binaryFileStream $newHyperlinkContent #This doesn;t work so well in Teams, but we'll keep the first link as it's only really visible from SharePoint
+    $newHyperlink = invoke-graphPut -tokenResponse $tokenResponseTeamsBot -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/Link to storage manged by $($associatedRegionalAdminTeam.DisplayName).url:/content" -binaryFileStream $newHyperlinkContent
+    #$anotherNewHyperlink = invoke-graphPut -tokenResponse $tokenResponseTeamsBot -graphQuery "/drives/$($newGraphGroupDrive.id)/items/root:/General/Link to storage manged by $($associatedRegionalAdminTeam.DisplayName).url:/content" -binaryFileStream $newHyperlinkContent #This doesn;t work so well in Teams, but we'll keep the first link as it's only really visible from SharePoint
 
     #Create new Tab in Teams linking to this location
-    $newGraphTeamGeneralChannel = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$($newGraphGroup.id)/channels"
-    $newGraphTeamGeneralChannelTabs = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs"
+    $newGraphTeamGeneralChannel = invoke-graphGet -tokenResponse $tokenResponseTeamsBot -graphQuery "/teams/$($newGraphGroup.id)/channels"
+    $newGraphTeamGeneralChannelTabs = invoke-graphGet -tokenResponse $tokenResponseTeamsBot -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs"
     $newGraphTeamGeneralChannelTabs | ? {$_.displayName -eq "Managed Files"} | % {
-        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs/$($_.id)" 
+        invoke-graphDelete -tokenResponse $tokenResponseTeamsBot -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs/$($_.id)" 
         }
     $tabConfiguration = @{
         "entityId"=$null
@@ -136,14 +134,14 @@ foreach($team in @("All (Europe)","All Homeworkers (CAN)")){
         "teamsApp@odata.bind"="https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/com.microsoft.teamspace.tab.web"
         "configuration"=$tabConfiguration
         }
-    $newGraphTeamGeneralChannelManagedFilesTab = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs" -graphBodyHashtable $tabBody
+    $newGraphTeamGeneralChannelManagedFilesTab = invoke-graphPost -tokenResponse $tokenResponseTeamsBot -graphQuery "/teams/$($newGraphGroup.id)/channels/$($newGraphTeamGeneralChannel.id)/tabs" -graphBodyHashtable $tabBody
 
 
     #endregion
 
     #region We still have to do some stuff in PnP because it's not supported in Graph yet
     if($addExecutingUserAsTemporaryOwner){ #copy-spoPage requires Site Collection Admin rights
-        $userWasAlreadySiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true -Verbose
+        $userWasAlreadySiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -pnpAppCreds $teamBotDetails -pnpCreds $365creds -addPermissionsIfMissing $true -Verbose
         }
     copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/SitePages/Candidate-template-for-regional-sites.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
 
@@ -181,7 +179,7 @@ foreach($team in @("All (Europe)","All Homeworkers (CAN)")){
     start-Process $newPnpTeam.SiteUrl
 
     Write-Verbose "set-standardSitePermissions [$($newGroup.DisplayName)]"
-    set-standardSitePermissions -unifiedGroupObject $newGroup -tokenResponse $tokenResponse -pnpCreds $365creds -Verbose
+    set-standardSitePermissions -tokenResponse $tokenResponseTeamsBot -pnpAppCreds $teamBotDetails -graphGroupExtended $newGraphGroup -pnpCreds $365creds -Verbose
 
 
     if($addExecutingUserAsTemporaryOwner){

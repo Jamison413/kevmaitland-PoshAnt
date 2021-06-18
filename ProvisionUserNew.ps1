@@ -211,9 +211,11 @@ Write-Error "More than 1 group found for regional group. They haven't been added
     If ($BYOD -eq 'y') {
     Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
     }
-    $COBO = Read-Host "Add to MDM - COBO user group? (y/n)"
+    $COBO = Read-Host "Add to MDM - COBO user group (are they in GBR/NA/PHL/CHN)? (y/n)"
     If ($COBO -eq 'y') {
     Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName ATP
 }
 
 }

@@ -1256,8 +1256,15 @@ function sanitise-forNetsuiteIntegration(){
         [string]$dodgyString
         )
     $lessDodgyString = remove-diacritics -String $dodgyString
-    $prettyGoodString = $lessDodgyString -replace "[^A-Za-z0-9_ ]",""
-    $prettyGoodString.Replace(" ","").Replace(" ","").Replace(" ","")
+    #$prettyGoodString = $lessDodgyString -replace "[^A-Za-z0-9_ ]",""     #Updated 2021-06-18 by Kev Maitland to *include* reserved SharePoint folder characters (otherwise removing these from NetSuite Opps/Projects won't trigger them to be processed as name changes)
+
+    $trailingFullStopRegex = '[\.](?=.)'
+    $prettyGoodString = $lessDodgyString -replace $trailingFullStopRegex  #Remove all . except final character
+
+    $reservedSharePointFolderCharacterRegex = $([regex]::Escape('":*<>?/\|'))
+    $evenBetterString = $prettyGoodString -replace "[^A-Za-z0-9_\. $reservedSharePointFolderCharacterRegex]"
+    
+    $evenBetterString.Replace(" ","").Replace(" ","").Replace(" ","")
     }
 function sanitise-forPnpSharePoint($dirtyString){ 
     if([string]::IsNullOrWhiteSpace($dirtyString)){return}

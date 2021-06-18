@@ -1025,7 +1025,7 @@ cls
             $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 30 -aadAppCreds $appCredsSharePointBot
                 #Can we find a corresponding Opp?
             $correspondingOpp = Compare-Object -ReferenceObject $allOppTerms -DifferenceObject $thisNewProjTerm -Property NetSuiteProjectId -ExcludeDifferent -IncludeEqual -PassThru
-            $correspondingOpp = set-standardisedClientDriveProperties -rawOppOrProjTerm $correspondingOpp -allClientTerms $allClientTerms
+            if(![string]::IsNullOrWhiteSpace($correspondingOpp)){$correspondingOpp = set-standardisedClientDriveProperties -rawOppOrProjTerm $correspondingOpp -allClientTerms $allClientTerms} #Set the friendly property names in case we haven;t already done this
             if(![string]::IsNullOrEmpty($correspondingOpp.DriveItemId)){
                 Write-Host "`t`tCorresponding Opp [$($correspondingOpp.UniversalOppName)][$($correspondingOpp.DriveClientId)][$($correspondingOpp.DriveItemId)] found for [$($thisNewProjTerm.UniversalProjName)][$($thisNewProjTerm.NetSuiteProjectId)][$($thisNewProjTerm.NetSuiteClientId)]"
                 try{

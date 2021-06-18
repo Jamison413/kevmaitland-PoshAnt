@@ -52,6 +52,9 @@ $processedassignees += New-Object psobject -Property @{
     "country" = $($unprocessedassignee.FieldValues.Yourcountry);
 }
 }
+#Get rid of Groupbot as we just use him for the nextrun date to avoid adding ANOTHER datasource just for the next run date
+$processedassignees = $processedassignees.Where({$_.email -ne "groupbot@anthesisgroup.com"})
+
 #Get rid of dupes from the Buddy System SP List - or they will be moved over with everyone at script end into the waiting list
 $dupecheck = $processedassignees
 $processedassignees = $processedassignees | sort email -Unique
@@ -92,7 +95,7 @@ $pairedArray = @($false)*[math]::Ceiling($processedassignees.length / 2)
 #Set the second counter in the middle of the array to start, this needs to be reset every loop
 $j = [math]::floor($processedassignees.length / 2)
 
-for($r = 0; $r -lt 1000; $r++){
+for($r = 0; $r -lt 4000; $r++){
 [System.Collections.ArrayList]$matchIDs = @()
 #[System.Collections.ArrayList]$matchIDsold = @()
 $j = [math]::floor($processedassignees.length / 2)
@@ -147,7 +150,7 @@ Break
 }
 
 #If we can't find a match, email Emily and exit the script
-If(($r = 1000) -and ($badmatches -contains 1)){
+If(($r = 4000) -and ($badmatches -contains 1)){
 write-host "It looks like it wasn't mathematically possible to find  unique parinings this week :( Emailing Emily..." -ForegroundColor Red
 $subject = "Buddy System: It looks like it wasn't mathemetically possible to find  unique pairings this week :("
 $body = "Emails out were cancelled, womp, womp..."
@@ -196,12 +199,12 @@ $body0 += "You have been matched with <font color='f36e21'><b>$($pair[1].name)</
 If(($community -ne "Not applicable")){$body0 += "<BR>They are in the $($community) Service Area"}
 $body0 += "`r`n`r`n<BR><BR>"
 $body0 += "<font color='f36e21'><b>What do I do next?</b></font color>`r`n`r`n<BR><BR>"
-$body0 += "Over the next week, get in touch with your Buddy to get to know them more!`r`n`r`n<BR><BR>"
+$body0 += "Over the next two weeks, get in touch with your Buddy to get to know them more!`r`n`r`n<BR><BR>"
 $body0 += "<font color='f36e21'><b>How do I contact my Anthesis Buddy?</b></font color>`r`n`r`n<BR><BR>"
 $body0 += "You can make good use of Microsoft Team’s excellent chat and video functionality - jump into a chat with them now by clicking this link: `r`n<BR>$($teamschatlink)`r`n`r`n<BR><BR>"
 $body0 += "Your Buddy is in timezone $($pair[1].timezone) so please be aware of time differences when getting in touch!`r`n`r`n<BR><BR>"
-$body0 += "<font color='f36e21'><b>What happens at the end of the week?</b></font color>`r`n`r`n<BR><BR>"
-$body0 += "You can still chat to your Buddy after the week has ended. You can also sign up again for another new Buddy on Thursdays by replying to the Anthesis Buddy System Re-Sign Up email (keep an eye on your inbox for this!). If you do not want to receive a new Buddy in the next week, either press the reject button or ignore the email and we will register your choice.`r`n`r`n<BR><BR>"
+$body0 += "<font color='f36e21'><b>What happens at the end of the fortnight?</b></font color>`r`n`r`n<BR><BR>"
+$body0 += "You can still chat to your Buddy after the the 14 days have ended. You can also sign up again for another new Buddy on Thursdays by replying to the Anthesis Buddy System Re-Sign Up email (keep an eye on your inbox for this!). If you do not want to receive a new Buddy in the cycle, either press the reject button or ignore the email and we will register your choice.`r`n`r`n<BR><BR>"
 $body0 += "Don’t forget to check out the Anthesis Wellbeing pages on Sharepoint ($($wellbeingpageslink)) to find advice on how to look after Mind, Body, and Spirit, #AnthesisWFH posts and more!`r`n`r`n<BR><BR>"
 $body0 += "With love,`r`n<BR>"
 $body0 += "The Buddy System Robot <3`r`n`r`n<BR><BR>"
@@ -218,12 +221,12 @@ $body1 += "You have been matched with <font color='f36e21'><b>$($pair[0].name)</
 If(($community -ne "Not applicable")){$body1 += "<BR>They are in the $($community) Service Area"}
 $body1 += "`r`n`r`n<BR><BR>"
 $body1 += "<font color='f36e21'><b>What do I do next?</b></font color>`r`n`r`n<BR><BR>"
-$body1 += "Over the next week, get in touch with your Buddy to get to know them more!`r`n`r`n<BR><BR>"
+$body1 += "Over the next two weeks, get in touch with your Buddy to get to know them more!`r`n`r`n<BR><BR>"
 $body1 += "<font color='f36e21'><b>How do I contact my Anthesis Buddy?</b></font color>`r`n`r`n<BR><BR>"
 $body1 += "You can make good use of Microsoft Team’s excellent chat and video functionality - jump into a chat with them now by clicking this link: `r`n<BR>$($teamschatlink)`r`n`r`n<BR><BR>"
 $body1 += "Your Buddy is in timezone $($pair[0].timezone) so please be aware of time differences when getting in touch!`r`n`r`n<BR><BR>"
-$body1 += "<font color='f36e21'><b>What happens at the end of the week?</b></font color>`r`n`r`n<BR><BR>"
-$body1 += "You can still chat to your Buddy after the week has ended. You can also sign up again for another new Buddy on Thursdays by replying to the Anthesis Buddy System Re-Sign Up email (keep an eye on your inbox for this!). If you do not want to receive a new Buddy in the next week, either press the reject button or ignore the email and we will register your choice.`r`n`r`n<BR><BR>"
+$body1 += "<font color='f36e21'><b>What happens at the end of the fortnight?</b></font color>`r`n`r`n<BR><BR>"
+$body1 += "You can still chat to your Buddy after the 14 days have ended. You can also sign up again for another new Buddy on Thursdays by replying to the Anthesis Buddy System Re-Sign Up email (keep an eye on your inbox for this!). If you do not want to receive a new Buddy in the next cycle, either press the reject button or ignore the email and we will register your choice.`r`n`r`n<BR><BR>"
 $body1 += "Don’t forget to check out the Anthesis Wellbeing pages on Sharepoint ($($wellbeingpageslink)) to find advice on how to look after Mind, Body, and Spirit, #AnthesisWFH posts and more!`r`n`r`n<BR><BR>"
 $body1 += "With love,`r`n<BR>"
 $body1 += "The Buddy System Robot <3`r`n`r`n<BR><BR>"
@@ -264,6 +267,9 @@ ForEach($validID in $matchIDs){
 Add-PnPListItem -List "Buddy System Historical Matches" -Values @{"MatchID" = $($validID)}
 }
 
+#Set the next run date on groupbot's list item
+Set-PnPListItem -List "Buddy System" -Identity "1775" -Values @{"nextRunDate" = (get-date).AddDays(14)}
+
 
 $buddyapplink = "https://apps.powerapps.com/play/dce65d94-2361-4d05-8bf3-8d4ad4362ffd?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f"
 $leftoversignups = Get-PnPListItem -List "Buddy System Repeat Sign Up"
@@ -274,7 +280,7 @@ $subject = "Notification: Anthesis Buddy System Participation"
 $body2 = "<HTML><FONT FACE=`"Calibri`">Hi $($leftoversignup.FieldValues.Yourname.LookupValue),`r`n`r`n<BR><BR>"
 $body2 += "You’re receiving this email to confirm that you have been removed from the Anthesis Buddy system`r`n`r`n<BR><BR>"
 $body2 += "<b>What do I need to do now?</b>`r`n`r`n<BR><BR>"
-$body2 += "You do not need to do anything else. You can sign up again at any point to receive a Buddy on Fridays by going to the Buddy App. If you have missed the Re-Sign Up email or Teams message (sent on Thursdays) and want to sign up again for next week, you will need to sign back up via the Buddy App form here: $($buddyapplink).`r`n<BR><BR>"
+$body2 += "You do not need to do anything else. You can sign up again at any point to receive a Buddy by going to the Buddy App. If you have missed the Re-Sign Up email or Teams message (sent every other Thursday) and want to sign up again for next cycle, you will need to sign back up via the Buddy App form here: $($buddyapplink).`r`n<BR><BR>"
 $body2 += "With love,`r`n<BR>"
 $body2 += "The Buddy System Robot <3`r`n`r`n<BR><BR>"
 $body2 += "(Ps I’m managed by the IT Team, if I have broken or if you have any questions, please get in touch via $($ITemail))"

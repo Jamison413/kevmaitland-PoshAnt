@@ -19,6 +19,12 @@ $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
+#Check connection
+If(!($tokenResponse.access_token)){
+write-host "Error getting TeamsBot Credentials, exiting." -ForegroundColor Red
+Exit
+}
+
 
 #Get members of 'Data Managers - Authorised (All) from 365' and sp groups from the team hub and client hub
 $datamanagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId "daf56fbd-ebce-457e-a10a-4fce50a2f99c" -memberType "Members"
@@ -46,6 +52,15 @@ Write-Host "Clients (unrestircted) - Modify is already clean ('ish)" -Foreground
 #############################
 
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub/" -Credentials $adminCreds
+
+$pnpconnection = Get-PnPConnection
+
+#Check connection
+If(!($pnpConnection)){
+write-host "Error getting pnp connection, exiting." -ForegroundColor Red
+Exit
+}
+
 $DataManagerSPOGroupName = "Internal - SPO Authorised Data Managers"
 $MembersSPOGroupName = "Internal - SPO Authorised TeamHub Members"
 
@@ -96,6 +111,16 @@ $spmembers = Remove-PnPUserFromGroup  -LoginName $($removedmember.InputObject) -
 #############################
 
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients/" -Credentials $adminCreds
+
+$pnpconnection = Get-PnPConnection
+
+#Check connection
+If(!($pnpConnection)){
+write-host "Error getting pnp connection, exiting." -ForegroundColor Red
+Exit
+}
+
+
 $DataManagerSPOGroupName = "External - SPO Authorised Data Managers"
 $MembersSPOGroupName = "External - Authorised Client Members"
 

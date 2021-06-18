@@ -1091,13 +1091,13 @@ function get-graphShiftOpenShifts(){
 #        ,[parameter(Mandatory = $false)]
 #            [string[]]$filterIds
         ,[parameter(Mandatory = $false)]
-            [string]$filterId
+            [string]$openShiftid
         )
     
     #if($filterIds){$filter += "`$filter=id in (`'$($filterIds -join "','")`')"}
-    if($filterId){$filter += "`$filter=id eq '$filterId'"}
+    if($openShiftid){$filter = "/$openShiftid"}
 
-    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts?$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId}
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts$filter" -additionalHeaders @{"MS-APP-ACTS-AS"=$MsAppActsAsUserId}
     
     }
 function get-graphShiftOpenShiftChangeRequests(){
@@ -2852,7 +2852,7 @@ function update-graphListItem(){
     $reponse = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose
     $reponse
 }
-function Update-graphOpenShiftShared(){
+function update-graphOpenShiftShared(){
         [cmdletbinding()]
         param(
             [parameter(Mandatory = $true)]
@@ -2902,7 +2902,7 @@ function Update-graphOpenShiftShared(){
            sharedOpenShift=$shiftDetails
            }
  
-        invoke-graphPut -tokenResponse $tokenResponseShiftBot -graphQuery "/teams/$teamId/schedule/openShifts/$openShiftId" -graphBodyHashtable $Shift -Verbose:$true -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
+        invoke-graphPut -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/schedule/openShifts/$openShiftId" -graphBodyHashtable $Shift -Verbose:$true -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
         }
         else{
         Write-Error -Exception "Couldn't find the Shift with the given teamId and openShiftId" -Message "Shift not found" 

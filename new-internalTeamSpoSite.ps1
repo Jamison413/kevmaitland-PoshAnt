@@ -7,7 +7,7 @@ $requests += Get-PnPListItem -List "Internal Team Site Requests" -Query "<View><
 if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.Site_x0020_Type},{$_.FieldValues.DataManager.LookupValue},{$_.FieldValues.Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
 
 
-$areDataManagersLineManagers = $false
+$areDataManagersLineManagers = $true
 $managedBy = "365"
 #$memberOf = ??
 $hideFromGal = $false
@@ -19,7 +19,8 @@ $alsoCreateTeam = $true
 
 foreach($request in $selectedRequests){
     $request = $requests | ? {$_.FieldValues.GUID.Guid -eq $request.'$_.FieldValues.GUID.Guid'}
-    $displayName = "$($request.FieldValues.Title) $($request.FieldValues.Site_x0020_Type)"
+    if($request.FieldValues.Site_x0020_Type -eq "Functional"){$displayName = $($request.FieldValues.Title)}
+    else{$displayName = "$($request.FieldValues.Title) $($request.FieldValues.Site_x0020_Type)"}
 
     $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
     $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
@@ -60,12 +61,14 @@ foreach($request in $selectedRequests){
 
     $newTeam = new-365Group -displayName $displayName -managerUpns $managers -teamMemberUpns $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $areDataManagersLineManagers -membershipmanagedBy $managedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $365creds
     Write-Verbose "Getting PnPUnifiedGroup [$displayName] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
-    Connect-PnPOnline -AccessToken $tokenResponse.access_token
+    #Connect-PnPOnline -AccessToken $tokenResponse.access_token
+    Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com" -RetryCount 2 -ReturnConnection
     $newPnpTeam = Get-PnPUnifiedGroup -Identity $newTeam.id
 
     #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
     if($addExecutingUserAsTemporaryOwner){
-        $userWasAlreadySiteAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -accessToken $tokenResponse.access_token -pnpCreds $365creds -addPermissionsIfMissing $true
+        Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
+        $executingUserAlreadySiteCollectionAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -pnpAppCreds $teamBotDetails -pnpCreds $365creds -addPermissionsIfMissing $true
         }
     copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Candiate-Template-for-Team-Site-Landing-Page.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
     test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $365creds -connectIfDifferent $true | Out-Null
@@ -139,15 +142,23 @@ foreach($request in $selectedRequests){
 
     if($addExecutingUserAsTemporaryOwner){
         Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-DistributionGroupMember -Identity $new365Group.anthesisgroup_UGSync.dataManagerGroupId -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        Remove-DistributionGroupMember -Identity $newTeam.anthesisgroup_UGSync.dataManagerGroupId -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
         }
     if($addExecutingUserAsTemporaryMember){
         Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
         }
 
-    Write-Verbose "set-standardSitePermissions [$($newTeam.DisplayName)]"
-    set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $newTeam -pnpCreds $365creds -Verbose
+    Write-Host -f DarkYellow "`tset-standardSitePermissions [$($newTeam.DisplayName)]"
+    try{
+        Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
+        set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $newTeam -pnpAppCreds $teamBotDetails -pnpCreds $365creds -Verbose:$VerbosePreference -suppressEmailNotifications -ErrorAction Continue
+        }
+    catch{$_}
 
+
+    Write-Verbose "Updating Team Request: Status = [Created]"
+    Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub" -Credentials $365creds
+    $dummy = Set-PnPListItem -List "34cad35a-4710-4fc9-bd53-ec35ae54574f" -Identity $request.Id -Values @{Status="Created"} #"Internal Team Site Requests" List 
 
     Write-Verbose "Preparing e-mail(s)"
     $originalManagers | % {

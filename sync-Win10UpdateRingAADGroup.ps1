@@ -80,7 +80,7 @@ Write-Host "Current count of devices in AAD group: $(($updateRingGroup | Measure
 #Compare by the AAD object ID we found earlier, if there is a mismatch, sync the device
 $unSyncedDevices = Compare-Object -ReferenceObject $updateRingGroup.id -DifferenceObject $targetDevices.FoundAADDirectoryObjectID
 If($unSyncedDevices){
-Write-Host "[We found $($unSynced.Count) devices not in our AAD group...syncing back up]" -ForegroundColor Cyan
+Write-Host "[We found $(($unSyncedDevices | Measure-Object).Count) devices not in our AAD group...syncing back up]" -ForegroundColor Cyan
     ForEach($unSyncedDevice in $unSyncedDevices){
     $thisUnsyncedDevice = $targetDevices | ? {$_.FoundAADDirectoryObjectID -eq $unSyncedDevice.InputObject}
     Write-Host "Adding device to ADD group: $($thisUnsyncedDevice.deviceName)..." -ForegroundColor Cyan

@@ -181,6 +181,8 @@ function add-netSuiteClientToNetSuite{
     catch{Write-Error $_;return}
     try{$statusId = convert-netSuiteStatusToId -status $status}
     catch{Write-Error $_;return}
+    if(@("13","15") -contains $statusId){$customFormId = convert-netSuiteCustomFormToId -formType 'Anthesis | Client Form'}
+    else{$customFormId = convert-netSuiteCustomFormToId -formType 'Anthesis | Lead Form'}
     if($sector){ #Not mandatory
         try{$sectorId = convert-netSuiteSectorToId -sector $sector}
         catch{Write-Error $_;return}
@@ -206,6 +208,7 @@ function add-netSuiteClientToNetSuite{
         entityStatus = @{id=$statusId}
         externalId = $externalId
         subsidiary = @{id=$subsidiaryId}
+        #customForm = @{id=$customFormId}
         }
     switch($newDataOriginatedFrom){
         "HubSpot" {
@@ -579,6 +582,24 @@ function convert-netSuiteClientTypeToId(){
         "Public Sector"	{$clientTypeId = 102}
         }
     $clientTypeId
+    }
+function convert-netSuiteCustomFormToId(){
+    [cmdletbinding()]
+    Param (    [parameter(Mandatory = $true)]
+        [ValidateSet("Anthesis | Client Form","Anthesis | Lead Form","Anthesis Contact Form","REST HubSpot Integration| Client Form","REST HubSpot Integration | Contact Form")]
+        [string]$formType
+        )
+    #ClientType Validation:  ($(get-netSuiteCustomListValues -objectType clientType -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false}).name -join '","'
+    #                         $(get-netSuiteCustomListValues -objectType clientType -netsuiteParameters $(get-netSuiteParameters -connectTo Production)) | ? {$_.isInactive -eq $false} | % {"`"$($_.Name)`"`t{`$clientTypeId = $($_.id)}"}
+
+    switch($formType){
+        "Anthesis | Client Form"	{$formTypeId = 141}
+        "Anthesis Contact Form"	{$formTypeId = 107}
+        "Anthesis | Lead Form"	    {$formTypeId = 101}
+        "REST HubSpot Integration| Client Form"	{$formTypeId = 171}
+        "REST HubSpot Integration | Contact Form"	{$formTypeId = 172}
+        }
+    $formTypeId
     }
 function convert-netSuiteSectorToId(){
     [cmdletbinding()]
@@ -1216,12 +1237,15 @@ function get-netSuiteParameters(){
 function get-netSuiteProjectFromNetSuite(){
     [cmdletbinding()]
     Param (
-        [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]|^$')]
-        [string]$query
-
-        ,[parameter(Mandatory=$false)]
-        [psobject]$netsuiteParameters
+        [parameter(Mandatory = $true,ParameterSetName="Query")]
+            [ValidatePattern('^?[\w+][=][\w+]|^$')]
+            [string]$query
+        ,[parameter(Mandatory=$true,ParameterSetName="Id")]
+            [string]$projectId
+        ,[parameter(Mandatory=$false,ParameterSetName="Query")]
+            [parameter(Mandatory = $false,ParameterSetName="GetAll")]
+            [parameter(Mandatory = $false,ParameterSetName="Id")]
+            [psobject]$netsuiteParameters
         )
 
     Write-Verbose "`tget-netSuiteProjectFromNetSuite([$($query)])"
@@ -1230,13 +1254,21 @@ function get-netSuiteProjectFromNetSuite(){
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
 
-    $projects = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/job$query" -netsuiteParameters $netsuiteParameters #-Verbose 
-    #$projectsEnumerated = [psobject[]]::new($projects.count)
-    [array]$projectsEnumerated = @($null) * $projects.Count
-    for ($i=0; $i -lt $projects.count;$i++) {
+    switch ($PsCmdlet.ParameterSetName){
+        "Id"    {
+            $projectsEnumerated = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/job/$projectId" -netsuiteParameters $netsuiteParameters 
+            }
+        default {
+            $projects = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/job$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+            #$projectsEnumerated = [psobject[]]::new($projects.count)
+            [array]$projectsEnumerated = @($null) * $projects.Count
+                                    for ($i=0; $i -lt $projects.count;$i++) {
         write-progress -activity "Retrieving NetSuite Project details..." -Status "[$($i)]/[$($projects.count)]" -PercentComplete $(($i*100)/$projects.count)
         $projectsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $projects.items[$i].links[0].href -netsuiteParameters $netsuiteParameters 
         }
+            }
+        }
+
     $projectsEnumerated
     }
 function get-netSuiteProjectFromSqlCache{
@@ -1812,6 +1844,15 @@ function update-netSuiteClientInNetSuite(){
         catch{return}
         $fieldHash["subsidiary"] = @{id=$subsidiaryId}
         }
+#    if($fieldHash.Keys -contains "customForm" -and $fieldHash["customForm"] -isnot [hashtable]){
+#        try{$customFormId = convert-netSuiteCustomFormToId -formType $fieldHash["customForm"]}
+#        catch{return}
+#        $fieldHash["customForm"] = @{id=$customFormId}
+#        }
+#    else{
+#        if(@("13","15") -contains $statusId){$customFormId = convert-netSuiteCustomFormToId -formType 'Anthesis | Client Form'}
+#        else{$customFormId = convert-netSuiteCustomFormToId -formType 'Anthesis | Lead Form'}
+#        }
 
     invoke-netSuiteRestMethod -requestType PATCH -url "$($netsuiteParameters.uri)/customer/$netSuiteClientId" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $fieldHash
 
@@ -1887,6 +1928,11 @@ function update-netSuiteContactInNetSuite(){
         try{$subsidiaryId = convert-netSuiteSubsidiaryToId -subsidiary $fieldHash["subsidiary"]}
         catch{return}
         $fieldHash["subsidiary"] = @{id=$subsidiaryId}
+        }
+    if($fieldHash.Keys -contains "customForm" -and $fieldHash["customForm"] -isnot [hashtable]){
+        try{$customFormId = convert-netSuiteCustomFormToId -formType $fieldHash["customForm"]}
+        catch{return}
+        $fieldHash["customForm"] = @{id=$customFormId}
         }
 
     invoke-netSuiteRestMethod -requestType PATCH -url "$($netsuiteParameters.uri)/contact/$netSuiteContactId" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $fieldHash

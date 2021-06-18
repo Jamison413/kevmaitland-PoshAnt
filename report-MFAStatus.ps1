@@ -15,8 +15,8 @@ Import-Module _PS_Library_MSOL
 Import-Module _PS_Library_Graph
 Import-Module _PS_Library_MFA
 
-$groupAdmin = "newgroupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\NewGroupBot.txt) 
+$groupAdmin = "groupbot@anthesisgroup.com"
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $adminCreds
 

@@ -1178,7 +1178,7 @@ function sync-groupMemberships(){
 
             if($usersAdded.Count -ne 0 -or $usersRemoved.Count -ne 0){
                 Write-Verbose "[$($usersAdded.Count + $usersRemoved.Count)] changes made - sending the change report to managers and admins"
-                $ownersEmailAddresses = $ownersAfterChanges.UserPrincipalName
+                $ownersEmailAddresses = @($ownersAfterChanges.UserPrincipalName)
                 if($syncWhat -eq "Owners"){
                     Write-Verbose "Getting all group Owners (both added and removed) for [$($graphExtendedUG.DisplayName)]"
                     $ownersEmailAddresses += $usersAdded.UPN

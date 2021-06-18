@@ -17,8 +17,8 @@ $teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desk
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #Unbelievbly, you still can't manage MESGs via Graph.
-$groupAdmin = "newgroupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\NewGroupBot.txt) 
+$groupAdmin = "groupbot@anthesisgroup.com"
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $adminCreds
 

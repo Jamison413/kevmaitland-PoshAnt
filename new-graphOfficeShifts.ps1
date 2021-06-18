@@ -65,13 +65,7 @@ function new-weekShiftHash(){
     }
 
 $offices = @()
-$offices += [ordered]@{
-    OfficeName="GBR-Oxford"
-    OfficeColour="Yellow"
-    OfficeWeekendColour="darkYellow"
-    OfficeDesks=8
-    ShiftNotes="Remember to clock in using the Wheelhouse App (available on the Anthesis and/or personal App Store), and to use hand sanitiser when entering/exiting the office please"
-    }
+
 $offices += [ordered]@{
     OfficeName="GBR-Bristol"
     OfficeColour="Green"
@@ -90,8 +84,15 @@ $offices += [ordered]@{
     OfficeName="GBR-Manchester"
     OfficeColour="Pink"
     OfficeWeekendColour="darkPink"
-    OfficeDesks=6
-    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
+    OfficeDesks=0
+    ShiftNotes="Office currently not available until we move to new premises in July 2021"
+    }
+$offices += [ordered]@{
+    OfficeName="GBR-Oxford"
+    OfficeColour="Yellow"
+    OfficeWeekendColour="darkYellow"
+    OfficeDesks=8
+    ShiftNotes="Oxford employees to use Wheelhouse booking system - do not need to duplicate bookings on Shifts"
     }
 
 #$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
@@ -110,7 +111,7 @@ $openShifts = invoke-graphGet -tokenResponse $tokenResponseshiftBot -graphQuery 
 [datetime]$nextMonday = $lastScheduledDay.AddDays(-$($lastScheduledDay.DayOfWeek.value__ - 1)+7) 
 
 if($lastScheduledDay.DayOfWeek.value__ -eq 0){$nextMonday = $nextMonday.AddDays(-7)} #Special case for Sundays being part of the wrong week
-$nextWeekOfShifts = new-weekShiftHash -date $nextMonday -suppressMonday:$true -suppressFriday:$true -suppressSaturday:$true -suppressSunday:$true
+$nextWeekOfShifts = new-weekShiftHash -date $nextMonday -suppressMonday:$false -suppressFriday:$false -suppressSaturday:$true -suppressSunday:$true
 
 #Get the SchedulingGroupId values for the offices
 $officeSchedulingGroups = invoke-graphGet -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups" -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}

@@ -663,6 +663,7 @@ function update-hubSpotObjectFromNetSuiteObject(){
                 zip = $netSuiteObject.shipZip
                 lastmodifiedinnetsuite = $netSuiteObject.lastModifiedDate
                 lastmodifiedinhubspot = $(Get-Date (Get-Date).ToUniversalTime() -Format o)
+                companystatusinnetsuite = $netSuiteObject.entityStatus.refName
                 }
             if([string]::IsNullOrWhiteSpace($fieldHash["generic_email_address__c"])){
                 $contacts = get-hubSpotContactsFromCompanyId -apiKey $apiKey -hubspotCompanyId $netSuiteObject.HubSpotId
