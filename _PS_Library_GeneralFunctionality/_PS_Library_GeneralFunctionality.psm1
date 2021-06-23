@@ -948,8 +948,8 @@ function get-microsoftProductInfo(){
         @("Microsoft 365 A5 for faculty","Microsoft 365 A5 for faculty","M365EDU_A5_FACULTY","e97c048c-37a4-45fb-ab50-922fbf07a370","Microsoft 365 A5 for faculty"),
         @("Microsoft 365 A5 for students","Microsoft 365 A5 for students","M365EDU_A5_STUDENT","46c119d4-0379-4a9d-85e4-97c66d3f909e","Microsoft 365 A5 for students"),
         @("MICROSOFT 365 BUSINESS","MICROSOFT 365 BUSINESS","SPB","cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46","MICROSOFT 365 BUSINESS"),
-        @("MICROSOFT 365 E3","MICROSOFT 365 E3","SPE_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","MICROSOFT 365 E3"),
-        @("Microsoft 365 E5","Microsoft 365 E5","SPE_E5","06ebc4ee-1bb5-47dd-8120-11324bc54e06","Microsoft 365 E5"),
+        @("M3","MICROSOFT 365 E3","SPE_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","MICROSOFT 365 E3"),
+        @("M5","Microsoft 365 E5","SPE_E5","06ebc4ee-1bb5-47dd-8120-11324bc54e06","Microsoft 365 E5"),
         @("Microsoft 365 E3_USGOV_DOD","Microsoft 365 E3_USGOV_DOD","SPE_E3_USGOV_DOD","d61d61cc-f992-433f-a577-5bd016037eeb","Microsoft 365 E3_USGOV_DOD"),
         @("Microsoft 365 E3_USGOV_GCCHIGH","Microsoft 365 E3_USGOV_GCCHIGH","SPE_E3_USGOV_GCCHIGH","ca9d1dd9-dfe9-4fef-b97c-9bc1ea3c3658","Microsoft 365 E3_USGOV_GCCHIGH"),
         @("Microsoft 365 E5 Compliance","Microsoft 365 E5 Compliance","INFORMATION_PROTECTION_COMPLIANCE","184efa21-98c3-4e5d-95ab-d07053a96e67","Microsoft 365 E5 Compliance"),
@@ -1006,8 +1006,8 @@ function get-microsoftProductInfo(){
         @("InternationalCalling","SKYPE FOR BUSINESS PSTN DOMESTIC CALLING (120 Minutes)","MCOPSTN5","54a152dc-90de-4996-93d2-bc47e670fc06","SKYPE FOR BUSINESS PSTN DOMESTIC CALLING (120 Minutes)"),
         @("VISIO ONLINE PLAN 1","VISIO ONLINE PLAN 1","VISIOONLINE_PLAN1","4b244418-9658-4451-a2b8-b5e2b364e9bd","VISIO ONLINE PLAN 1"),
         @("Visio","VISIO Online Plan 2","VISIOCLIENT","c5928f49-12ba-48f7-ada3-0d743a3601d5","Visio Pro for Office 365 (CSP)"),
-        @("WINDOWS 10 ENTERPRISE E3","WINDOWS 10 ENTERPRISE E3","WIN10_PRO_ENT_SUB","cb10e6cd-9da4-4992-867b-67546b1db821","WINDOWS 10 ENTERPRISE E3"),
-        @("Windows 10 Enterprise E5","Windows 10 Enterprise E5","WIN10_VDA_E5","488ba24a-39a9-4473-8ee5-19291e71b002","Windows 10 Enterprise E5"),
+        @("WinE3","WINDOWS 10 ENTERPRISE E3","WIN10_PRO_ENT_SUB","6a0f6da5-0b87-4190-a6ae-9bb5a2b9546a","WINDOWS 10 ENTERPRISE E3"),
+        @("WinE5","Windows 10 Enterprise E5","WIN10_VDA_E5","488ba24a-39a9-4473-8ee5-19291e71b002","Windows 10 Enterprise E5"),
         @("PowerAutomateFree","FLOW_FREE","FLOW_FREE","f30db892-07e9-47e9-837c-80727f46fd3d","FLOW_FREE"),
         @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM")
 

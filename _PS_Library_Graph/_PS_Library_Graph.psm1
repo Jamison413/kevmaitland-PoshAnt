@@ -156,21 +156,29 @@ function add-graphLicenseToUser(){
             [parameter(Mandatory = $true,ParameterSetName="Guids")]
             [string]$userIdOrUpn
         ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [ValidateSet("K1","E1","E3","E5","EMS","ATP","PowerBIFree","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio")]
+            [ValidateSet("Kiosk","E1","E3","E5","EMS","ATP","PowerBIFree","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio","M3","WinE3")]
             [string]$licenseFriendlyName 
         ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
             [string]$licenseGuid
         ,[parameter(Mandatory = $false,ParameterSetName = "Guid")]
+            [parameter(Mandatory = $false,ParameterSetName = "Friendly")]
             [string[]]$disabledPlansGuids = @()
         ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
             [string[]]$licenseGuids
         )
+    $specialLicenses = @("Kiosk","80b2d799-d2ba-4d2a-8842-fb0d0f3a4b82","E1","18181a46-0d4e-45cd-891e-60aabd171b4e","E3","6fd2c87f-b296-42f0-b197-1e91e994b900","E5","c7df2760-2c81-4ef7-b578-5b5392b571df","M3","05e9a617-0261-4cee-bb44-138d3ef5d965","M5","06ebc4ee-1bb5-47dd-8120-11324bc54e06")
     $licensesToRemove = @()
-    if(<#Licenses contain K1/E1/E3/E5#>$false){
+    if($specialLicenses -contains $licenseFriendlyName -or
+        $specialLicenses -contains $licenseGuid 
+        ){
         #We have to remove any conflicting licenses at the same time
         #get user licesnses
+        $userRecord = get-graphUsers -tokenResponse $tokenResponse -filterUpns $userIdOrUpn -selectAllProperties
         #build appropriate remove hash
-        #$licensesToRemove = @("guidToRemove")
+        $matchedLicenses = $(Compare-Object -ReferenceObject $userRecord.assignedLicenses.skuId -DifferenceObject $specialLicenses -IncludeEqual -ExcludeDifferent)
+        @($matchedLicenses.InputObject | Select-Object) | % {
+            $licensesToRemove += $_
+            }
         }
 
     switch ($PsCmdlet.ParameterSetName){
@@ -184,7 +192,7 @@ function add-graphLicenseToUser(){
         }
 
     #Iterate through the supplied/derived licenseGuids
-    $licenseGuids | % {
+    @($licenseGuids | Select-Object) | % {
         $thisLicenseDefinition = @{"skuId"=$_}
         $thisLicenseDefinition.Add("disabledPlans",$disabledPlansGuids) #$disabledPlansGuids is $null if $PsCmdlet.ParameterSetName -eq "Guids", so we don't need to worry about which disabledPlans belong to which licenseGuid
         [array]$licenseArray += $thisLicenseDefinition
@@ -195,7 +203,7 @@ function add-graphLicenseToUser(){
         "removeLicenses"=$licensesToRemove
         }
 
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable 
     }
 function add-graphUsersToGroup(){
     [cmdletbinding()]
