@@ -53,13 +53,13 @@ $timeForFullCycle = Measure-Command {
                     sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Members -sourceGroup $365Group.anthesisgroup_UGSync.masterMembershipList -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
                     }
                 catch{
-                    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members`r`n`r`n$(get-errorSummary $_)"
+                    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members`r`n`r`n$(get-errorSummary $_)" -priority high
                     #Send-MailMessage -To $adminEmailAddresses  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnfiedGroupMembership [$($365Group.DisplayName)]" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members" -From "$env:COMPUTERNAME@anthesisgroup.com" 
                     continue
                     }
                 }
             else{
-                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members`r`n`r`n$(get-errorSummary $_)"
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members`r`n`r`n$(get-errorSummary $_)" -priority high
                 #Send-MailMessage -To $adminEmailAddresses  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members" -From "$env:COMPUTERNAME@anthesisgroup.com"
                 }
             continue
@@ -77,13 +77,13 @@ $timeForFullCycle = Measure-Command {
                     sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
                     }
                 catch{
-                    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners`r`n`r`n$(get-errorSummary $_)"
+                    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners`r`n`r`n$(get-errorSummary $_)" -priority high
                     #Send-MailMessage -To $adminEmailAddresses  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnfiedGroupMembership [$($365Group.DisplayName)]" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners" -From "$env:COMPUTERNAME@anthesisgroup.com"
                     continue
                     }
                 }
             else{
-                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners`r`n`r`n$(get-errorSummary $_)"
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners`r`n`r`n$(get-errorSummary $_)" -priority high
                 #Send-MailMessage -To $adminEmailAddresses  -SmtpServer anthesisgroup-com.mail.protection.outlook.com -Subject "FAILED: sync-UnfiedGroupMembership [$($365Group.DisplayName)]" -Priority High -Body "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners" -From "$env:COMPUTERNAME@anthesisgroup.com"
                 }
             continue

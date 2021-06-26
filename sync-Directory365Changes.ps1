@@ -108,20 +108,10 @@ $ctx = Get-PnPContext
 
 
 #Conn - Graph for overall user profile
-$teamBotDetails = Import-Csv "$env:USERPROFILE\Desktop\teambotdetails.txt"
-$resource = "https://graph.microsoft.com"
-$tenantId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.TenantId)
-$clientId = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.ClientID)
-$redirect = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Redirect)
-$secret   = decrypt-SecureString (ConvertTo-SecureString $teamBotDetails.Secret)
-
-$ReqTokenBody = @{
-    Grant_Type    = "client_credentials"
-    Scope         = "https://graph.microsoft.com/.default"
-    client_Id     = $clientID
-    Client_Secret = $secret
-    } 
-$tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -Method POST -Body $ReqTokenBody
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
+$tokenResponseTeams = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype START -logstring "Starting run for sync-Directory365Changes"
 
@@ -133,13 +123,13 @@ $reportinglinesListId = "42dca4b4-170c-4caf-bcfe-62e00cb62819"
 
 
 #Get all licensed graph users
-$usersarray = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers:$true -selectAllProperties:$true
+$usersarray = get-graphUsers -tokenResponse $tokenResponseTeams -filterLicensedUsers:$true -selectAllProperties:$true
 $allgraphusers = remove-mailboxesandbots -usersarray $usersarray
 #Get all current Anthesians in the list
-$allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
+$allanthesians = get-graphListItems -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
 $allanthesianGUIDS = $allanthesians | select -ExpandProperty "fields"
 #Get all current Live Reporting Lines List
-$allPOPreports = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $reportinglinesListId -expandAllFields
+$allPOPreports = get-graphListItems -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $reportinglinesListId -expandAllFields
 
 #Set Teams Messaging holder
 $TeamsReport = @()
@@ -176,7 +166,7 @@ $context.ExecuteQuery()
 
 #Graph and SPO manager
 $graphQuery = "/users/$($graphuser.id)/manager"
-$graphmanager = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graphQuery -ErrorAction SilentlyContinue
+$graphmanager = invoke-graphGet -tokenResponse $tokenResponseTeams -graphQuery $graphQuery -ErrorAction SilentlyContinue
     If($graphmanager){
         $context = $ctx
         $sharepointUsers = $context.Web.SiteUsers
@@ -191,7 +181,7 @@ $graphmanager = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graph
     }
 
 #Exchange timezone
-$exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)"
+$exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponseTeams -identity "$($graphuser.userPrincipalName)"
 #Philippine's uses several timezone names
 If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
 $exoTimezone = New-Object -TypeName psobject @{
@@ -271,7 +261,7 @@ $body = "{
 }
 $graphQuery = "https://graph.microsoft.com/v1.0/sites/$($graphSiteId)/lists/$($directoryListId)/items"
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
-$directoryresponse = Invoke-RestMethod -Uri "$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post -verbose
+$directoryresponse = Invoke-RestMethod -Uri "$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponseTeams.access_token)"} -Method Post -verbose
 If($directoryresponse.fields.Email -eq $user.graphuser.userPrincipalName){
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "user added to Directory: [$($user.graphuser.userPrincipalName)]"
 }
@@ -310,7 +300,7 @@ $body = "{
 }
 $graphQuery = "https://graph.microsoft.com/v1.0/sites/$($graphSiteId)/lists/$($reportinglinesListId)/items"
 $body = [System.Text.Encoding]::UTF8.GetBytes($body)
-$reportresponse = Invoke-RestMethod -Uri "$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponse.access_token)"} -Method Post -verbose
+$reportresponse = Invoke-RestMethod -Uri "$graphQuery" -Body $body -ContentType "application/json; charset=utf-8" -Headers @{Authorization = "Bearer $($tokenResponseTeams.access_token)"} -Method Post -verbose
 If($reportresponse.fields.Email -eq $user.graphuser.userPrincipalName){
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "user added to Reporting List: [$($user.graphuser.userPrincipalName)]"
 }
@@ -335,18 +325,18 @@ ForEach($removedanthesian in $removedanthesians){
     $thisreporttoremove = $allPOPreports | Where-Object {$_.fields.UserGUID -eq "$($removedanthesian.InputObject)"}
     Write-Host "Removed Anthesian: Removing $($anthesiantoremove.Email) from Anthesis People Directory" -ForegroundColor Yellow
     $graphItemId = $anthesiantoremove.id
-    delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $graphItemId
+    delete-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $graphItemId
     $graphItemId = $thisreporttoremove.id
-    delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $graphItemId
+    delete-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $graphItemId
 
     #Check if it was deleted, we can't capture any details of the response for the graph api weirdly. We try to query the list and if it was removed we should recieve an error code saying it can't find the item
     $error.clear()
     $graphItemId = $anthesiantoremove.id
-    get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -filterId $graphItemId
+    get-graphListItems -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -filterId $graphItemId
     $removeitemcheck = If($($error[0]) -match '"code": "itemNotFound"'){1}
     $error.clear()
     $graphItemId = $thisreporttoremove.id
-    get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $reportinglinesListId -filterId $graphItemId
+    get-graphListItems -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $reportinglinesListId -filterId $graphItemId
     If($($error[0]) -match '"code": "itemNotFound"'){$removeitemcheck += 2} #########///////////this section doesn't work because null is also -notcontains############
     $error.clear()
         If($removeitemcheck -eq 3){
@@ -374,7 +364,8 @@ If($TeamsReport){
 
 $report = $report | out-string
 
-Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+#Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "cb1d8222.anthesisgroup.com@amer.teams.ms" -subject "Test" -bodyHtml $report
 }
 
 
@@ -395,7 +386,7 @@ If($($thisanthesian.fields.JobTitle) -ne $($graphuser.jobTitle)){
     $error.clear()
     Write-Host "Job title has been changed in 365 for $($graphuser.userPrincipalName)...amending lists" -ForegroundColor Yellow
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change in 365' -logstring "user job title changed in 365: [$($graphuser.userPrincipalName)]"
-    $jobtitledirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"JobTitle" = "$($graphuser.JobTitle)"} -Verbose
+    $jobtitledirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"JobTitle" = "$($graphuser.JobTitle)"} -Verbose
     If($jobtitledirectoryupdate.JobTitle -eq $graphuser.jobTitle){
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated job title for [$($graphuser.userPrincipalName)]: $($thisanthesian.fields.JobTitle) to $($graphuser.JobTitle)"
     }
@@ -409,7 +400,7 @@ If($($thisanthesian.fields.cellphone) -ne $($graphuser.mobilePhone)){
     $error.clear()
     Write-Host "Mobile number has been changed in 365 for $($graphuser.userPrincipalName)...amending lists" -ForegroundColor Yellow
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change in 365' -logstring "user mobile number changed in 365: [$($graphuser.userPrincipalName)]"
-    $mobilenumberdirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"CellPhone" = "$($graphuser.mobilePhone)"} -Verbose
+    $mobilenumberdirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"CellPhone" = "$($graphuser.mobilePhone)"} -Verbose
     If($mobilenumberdirectoryupdate.CellPhone -eq $graphuser.mobilePhone){
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated mobile number for [$($graphuser.userPrincipalName)]: $($thisanthesian.fields.CellPhone) to $($graphuser.mobilePhone)"
     }
@@ -423,7 +414,7 @@ If($($thisanthesian.fields.Office_x0020_Phone) -ne $($graphuser.businessPhones))
     $error.clear()
     Write-Host "Office number has been changed in 365 for $($graphuser.userPrincipalName)...amending lists" -ForegroundColor Yellow
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change in 365' -logstring "user office number changed in 365: [$($graphuser.userPrincipalName)]"
-    $officenumberdirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office_x0020_Phone" = "$($graphuser.businessPhones)"} -Verbose
+    $officenumberdirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office_x0020_Phone" = "$($graphuser.businessPhones)"} -Verbose
     If($officenumberdirectoryupdate.Office_x0020_Phone -eq $graphuser.businessPhones){
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated office number for [$($graphuser.userPrincipalName)]: $($thisanthesian.fields.Office_x0020_Phone) to $($graphuser.businessPhones)"
     }
@@ -437,7 +428,7 @@ If($($thisanthesian.fields.Community) -ne $($graphuser.department)){
     $error.clear()
     Write-Host "Community has been changed in 365 for $($graphuser.userPrincipalName)...amending lists" -ForegroundColor Yellow
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change in 365' -logstring "user community changed in 365: [$($graphuser.userPrincipalName)]"
-    $communitydirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Community" = "$($graphuser.department)"} -Verbose
+    $communitydirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Community" = "$($graphuser.department)"} -Verbose
     If($communitydirectoryupdate.Community -eq $graphuser.department){
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated community for [$($graphuser.userPrincipalName)]: $($thisanthesian.fields.Community) to $($graphuser.department)"
     }
@@ -455,14 +446,14 @@ Connect-PnPOnline "https://anthesisllc-admin.sharepoint.com/" -Credentials $spoC
 $officeterm = Get-PnPTerm -TermSet "Offices" -TermGroup "Anthesis" -Includes CustomProperties | Where-Object -Property "Name" -EQ $graphuser.officeLocation
 If($officeterm){
     #Set graphuser office
-    set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"officeLocation" = $($officeterm.Name)}
-    set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"streetAddress" = $($officeterm.CustomProperties.'Street Address')}
-    set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"postalCode" = $($officeterm.CustomProperties.'Postal Code')}
-    set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"country" = $($officeterm.CustomProperties.'Country')}
+    set-graphuser -tokenResponse $tokenResponseTeams -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"officeLocation" = $($officeterm.Name)}
+    set-graphuser -tokenResponse $tokenResponseTeams -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"streetAddress" = $($officeterm.CustomProperties.'Street Address')}
+    set-graphuser -tokenResponse $tokenResponseTeams -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"postalCode" = $($officeterm.CustomProperties.'Postal Code')}
+    set-graphuser -tokenResponse $tokenResponseTeams -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"country" = $($officeterm.CustomProperties.'Country')}
     #Set SPO timezone
     Set-SPOTimezone -upn $graphuser.userPrincipalName -office $officeterm.Name
     #Set EXO timezone
-    $mailboxupdate = set-graphMailboxSettings -tokenResponse $tokenResponse -identity $graphuser.userPrincipalName -timeZone "$($officeterm.CustomProperties.Timezone)"
+    $mailboxupdate = set-graphMailboxSettings -tokenResponse $tokenResponseTeams -identity $graphuser.userPrincipalName -timeZone "$($officeterm.CustomProperties.Timezone)"
     
     #Check timezones after waiting 10 seconds for changes to sync up and run checks
     $timezonesync = @()
@@ -473,7 +464,7 @@ If($officeterm){
         $timezonesync += 0
         }
         Else{
-        $currenttimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "emily.pressey@anthesisgroup.com"
+        $currenttimezone = get-graphMailboxSettings -tokenResponse $tokenResponseTeams -identity "emily.pressey@anthesisgroup.com"
         friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype ERROR -logstring "(365) Something went wrong updating the Exchange Online Mailbox timezone for [$($graphuser.userPrincipalName)]"
         $TeamsReport += @{"$(get-date) (365) ERROR - [Part of Office Location change]  Mailbox timezone not changed to $($officeterm.CustomProperties.Timezone). Current mailbox timezone is: $($currenttimezone.timeZone)" = "[$($graphuser.userPrincipalName)]"}
         $timezonesync += 1
@@ -505,7 +496,7 @@ If($officeterm){
         }                 
     If($timezonesync -eq 0){
     #If all returns okay, update the Directory with the friendly utc timezone 
-    $exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponse -identity "$($graphuser.userPrincipalName)" -Verbose
+    $exoTimezone = get-graphMailboxSettings -tokenResponse $tokenResponseTeams -identity "$($graphuser.userPrincipalName)" -Verbose
     #Philippine's uses several timezone names
     If(($exoTimezone.timeZone -eq "Singapore Standard Time") -or ($exoTimezone.timeZone -eq "Taipei Standard Time") -or ($exoTimezone.timeZone -eq "China Standard Time")){
     $exoTimezone = New-Object -TypeName psobject @{
@@ -515,7 +506,7 @@ If($officeterm){
     Else{
     $exoTimezone = Get-TimeZone $exoTimezone.timeZone
     }
-    $officedirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office" = "$($graphuser.officeLocation)";"Timezone" = "$($exoTimezone.DisplayName)";"Country" = "$($officeterm.CustomProperties.Country)"} -Verbose    
+    $officedirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"Office" = "$($graphuser.officeLocation)";"Timezone" = "$($exoTimezone.DisplayName)";"Country" = "$($officeterm.CustomProperties.Country)"} -Verbose    
             If($officedirectoryupdate.Office -eq  $($graphuser.officeLocation)){
             friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated Office for [$($graphuser.userPrincipalName)]: $($graphuser.officeLocation) to $($thisanthesian.fields.Office)"
             }
@@ -536,7 +527,7 @@ $TeamsReport += @{"$(get-date) (365/Directory List) ERROR - Office not changed t
 $error.clear()
 $graphQuery = "/users/$($graphuser.id)/manager"
 $graphmanager = ""
-$graphmanager = invoke-graphGet -tokenResponse $tokenResponse -graphQuery $graphQuery -ErrorAction SilentlyContinue
+$graphmanager = invoke-graphGet -tokenResponse $tokenResponseTeams -graphQuery $graphQuery -ErrorAction SilentlyContinue
 #We only want to amend the directory and reporting list if there is a) a manager present in Azure AD AND b) it is different to the entries in both lists
 If($graphmanager){
         $spomanager = $allanthesians  | Where-Object {$_.fields.Email -eq "$($graphmanager.userPrincipalName)"}
@@ -545,11 +536,11 @@ If($graphmanager){
         friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change in 365' -logstring "user manager changed in 365: [$($graphuser.userPrincipalName)]"
         #If it was set correctly, update the Directory and Reporting list
         $spoManager = $allanthesians  | Where-Object {$_.fields.Email -eq "$($graphmanager.userPrincipalName)"}
-        $managerdirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"ManagerLookupId" = "$($spomanager.fields.AnthesianLookupId)";"ManagerEmail" = $($spomanager.fields.Email)} -Verbose
+        $managerdirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"ManagerLookupId" = "$($spomanager.fields.AnthesianLookupId)";"ManagerEmail" = $($spomanager.fields.Email)} -Verbose
         If($managerdirectoryupdate.ManagerEmail -eq $graphmanager.userPrincipalName){
         friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated manager for [$($graphuser.userPrincipalName)]: $($thisanthesian.fields.ManagerEmail) to $($graphmanager.userPrincipalName)"
         #If the Directory update, go ahead and update the reporting list, just to keep them nice and in sync
-        $managerreportingupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $reportinglinesListId -listitemId "$($thisreport.id)" -fieldHash @{"ManagerLookupId" = "$($spomanager.fields.AnthesianLookupId)";"ManagerEmail" = $($spomanager.fields.Email)} -Verbose
+        $managerreportingupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $reportinglinesListId -listitemId "$($thisreport.id)" -fieldHash @{"ManagerLookupId" = "$($spomanager.fields.AnthesianLookupId)";"ManagerEmail" = $($spomanager.fields.Email)} -Verbose
             If($managerreportingupdate.ManagerEmail -eq $graphmanager.userPrincipalName){
             friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Reporting) Updated the manager for [$($graphuser.userPrincipalName)]: $($graphmanager.userPrincipalName) to $($graphmanager.userPrincipalName)"
             }
@@ -570,7 +561,7 @@ If($($thisanthesian.fields.City) -ne $($graphuser.city)){
     $error.clear()
     Write-Host "City has been changed in 365 for $($graphuser.userPrincipalName)...amending lists" -ForegroundColor Yellow
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change in 365' -logstring "user city changed in 365: [$($graphuser.userPrincipalName)]"
-    $citydirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"City" = "$($graphuser.city)"} -Verbose
+    $citydirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"City" = "$($graphuser.city)"} -Verbose
     If($citydirectoryupdate.City -eq $graphuser.city){
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated city for [$($graphuser.userPrincipalName)]: $($thisanthesian.fields.City) to $($graphuser.city)"
     }
@@ -584,7 +575,7 @@ If($($thisanthesian.fields.BusinessUnit) -ne $($graphuser.anthesisgroup_employee
     $error.clear()
     Write-Host "Business Unit has been changed in 365 for $($graphuser.userPrincipalName)...amending lists" -ForegroundColor Yellow
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'Change in 365' -logstring "user business unit changed in 365: [$($graphuser.userPrincipalName)]"
-    $businessunitdirectoryupdate = update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"BusinessUnit" = "$($graphuser.anthesisgroup_employeeInfo.businessUnit)"} -Verbose
+    $businessunitdirectoryupdate = update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId "$($thisanthesian.id)" -fieldHash @{"BusinessUnit" = "$($graphuser.anthesisgroup_employeeInfo.businessUnit)"} -Verbose
     If($businessunitdirectoryupdate.BusinessUnit -eq $graphuser.anthesisgroup_employeeInfo.businessUnit){
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype SUCCESS -logstring "(Directory) Updated business unit for [$($graphuser.userPrincipalName)]: $($thisanthesian.fields.BusinessUnit) to $($graphuser.anthesisgroup_employeeInfo.businessUnit)"
     }
@@ -602,7 +593,7 @@ If($($thisanthesian.fields.BusinessUnit) -ne $($graphuser.anthesisgroup_employee
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "Line602"
 
 #Get all current Anthesians in the list
-$allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
+$allanthesians = get-graphListItems -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
 $allanthesiansDetails = $allanthesians | select -ExpandProperty "fields"
 
 $dupecheck = $allanthesiansDetails
@@ -619,7 +610,7 @@ If($dupestoremove){
         Write-Host "Removing $($totaltoremove) dupes for $($dupe.InputObject)" -ForegroundColor Yellow
         $removalIDs = $($dupecount | Select-Object -First $($totaltoremove)) | select -Property "ID"
             foreach($removalID in $removalIDs){
-            delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $removalID.id
+            delete-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $removalID.id
         }
 }
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype ERROR -logstring "DUPLICATE REMOVED FROM DIRECTORY LIST: $($dupe.InputObject)"
@@ -634,7 +625,7 @@ Write-Host "No dupes found in Directory List" -ForegroundColor Yellow
 
 $dupestoremove = @()
 #Get all current Live Reporting Lines List
-$allPOPreports = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $reportinglinesListId -expandAllFields
+$allPOPreports = get-graphListItems -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $reportinglinesListId -expandAllFields
 $allPOPreportsDetails = $allPOPreports | select -ExpandProperty "fields"
 
 $dupecheck = $allPOPreportsDetails
@@ -651,7 +642,7 @@ If($dupestoremove){
         Write-Host "Removing $($totaltoremove) dupes for $($dupe.InputObject)" -ForegroundColor Yellow
         $removalIDs = $($dupecount | Select-Object -First $($totaltoremove)) | select -Property "ID"
             foreach($removalID in $removalIDs){
-            delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $removalID.id
+            delete-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $removalID.id
         }
 }
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype ERROR -logstring "DUPLICATE REMOVED FROM REPORTING LIST: $($dupe.InputObject)"
@@ -672,7 +663,7 @@ If($unsyncedanthesians){
     ForEach($unsyncedanthesian in $unsyncedanthesians){
     $idtoremove = $allanthesiansDetails | Where-Object -Property "UserGUID" -EQ "$($unsyncedanthesian.InputObject)" | Select-Object -Property "Id"
     #Remove each entry in the main Directory
-    delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $idtoremove.id
+    delete-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -graphListId $directoryListId -graphItemId $idtoremove.id
 
     #Kick the script off again via scheduled task so they will get created again without having to duplicate code
     Start-ScheduledTask -TaskName "Ant - Sync Directory 365 Changes"
@@ -685,7 +676,7 @@ $missingpops = Compare-Object -ReferenceObject $allanthesiansDetails.UserGUID -D
 ForEach($missingpop in $missingpops){
     $popidtoremove = $allPOPreportsDetails | Where-Object -Property "UserGUID" -EQ "$($missingpop.InputObject)" | Select-Object -Property "Id"
     #Remove each entry in the pop list
-    delete-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $popidtoremove.id
+    delete-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -graphListId $reportinglinesListId -graphItemId $popidtoremove.id
 }
 
 
@@ -695,9 +686,9 @@ friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstri
 #Update Hire date on People Services list item
 
 #This is a real pain - we can't update HireDate at the moment on the graph object, so we're searching the two new starter request lists for an entry. I've used pnp for my sanity here just to differentiate processing from the two lists we're processing with Graph 
-$allanthesians = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
-$oldrequests = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/hr" -listName "New User Requests" -expandAllFields
-$newrequests = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -listName "New Starter Details" -expandAllFields
+$allanthesians = get-graphListItems -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -expandAllFields
+$oldrequests = get-graphListItems -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/hr" -listName "New User Requests" -expandAllFields
+$newrequests = get-graphListItems -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -listName "New Starter Details" -expandAllFields
 
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype MESSAGE -logstring "705"
 
@@ -709,7 +700,7 @@ ForEach($anthesian in $allanthesians){
     $thisFoundUser = $oldrequests | ? {($(remove-diacritics $($_.Fields.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
         If(($thisFoundUser | Measure-Object).count -eq 1){
         write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
-        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.Fields.Start_x0020_Date | get-date -format "o")} -Verbose
+        update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.Fields.Start_x0020_Date | get-date -format "o")} -Verbose
         }
         Else{
         Write-Host "Not found in old user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
@@ -720,7 +711,7 @@ ForEach($anthesian in $allanthesians){
         $thisFoundUser = $newrequests | ? {($(remove-diacritics $($_.Fields.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) -eq $anthesian.fields.Email}
         If(($thisFoundUser | Measure-Object).count -eq 1){
         write-host "Updating hireDate for $($anthesian.Fields.Email)" -foregroundcolor Cyan
-        update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.Fields.StartDate | get-date -format "o")} -verbose
+        update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"HireDate" = $($thisFoundUser.Fields.StartDate | get-date -format "o")} -verbose
         }
         Else{
         Write-Host "Not found in new user request list: $($anthesian.Fields.Email)" -ForegroundColor Red
@@ -742,7 +733,7 @@ $TenureinDays = $TenureinDays.Days + 1
     If($currentListItemTenure -ne $TenureinDays){
     write-host "Updating tenure for $($anthesian.Fields.Email): $($TenureinDays) (from $($currentListItemTenure))" -foregroundcolor Cyan
     friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype PROCESSING -logstring "Tenure Update: $($anthesian.Fields.Email): $($TenureinDays) (from $($currentListItemTenure))"
-    update-graphListItem -tokenResponse $tokenResponse -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"TenureDays" = $($TenureinDays)} -Verbose
+    update-graphListItem -tokenResponse $tokenResponseTeams -graphSiteId $graphSiteId -listId $directoryListId -listitemId $anthesian.id -fieldHash @{"TenureDays" = $($TenureinDays)} -Verbose
     }
 }
 }
@@ -760,7 +751,9 @@ If($TeamsReport){
 
 $report = $report | out-string
 
-Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+#Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "cb1d8222.anthesisgroup.com@amer.teams.ms" -subject "Test" -bodyHtml $report
+
 }
 
 

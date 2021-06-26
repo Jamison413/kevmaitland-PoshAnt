@@ -25,6 +25,9 @@ connect-ToExo -credential $exoCreds
 Connect-AzureAD -credential $adminCreds
 connect-toAAD -credential $adminCreds
 
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
+
 #Connect to the People Services site
 $pnpconnect = Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/" -Credentials $adminCreds
 
@@ -51,7 +54,8 @@ ForEach($moduleitem in $allmodules){
         $report += "***************Errors found in Anthesis Academy Sync: Duplicate Module Codes***************" + "<br><br>"
         $report += "Errors found on this Module: $($moduleitem.fieldvalues.ModuleName). This will cause issues in Powerapps and needs to be manually resolved." + "<br><br>"       
         $report = $report | out-string
-Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+#Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -Subject "Anthesis Academy Sync: Error" -bodyHtml $report 
 
     }
     Else{
@@ -120,7 +124,8 @@ $thisRegistrantModule = $allmodules.where({$_.FieldValues.ModuleCode -eq $nonwai
     <p></p>
     <p>The Anthesis Academy</p>
     </BODY></HTML>"
-     Send-MailMessage  -BodyAsHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+     #Send-MailMessage  -BodyAsHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+     send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses $($newregistrant.FieldValues.RegistrantName.Email)  -bodyHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)"
      #Send-MailMessage  -BodyAsHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)" -to "emily.pressey@anthesisgroup.com" -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
     }
 
@@ -139,7 +144,8 @@ Write-Host "We shouldn't be processing this registrant, they are unapproved by l
         $report += "***************Errors found in Anthesis Academy Sync: Powershell is trying to process an Unapproved Registrant***************" + "<br><br>"
         $report += "Weird - it's $($newregistrant.FieldValues.RegistrantName.Email). ID $($newregistrant.Id). This shouldn't be happening!" + "<br><br>"       
         $report = $report | out-string
-Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+#Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
 }
 
 
@@ -163,7 +169,9 @@ Write-Host "Something has gone very wrong, too many people have signed up to thi
         $report += "***************Errors found in Anthesis Academy Sync: Too Many People Have Signed Up For a Module***************" + "<br><br>"
         $report += "Errors found on this Module: $($thismodule.fieldvalues.ModuleName). The number of registered people has exceeded the maximum number of allowed registrants." + "<br><br>"       
         $report = $report | out-string
-Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+#Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
+
 }
     #Check for count - equal to
 If($currentregistrants.Count -eq $thismodule.fieldvalues.MaxRegistrantAmount){
@@ -172,7 +180,9 @@ Write-Host "Something has gone wrong in powerapps, we shouldn't be processing ne
         $report += "***************Errors found in Anthesis Academy Sync: We have reached the Maximum Sign Up Count For a Module***************" + "<br><br>"
         $report += "Errors found on this Module: $($thismodule.fieldvalues.ModuleName). We shouldn't be processing any more people as they shouldn't have had the option to sign up. This might have been a timing issue (unlikely though)." + "<br><br>"
         $report = $report | out-string
-    Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+    #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
+
 }
 
 
@@ -209,7 +219,9 @@ Else{
                 <p></p>
                 <p>The Anthesis Academy</p>
                 </BODY></HTML>"
-                Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+                #Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses $($newregistrant.FieldValues.RegistrantName.Email) -subject "You've Signed Up to an Anthesis Academy Module!" -bodyHtml $body
+
     }
     Else{
     Write-Host "Something went wrong registering $($newregistrant.FieldValues.RegistrantName.Email) to module: $($thismodule.fieldvalues.ModuleName). Messaging Emily." -ForegroundColor Red
@@ -217,7 +229,8 @@ Else{
         $report += "***************Errors found in Anthesis Academy Sync: Something Went Wrong Processing a Registrant to a Module***************" + "<br><br>"
         $report += "Something went wrong registering $($newregistrant.FieldValues.RegistrantName.Email) to module: $($thismodule.fieldvalues.ModuleName)." + "<br><br>"
         $report = $report | out-string
-    Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+    #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
     }
 }
 Else{

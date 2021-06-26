@@ -2418,6 +2418,9 @@ function send-graphMailMessage(){
             [string]$bodyHtml
         ,[parameter(Mandatory = $false)]
             [bool]$saveToSentItems = $true
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet ("low","normal","high")]
+            [string]$priority = "normal"
         )
 
     [array]$formattedToAddresses = $toAddresses | % {
@@ -2429,6 +2432,7 @@ function send-graphMailMessage(){
     $message = @{
         toRecipients = $formattedToAddresses
         subject = $subject
+        importance=$priority
         #from = $formattedFromAddresses
         #sender = $formattedFromAddresses
         }

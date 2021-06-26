@@ -19,8 +19,14 @@ connect-ToExo -credential $exoCreds
 $TeamsReport = @()
 
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
-$teamBotTokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
-$allgraphusers = get-graphUsers -tokenResponse $teamBotTokenResponse -filterLicensedUsers
+$tokenResponseTeams = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
+$shiftBotDetails = get-graphAppClientCredentials -appName ShiftBot
+$tokenResponseShiftBot = get-graphTokenResponse -aadAppCreds $shiftBotDetails
+
+
+$allgraphusers = get-graphUsers -tokenResponse $tokenResponseTeams -filterLicensedUsers
 
 #$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
 $teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
@@ -28,8 +34,6 @@ $teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)
 $groupBotGuid = "00aa81e4-2e8f-4170-bc24-843b917fd7cf"
 $msAppActsAsUserId = "00aa81e4-2e8f-4170-bc24-843b917fd7cf" #GroupBot
 
-$shiftBotDetails = get-graphAppClientCredentials -appName ShiftBot
-$tokenResponseShiftBot = get-graphTokenResponse -grant_type client_credentials -aadAppCreds $shiftBotDetails
 #Write-Verbose "Access Token: [$($tokenResponseShiftBot.access_token)]"
 
 Write-Host "Approving OpenShiftChangeRequests" -ForegroundColor Cyan
@@ -111,8 +115,8 @@ If($TeamsReport){
 }
 $report = $report | out-string
 
-Send-MailMessage -To "c6167716.anthesisgroup.com@amer.teams.ms" -From "ShiftsRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Shifts Approval Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-
+#Send-MailMessage -To "c6167716.anthesisgroup.com@amer.teams.ms" -From "ShiftsRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Shifts Approval Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses "c6167716.anthesisgroup.com@amer.teams.ms" -subject "Shifts Approval Error" -bodyHtml $report
 }
 
 Stop-Transcript

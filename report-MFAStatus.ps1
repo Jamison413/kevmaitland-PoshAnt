@@ -24,7 +24,9 @@ connect-ToExo -credential $adminCreds
 connect-ToMsol -credential $adminCreds
 
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
-$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$tokenResponseTeams = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
 
 #For Licensed User Accounts
@@ -139,8 +141,8 @@ $upnsToEnable | % {
 
 
 #Send a message to Teams to get Emily to chase anyone who's bypassed the prompts
-$allnewuserrequestsoldlist = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/hr" -listName "New User Requests" -expandAllFields
-$allnewuserrequestsnewlist = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -listName "New Starter Details" -expandAllFields
+$allnewuserrequestsoldlist = get-graphListItems -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/hr" -listName "New User Requests" -expandAllFields
+$allnewuserrequestsnewlist = get-graphListItems -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365" -listName "New Starter Details" -expandAllFields
 
 
 $startstochase = @()
@@ -179,7 +181,8 @@ $startstochase += "$($userobj.user) started $($userobj.'Start Date')"
 $subject = "MFA status report"
 $body = "<HTML><FONT FACE=`"Calibri`">Hello IT Team, these guys need chasing for MFA if they have started`r`n`r`n<BR><BR>"
 ForEach($persontochase in $startstochase){$body += "$($persontochase) `r`n<BR>"}
-Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
+#Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses "cb1d8222.anthesisgroup.com@amer.teams.ms" -Subject $subject -bodyHtml $body 
 
 #Reports
 If(!($error)){
@@ -205,10 +208,10 @@ $overviewreportHash = @{
 "Status" = "$($status)"
 }
 
-#$ITreportinglistitems = get-graphListItems -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -expandAllFields
-Update-graphListItem -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 8  -fieldHash $EnabledreportHash 
-Update-graphListItem -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 9  -fieldHash $NoMFAreportHash
-Update-graphListItem -tokenResponse $tokenResponse -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 10  -fieldHash $overviewreportHash
+#$ITreportinglistitems = get-graphListItems -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -expandAllFields
+Update-graphListItem -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 8  -fieldHash $EnabledreportHash 
+Update-graphListItem -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 9  -fieldHash $NoMFAreportHash
+Update-graphListItem -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 10  -fieldHash $overviewreportHash
 
 <#
 

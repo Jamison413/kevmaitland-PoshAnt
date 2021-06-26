@@ -24,6 +24,10 @@ $allDevices = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/device
 #Re-connect with TeamsBot to get the AAD group 
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
+
+
 If(!($tokenResponse.access_token)){
 $TeamsReport = @{"Devices not Synced between Intune and AAD Group - TeamsBotConnection" = "Problem getting Graph Credentials"}
 Exit
@@ -115,7 +119,8 @@ If($TeamsReport){
         $report += "$($t.Keys)" + " - " + "$($t.Values)" + "<br><br>"
 }
 $report = $report | out-string
-Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "groupbot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+#Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "groupbot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "test" -bodyHtml $report
 }
 
 
@@ -200,5 +205,6 @@ If($TeamsReport){
 }
 }
 $report = $report | out-string
-Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "groupbot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+#Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "groupbot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "test" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "test" -bodyHtml $report
 

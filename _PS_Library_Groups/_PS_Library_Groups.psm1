@@ -623,14 +623,13 @@ function remove-DataManagerFromGroup(){
 
     if($dataManagerGroupMembers.WindowsLiveID -notcontains $upnToRemove){
         Write-Warning "remove-DataManagerFromGroup could not remove [$upnToRemove] from [$dataManagerGroupId] because it is not a member"
-        continue
+        return
         }
-
-    Remove-DistributionGroupMember -Identity $dataManagerGroupId -Member $upnToRemove -BypassSecurityGroupManagerCheck -Confirm:$false
+    #Remove-DistributionGroupMember -Identity $dataManagerGroupId -Member $upnToRemove -BypassSecurityGroupManagerCheck -Confirm:$false 
 
     ,[array]$otherDataManagers = $dataManagerGroupMembers | ? {$_.WindowsLiveID -ne $upnToRemove}
     if($otherDataManagers.Count -eq 0){ #If this user is the last Data Manager, add GroupBot to prevent this Data Manager group from becoming empty
-        Add-DistributionGroupMember -Identity $dataManagerGroupId -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck -Confirm:$false
+        #Add-DistributionGroupMember -Identity $dataManagerGroupId -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck -Confirm:$false
         }
     }
 function rummage-forDistributionGroup(){
@@ -798,11 +797,11 @@ function send-noOwnersForGroupAlertToAdmins(){
     if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
 
     if($PSCmdlet.ShouldProcess($("[$($UnifiedGroup.DisplayName)]"))){#Fudges -WhatIf as it's not suppoerted natively by Send-MailMessage
-        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn groupbot@anthesisgroup.com -toAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn groupbot@anthesisgroup.com -toAddresses $adminEmailAddresses -subject $subject -bodyHtml $body -priority high
         #Send-MailMessage -To $adminEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
         }
     else{
-        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn groupbot@anthesisgroup.com -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn groupbot@anthesisgroup.com -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body -priority high
         #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
         }
     
