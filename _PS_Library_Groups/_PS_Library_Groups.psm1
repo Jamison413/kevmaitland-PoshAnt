@@ -660,23 +660,25 @@ function rummage-forDistributionGroup(){
 function send-membershipChangeReportToManagers(){
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
-        [Parameter(Mandatory=$true, Position=0)]
-        [psobject]$UnifiedGroup
+        [Parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        ,[Parameter(Mandatory=$true, Position=0)]
+            [psobject]$UnifiedGroup
         ,[Parameter(Mandatory=$true, Position=1)]
-        [ValidateSet("Members", "Owners")]
-        [string]$changesAreTo
+            [ValidateSet("Members", "Owners")]
+            [string]$changesAreTo
         ,[Parameter(Mandatory=$false, Position=2)]
-        [array]$usersAddedArray
+            [array]$usersAddedArray
         ,[Parameter(Mandatory=$false, Position=3)]
-        [array]$usersRemovedArray
+            [array]$usersRemovedArray
         ,[Parameter(Mandatory=$false, Position=4)]
-        [array]$usersWithProblemsArray
+            [array]$usersWithProblemsArray
         ,[Parameter(Mandatory=$false, Position=5)]
-        [array]$usersInGroupAfterChanges
+            [array]$usersInGroupAfterChanges
         ,[Parameter(Mandatory=$false, Position=6)]
-        [string[]]$adminEmailAddresses
+            [string[]]$adminEmailAddresses
         ,[Parameter(Mandatory=$false, Position=7)]
-        [string[]]$ownersEmailAddresses
+            [string[]]$ownersEmailAddresses
         )
 
     #The recipient of the report is only interested in changes to the 365 Group, so we'll just portray all changes as being to the 365 group reagrdless of which group was actualyl updated
@@ -708,29 +710,34 @@ function send-membershipChangeReportToManagers(){
     if($PSCmdlet.ShouldProcess($("$changesAreTo [$($UnifiedGroup.DisplayName)]"))){#Fudges -WhatIf as it's not suppoerted natively by Send-MailMessage
         Write-verbose "To [$($ownersEmailAddresses -join "; ")]"
         Write-verbose "CC [$($adminEmailAddresses -join "; ")]"
-        Send-MailMessage -To $ownersEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc $adminEmailAddresses -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses $ownersEmailAddresses -bccAddresses "t0-kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
+        #send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses $ownersEmailAddresses -ccAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
+        #Send-MailMessage -To $ownersEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc $adminEmailAddresses -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
     else{
-        Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -ccAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
+        #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
 
     }
 function send-membershipChangeProblemReportToAdmins(){
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
-        [Parameter(Mandatory=$true, Position=0)]
-        [psobject]$UnifiedGroup
+        [Parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        ,[Parameter(Mandatory=$true, Position=0)]
+            [psobject]$UnifiedGroup
         ,[Parameter(Mandatory=$true, Position=1)]
-        [ValidateSet("Members", "Owners")]
-        [string]$changesAreTo
+            [ValidateSet("Members", "Owners")]
+            [string]$changesAreTo
         ,[Parameter(Mandatory=$false, Position=2)]
-        [array]$usersWithProblemsArray
+            [array]$usersWithProblemsArray
         ,[Parameter(Mandatory=$false, Position=3)]
-        [array]$usersIn365GroupAfterChanges
+            [array]$usersIn365GroupAfterChanges
         ,[Parameter(Mandatory=$false, Position=4)]
-        [array]$usersInAADGroupAfterChanges
+            [array]$usersInAADGroupAfterChanges
         ,[Parameter(Mandatory=$false, Position=5)]
-        [string[]]$adminEmailAddresses
+            [string[]]$adminEmailAddresses
         )
 
     $subject = "Error managing $($changesAreTo)hip for Group [$($UnifiedGroup.DisplayName)]"
@@ -755,22 +762,26 @@ function send-membershipChangeProblemReportToAdmins(){
     $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
     
     if($PSCmdlet.ShouldProcess($("$changesAreTo [$($UnifiedGroup.DisplayName)]"))){#Fudges -WhatIf as it's not suppoerted natively by Send-MailMessage
-        Send-MailMessage -To $adminEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
+        #Send-MailMessage -To $adminEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
     else{
-        Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
+        #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
 
     }
 function send-noOwnersForGroupAlertToAdmins(){
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
-        [Parameter(Mandatory=$true, Position=0)]
-        [psobject]$UnifiedGroup
-        ,[Parameter(Mandatory=$false, Position=1)]
-        [array]$currentOwners
-        ,[Parameter(Mandatory=$false, Position=2)]
-        [string[]]$adminEmailAddresses
+        [Parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        ,[Parameter(Mandatory=$true)]
+            [psobject]$UnifiedGroup
+        ,[Parameter(Mandatory=$false)]
+            [array]$currentOwners
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$adminEmailAddresses
         )
 
     $subject = "Unowned 365 Group found: [$($UnifiedGroup.DisplayName)]"
@@ -787,10 +798,12 @@ function send-noOwnersForGroupAlertToAdmins(){
     if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
 
     if($PSCmdlet.ShouldProcess($("[$($UnifiedGroup.DisplayName)]"))){#Fudges -WhatIf as it's not suppoerted natively by Send-MailMessage
-        Send-MailMessage -To $adminEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn groupbot@anthesisgroup.com -toAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
+        #Send-MailMessage -To $adminEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
         }
     else{
-        Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn groupbot@anthesisgroup.com -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
+        #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Priority High
         }
     
     }
@@ -944,7 +957,9 @@ function set-unifiedGroupCustomAttributes(){
 function sync-groupMemberships(){
     [CmdletBinding(SupportsShouldProcess=$true )]
     param(
-        [Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
+        [Parameter(Mandatory = $true)]
+            [psobject]$tokenResponseSmtp
+        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
             [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
             [PSObject]$graphExtendedUG
         ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
@@ -1165,14 +1180,14 @@ function sync-groupMemberships(){
                 Write-Verbose "Found [$($usersFailed.Count)] problems - notifying 365 Group Admins"
                 $ugUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType $syncWhat -returnOnlyUsers
                 $aadgUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphMesg.id -memberType $syncWhat -returnOnlyUsers
-                send-membershipChangeProblemReportToAdmins -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                send-membershipChangeProblemReportToAdmins  -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
                 }
             else{Write-Verbose "No problems adding/removing users, not sending problem report e-mail to Admins"}
 
             $ownersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType Owners -returnOnlyUsers
             if($($ownersAfterChanges.DisplayName | ? {$_ -notmatch "Ω"}).Count -eq 0){
                 Write-Verbose "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Admins so that this doesn't get auto-deleted"
-                send-noOwnersForGroupAlertToAdmins -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
                 }
             else{Write-Verbose "Owners look normal, not sending problem report e-mail to Admins"}
 
@@ -1186,7 +1201,7 @@ function sync-groupMemberships(){
                     $ownersEmailAddresses = $ownersEmailAddresses | Select-Object -Unique
                     }
                 $ugUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType $syncWhat -returnOnlyUsers
-                send-membershipChangeReportToManagers -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersAddedArray $usersAdded -usersRemovedArray $usersRemoved -usersWithProblemsArray $usersFailed -usersInGroupAfterChanges $ugUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -ownersEmailAddresses $ownersEmailAddresses -WhatIf:$WhatIfPreference
+                send-membershipChangeReportToManagers -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersAddedArray $usersAdded -usersRemovedArray $usersRemoved -usersWithProblemsArray $usersFailed -usersInGroupAfterChanges $ugUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -ownersEmailAddresses $ownersEmailAddresses -WhatIf:$WhatIfPreference
                 }
             else{Write-Verbose "No membership changes - not sending report to Mangers & Admins"}
             }
@@ -1423,7 +1438,7 @@ function sync-groupMemberships_deprecated(){
                 $ugUsersAfterChanges | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name userPrincipalName -Value $_.WindowsLiveID}
                 $aadgUsersAfterChanges = Get-DistributionGroupMember -Identity $AADGroup.Id
                 $aadgUsersAfterChanges | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name userPrincipalName -Value $_.WindowsLiveID}
-                send-membershipChangeProblemReportToAdmins -UnifiedGroup $UnifiedGroup -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                send-membershipChangeProblemReportToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $UnifiedGroup -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
                 }
             else{Write-Verbose "No problems adding/removing users, not sending problem report e-mail to Admins"}
 
@@ -1439,7 +1454,7 @@ function sync-groupMemberships_deprecated(){
 
             if($($owners.DisplayName | ? {$_ -notmatch "Ω"}).Count -eq 0){
                 Write-Verbose "No active owners for 365 Group [$($UnifiedGroup.DisplayName)] - notifying Admins so that this doesn't get auto-deleted"
-                send-noOwnersForGroupAlertToAdmins -UnifiedGroup $UnifiedGroup -currentOwners $owners -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $UnifiedGroup -currentOwners $owners -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
                 }
             else{Write-Verbose "Owners look normal, not sending problem report e-mail to Admins"}
 
@@ -1454,7 +1469,7 @@ function sync-groupMemberships_deprecated(){
                     }
                 $ugUsersAfterChanges = Get-UnifiedGroupLinks -Identity $UnifiedGroup.ExternalDirectoryObjectId -LinkType $syncWhat  #Get-AzureADGroupMember is too slow and doesn't pick up the changes we've made above.
                 $ugUsersAfterChanges | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name userPrincipalName -Value $_.WindowsLiveID}
-                send-membershipChangeReportToManagers -UnifiedGroup $UnifiedGroup -changesAreTo $syncWhat -usersAddedArray $usersAdded -usersRemovedArray $usersRemoved -usersWithProblemsArray $usersFailed -usersInGroupAfterChanges $ugUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -ownersEmailAddresses $ownersEmailAddresses -WhatIf:$WhatIfPreference
+                send-membershipChangeReportToManagers -tokenResponse $tokenResponseSmtp -UnifiedGroup $UnifiedGroup -changesAreTo $syncWhat -usersAddedArray $usersAdded -usersRemovedArray $usersRemoved -usersWithProblemsArray $usersFailed -usersInGroupAfterChanges $ugUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -ownersEmailAddresses $ownersEmailAddresses -WhatIf:$WhatIfPreference
                 }
             else{Write-Verbose "No membership changes - not sending report to Mangers & Admins"}
             }

@@ -365,6 +365,7 @@ function get-groupAdminRoleEmailAddresses(){
     $admins = @()
     get-graphAdministrativeRoleMembers -tokenResponse $tokenResponse -roleName 'User Account Administrator' | % {$admins += $_.userPrincipalName}
     get-graphAdministrativeRoleMembers -tokenResponse $tokenResponse -roleName 'Exchange Service Administrator' | % {$admins += $_.userPrincipalName}
+    $admins += "t0-kevin.maitland@anthesisgroup.com"
     $admins | Sort-Object -Unique
     }
 function get-graphAdministrativeRoleMembers(){
@@ -422,7 +423,7 @@ function get-graphAppClientCredentials{
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-            [ValidateSet("TeamsBot","SchemaBot","IntuneBot","SharePointBot","ShiftBot","ReportBot")]
+            [ValidateSet("TeamsBot","SchemaBot","IntuneBot","SharePointBot","ShiftBot","ReportBot","SmtpBot")]
             [String]$appName
         )
     
@@ -433,6 +434,7 @@ function get-graphAppClientCredentials{
         "SharePointBot" {$encryptedCredsFile = "spBotDetails.txt"}
         "ShiftBot" {$encryptedCredsFile = "shiftBotDetails.txt"}
         "ReportBot"{$encryptedCredsFile = "ReportBotDetails.txt"}
+        "SmtpBot"{$encryptedCredsFile = "SmtpBot.txt"}
         }
     
     $placesToLook = @( #Figure out where to look
@@ -2390,6 +2392,63 @@ function reset-graphUnifiedGroupSettingsToOriginals(){
         #And check the Membership settings are correct too:
         set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended
         }
+    }
+function send-graphMailMessage(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [ValidatePattern("@")]
+            [string]$fromUpn
+        ,[parameter(Mandatory = $true)]
+            [ValidatePattern("@")]
+            [string[]]$toAddresses
+        ,[parameter(Mandatory = $false)]
+            [ValidatePattern("@")]
+            [string[]]$ccAddresses
+        ,[parameter(Mandatory = $false)]
+            [ValidatePattern("@")]
+            [string[]]$bccAddresses
+        ,[parameter(Mandatory = $true)]
+            [string]$subject
+        ,[parameter(Mandatory = $true,ParameterSetName = "text")]
+            [string]$bodyText
+        ,[parameter(Mandatory = $true,ParameterSetName = "HTML")]
+            [string]$bodyHtml
+        ,[parameter(Mandatory = $false)]
+            [bool]$saveToSentItems = $true
+        )
+
+    [array]$formattedToAddresses = $toAddresses | % {
+        @{emailAddress=@{'address'=$_}}
+        }
+    [array]$formattedFromAddresses = $fromUpn | % {
+        @{emailAddress=@{'address'=$_}}
+        }
+    $message = @{
+        toRecipients = $formattedToAddresses
+        subject = $subject
+        #from = $formattedFromAddresses
+        #sender = $formattedFromAddresses
+        }
+
+    if($ccAddresses){
+        [array]$formattedCcAddresses = $ccAddresses | % {
+            @{emailAddress=@{'address'=$_}}
+            }
+        $message.Add("ccRecipients",$formattedCcAddresses)
+        }
+    if($bccAddresses){
+        [array]$formattedBccAddresses = $bccAddresses | % {
+            @{emailAddress=@{'address'=$_}}
+            }
+        $message.Add("bccRecipients",$formattedBccAddresses)
+        }
+    if($bodyText){$message.Add("body",@{"contentType"="Text";"content"=$bodyText})}
+    if($bodyHtml){$message.Add("body",@{"contentType"="HTML";"content"=$bodyHtml})}
+
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$fromUpn/sendMail" -graphBodyHashtable @{"message"=$message;"saveToSentItems"=$saveToSentItems}
     }
 function set-graphDrive_unsupported(){
      [cmdletbinding()]
