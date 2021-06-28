@@ -618,19 +618,20 @@ function remove-DataManagerFromGroup(){
         ,[Parameter(Mandatory=$true)]
             [string]$upnToRemove
         )
-    Write-Verbose "remove-DataManagerFromGroup([$dataManagerGroupId],[$upnToRemove])"
+    Write-Verbose "remove-DataManagerFromGroup([$upnToRemove],[$dataManagerGroupId])"
     $dataManagerGroupMembers = Get-DistributionGroupMember -Identity $dataManagerGroupId
 
     if($dataManagerGroupMembers.WindowsLiveID -notcontains $upnToRemove){
         Write-Warning "remove-DataManagerFromGroup could not remove [$upnToRemove] from [$dataManagerGroupId] because it is not a member"
         return
         }
-    #Remove-DistributionGroupMember -Identity $dataManagerGroupId -Member $upnToRemove -BypassSecurityGroupManagerCheck -Confirm:$false 
 
     ,[array]$otherDataManagers = $dataManagerGroupMembers | ? {$_.WindowsLiveID -ne $upnToRemove}
     if($otherDataManagers.Count -eq 0){ #If this user is the last Data Manager, add GroupBot to prevent this Data Manager group from becoming empty
-        #Add-DistributionGroupMember -Identity $dataManagerGroupId -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck -Confirm:$false
+        Add-DistributionGroupMember -Identity $dataManagerGroupId -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck -Confirm:$false
         }
+
+    Remove-DistributionGroupMember -Identity $dataManagerGroupId -Member $upnToRemove -BypassSecurityGroupManagerCheck -Confirm:$false 
     }
 function rummage-forDistributionGroup(){
     [CmdletBinding()]
@@ -655,6 +656,42 @@ function rummage-forDistributionGroup(){
         #    }
         } 
     $dg
+    }
+function send-dataManagerReassignmentRequest(){
+    [CmdletBinding(SupportsShouldProcess=$true )]
+    param(
+        [Parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        ,[Parameter(Mandatory=$true)]
+            [psobject]$unifiedGroup
+        ,[Parameter(Mandatory=$false)]
+            [array]$currentOwners
+        ,[Parameter(Mandatory=$false)]
+            [string[]]$adminEmailAddresses
+        )
+
+    if([string]::IsNullOrWhiteSpace($currentOwners.manager)){
+        #If _none_ of the Ex-Employees have Line Managers, send an alert to the IT Admins to sort this Team/Site out manually
+        send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponse -UnifiedGroup $unifiedGroup -currentOwners $currentOwners -adminEmailAddresses $adminEmailAddresses
+        return
+        }
+
+
+    $currentOwners | % {
+        if([string]::IsNullOrWhiteSpace($_.manager)){<#Do nothing - leave it to one of the Ex-Employees who does have a Line Manager assigned#>}
+        else{
+            $subject = "Unmanaged Site/Team Group found: [$($UnifiedGroup.DisplayName)]"
+            $body = "<HTML><FONT FACE=`"Calibri`">Hello $($_.manager.givenName),`r`n`r`n<BR><BR>"
+            $body += "The 365 Site/Team [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.id)] is currently managed by one of your ex-reportees:`r`n`t<BR>"
+            $body += "<PRE>&#9;$($_.displayName)</PRE>`r`n`r`n<BR>"
+            $body += "Please could you let the <A HREF='mailto:IT_Team_GBR@anthesisgroup.com'>IT Team</A> know who to reassign this to? You can find a list of everyone with current Data Manager training by <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-296'>expanding the <B>Data Manager - Authorised (All)</B> group in Outlook</A>.`r`n`r`n<BR><BR>"
+            $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
+            send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses $_.manager.mail -bccAddresses "t0-kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
+            #send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
+            }
+        }
+
+    
     }
 function send-membershipChangeReportToManagers(){
     [CmdletBinding(SupportsShouldProcess=$true)]
@@ -709,12 +746,12 @@ function send-membershipChangeReportToManagers(){
     if($PSCmdlet.ShouldProcess($("$changesAreTo [$($UnifiedGroup.DisplayName)]"))){#Fudges -WhatIf as it's not suppoerted natively by Send-MailMessage
         Write-verbose "To [$($ownersEmailAddresses -join "; ")]"
         Write-verbose "CC [$($adminEmailAddresses -join "; ")]"
-        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses $ownersEmailAddresses -bccAddresses "t0-kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
-        #send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses $ownersEmailAddresses -ccAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses $ownersEmailAddresses -bccAddresses "t0-kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
+        #send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses $ownersEmailAddresses -ccAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
         #Send-MailMessage -To $ownersEmailAddresses -From "thehelpfulgroupsrobot@anthesisgroup.com" -cc $adminEmailAddresses -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
     else{
-        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -ccAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
+        send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -ccAddresses $adminEmailAddresses -subject $subject -bodyHtml $body
         #Send-MailMessage -To "kevin.maitland@anthesisgroup.com" -From "thehelpfulgroupsrobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8
         }
 
@@ -1183,10 +1220,20 @@ function sync-groupMemberships(){
                 }
             else{Write-Verbose "No problems adding/removing users, not sending problem report e-mail to Admins"}
 
-            $ownersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType Owners -returnOnlyUsers
-            if($($ownersAfterChanges.DisplayName | ? {$_ -notmatch "Ω"}).Count -eq 0){
-                Write-Verbose "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Admins so that this doesn't get auto-deleted"
-                send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+            $ownersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType Owners -returnOnlyUsers -includeLineManager
+            if(@($ownersAfterChanges | Select-Object).Count -eq 0){
+                Write-Verbose "No owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Admins as this will require a brain to resolve"
+                #Scandalous bodge to reduce the number of email alerts generated
+                if((Get-Random -Minimum 1 -Maximum 48) -eq 1){#This runs function is run every 30 minutes, so this should average 1 alert per day
+                    send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                    }
+                }
+            if(@($ownersAfterChanges.DisplayName | ? {$_ -match "Ω"} | Select-Object).Count -eq @($ownersAfterChanges | Select-Object).Count){
+                Write-Verbose "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Line Managers to request reassignment"
+                #Scandalous bodge to reduce the number of email alerts generated
+                if((Get-Random -Minimum 1 -Maximum 48) -eq 1){#This runs function is run every 30 minutes, so this should average 1 alert per day
+                    send-dataManagerReassignmentRequest -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                    }
                 }
             else{Write-Verbose "Owners look normal, not sending problem report e-mail to Admins"}
 
@@ -1212,274 +1259,6 @@ function sync-groupMemberships(){
             }
         elseif(!$graphExtendedUG){
             Write-Error "No 365 group found for AAD Group [$($graphMesg.DisplayName)][$($graphMesg.Id)]"
-            break
-            }
-        }
-    }
-function sync-groupMemberships_deprecated(){
-    [CmdletBinding(SupportsShouldProcess=$true )]
-    param(
-        [Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-        [PSObject]$UnifiedGroup
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-        [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
-        [Microsoft.Open.MSGraph.Model.MsGroup]$AADGroup
-        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
-        [string]$UnifiedGroupId
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-        [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
-        [string]$AADGroupId
-        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
-        [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
-        [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
-        [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
-        [ValidateSet("Members", "Owners")]
-        [string]$syncWhat
-        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
-        [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
-        [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
-        [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
-        [ValidateSet("365", "AAD")]
-        [string]$sourceGroup
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-        [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
-        [bool]$dontSendEmailReport = $false
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-        [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
-        [string[]]$adminEmailAddresses
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-        [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-        [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
-        [bool]$enumerateSubgroups = $false
-        )
-
-    #region Get $UnifiedGroup and $AADGroup, regardless of which parameters we've been given
-    switch ($PsCmdlet.ParameterSetName){
-        “365GroupIdOnly”  {
-            Write-Verbose "We've been given a 365 Id, so we need the Group objects"
-            $UnifiedGroup = Get-UnifiedGroup $UnifiedGroupId
-            if(!$UnifiedGroup){
-                Write-Error "Could not retrieve Unified Group from ID [$UnifiedGroupId]"
-                break
-                }
-            if(![string]::IsNullOrWhiteSpace($AADGroupId)){
-                Write-Verbose "Getting AAD Group from ID [$AADGroupId]"
-                $AADGroup = Get-AzureADMSGroup -Id $AADGroupId
-                if(!$AADGroup){
-                    Write-Error "Could not retrieve AAD Group with ID [$AADGroupId]. Exiting without attempting to find the AAD Group associated with 365 Group [$UnifiedGroupId].."
-                    break
-                    }
-                }
-            }
-        “AADGroupIdOnly”  {
-            Write-Verbose "We've been given an AAD Id, so we need the Group objects"
-            $AADGroup = Get-AzureADMSGroup -Id $AADGroupId
-            if(!$AADGroup){
-                Write-Error "Could not retrieve AAD Group from ID [$AADGroupId]. Cannot continue."
-                break
-                }
-            if(![string]::IsNullOrWhiteSpace($UnifiedGroupId)){
-                $UnifiedGroup = Get-UnifiedGroup -Identity $UnifiedGroupId
-                if(!$UnifiedGroup){
-                    Write-Error "Could not retrieve 365 Group with Id [$UnifiedGroupId]. Exiting without attempting to find the 365 Group associated with MESG [$AADGroupId]."
-                    break
-                    }
-                }
-            }
-        #Now we've definitely got either $UnifiedGroup or $AADGroup, get the other one if it hasn't been supplied as a parameter
-        {$_ -in "365GroupIdOnly","365GroupObjectSupplied"}  {
-            if([string]::IsNullOrWhiteSpace($AADGroup)){
-                switch ($syncWhat){
-                    "Members" {
-                        Write-Verbose "No `$AADGroup or `$AADGroupId provided - looking for Members group with Id [$($UnifiedGroup.CustomAttribute3)] linked to UG [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.ExternalDirectoryObjectId)]"
-                        $AADGroup = Get-AzureADMSGroup -Id ($UnifiedGroup.CustomAttribute3)
-                        if(!$AADGroup){
-                            Write-Error "Could not retrieve AAD Members Group from ID [$($UnifiedGroup.CustomAttribute3)]. Cannot continue."
-                            break
-                            }
-                        }
-                    "Owners"  {
-                        Write-Verbose "No `$AADGroup or `$AADGroupId provided - looking for Owners group with Id [$($UnifiedGroup.CustomAttribute2)] linked to UG [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.ExternalDirectoryObjectId)]"
-                        $AADGroup = Get-AzureADMSGroup -Id ($UnifiedGroup.CustomAttribute2)
-                        if(!$AADGroup){
-                            Write-Error "Could not retrieve AAD Owners Group from ID [$($UnifiedGroup.CustomAttribute2)]. Cannot continue."
-                            break
-                            }
-                        }
-                    }
-                }            
-            }
-        {$_ -in "AADGroupIdOnly","AADGroupObjectSupplied"}  {
-            if([string]::IsNullOrWhiteSpace($UnifiedGroup)){
-                switch($syncWhat){
-                    "Members" {
-                        Write-Verbose "No `$UnifiedGroup or `$UnifiedGroupId provided - looking for associated 365 Group with `$UnifiedGroup.CustomAttribute3 -eq [$($AADGroup.Id)]"
-                        $UnifiedGroup = Get-UnifiedGroup -Filter "CustomAttribute3 -eq '$($AADGroup.Id)'"
-                        }
-                    "Owners" {
-                        Write-Verbose "No `$UnifiedGroup or `$UnifiedGroupId provided - looking for associated 365 Group with `$UnifiedGroup.CustomAttribute2 -eq [$($AADGroup.Id)]"
-                        $UnifiedGroup = Get-UnifiedGroup  -Filter "CustomAttribute2 -eq '$($AADGroup.Id)'"
-                        }
-                    }
-                if(!$UnifiedGroup){
-                    Write-Error "Could not retrieve 365 Group based on $syncWhat AADGroupID [$($AADGroup.Id)]. Cannot continue."
-                    break
-                    }
-                }
-            
-            }
-        }
-    #endregion
-    
-    if($AADGroup -and $UnifiedGroup){ #If we've got an AAD and a 365 Group to compare...
-        $ugUsersBeforeChanges = @()
-        $aadgUsersBeforeChanges = @()
-        if($enumerateSubgroups){enumerate-nestedAADGroups -aadGroupId $AADGroup.Id -Verbose:$VerbosePreference  | %{[array]$aadgUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}}
-        else{Get-AzureADGroupMember -All:$true -ObjectId $AADGroup.Id | %{[array]$aadgUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}}
-        switch ($syncWhat){
-            "Members" {
-                Get-AzureADGroupMember -All:$true -ObjectId $UnifiedGroup.ExternalDirectoryObjectId | %{[array]$ugUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
-                if($sourceGroup -eq "AAD"){Get-AzureADGroupMember -All:$true -ObjectId $UnifiedGroup.CustomAttribute2 | %{[array]$aadgUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}} #Add DataManagers too (to fix issue with Communities)
-                }
-            "Owners" {
-                Get-AzureADGroupOwner -All:$true -ObjectId $UnifiedGroup.ExternalDirectoryObjectId | %{[array]$ugUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.ObjectId})}
-                }
-            }
-        #We didn't used to need this -unique step, but smoehow duplicates were appearing:
-        $ugUsersBeforeChanges = $ugUsersBeforeChanges | Sort-Object  -Property objectId -Unique
-        if($ugUsersBeforeChanges.Count -lt 1){$ugUsersBeforeChanges = @()}
-        $aadgUsersBeforeChanges = $aadgUsersBeforeChanges | Sort-Object  -Property objectId -Unique
-        if($aadgUsersBeforeChanges.Count -lt 1){$aadgUsersBeforeChanges = @()}
-        $usersDelta = Compare-Object -ReferenceObject $ugUsersBeforeChanges -DifferenceObject $aadgUsersBeforeChanges -Property userPrincipalName -PassThru -IncludeEqual
-         $($usersDelta | % {Write-Verbose "$_"})
-
-        $usersAdded = @()
-        $usersRemoved = @()
-        $usersFailed = @()
-
-        switch($sourceGroup){
-            "365" {
-                #Add extra users from UG to MESG
-                $usersDelta | ?{$_.SideIndicator -eq "<="} | %{
-                    $userToBeChanged = $_
-                    Write-Verbose "`tAdding [$($userToBeChanged.userPrincipalName)] to [$($AADGroup.DisplayName)][$($AADGroup.Id)] MESG"
-                    try{
-                        Add-DistributionGroupMember -Identity $AADGroup.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck -WhatIf:$WhatIfPreference -ErrorAction Stop
-                        [array]$usersAdded += (New-Object psobject -Property $([ordered]@{"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
-                        }
-                    catch{
-                        Write-Warning "Failed to add [$($userToBeChanged.userPrincipalName)] to MESG [$($AADGroup.DisplayName)][$($AADGroup.Id)]" 
-                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Added";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
-                        }
-                    }
-
-                #Remove "removed" users from MESG
-                $usersDelta | ?{$_.SideIndicator -eq "=>"} | %{ 
-                    $userToBeChanged = $_
-                    Write-Verbose "`tRemoving [$($userToBeChanged.userPrincipalName)] from [$($AADGroup.DisplayName)][$($AADGroup.Id)] MESG"
-                    try{
-                        Remove-DistributionGroupMember -Identity $AADGroup.Id -Member $userToBeChanged.objectId -BypassSecurityGroupManagerCheck -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
-                        [array]$usersRemoved += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
-                        }
-                    catch{
-                        Write-Warning "Failed to remove [$($userToBeChanged.userPrincipalName)] from MESG [$($AADGroup.DisplayName)][$($AADGroup.Id)]"
-                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
-                        }
-                    }                
-                }
-            "AAD" {
-                #Add extra users from MESG to UG
-                $usersDelta | ?{$_.SideIndicator -eq "=>" -and $_.DisplayName -notmatch "Shared Mailbox"} | %{
-                    $userToBeChanged = $_
-                    Write-Verbose "`tAdding [$($userToBeChanged.userPrincipalName)] to [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.Id)] UG $syncWhat"
-                    try{
-                        Add-UnifiedGroupLinks -Identity $UnifiedGroup.ExternalDirectoryObjectId -Links $userToBeChanged.objectId -LinkType Members -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
-                        if($syncWhat -eq "Owners"){
-                            Add-UnifiedGroupLinks -Identity $UnifiedGroup.ExternalDirectoryObjectId -Links $userToBeChanged.objectId -LinkType Owners -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
-                            } #Only Members can be Owners of a group. Please add 'User.Name' first as members before adding them as owners.
-                        [array]$usersAdded += (New-Object psobject -Property $([ordered]@{"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
-                        }
-                    catch{
-                        Write-Warning "Failed to add [$($userToBeChanged.userPrincipalName)] to UG $syncWhat [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.Id)]" 
-                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Added";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
-                        }
-                    }
-
-                #Remove "removed" users from UG
-                $usersDelta | ?{$_.SideIndicator -eq "<="} | %{ 
-                    $userToBeChanged = $_
-                    Write-Verbose "`tRemoving [$($userToBeChanged.userPrincipalName)] from [$($AADGroup.DisplayName)][$($AADGroup.Id)] UG $syncWhat"
-                    try{
-                        Remove-UnifiedGroupLinks -Identity $UnifiedGroup.ExternalDirectoryObjectId -Links $userToBeChanged.objectId -LinkType $syncWhat -Confirm:$false -WhatIf:$WhatIfPreference -ErrorAction Stop
-                        [array]$usersRemoved += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName}))
-                        }
-                    catch{
-                        Write-Warning "Failed to remove [$($userToBeChanged.userPrincipalName)] from UG $syncWhat [$($AADGroup.DisplayName)][$($AADGroup.Id)]"
-                        [array]$usersFailed += (New-Object psobject -Property $([ordered]@{"Change"="Removed";"UPN"=$userToBeChanged.userPrincipalName;"DisplayName"=$userToBeChanged.displayName;"ErrorMessage"=$_}))
-                        }
-                    }                
-                }
-            }
-
-        #Now report any problems/changes    
-        if(!$dontSendEmailReport){
-            Write-Verbose "Preparing 365 to MESG $syncWhat sync report to send to Admins & Owners"
-            if($usersFailed.Count -ne 0){
-                Write-Verbose "Found [$($usersFailed.Count)] problems - notifying 365 Group Admins"
-                $ugUsersAfterChanges = Get-UnifiedGroupLinks -Identity $UnifiedGroup.ExternalDirectoryObjectId -LinkType $syncWhat  #Get-AzureADGroupMember is too slow and doesn't pick up the changes we've made above.
-                $ugUsersAfterChanges | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name userPrincipalName -Value $_.WindowsLiveID}
-                $aadgUsersAfterChanges = Get-DistributionGroupMember -Identity $AADGroup.Id
-                $aadgUsersAfterChanges | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name userPrincipalName -Value $_.WindowsLiveID}
-                send-membershipChangeProblemReportToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $UnifiedGroup -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
-                }
-            else{Write-Verbose "No problems adding/removing users, not sending problem report e-mail to Admins"}
-
-            switch($syncWhat){
-                "Members" {
-                    Write-Verbose "Gettings group Owners for [$($UnifiedGroup.DisplayName)]"
-                    $owners = Get-AzureADGroupOwner -ObjectId $UnifiedGroup.ExternalDirectoryObjectId
-                    }
-                "Owners"  {
-                    $owners = $ugUsersBeforeChanges
-                    }
-                }            
-
-            if($($owners.DisplayName | ? {$_ -notmatch "Ω"}).Count -eq 0){
-                Write-Verbose "No active owners for 365 Group [$($UnifiedGroup.DisplayName)] - notifying Admins so that this doesn't get auto-deleted"
-                send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $UnifiedGroup -currentOwners $owners -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
-                }
-            else{Write-Verbose "Owners look normal, not sending problem report e-mail to Admins"}
-
-            if($usersAdded.Count -ne 0 -or $usersRemoved.Count -ne 0){
-                Write-Verbose "[$($usersAdded.Count + $usersRemoved.Count)] changes made - sending the change report to managers and admins"
-                $ownersEmailAddresses = $owners.UserPrincipalName
-                if($syncWhat -eq "Owners"){
-                    Write-Verbose "Getting all group Owners (both added and removed) for [$($UnifiedGroup.DisplayName)]"
-                    $ownersEmailAddresses += $usersAdded.UPN
-                    $ownersEmailAddresses += $usersRemoved.UPN
-                    $ownersEmailAddresses = $ownersEmailAddresses | Select-Object -Unique
-                    }
-                $ugUsersAfterChanges = Get-UnifiedGroupLinks -Identity $UnifiedGroup.ExternalDirectoryObjectId -LinkType $syncWhat  #Get-AzureADGroupMember is too slow and doesn't pick up the changes we've made above.
-                $ugUsersAfterChanges | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name userPrincipalName -Value $_.WindowsLiveID}
-                send-membershipChangeReportToManagers -tokenResponse $tokenResponseSmtp -UnifiedGroup $UnifiedGroup -changesAreTo $syncWhat -usersAddedArray $usersAdded -usersRemovedArray $usersRemoved -usersWithProblemsArray $usersFailed -usersInGroupAfterChanges $ugUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -ownersEmailAddresses $ownersEmailAddresses -WhatIf:$WhatIfPreference
-                }
-            else{Write-Verbose "No membership changes - not sending report to Mangers & Admins"}
-            }
-        }
-    else{
-        if(!$AADGroup){
-            Write-Error "No AAD group found for UG [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.ExternalDirectoryObjectId)]"
-            break
-            }
-        elseif(!$UnifiedGroup){
-            Write-Error "No 365 group found for AAD Group [$($AADGroup.DisplayName)][$($AADGroup.Id)]"
             break
             }
         }

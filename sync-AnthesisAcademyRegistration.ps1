@@ -230,7 +230,7 @@ Else{
         $report += "Something went wrong registering $($newregistrant.FieldValues.RegistrantName.Email) to module: $($thismodule.fieldvalues.ModuleName)." + "<br><br>"
         $report = $report | out-string
     #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: send-graphMailMessage" -bodyHtml $report
     }
 }
 Else{
