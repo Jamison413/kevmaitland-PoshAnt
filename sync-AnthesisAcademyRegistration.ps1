@@ -4,7 +4,7 @@
 #                  #
 ####################
 
-$Logname = "C:\ScriptLogs" + "\sync-AnthesisAcademyRegistration$(Get-Date -Format "yyMMdd").log" #Check this location before live
+$Logname = "C:\ScriptLogs" + "\sync-AnthesisAcademyRegistration$(Get-Date -Format "yyMMdd").log"
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
@@ -14,6 +14,7 @@ Import-Module SharePointPnPPowerShellOnline
 Remove-Module SharePointPnPPowerShellOnline
 import-Module PnP.PowerShell
 
+$smtpBotAccount = "groupbot@anthesisgroup.com"
 
 
 $Admin = "kimblebot@anthesisgroup.com"
@@ -55,7 +56,7 @@ ForEach($moduleitem in $allmodules){
         $report += "Errors found on this Module: $($moduleitem.fieldvalues.ModuleName). This will cause issues in Powerapps and needs to be manually resolved." + "<br><br>"       
         $report = $report | out-string
 #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -Subject "Anthesis Academy Sync: Error" -bodyHtml $report 
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses "284d3f27.anthesisgroup.com@amer.teams.ms" -Subject "Anthesis Academy Sync: Error" -bodyHtml $report 
 
     }
     Else{
@@ -107,7 +108,8 @@ $isitaftertheevent = New-TimeSpan -Start (get-date) -End $currentevent.FieldValu
 #Clean out registrants for closed modules (might have been waiting for approval)
 $allmodules = Get-PnPListItem -List $masterModuleList #re-get the modules we might have processed above so its up to date
 $allregistrants = Get-PnPListItem -List $registrantProcessingList
-$allnonwaitingregistrants = $allregistrants.Where({($_.FieldValues.FlowProcessed -eq "Waiting for Approval") -or ($_.FieldValues.FlowProcessed -eq "Approved - Waiting to be Processed as Registrant")})
+$allnonwaitingregistrants = $allregistrants.Where({($_.FieldValues.FlowProcessed -eq "Waiting for Approval") -or ($_.FieldValues.FlowProcessed -eq "Approved - Waiting to be Processed as Registrant") -or ($_.FieldValues.Processed -eq "Approved - Waiting to be Processed as Registrant")})
+
 ForEach($nonwaitingregistrant in $allnonwaitingregistrants){
 
 #Find the corresponding module for the registrant
@@ -125,14 +127,17 @@ $thisRegistrantModule = $allmodules.where({$_.FieldValues.ModuleCode -eq $nonwai
     <p>The Anthesis Academy</p>
     </BODY></HTML>"
      #Send-MailMessage  -BodyAsHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
-     send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses $($newregistrant.FieldValues.RegistrantName.Email)  -bodyHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)"
+     send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses $($newregistrant.FieldValues.RegistrantName.Email)  -bodyHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)"
      #Send-MailMessage  -BodyAsHtml $body -Subject "Anthesis Academy: Could not finalise sign up to $($thisRegistrantModule.FieldValues.ModuleName)" -to "emily.pressey@anthesisgroup.com" -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
+    
     }
 
 }
 
 
-$allnewregistrants = Get-PnPListItem -List $registrantProcessingList  -Query "<View><Query><Where><Eq><FieldRef Name='FlowProcessed'/><Value Type='Text'>Approved - Waiting to be Processed as Registrant</Value></Eq></Where></Query></View>"
+
+
+$allnewregistrants = Get-PnPListItem -List $registrantProcessingList  -Query "<View><Query><Where><Eq><FieldRef Name='Processed'/><Value Type='Text'>Approved - Waiting to be Processed as Registrant</Value></Eq></Where></Query></View>"
 #$allnewregistrants = $allnewregistrants.where({$_.FieldValues.Processed -ne "Module Full - Cannot Process"})
 
 ForEach($newregistrant in $allnewregistrants){
@@ -145,7 +150,7 @@ Write-Host "We shouldn't be processing this registrant, they are unapproved by l
         $report += "Weird - it's $($newregistrant.FieldValues.RegistrantName.Email). ID $($newregistrant.Id). This shouldn't be happening!" + "<br><br>"       
         $report = $report | out-string
 #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses "284d3f27.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
 }
 
 
@@ -153,6 +158,7 @@ send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddre
 
 #Get the Module list each time we iterate to get the most up to date registrant list and count
 $alllivemodules = Get-PnPListItem -List $masterModuleList -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='Text'>Sign Up Live</Value></Eq></Where></Query></View>"
+
 
 #Get the module (check we only brought back 1) and check it's live and as a last ditch attempt check that the Max registration count hasn't been reached - if so something is wrong in PowerApps
 $thismodule = $alllivemodules.where({$_.FieldValues.ModuleCode -eq $newregistrant.FieldValues.ModuleCode})
@@ -164,13 +170,13 @@ $currentregistrants = @($thismodule.fieldvalues.RegistrantList.Email)
 
     #Check for count - greater than
 If($currentregistrants.Count -gt $thismodule.fieldvalues.MaxRegistrantAmount){
-Write-Host "Something has gone very wrong, too many people have signed up to this module ($($thismodule.fieldvalues.modulename)). Messaging Emily.)" -ForegroundColor Red
+Write-Host "Something has gone very wrong, too many people have signed up to this module ($($thismodule.fieldvalues.modulename)). Messaging.)" -ForegroundColor Red
         $report = @()
         $report += "***************Errors found in Anthesis Academy Sync: Too Many People Have Signed Up For a Module***************" + "<br><br>"
         $report += "Errors found on this Module: $($thismodule.fieldvalues.ModuleName). The number of registered people has exceeded the maximum number of allowed registrants." + "<br><br>"       
         $report = $report | out-string
 #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses "284d3f27.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
 
 }
     #Check for count - equal to
@@ -181,9 +187,11 @@ Write-Host "Something has gone wrong in powerapps, we shouldn't be processing ne
         $report += "Errors found on this Module: $($thismodule.fieldvalues.ModuleName). We shouldn't be processing any more people as they shouldn't have had the option to sign up. This might have been a timing issue (unlikely though)." + "<br><br>"
         $report = $report | out-string
     #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses "284d3f27.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
 
 }
+
+
 
 
 #Add the new registrant if they aren't already there - update the module list item
@@ -220,25 +228,39 @@ Else{
                 <p>The Anthesis Academy</p>
                 </BODY></HTML>"
                 #Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
-                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses $($newregistrant.FieldValues.RegistrantName.Email) -subject "You've Signed Up to an Anthesis Academy Module!" -bodyHtml $body
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses $($newregistrant.FieldValues.RegistrantName.Email) -subject "You've Signed Up to an Anthesis Academy Module!" -bodyHtml $body
 
     }
     Else{
-    Write-Host "Something went wrong registering $($newregistrant.FieldValues.RegistrantName.Email) to module: $($thismodule.fieldvalues.ModuleName). Messaging Emily." -ForegroundColor Red
+    Write-Host "Something went wrong registering $($newregistrant.FieldValues.RegistrantName.Email) to module: $($thismodule.fieldvalues.ModuleName). Messaging." -ForegroundColor Red
         $report = @()
         $report += "***************Errors found in Anthesis Academy Sync: Something Went Wrong Processing a Registrant to a Module***************" + "<br><br>"
         $report += "Something went wrong registering $($newregistrant.FieldValues.RegistrantName.Email) to module: $($thismodule.fieldvalues.ModuleName)." + "<br><br>"
         $report = $report | out-string
     #Send-MailMessage -To "8ed81bd4.anthesisgroup.com@amer.teams.ms" -From "PeopleServicesRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Anthesis Academy Sync: Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
-    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddresses "8ed81bd4.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error" -bodyHtml $report
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses "284d3f27.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: send-graphMailMessage" -bodyHtml $report
     }
 }
 Else{
     write-host "$($newregistrant.FieldValues.RegistrantName.Email): Already signed up to the '$($thismodule.fieldvalues.ModuleName)' module. Not added." -ForegroundColor Red
+    $1000 = Set-PnPListItem -List $registrantProcessingList -Identity $newregistrant.Id -Values @{"Processed" = "Approved - Already Registered"}
+
 }
 }
 Else{
-Write-Host "Error: $($thismodule) Too many modules were found, we couldn't find the one needed! There are likely to be duplicate Module Codes in the list" -ForegroundColor Red
+Write-Host "Error: $($thismodule) Either too many modules were found or none at all, we couldn't find the one needed! There are likely to be duplicate Module Codes in the list or someone has been deleting things" -ForegroundColor Red
+Write-Host "Error: number of Modules found is $(($thismodule | Measure-Object).Count)"
+    If($(($thismodule | Measure-Object).Count -eq 0)){
+        $report = @()
+        $report += "***************Errors found in Anthesis Academy Sync: We couldn't find a Module to Register a participant***************" + "<br><br>"
+        $report += "Errors found on this Registrant: 0 Modules found for Registrant item ID $($newregistrant.Id). The module has probably been deleted from the Master Module list in Sharepoint, module code was $($newregistrant.FieldValues.ModuleCode)." + "<br><br>"
+        $report = $report | out-string
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses "284d3f27.anthesisgroup.com@amer.teams.ms" -subject "Anthesis Academy Sync: Error 0 Modules found for Registrant item ID $($newregistrant.Id)" -bodyHtml $report -Verbose
+    $1001 = Set-PnPListItem -List $registrantProcessingList -Identity $newregistrant.Id -Values @{"Processed" = "Approved - Can't find Module"}
+
+    }
+
+
 }
 }
 
