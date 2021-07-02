@@ -18,6 +18,8 @@ $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredentia
 
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
 #Check connection
 If(!($tokenResponse.access_token)){
@@ -225,7 +227,8 @@ $newauthorisedDataManagers | % {
     $welcomeBodyTrunk += "If you have any more questions about Data Management, you can email the <A HREF='mailto:itteamall@anthesisgroup.com'>Global IT Team</A><BR><BR>`r`n`r`n"
     $welcomeBodyTrunk += "Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To $thisUser.FieldValues.User.Email -Encoding UTF8
+    #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To $thisUser.FieldValues.User.Email -Encoding UTF8
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses $thisUser.FieldValues.User.Email -Subject "Resources for new Data Managers" -bodyHtml $welcomeBodyTrunk
     }
 
 #Notify authorised Data Managers who don't own any sites that they can own sites, and to get in touch with the IT Team.
@@ -238,7 +241,8 @@ $authorisedButUnassignedDataManagers | ? {$newAuthorisedDataManagers.mail -notco
         $nudgeBodyTrunk += "If this is an oversight, please let the <A HREF='mailto:itteamall@anthesisgroup.com'>IT Team</A> know which teams you should be managing, and they will fix this.<BR><BR>`r`n`r`n"
         $nudgeBodyTrunk += "Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
         #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Resources for new Data Managers" -BodyAsHtml $welcomeBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
-        Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Data Managers status" -BodyAsHtml $nudgeBodyTrunk -To $thisUser.FieldValues.User.Email -Encoding UTF8
+        #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Data Managers status" -BodyAsHtml $nudgeBodyTrunk -To $thisUser.FieldValues.User.Email -Encoding UTF8
+        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses $thisUser.FieldValues.User.Email -Subject "Data Managers status" -bodyHtml $nudgeBodyTrunk
         }
     }
 
@@ -262,8 +266,9 @@ $expiringSoonDataManagers | % {
         }
     $warningBodyTrunk += "</UL><BR><BR>`r`n`r`nLove,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To $thisUser.FieldValues.User.Email  -Encoding UTF8
+    #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To $thisUser.FieldValues.User.Email  -Encoding UTF8
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To "emily.pressey@anthesisgroup.com"  -Encoding UTF8
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses $thisUser.FieldValues.User.Email -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -bodyHtml $warningBodyTrunk
     Set-PnPListItem -List "User Training Records" -Identity $thisUser.Id -Values @{"LastReminderEmailSent" = "$(get-date)"}
     }
 
@@ -281,8 +286,9 @@ $expiringSoonDataManagers | % {
         }
     $warningBodyTrunk += "</UL><BR><BR>`r`n`r`nLove,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To $thisUser.FieldValues.User.Email  -Encoding UTF8
+    #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To $thisUser.FieldValues.User.Email  -Encoding UTF8
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -BodyAsHtml $warningBodyTrunk -To "emily.pressey@anthesisgroup.com"  -Encoding UTF8
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses $thisUser.FieldValues.User.Email -Subject "Renew your Data Manager training before $(Get-Date (Get-Date $thisUser.FieldValues.Date_x0020_of_x0020_training.AddYears(1)) -f "yyyy-MM-dd")" -bodyHtml $warningBodyTrunk
     Set-PnPListItem -List "User Training Records" -Identity $thisUser.Id -Values @{"LastReminderEmailSent" = "$(get-date)"}        
     }
         
@@ -304,13 +310,16 @@ $unauthorisedDataManagers | ? {$_.mail -ne "groupbot@anthesisgroup.com"} | % {
         }
     $removedBodyTrunk += "</UL>Love,`r`n`r`n<BR><BR>The Data Manager Robot</FONT></HTML>"
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training before 2020-07-01" -BodyAsHtml $removedBodyTrunk -To kevin.maitland@anthesisgroup.com  -Encoding UTF8;break
-    Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -BodyAsHtml $removedBodyTrunk -To $thisUser.userPrincipalName  -Encoding UTF8 -Priority High
+    #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -BodyAsHtml $removedBodyTrunk -To $thisUser.userPrincipalName  -Encoding UTF8 -Priority High
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -BodyAsHtml $removedBodyTrunk -To "emily.pressey@anthesisgroup.com"  -Encoding UTF8 -Priority High
+    send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses $thisUser.userPrincipalName -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -bodyHtml $removedBodyTrunk -priority high 
+    #send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses "kevin.maitland@anthesisgroup.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -bodyHtml $removedBodyTrunk -priority high 
     #Now remove them from each of their groups (this will remove them from their "- Data Manager" groups, and the sync-UnifiedGroupMembership will then demote them on the next cycle). If they are the last Data Manager, they will be replaced with GroupBot
     if($thisUser.mail -ne "groupbot@anthesisgroup.com"){
         $whoOwnsWhatHash[$($thisUser.mail)] | % {
             Write-Verbose "Removing [$($thisUser.mail)] from [$($_[0])]"
-            remove-DataManagerFromGroup -dataManagerGroupId $_[1] -upnToRemove $thisUser.mail -ErrorAction Stop
+            try{remove-DataManagerFromGroup -dataManagerGroupId $_[1] -upnToRemove $thisUser.mail -ErrorAction Continue}
+            catch{get-errorSummary $_;continue}
             }
         }
     

@@ -15,6 +15,8 @@ $groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\G
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $adminCreds
 
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
 $ukRuleName = "External Senders with matching UK Display Names"
 $spainRuleName = "External Senders with matching Spain Display Names"
@@ -35,9 +37,12 @@ $spainDisplayNames = $spainUsers.DisplayName | Sort-Object
 $everyoneElse = $liveUsers | ? {$_.UsageLocation -ne "United Kingdom" -and $_.UsageLocation -ne "Spain"}
 $roWDisplayNames = $everyoneElse.DisplayName | Sort-Object
 
-$ukRule | Set-TransportRule -Name $ukRuleName -Priority 0 -FromScope "NotInOrganization" -ApplyHtmlDisclaimerLocation "Prepend" -HeaderMatchesMessageHeader From -HeaderMatchesPatterns $ukDisplayNames -ApplyHtmlDisclaimerText $ruleHtml -SentTo $null -ExceptIfFrom @("noreply@email.teams.microsoft.com","no-reply@sharepointonline.com")
-$spainRule | Set-TransportRule -Name $spainRuleName -Priority 0 -FromScope "NotInOrganization" -ApplyHtmlDisclaimerLocation "Prepend" -HeaderMatchesMessageHeader From -HeaderMatchesPatterns $spainDisplayNames -ApplyHtmlDisclaimerText $ruleHtml -SentTo $null  -ExceptIfFrom @("noreply@email.teams.microsoft.com","no-reply@sharepointonline.com")
-$roWRule | Set-TransportRule -Name $restOfWorldRuleName -Priority 0 -FromScope "NotInOrganization" -ApplyHtmlDisclaimerLocation "Prepend" -HeaderMatchesMessageHeader From -HeaderMatchesPatterns $roWDisplayNames -ApplyHtmlDisclaimerText $ruleHtml -SentTo $null  -ExceptIfFrom @("noreply@email.teams.microsoft.com","no-reply@sharepointonline.com") #kevin.maitland@anthesisgroup.com
+try{$ukRule | Set-TransportRule -Name $ukRuleName -Priority 0 -FromScope "NotInOrganization" -ApplyHtmlDisclaimerLocation "Prepend" -HeaderMatchesMessageHeader From -HeaderMatchesPatterns $ukDisplayNames -ApplyHtmlDisclaimerText $ruleHtml -SentTo $null -ExceptIfFrom @("noreply@email.teams.microsoft.com","no-reply@sharepointonline.com") -ErrorAction Stop}
+catch{send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses ITTeamAll-Managers@anthesisgroup.com -subject "Error updating `$ukRule in update-PhisingTransportRules.ps1 on [$env:COMPUTERNAME]" -bodyText $(get-errorSummary $_) -priority high}
+try{$spainRule | Set-TransportRule -Name $spainRuleName -Priority 0 -FromScope "NotInOrganization" -ApplyHtmlDisclaimerLocation "Prepend" -HeaderMatchesMessageHeader From -HeaderMatchesPatterns $spainDisplayNames -ApplyHtmlDisclaimerText $ruleHtml -SentTo $null  -ExceptIfFrom @("noreply@email.teams.microsoft.com","no-reply@sharepointonline.com") -ErrorAction Stop}
+catch{send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses ITTeamAll-Managers@anthesisgroup.com -subject "Error updating `$spainRule in update-PhisingTransportRules.ps1 on [$env:COMPUTERNAME]" -bodyText $(get-errorSummary $_) -priority high}
+try{$roWRule | Set-TransportRule -Name $restOfWorldRuleName -Priority 0 -FromScope "NotInOrganization" -ApplyHtmlDisclaimerLocation "Prepend" -HeaderMatchesMessageHeader From -HeaderMatchesPatterns $roWDisplayNames -ApplyHtmlDisclaimerText $ruleHtml -SentTo $null  -ExceptIfFrom @("noreply@email.teams.microsoft.com","no-reply@sharepointonline.com")} #kevin.maitland@anthesisgroup.com
+catch{send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses ITTeamAll-Managers@anthesisgroup.com -subject "Error updating `$roWRule in update-PhisingTransportRules.ps1 on [$env:COMPUTERNAME]" -bodyText $(get-errorSummary $_) -priority high}
 #get-help New-TransportRule -Detailed
 
 Stop-Transcript

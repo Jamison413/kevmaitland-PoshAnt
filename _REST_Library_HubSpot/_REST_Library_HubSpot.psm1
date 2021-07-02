@@ -21,6 +21,7 @@ function get-hubSpotApiKey(){
     param()
     $encryptedCredsFile = "HubSync.txt"
     $placesToLook = @( #Figure out where to look
+        "$env:USERPROFILE\Downloads\$encryptedCredsFile"
         "$env:USERPROFILE\Desktop\$encryptedCredsFile"
         ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\$encryptedCredsFile"
         )

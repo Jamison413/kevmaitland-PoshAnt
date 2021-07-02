@@ -365,6 +365,7 @@ function get-groupAdminRoleEmailAddresses(){
     $admins = @()
     get-graphAdministrativeRoleMembers -tokenResponse $tokenResponse -roleName 'User Account Administrator' | % {$admins += $_.userPrincipalName}
     get-graphAdministrativeRoleMembers -tokenResponse $tokenResponse -roleName 'Exchange Service Administrator' | % {$admins += $_.userPrincipalName}
+    $admins += "t0-kevin.maitland@anthesisgroup.com"
     $admins | Sort-Object -Unique
     }
 function get-graphAdministrativeRoleMembers(){
@@ -422,7 +423,7 @@ function get-graphAppClientCredentials{
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-            [ValidateSet("TeamsBot","SchemaBot","IntuneBot","SharePointBot","ShiftBot","ReportBot")]
+            [ValidateSet("TeamsBot","SchemaBot","IntuneBot","SharePointBot","ShiftBot","ReportBot","SmtpBot")]
             [String]$appName
         )
     
@@ -433,6 +434,7 @@ function get-graphAppClientCredentials{
         "SharePointBot" {$encryptedCredsFile = "spBotDetails.txt"}
         "ShiftBot" {$encryptedCredsFile = "shiftBotDetails.txt"}
         "ReportBot"{$encryptedCredsFile = "ReportBotDetails.txt"}
+        "SmtpBot"{$encryptedCredsFile = "SmtpBot.txt"}
         }
     
     $placesToLook = @( #Figure out where to look
@@ -555,7 +557,7 @@ function get-graphDevices(){
 
     $refiner = "?"+$select
     if($filter){
-        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$filter
         }#>
 
@@ -717,7 +719,7 @@ function get-graphDrives(){
 
     $refiner = "?"+$select
     if($filter){
-        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$filter
         }    
     if($refiner.Length -gt 1){$query = $query+[uri]::EscapeDataString($refiner)}
@@ -781,7 +783,7 @@ function get-graphGroups(){
 
     $refiner = "?"+$select
     if($filter){
-        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$filter
         }
     
@@ -895,7 +897,7 @@ function get-graphIntuneDevices(){
 
     $refiner = "?"+$select
     if($filter){
-        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$filter
         }#>
 
@@ -1033,7 +1035,7 @@ function get-graphListItems(){
         $expand = "`$expand=$expand"
         }
     if($expand){
-        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$expand
         }
 
@@ -1088,6 +1090,19 @@ function get-graphRoomCalendarEvents(){
     #Need to use calendarView for all room events and specify a start/end datetime for query
     invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/users/$roomemail/calendarView/?endDateTime=$endDateTime&startDateTime=$startDateTime" -Verbose:$VerbosePreference
 }
+function get-graphSelectAllUserProperties(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $false)]
+            [ValidateSet("beta","v1.0")]
+            [string]$endpoint = "v1.0"
+        )
+    
+    switch ($endpoint){
+        'v1.0' {"anthesisgroup_employeeInfo,accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,employeeHireDate,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"}
+        'beta' {"anthesisgroup_employeeInfo,accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,employeeHireDate,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType,infoCatalogs,preferredDataLocation,signInActivity"}
+        } #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
+    }
 function get-graphShiftOpenShifts(){
     [cmdletbinding()]
     param(
@@ -1371,6 +1386,33 @@ function get-graphTokenResponse{
     $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
     $tokenResponse
     }
+function get-graphUserLineManager(){
+    [cmdletbinding(DefaultParameterSetName = "noManagementLevels")]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true)]
+            [string]$userIdOrUpn
+        ,[parameter(Mandatory = $true,ParameterSetName = "fixedManagementLevels")]
+            [ValidateRange(1,1000)] #Graph API limit https://docs.microsoft.com/en-us/graph/api/user-list-manager?view=graph-rest-1.0&tabs=http
+            [int]$returnManagementLevels
+        ,[parameter(Mandatory = $true,ParameterSetName = "maxManagementLevels")]
+            [switch]$returnAllManagementLevels
+        ,[parameter(Mandatory = $false)]
+            [switch]$selectAllProperties = $false
+        )
+
+
+    if($selectAllProperties){$select = "`$select=$(get-graphSelectAllUserProperties)"}
+    switch ($PsCmdlet.ParameterSetName){
+        'noManagementLevels'    {$refiner = "/manager?$select"}
+        'fixedManagementLevels' {$refiner = "?`$expand=manager(`$levels=$returnManagementLevels;$select)"}
+        'maxManagementLevels'   {$refiner = "?`$expand=manager(`$levels=max;$select)"}
+        }
+
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users/$userIdOrUpn$refiner"
+
+    }
 function get-graphUsers(){
     [cmdletbinding()]
     param(
@@ -1392,6 +1434,8 @@ function get-graphUsers(){
         ,[parameter(Mandatory = $false)]
             [switch]$selectAllProperties = $false
         ,[parameter(Mandatory = $false)]
+            [switch]$includeLineManager = $false
+        ,[parameter(Mandatory = $false)]
             [switch]$useBetaEndPoint = $false
         )
 
@@ -1410,30 +1454,34 @@ function get-graphUsers(){
         }
 
     if($filterLicensedUsers){
-        $select = ",id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,companyName,country,department,anthesisgroup_employeeInfo"
+        $select = "id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,companyName,country,department,anthesisgroup_employeeInfo"
         }
     if($selectAllProperties){
-        $select = ",anthesisgroup_employeeInfo,accountEnabled,assignedLicenses,assignedPlans,businessPhones,city,companyName,country,createdDateTime,creationType,deletedDateTime,department,displayName,employeeId,employeeHireDate,faxNumber,givenName,id,identities,imAddresses,isResourceAccount,jobTitle,lastPasswordChangeDateTime,legalAgeGroupClassification,licenseAssignmentStates,mail,mailNickname,mobilePhone,officeLocation,onPremisesDistinguishedName,onPremisesDomainName,onPremisesExtensionAttributes,onPremisesImmutableId,onPremisesLastSyncDateTime,onPremisesProvisioningErrors,onPremisesSamAccountName,onPremisesSecurityIdentifier,onPremisesSyncEnabled,onPremisesUserPrincipalName,otherMails,passwordPolicies,passwordProfile,postalCode,preferredDataLocation,preferredLanguage,provisionedPlans,proxyAddresses,refreshTokensValidFromDateTime,showInAddressList,signInSessionsValidFromDateTime,state,streetAddress,surname,usageLocation,userPrincipalName,userType"
-        if($useBetaEndPoint){$select = $select+",infoCatalogs,preferredDataLocation,signInActivity"}
+        $includeLineManager = $true #Assume that Line Managers are part of "allProperties"
+        if($useBetaEndPoint){$select = get-graphSelectAllUserProperties -endpoint beta}
+        else{$select = get-graphSelectAllUserProperties}
         } #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
-    $selectCustomProperties | % {
+    @($selectCustomProperties | Select-Object) | % {
         $select += ",$_"
         }
-
+    
+    if($includeLineManager){
+        $expand += ",manager(`$levels=1)"
+        }
+    
     #Build the refiner based on the parameters supplied
-    if(![string]::IsNullOrWhiteSpace($select)){
-        if($select.StartsWith(",")){$select = $select.Substring(1,$select.Length-1)}
-        $select = "`$select=$select"
+    $refiner = "?"
+    if($select){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+"`$select=$($select.TrimStart(","))"#Add the select to the refiner, trimming off any leading ","
         }
-    if(![string]::IsNullOrWhiteSpace($filter)){
-        if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
-        $filter = "`$filter=$filter"
-        }
-
-    $refiner = "?"+$select
     if($filter){
-        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another query option in the refiner, use the '&' symbol to concatenate the the strings
-        $refiner = $refiner+$filter
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+"`$filter=$($filter.TrimStart(" and "))"#Add the filter to the refiner, trimming off any leading " and "
+        }
+    if($expand){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+"`$expand=$($expand.TrimStart(","))"#Add the expand to the refiner, trimming off any leading ","
         }
 
     Write-Verbose "Graph Query = [users$refiner]"
@@ -1475,6 +1523,10 @@ function get-graphUsersFromGroup(){
         ,[parameter(Mandatory = $false,ParameterSetName = "groupId")]
             [parameter(Mandatory = $false,ParameterSetName = "groupUpn")]
             [switch]$returnOnlyLicensedUsers = $false
+        ,[parameter(Mandatory = $false)]
+            [switch]$selectAllProperties = $false
+        ,[parameter(Mandatory = $false)]
+            [switch]$includeLineManager = $false
         )
 
     #We need the GroupId, so if we were only given the UPN, we need to find the Id from that.
@@ -1491,9 +1543,26 @@ function get-graphUsersFromGroup(){
             }
         }
     if($returnOnlyLicensedUsers){
-        $refiner = "?`$select=id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,anthesisgroup_employeeInfo"
+        $select = "id,displayName,jobTitle,mail,userPrincipalName,usageLocation,assignedLicenses,anthesisgroup_employeeInfo"
         $returnOnlyUsers = $true #Licensed Users are a subset of Users, so $returnOnlyUsers = $true is implied if $returnOnlyLicensedUsers = $true
         }
+    if($selectAllProperties){
+        $includeLineManager = $true #Assume that Line Managers are part of "allProperties"
+        if($useBetaEndPoint){$select = get-graphSelectAllUserProperties -endpoint beta}
+        else{$select = get-graphSelectAllUserProperties}
+        } #Not Implemented yet: aboutMe, birthday, hireDate, interests, mailboxSettings, mySite,pastProjects, preferredName,responsibilities,schools, skills 
+
+    #Build the refiner based on the parameters supplied
+    $refiner = "?"
+    if($select){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+"`$select=$($select.TrimStart(","))"#Add the select to the refiner, trimming off any leading ","
+        }
+    if($filter){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+"`$filter=$($filter.TrimStart(" and "))" #Add the filter to the refiner, trimming off any leading " and "
+        }
+
     Write-Verbose "Graph Query = [groups/$($groupId)/$($memberType+$refiner)]"
     try{
         $allMembers = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "groups/$groupId/$memberType$refiner"
@@ -1501,6 +1570,12 @@ function get-graphUsersFromGroup(){
     catch{
         Write-Error "Error retrieving Graph Group $memberType in get-graphUsersFromGroup() using query [groups/$($groupId)/$($memberType+$refiner)]"
         Throw $_ #Terminate on this error
+        }
+
+    if($includeLineManager){ #Relationships (like /owners) don't support $expand parameters, so we have to enumerate the Line Managers per-user
+        $allMembers | ? {$_.'@odata.type' -eq "#microsoft.graph.user"} | % {
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name manager -Value $(get-graphUserLineManager -tokenResponse $tokenResponse -userIdOrUpn $_.userPrincipalName -selectAllProperties:$selectAllProperties)
+            }
         }
     
     if($returnOnlyUsers){
@@ -2390,6 +2465,67 @@ function reset-graphUnifiedGroupSettingsToOriginals(){
         #And check the Membership settings are correct too:
         set-graphUnifiedGroupGuestSettings -tokenResponse $tokenResponse -graphUnifiedGroupExtended $graphGroupExtended
         }
+    }
+function send-graphMailMessage(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [ValidatePattern("@")]
+            [string]$fromUpn
+        ,[parameter(Mandatory = $true)]
+            [ValidatePattern("@")]
+            [string[]]$toAddresses
+        ,[parameter(Mandatory = $false)]
+            [ValidatePattern("@")]
+            [string[]]$ccAddresses
+        ,[parameter(Mandatory = $false)]
+            [ValidatePattern("@")]
+            [string[]]$bccAddresses
+        ,[parameter(Mandatory = $true)]
+            [string]$subject
+        ,[parameter(Mandatory = $true,ParameterSetName = "text")]
+            [string]$bodyText
+        ,[parameter(Mandatory = $true,ParameterSetName = "HTML")]
+            [string]$bodyHtml
+        ,[parameter(Mandatory = $false)]
+            [bool]$saveToSentItems = $true
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet ("low","normal","high")]
+            [string]$priority = "normal"
+        )
+
+    [array]$formattedToAddresses = $toAddresses | % {
+        @{emailAddress=@{'address'=$_}}
+        }
+    [array]$formattedFromAddresses = $fromUpn | % {
+        @{emailAddress=@{'address'=$_}}
+        }
+    $message = @{
+        toRecipients = $formattedToAddresses
+        subject = $subject
+        importance=$priority
+        #from = $formattedFromAddresses
+        #sender = $formattedFromAddresses
+        }
+
+    if($ccAddresses){
+        [array]$formattedCcAddresses = $ccAddresses | % {
+            @{emailAddress=@{'address'=$_}}
+            }
+        $message.Add("ccRecipients",$formattedCcAddresses)
+        }
+    if($bccAddresses){
+        [array]$formattedBccAddresses = $bccAddresses | % {
+            @{emailAddress=@{'address'=$_}}
+            }
+        $message.Add("bccRecipients",$formattedBccAddresses)
+        }
+    if($bodyText){$message.Add("body",@{"contentType"="Text";"content"=$bodyText})}
+    if($bodyHtml){$message.Add("body",@{"contentType"="HTML";"content"=$bodyHtml})}
+
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$fromUpn/sendMail" -graphBodyHashtable @{"message"=$message;"saveToSentItems"=$saveToSentItems}
     }
 function set-graphDrive_unsupported(){
      [cmdletbinding()]

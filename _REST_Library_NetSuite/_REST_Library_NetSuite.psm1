@@ -1204,12 +1204,14 @@ function get-netSuiteParameters(){
     if($connectTo -eq "Production"){
         $placesToLook = @(
             "$env:USERPROFILE\Desktop\netsuite_live.txt"
+            "$env:USERPROFILE\Downloads\netsuite_live.txt"
             ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_live.txt"
             )
         }
     else{
         $placesToLook = @(
             "$env:USERPROFILE\Desktop\netsuite.txt"
+            "$env:USERPROFILE\Downloads\netsuite_sandbox.txt"
             ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite.txt"
             )
         
