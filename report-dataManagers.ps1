@@ -313,6 +313,7 @@ $unauthorisedDataManagers | ? {$_.mail -ne "groupbot@anthesisgroup.com"} | % {
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -BodyAsHtml $removedBodyTrunk -To $thisUser.userPrincipalName  -Encoding UTF8 -Priority High
     #Send-MailMessage -From groupbot@anthesisgroup.com -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -BodyAsHtml $removedBodyTrunk -To "emily.pressey@anthesisgroup.com"  -Encoding UTF8 -Priority High
     send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses $thisUser.userPrincipalName -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -bodyHtml $removedBodyTrunk -priority high 
+    #send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn groupbot@anthesisgroup.com -toAddresses "kevin.maitland@anthesisgroup.com" -Subject "Renew your Data Manager training to be reinstated as a Data Manager" -bodyHtml $removedBodyTrunk -priority high 
     #Now remove them from each of their groups (this will remove them from their "- Data Manager" groups, and the sync-UnifiedGroupMembership will then demote them on the next cycle). If they are the last Data Manager, they will be replaced with GroupBot
     if($thisUser.mail -ne "groupbot@anthesisgroup.com"){
         $whoOwnsWhatHash[$($thisUser.mail)] | % {
