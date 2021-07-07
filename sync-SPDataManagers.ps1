@@ -2,12 +2,7 @@
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
-Import-Module _PNP_Library_SPO
-Import-Module _PS_Library_Graph
-Remove-Module PnP.PowerShell
-Import-Module SharePointPnPPowerShellOnline
-Remove-Module SharePointPnPPowerShellOnline
-import-Module PnP.PowerShell
+
 
 #For pnp (Graph can't manage Sharepoint groups currently)
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
@@ -64,8 +59,8 @@ Exit
 $DataManagerSPOGroupName = "Internal - SPO Authorised Data Managers"
 $MembersSPOGroupName = "Internal - SPO Authorised TeamHub Members"
 
-$internalcurrentspdatamanagers = Get-PnPGroupMember -Identity $DataManagerSPOGroupName
-$internalcurrentspmembers = Get-PnPGroupMember -Identity $MembersSPOGroupName
+$internalcurrentspdatamanagers = Get-PnPGroupMembers -Identity $DataManagerSPOGroupName
+$internalcurrentspmembers = Get-PnPGroupMembers -Identity $MembersSPOGroupName
 
 #We just compare and add/remove any new members
 
@@ -124,8 +119,8 @@ Exit
 $DataManagerSPOGroupName = "External - SPO Authorised Data Managers"
 $MembersSPOGroupName = "External - Authorised Client Members"
 
-$externalcurrentspdatamanagers = Get-PnPGroupMember -Identity $DataManagerSPOGroupName
-$externalcurrentspmembers = Get-PnPGroupMember -Identity $MembersSPOGroupName
+$externalcurrentspdatamanagers = Get-PnPGroupMembers -Identity $DataManagerSPOGroupName
+$externalcurrentspmembers = Get-PnPGroupMembers -Identity $MembersSPOGroupName
 
 #We just compare and add/remove any new members to the two Sharepoint groups - external
 
