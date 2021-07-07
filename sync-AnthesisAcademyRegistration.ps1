@@ -8,13 +8,13 @@ $Logname = "C:\ScriptLogs" + "\sync-AnthesisAcademyRegistration$(Get-Date -Forma
 Start-Transcript -Path $Logname -Append
 Write-Host "Script started:" (Get-date)
 
-Import-Module _PNP_Library_SPO
-Remove-Module PnP.PowerShell
-Import-Module SharePointPnPPowerShellOnline
-Remove-Module SharePointPnPPowerShellOnline
-import-Module PnP.PowerShell
+Import-Module _PNP_Library_SPO -ErrorAction Continue
+Remove-Module PnP.PowerShell -ErrorAction Continue
+Import-Module SharePointPnPPowerShellOnline -ErrorAction Continue
+Remove-Module SharePointPnPPowerShellOnline -ErrorAction Continue
+import-Module PnP.PowerShell -ErrorAction Continue
 
-$smtpBotAccount = "groupbot@anthesisgroup.com"
+$smtpBotAccount = "AnthesisAcademy@anthesisgroup.com"
 
 
 $Admin = "kimblebot@anthesisgroup.com"
