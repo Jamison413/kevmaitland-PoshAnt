@@ -8,6 +8,11 @@ import-Module PnP.PowerShell
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
+#email out
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
+
+
 
 #Get some useful information
 
@@ -274,11 +279,13 @@ foreach ($currentRequest in $selectedRequests){
             $cc = $(convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique)
             Write-Verbose "Sending e-mail"
             if($cc){
-                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $cc -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+                #Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $cc -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn externalsiterobot@anthesisgroup.com -toAddresses $fullRequest.FieldValues.Site_x0020_Admin.Email -subject "External Site for $externalParty created" -bodyHtml $body -ccAddresses $cc -bccAddresses $($365creds.UserName)
                 Write-Verbose "E-mail sent"
                 }
             else{
-                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Credential $365creds
+                #Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Credential $365creds
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn externalsiterobot@anthesisgroup.com -toAddresses $fullRequest.FieldValues.Site_x0020_Admin.Email -subject "External Site for $externalParty created" -bodyHtml $body -bccAddresses $($365creds.UserName)
                 Write-Verbose "E-mail sent"
                 } #Send-MailMessage doesn't support Empty CC option
             }
@@ -321,11 +328,13 @@ foreach ($currentRequest in $selectedRequests){
             $cc = $(convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique)
             Write-Verbose "Sending e-mail"
             if($cc){
-                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $cc -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+                #Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $cc -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn externalsiterobot@anthesisgroup.com -toAddresses $fullRequest.FieldValues.Site_x0020_Admin.Email -subject "External Site for $externalParty created" -bodyHtml $body -ccAddresses $cc -bccAddresses $($365creds.UserName)
                 Write-Verbose "E-mail sent"
                 }
             else{
-                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Credential $365creds
+                #Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Credential $365creds
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn externalsiterobot@anthesisgroup.com -toAddresses $fullRequest.FieldValues.Site_x0020_Admin.Email -subject "External Site for $externalParty created" -bodyHtml $body -bccAddresses $($365creds.UserName)
                 Write-Verbose "E-mail sent"
                 } #Send-MailMessage doesn't support Empty CC option
             }
@@ -367,11 +376,13 @@ foreach ($currentRequest in $selectedRequests){
             $cc = $(convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.Site_x0020_Owners.Email +","+ $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique)
             Write-Verbose "Sending e-mail"
             if($cc){
-                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $cc -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+                #Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -Cc $cc -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn externalsiterobot@anthesisgroup.com -toAddresses $fullRequest.FieldValues.Site_x0020_Admin.Email -subject "External Site for $externalParty created" -bodyHtml $body -ccAddresses $cc -bccAddresses $($365creds.UserName)
                 Write-Verbose "E-mail sent"
                 }
             else{
-                Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Credential $365creds
+                #Send-MailMessage  -BodyAsHtml $body -Subject "External Site for $externalParty created" -to $fullRequest.FieldValues.Site_x0020_Admin.Email -bcc $($365creds.UserName) -from "ExternalSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8 -Credential $365creds
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn externalsiterobot@anthesisgroup.com -toAddresses $fullRequest.FieldValues.Site_x0020_Admin.Email -subject "External Site for $externalParty created" -bodyHtml $body -bccAddresses $($365creds.UserName)
                 Write-Verbose "E-mail sent"
                 } #Send-MailMessage doesn't support Empty CC option
             }
@@ -387,8 +398,7 @@ foreach ($currentRequest in $selectedRequests){
 
 <#Testing Jira Ticket#>
 Set-JiraConfigServer 'https://anthesisit.atlassian.net'
-
-$jiraCreds = import-encryptedCsv -pathToEncryptedCsv 'C:\Users\Netmin\Desktop\JiraDetails.txt'
+$jiraCreds = import-encryptedCsv -pathToEncryptedCsv "$($env:USERPROFILE)\Downloads\jira.txt"
 $jiraPsCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $jiraCreds.UserName, $(ConvertTo-SecureString -AsPlainText $jiraCreds.Password -Force)
 
 New-JiraSession -Credential $jiraPsCreds 
