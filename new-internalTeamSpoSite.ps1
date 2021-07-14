@@ -1,6 +1,12 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
 
+#email out
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
+
+
+
 $requests = @()
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub" -Credentials $365creds
 $requests += Get-PnPListItem -List "Internal Team Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
@@ -193,7 +199,9 @@ foreach($request in $selectedRequests){
 
                 <p>The Team Site Robot</p>
                 </BODY></HTML>"
-            Send-MailMessage  -BodyAsHtml $body -Subject "[$($newTeam.DisplayName)] Team Site created" -to $thisManager -bcc $((Get-PnPConnection).PSCredential.UserName) -from "TeamSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+            #Send-MailMessage  -BodyAsHtml $body -Subject "[$($newTeam.DisplayName)] Team Site created" -to $thisManager -bcc $((Get-PnPConnection).PSCredential.UserName) -from "TeamSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+            send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn teamsiterobot@anthesisgroup.com -toAddresses $thisManager -subject "[$($newTeam.DisplayName)] Team Site created" -bodyHtml $body -bccAddresses $($365creds.UserName)
+
             Write-Verbose "E-mail sent"
             }
         catch{$_}

@@ -8,6 +8,12 @@ Write-host "**********************" -ForegroundColor White
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PNP_Library_SPO
 
+$smtpaddress = "groupbot@anthesisgroup.com"
+
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
+
+
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
@@ -28,7 +34,7 @@ $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 Connect-PnPOnline -url "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -Credentials $adminCreds
 
 #Hardcode Adriana Quintero
-Add-PnPListItem -List "Buddy System" -Values @{"Yourname" = "Adriana.Quintero@anthesisgroup.com"; "Community" = "Not applicable"; "Youtimezone" = "UTC+01:00"; "Yourcountry" = "France"}
+#Add-PnPListItem -List "Buddy System" -Values @{"Yourname" = "Adriana.Quintero@anthesisgroup.com"; "Community" = "Not applicable"; "Youtimezone" = "UTC+01:00"; "Yourcountry" = "France"}
 
 
 #Process historical matches
@@ -154,7 +160,8 @@ If(($r = 4000) -and ($badmatches -contains 1)){
 write-host "It looks like it wasn't mathematically possible to find  unique parinings this week :( Emailing Emily..." -ForegroundColor Red
 $subject = "Buddy System: It looks like it wasn't mathemetically possible to find  unique pairings this week :("
 $body = "Emails out were cancelled, womp, womp..."
-Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds 
+#Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds 
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "emily.pressey@anthesisgroup.com" -subject $subject -bodyText $body -priority high
 #Exit
 }
 Else{
@@ -236,8 +243,10 @@ $body1 += "(Ps I’m managed by the IT Team, if I have broken or if you have any
 write-host "Sending emails to $($pair[0].email) and $($pair[1].email)" -ForegroundColor Green
 $summaryemailmatches += "$($pair[0].email) and $($pair[1].email) `r`n <BR>"
 Try{
-Send-MailMessage -To "$($pair[0].email)" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body0 -Encoding UTF8 -Credential $adminCreds
-Send-MailMessage -To "$($pair[1].email)" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body1 -Encoding UTF8 -Credential $adminCreds
+#Send-MailMessage -To "$($pair[0].email)" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body0 -Encoding UTF8 -Credential $adminCreds
+#Send-MailMessage -To "$($pair[1].email)" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body1 -Encoding UTF8 -Credential $adminCreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "$($pair[0].email)" -subject $subject -bodyHtml $body0 -priority high
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "$($pair[1].email)" -subject $subject -bodyHtml $body1 -priority high
 }
 Catch{
 #send-mailmessage does not return anything if it fails oddly enough, so have captured the Powershell error to test instead
@@ -274,6 +283,8 @@ Set-PnPListItem -List "Buddy System" -Identity "1775" -Values @{"nextRunDate" = 
 $buddyapplink = "https://apps.powerapps.com/play/dce65d94-2361-4d05-8bf3-8d4ad4362ffd?tenantId=271df584-ab64-437f-85b6-80ff9bef6c9f"
 $leftoversignups = Get-PnPListItem -List "Buddy System Repeat Sign Up"
 $summaryleftoverpeople = @()
+
+########NEED TO AMEND THE SEND-GRAPHMESSAGE EMAIL RECIPIENT ON THIS ONE!
 ForEach($leftoversignup in $leftoversignups){
 
 $subject = "Notification: Anthesis Buddy System Participation"
@@ -286,11 +297,12 @@ $body2 += "The Buddy System Robot <3`r`n`r`n<BR><BR>"
 $body2 += "(Ps I’m managed by the IT Team, if I have broken or if you have any questions, please get in touch via $($ITemail))"
 
 Write-Host "Emailing $($leftoversignup.FieldValues.Yourname.Email) to let them know they have been removed" -ForegroundColor Yellow
-Send-MailMessage -To "$($leftoversignup.FieldValues.Yourname.Email)" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body2 -Encoding UTF8 -Credential $adminCreds
+#Send-MailMessage -To "$($leftoversignup.FieldValues.Yourname.Email)" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body2 -Encoding UTF8 -Credential $adminCreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "$($leftoversignup)" -subject $subject -bodyHtml $body2 -priority high
 
-$summaryleftoverpeople += "$($leftoversignup.FieldValues.Yourname.Email)<BR>"
+$summaryleftoverpeople += "$($leftoversignup)<BR>"
 
-Remove-PnPListItem -List "Buddy System Repeat Sign Up" -Identity $($leftoversignup.Id) -Force
+#Remove-PnPListItem -List "Buddy System Repeat Sign Up" -Identity $($leftoversignup.Id) -Force
 
 }
 
@@ -313,8 +325,12 @@ $body3 += "<HTML><FONT FACE=`"Calibri`">$summaryemailmatches`r`n`r`n<BR><BR>"
 $body3 += "<HTML><FONT FACE=`"Calibri`">Here are this week's locations:`r`n`r`n<BR><BR>"
 $body3 += "<HTML><FONT FACE=`"Calibri`">$summaryemailcountries`r`n`r`n<BR><BR>"
 
-Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body3 -Encoding UTF8 -Credential $adminCreds
-Send-MailMessage -To "paul.crewe@anthesisgroup.com" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body3 -Encoding UTF8 -Credential $adminCreds
+#Send-MailMessage -To "emily.pressey@anthesisgroup.com" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body3 -Encoding UTF8 -Credential $adminCreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "emily.pressey@anthesisgroup.com" -subject $subject -bodyHtml $body3 -priority high
+
+#Send-MailMessage -To "paul.crewe@anthesisgroup.com" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body3 -Encoding UTF8 -Credential $adminCreds
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "paul.crewe@anthesisgroup.com" -subject $subject -bodyHtml $body3 -priority high
+
 
 #end here
 #-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#

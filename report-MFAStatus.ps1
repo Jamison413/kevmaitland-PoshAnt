@@ -68,6 +68,8 @@ $usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "
 $usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "NewGroupBot@anthesisgroup.com"
 $usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "T1-Emily.Pressey@anthesisgroup.com"
 $usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "t1-andrew.ost@anthesisgroup.com"
+$usersnotactivatedwithMFA = $usersnotactivatedwithMFA | where-object -Property "UserPrincipalName" -NE "tempga@sustain.co.uk"
+
 
 
 #Enable it for anyone in Spain, remove them from the list
@@ -184,34 +186,6 @@ ForEach($persontochase in $startstochase){$body += "$($persontochase) `r`n<BR>"}
 #Send-MailMessage -To "cb1d8222.anthesisgroup.com@amer.teams.ms" -From "thehelpfulmfarobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body -Encoding UTF8 -Credential $adminCreds
 send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses "cb1d8222.anthesisgroup.com@amer.teams.ms" -Subject $subject -bodyHtml $body 
 
-#Reports
-If(!($error)){
-$status = "Ok"
-}
-Else{
-$status = "Error"
-}
-$EnabledreportHash = @{
-"reportType" = "MFA Enabled Users";
-"Notes" = "$($enabledUsers.UserPrincipalName)"
-"Objectcount" = "$(($enabledUsers | Measure-Object).count)"
-}
-$NoMFAreportHash = @{
-"reportType" = "Users without MFA";
-"Notes" = "$($userswithnomfa.UserPrincipalName)"
-"Objectcount" = "$(($userswithnomfa | Measure-Object).count)"
-}
-$overviewreportHash = @{
-"reportType" = "report-MFAStatus";
-"Notes" = "$($error)"
-"LastRun" = "$(get-date)"
-"Status" = "$($status)"
-}
-
-#$ITreportinglistitems = get-graphListItems -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -expandAllFields
-Update-graphListItem -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 8  -fieldHash $EnabledreportHash 
-Update-graphListItem -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 9  -fieldHash $NoMFAreportHash
-Update-graphListItem -tokenResponse $tokenResponseTeams -serverRelativeSiteUrl "https://anthesisllc.sharepoint.com/teams/IT_Team_All_365/" -listName "IT reporting" -listitemId 10  -fieldHash $overviewreportHash
 
 <#
 

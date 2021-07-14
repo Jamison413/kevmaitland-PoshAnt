@@ -785,6 +785,11 @@ cls
         #Does Term have a TermProjId?
         $existingOppTermsWithProject = $existingOpps    | ? {![string]::IsNullOrWhiteSpace($_.NetSuiteProjectId) -and $_.CustomProperty.flagForReprocessing -ne $false}
             #Yes: Do nothing to Opps that have been won & set flagForReproccessing = $false
+            #
+            #Actually, if $deltaSync -eq $false, check whether the Opp folder still exists _and_ the Proj folder exists. If both > migrate Opp folder data to Proj fodler and delete Opp folder
+            #
+            #
+            #
         Write-Host "`tProcessing [$($existingOppTermsWithProject.Count)] existing Opportunities with Projects"
         @($existingOppTermsWithProject | Select-Object) | % {
             $thisWonOpp = $_

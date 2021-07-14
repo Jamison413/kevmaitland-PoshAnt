@@ -84,14 +84,14 @@ $offices += [ordered]@{
     OfficeName="GBR-Manchester"
     OfficeColour="Pink"
     OfficeWeekendColour="darkPink"
-    OfficeDesks=0
+    OfficeDesks=7
     ShiftNotes="Office currently not available until we move to new premises in July 2021"
     }
 $offices += [ordered]@{
     OfficeName="GBR-Oxford"
     OfficeColour="Yellow"
     OfficeWeekendColour="darkYellow"
-    OfficeDesks=8
+    OfficeDesks=0
     ShiftNotes="Oxford employees to use Wheelhouse booking system - do not need to duplicate bookings on Shifts"
     }
 
