@@ -228,15 +228,37 @@ function process-folders(){
         "merge" {
             #Move DriveItem
             [array]$childDriveItems = get-graphDriveItems -tokenResponse $tokenResponse -driveGraphId $standardisedSourceFolder.DriveClientId -itemGraphId $standardisedSourceFolder.DriveItemId -returnWhat Children
+            if($([bool]$mergeInto.PSobject.Properties.name -match "webUrl") -eq $false -and ![string]::IsNullOrWhiteSpace($mergeInto.DriveItemUrl)){$mergeInto | Add-Member -MemberType NoteProperty -Name webUrl -Value $mergeInto.DriveItemUrl -Force}#If we've been passed a Standardised destination folder, re-set the raw properties so this function works for both raw DriveItems *and* standardised folders
+            if($([bool]$mergeInto.PSobject.Properties.name -match "id") -eq $false -and ![string]::IsNullOrWhiteSpace($mergeInto.DriveItemId)){$mergeInto | Add-Member -MemberType NoteProperty -Name id -Value $mergeInto.DriveItemId -Force}#If we've been passed a Standardised destination folder, re-set the raw properties so this function works for both raw DriveItems *and* standardised folders
+            if($([bool]$mergeInto.PSobject.Properties.name -match "parentReference.driveId") -eq $false -and ![string]::IsNullOrWhiteSpace($mergeInto.DriveClientId)){$mergeInto | Add-Member -MemberType NoteProperty -Name "parentReference" -Value @(New-Object psobject -ArgumentList @{driveId=$mergeInto.DriveClientId}) -Force}#If we've been passed a Standardised destination folder, re-set the raw properties so this function works for both raw DriveItems *and* standardised folders
+            if($([bool]$mergeInto.PSobject.Properties.name -match "name") -eq $false -and ![string]::IsNullOrWhiteSpace($mergeInto.DriveItemName)){$mergeInto | Add-Member -MemberType NoteProperty -Name "name" -Value $mergeInto.DriveItemName -Force}#If we've been passed a Standardised destination folder, re-set the raw properties so this function works for both raw DriveItems *and* standardised folders
             @($childDriveItems | Select-Object) | % {
                 $thisChildDriveItem = $_
                 try{
-                    Write-Host "`t`t`t`tMoving [$($standardisedSourceFolder.DriveItemName)][$($standardisedSourceFolder.DriveItemUrl)] to [$($mergeInto.webUrl)]"
+                    Write-Host "`t`t`t`tMoving [$($standardisedSourceFolder.DriveItemName+" | "+$thisChildDriveItem.name)][$($thisChildDriveItem.webUrl)] to [$($mergeInto.webUrl)]"
                     [array]$movedDriveItems += move-graphDriveItem -tokenResponse $tokenResponse -driveGraphIdSource $thisChildDriveItem.parentReference.driveId -itemGraphIdSource $thisChildDriveItem.id -driveGraphIdDestination $mergeInto.parentReference.driveId -parentItemGraphIdDestination $mergeInto.id
                     }
                 catch{
-                    Write-Host -ForegroundColor Red "`t`t`t`t$(get-errorSummary $_)"
-                    [array]$failedDriveItems += $thisChildDriveItem
+                    if($_.Exception -match "(409)"){
+                        #If there is a conflict, try moving the childitems. If all childitems are moved, delete this item.
+                        Write-Warning "`tFolder [$($thisChildDriveItem.name)] exists in destination - attempting to move subfolders instead"
+                        if($([bool]$thisChildDriveItem.PSobject.Properties.name -match "DriveClientId") -eq $false){$thisChildDriveItem | Add-Member -MemberType NoteProperty -Name DriveClientId -Value $thisChildDriveItem.parentReference.driveId -Force}#As we now have a raw source folder, set the standardised properties so we can resubmit it to this function
+                        if($([bool]$mergeInto.PSobject.Properties.name -match "parentReference.driveId") -eq $false -and ![string]::IsNullOrWhiteSpace($mergeInto.DriveClientId)){$mergeInto | Add-Member -MemberType NoteProperty -Name "parentReference" -Value @(New-Object psobject -ArgumentList @{driveId=$mergeInto.DriveClientId}) -Force}#If we've been passed a Standardised destination folder, re-set the raw properties so this function works for both raw DriveItems *and* standardised folders
+                        if($([bool]$thisChildDriveItem.PSobject.Properties.name -match "DriveItemId") -eq $false){$thisChildDriveItem | Add-Member -MemberType NoteProperty -Name DriveItemId -Value $thisChildDriveItem.id -Force}#As we now have a raw source folder, set the standardised properties so we can resubmit it to this function
+                        $mergeIntoSubfolder = get-graphDriveItems -tokenResponse $tokenResponse -driveGraphId $mergeInto.parentReference.driveId -itemGraphId $mergeInto.id -returnWhat Children -filterNameRegex $([regex]::Escape($thisChildDriveItem.name))
+                        process-folders -tokenResponse $tokenResponse -standardisedSourceFolder $thisChildDriveItem -mergeInto $mergeIntoSubfolder -Verbose:$VerbosePreference
+                        $refreshedThisChildDriveItem = get-graphDriveItems -tokenResponse $tokenResponse -driveGraphId $thisChildDriveItem.parentReference.driveId -itemGraphId $thisChildDriveItem.id -returnWhat Item
+                        if($([bool]$refreshedThisChildDriveItem.PSobject.Properties.name -match "DriveClientId")   -eq $false){$refreshedThisChildDriveItem | Add-Member -MemberType NoteProperty -Name DriveClientId   -Value $refreshedThisChildDriveItem.parentReference.driveId -Force}#As we now have a raw source folder, set the standardised properties so we can resubmit it to this function
+                        if($([bool]$refreshedThisChildDriveItem.PSobject.Properties.name -match "DriveClientName") -eq $false){$refreshedThisChildDriveItem | Add-Member -MemberType NoteProperty -Name DriveClientName -Value $standardisedSourceFolder.DriveClientName -Force}#As we now have a raw source folder, set the standardised properties so we can resubmit it to this function
+                        if($([bool]$refreshedThisChildDriveItem.PSobject.Properties.name -match "DriveItemId")     -eq $false){$refreshedThisChildDriveItem | Add-Member -MemberType NoteProperty -Name DriveItemId     -Value $refreshedThisChildDriveItem.id -Force}#As we now have a raw source folder, set the standardised properties so we can resubmit it to this function
+                        if($([bool]$refreshedThisChildDriveItem.PSobject.Properties.name -match "DriveItemName")   -eq $false){$refreshedThisChildDriveItem | Add-Member -MemberType NoteProperty -Name DriveItemName   -Value $refreshedThisChildDriveItem.name -Force}#As we now have a raw source folder, set the standardised properties so we can resubmit it to this function
+                        if($([bool]$refreshedThisChildDriveItem.PSobject.Properties.name -match "DriveItemSize")   -eq $false){$refreshedThisChildDriveItem | Add-Member -MemberType NoteProperty -Name DriveItemSize   -Value $refreshedThisChildDriveItem.size -Force}#As we now have a raw source folder, set the standardised properties so we can resubmit it to this function
+                        process-folders -tokenResponse $tokenResponse -standardisedSourceFolder $refreshedThisChildDriveItem -confirmDeleteEmptyFolders
+                        }
+                    else{
+                        Write-Host -ForegroundColor Red "`t`t`t`t$(get-errorSummary $_)"
+                        [array]$failedDriveItems += $thisChildDriveItem
+                        }
                     }
                 }
             if($failedDriveItems.Count -gt 0){return $failedDriveItems}
@@ -379,7 +401,7 @@ cls
     #region getTermData
         $sharePointAdmin = "kimblebot@anthesisgroup.com"
         #convertTo-localisedSecureString "KimbleBotPasswordHere"
-        try{$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt)}
+        try{$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt)}
         catch{
             if($_.Exception -match "Key not valid for use in specified state"){
                 Write-Error "[$env:USERPROFILE\Desktop\KimbleBot.txt] Key not valid for use in specified state."
@@ -479,10 +501,8 @@ cls
     #endregion
     #endregion
 
-
-    #region ProcessData
-
-    #region ProcessClientsData
+    #region Prepare data
+    #region Prepare Clients datasets
 
     if($deltaSync -eq $true){
         [array]$newClients = $allClientTerms | ? {[string]::IsNullOrEmpty($_.DriveClientId)}
@@ -496,6 +516,72 @@ cls
         #[array]$orphanedClientDocLibs = $clientComparison | ? {$_.SideIndicator -eq "=>"}
         }
 
+        #endregion
+    #region Prepare Opps datasets
+    $matchingOppsToClients = Measure-Command {
+        if($deltaSync -eq $true){
+            [array]$newOpps = $allOppTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
+            [array]$existingOpps = $allOppTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -ne $false}
+            }
+
+        if($deltaSync -eq $false){
+            $oppComparison = Compare-Object -ReferenceObject @($allOppTerms | Select-Object) -DifferenceObject @($driveItemsOppFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
+            [array]$newOpps = $oppComparison | ? {$_.SideIndicator -eq "<=" -and [string]::IsNullOrWhiteSpace($_.NetSuiteProjectId)} #Exclude any Opps already converted to a Project
+            [array]$existingOpps = $oppComparison | ? {$_.SideIndicator -eq "=="}
+            #[array]$orphanedOppFolders = $oppComparison | ? {$_.SideIndicator -eq "=>"}
+            }
+
+        $orphanedOppFolders = @($orphanedOppFolders | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
+        $newOpps            = @($newOpps            | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
+        $existingOpps       = @($existingOpps       | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
+        [array]$misplacedOpps = $orphanedOppFolders | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
+        [array]$misplacedOpps += $newOpps           | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
+        [array]$misplacedOpps += $existingOpps      | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
+        if($($misplacedOpps.Count) -gt 0){
+            if($deltaSync -eq $false){@($misplacedOpps | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalOppName)][$($_.NetSuiteOppId)][$($_.NetSuiteClientId)]"}}
+            $orphanedOppFolders = $orphanedOppFolders | ? {$misplacedProjs.id -notcontains $_.id}
+            $newOpps            = $newOpps            | ? {$misplacedProjs.id -notcontains $_.id}
+            $existingOpps       = $existingOpps       | ? {$misplacedProjs.id -notcontains $_.id}
+            }
+        }
+    Write-Host "`t[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)]/[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count)] Opps matched to Client Terms ([$($($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)*100/$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count))]%) in [$($matchingOppsToClients.TotalSeconds)] seconds. [$($misplacedOpps.Count)] Opps don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term)"
+        #endregion
+    #region Prepare Projs datasets
+    $matchingProjsToClients = Measure-Command {
+        if($deltaSync -eq $true){
+            [array]$newProjs = $allProjTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
+            [array]$existingProjs = $allProjTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -ne $false}
+            }
+
+
+        if($deltaSync -eq $false){
+            $projComparison = Compare-Object -ReferenceObject @($allProjTerms | Select-Object) -DifferenceObject @($driveItemsProjFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
+            [array]$newProjs = $allProjTerms | ? {$_.SideIndicator -eq "<="} 
+            [array]$existingProjs = $allProjTerms | ? {$_.SideIndicator -eq "=="}
+            #[array]$orphanedProjFolders = $projComparison | ? {$_.SideIndicator -eq "=>"}
+            }
+
+        $orphanedProjFolders = @($orphanedProjFolders | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
+        $newProjs            = @($newProjs            | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
+        $existingProjs       = @($existingProjs       | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
+        [array]$misplacedProjs = $orphanedProjFolders | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
+        [array]$misplacedProjs += $newProjs           | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
+        [array]$misplacedProjs += $existingProjs      | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
+        }
+    Write-Host "`t[$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count-$misplacedProjs.Count)]/[$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count)] Projs matched to Client Terms ([$($($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count-$misplacedProjs.Count)*100/$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count))]%) in [$($matchingProjsToClients.TotalSeconds)] seconds. [$($misplacedProjs.Count)] Projs don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term)"
+    if($($misplacedProjs.Count) -gt 0){
+        if($deltaSync -eq $false){@($misplacedProjs | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalProjName)][$($_.NetSuiteProjId)][$($_.NetSuiteClientId)]"}}
+        $orphanedProjFolders = $orphanedProjFolders | ? {$misplacedProjs.id -notcontains $_.id}
+        $newProjs            = $newProjs            | ? {$misplacedProjs.id -notcontains $_.id}
+        $existingProjs       = $existingProjs       | ? {$misplacedProjs.id -notcontains $_.id}
+        }
+
+        #endregion    
+    #endregion
+
+    #region ProcessData
+
+    #region ProcessClientsData
 
         #region Orphaned Client DocLibs
         $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 3000 -aadAppCreds $appCredsSharePointBot
@@ -668,35 +754,6 @@ cls
     #endregion
 
     #region ProcessOpportunities
-        #region Prepare Opps datasets
-    $matchingOppsToClients = Measure-Command {
-        if($deltaSync -eq $true){
-            [array]$newOpps = $allOppTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
-            [array]$existingOpps = $allOppTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -ne $false}
-            }
-
-        if($deltaSync -eq $false){
-            $oppComparison = Compare-Object -ReferenceObject @($allOppTerms | Select-Object) -DifferenceObject @($driveItemsOppFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
-            [array]$newOpps = $oppComparison | ? {$_.SideIndicator -eq "<=" -and [string]::IsNullOrWhiteSpace($_.NetSuiteProjectId)} #Exclude any Opps already converted to a Project
-            [array]$existingOpps = $oppComparison | ? {$_.SideIndicator -eq "=="}
-            #[array]$orphanedOppFolders = $oppComparison | ? {$_.SideIndicator -eq "=>"}
-            }
-
-        $orphanedOppFolders = @($orphanedOppFolders | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $newOpps            = @($newOpps            | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $existingOpps       = @($existingOpps       | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        [array]$misplacedOpps = $orphanedOppFolders | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedOpps += $newOpps           | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedOpps += $existingOpps      | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        if($($misplacedOpps.Count) -gt 0){
-            if($deltaSync -eq $false){@($misplacedOpps | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalOppName)][$($_.NetSuiteOppId)][$($_.NetSuiteClientId)]"}}
-            $orphanedOppFolders = $orphanedOppFolders | ? {$misplacedProjs.id -notcontains $_.id}
-            $newOpps            = $newOpps            | ? {$misplacedProjs.id -notcontains $_.id}
-            $existingOpps       = $existingOpps       | ? {$misplacedProjs.id -notcontains $_.id}
-            }
-        }
-    Write-Host "`t[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)]/[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count)] Opps matched to Client Terms ([$($($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)*100/$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count))]%) in [$($matchingOppsToClients.TotalSeconds)] seconds. [$($misplacedOpps.Count)] Opps don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term)"
-        #endregion
 
         #region orphanedOpps
     $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 3000 -aadAppCreds $appCredsSharePointBot
@@ -785,17 +842,41 @@ cls
         #Does Term have a TermProjId?
         $existingOppTermsWithProject = $existingOpps    | ? {![string]::IsNullOrWhiteSpace($_.NetSuiteProjectId) -and $_.CustomProperty.flagForReprocessing -ne $false}
             #Yes: Do nothing to Opps that have been won & set flagForReproccessing = $false
-            #
-            #Actually, if $deltaSync -eq $false, check whether the Opp folder still exists _and_ the Proj folder exists. If both > migrate Opp folder data to Proj fodler and delete Opp folder
-            #
-            #
-            #
+            #Actually, if $deltaSync -eq $false, check whether the Opp folder still exists _and_ the Proj folder exists. If both > migrate Opp folder data to Proj folder and delete Opp folder
         Write-Host "`tProcessing [$($existingOppTermsWithProject.Count)] existing Opportunities with Projects"
         @($existingOppTermsWithProject | Select-Object) | % {
-            $thisWonOpp = $_
-            Write-Host "`t`tDeflagging Opp [$($thisWonOpp.UniversalOppName)][$($thisWonOpp.NetSuiteOppId)][$($thisWonOpp.Id)] for [$($thisWonOpp.UniversalClientName)][$($thisWonOpp.NetSuiteClientId)] (Opps no longer control Folders once they have been converted to Projects)"
-            $thisWonOpp.SetCustomProperty("flagForReprocessing",$false)
-            try{$thisWonOpp.Context.ExecuteQuery()}
+            $thisWonOppTerm = $_
+            #Actually, if $deltaSync -eq $false, check whether the Opp folder still exists _and_ the Proj folder exists. If both > migrate Opp folder data to Proj folder and delete Opp folder
+            if($deltaSync -eq $false){ #This relies on us having enumerated $topLevelFolders
+                $thisWonOppFolder = Compare-Object $topLevelFolders -DifferenceObject $thisWonOppTerm -Property DriveClientId,DriveItemId -ExcludeDifferent -IncludeEqual -PassThru #Check whether there is still an OppFolder
+                if(![string]::IsNullOrWhiteSpace($thisWonOppFolder)){ #If the Opp folder hasn't been migrated, find the corresponding Proj folder and try again
+                    $thisWonProjTerm = Compare-Object $allProjTerms -DifferenceObject $thisWonOppTerm -Property NetSuiteProjectId -ExcludeDifferent -IncludeEqual -PassThru
+                    if(![string]::IsNullOrWhiteSpace($thisWonProjTerm)){
+                        $thisWonProjFolder =  Compare-Object $topLevelFolders -DifferenceObject $thisWonProjTerm -Property DriveClientId,DriveItemId -ExcludeDifferent -IncludeEqual -PassThru
+                        if(![string]::IsNullOrWhiteSpace($thisWonProjFolder)){ #If we have both $thisWonOppFolder _and_ $thisWonProjFolder, try to merge the OppFolder into the ProjFolder
+                            try{
+                                Write-Host "`t`tOpp [$($thisWonOppTerm.UniversalOppName)][$($thisWonOppTerm.NetSuiteOppId)][$($thisWonOppTerm.Id)] for [$($thisWonOppTerm.UniversalClientName)][$($thisWonOppTerm.NetSuiteClientId)] has an orphaned Opp folder - attempting to tidy it up automatically"
+                                $didItWork = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $thisWonOppFolder -mergeInto $thisWonProjFolder
+                                if($didItWork.weburl -match $thisWonProjFolder.DriveItemUrl -or [string]::IsNullOrWhiteSpace($didItWork)){
+                                    Write-Host "`t`t`tSuccess: [$(@($didItWork.id | Select-Object).Count)] folders with data moved. Attempting to delete orphaned Opp Folder"
+                                    $isTheOppFolderGone = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $thisWonOppFolder -confirmDeleteEmptyFolders
+                                    if($isTheOppFolderGone -eq $true){Write-Host "`t`t`t`tSuccess: Opp Folder [$($thisWonOppFolder.DriveItemUrl)] was empty - removed successfully!"}
+                                    else{Write-Host "`t`t`t`Failed to remove Opp Folder [$($thisWonOppFolder.DriveItemUrl)]"}
+                                    }
+                                }
+                            catch{get-errorSummary $_}
+                            }
+                        else{<#This is an error - there _should_ be a Proj Folder for all Projs because *new* Projs are processed after this region#>}
+                        }
+                    else{<#This is an error - there _should_ be a Proj Term for all Opps with a ProjId because *new* Projs are processed after this region#>}
+                    }
+                else{<#Do nothing - if there is no OppFolder, it must have been process correctly already#>}
+                
+                }
+            
+            Write-Host "`t`tDeflagging Opp [$($thisWonOppTerm.UniversalOppName)][$($thisWonOppTerm.NetSuiteOppId)][$($thisWonOppTerm.Id)] for [$($thisWonOppTerm.UniversalClientName)][$($thisWonOppTerm.NetSuiteClientId)] (Opps no longer control Folders once they have been converted to Projects)"
+            $thisWonOppTerm.SetCustomProperty("flagForReprocessing",$false)
+            try{$thisWonOppTerm.Context.ExecuteQuery()}
             catch{Write-Host -ForegroundColor Red "`t`t`t$(get-errorSummary -errorToSummarise $_)"}
             }
 
@@ -927,37 +1008,7 @@ cls
     #endregion
 
     #region ProcessProjectsData
-        #region Prepare Projs datasets
-    $matchingProjsToClients = Measure-Command {
-        if($deltaSync -eq $true){
-            [array]$newProjs = $allProjTerms | ? {[string]::IsNullOrEmpty($_.DriveItemId)}
-            [array]$existingProjs = $allProjTerms | ? {![string]::IsNullOrEmpty($_.DriveItemId) -and $_.CustomProperties.flagForReprocessing -ne $false}
-            }
 
-
-        if($deltaSync -eq $false){
-            $projComparison = Compare-Object -ReferenceObject @($allProjTerms | Select-Object) -DifferenceObject @($driveItemsProjFolders | Select-Object) -Property "DriveItemId" -IncludeEqual -PassThru
-            [array]$newProjs = $allProjTerms | ? {$_.SideIndicator -eq "<="} 
-            [array]$existingProjs = $allProjTerms | ? {$_.SideIndicator -eq "=="}
-            #[array]$orphanedProjFolders = $projComparison | ? {$_.SideIndicator -eq "=>"}
-            }
-
-        $orphanedProjFolders = @($orphanedProjFolders | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $newProjs            = @($newProjs            | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        $existingProjs       = @($existingProjs       | Select-Object) | % {set-standardisedClientDriveProperties -rawOppOrProjTerm $_ -allClientTerms $allClientTerms}
-        [array]$misplacedProjs = $orphanedProjFolders | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedProjs += $newProjs           | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        [array]$misplacedProjs += $existingProjs      | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
-        }
-    Write-Host "`t[$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count-$misplacedProjs.Count)]/[$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count)] Projs matched to Client Terms ([$($($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count-$misplacedProjs.Count)*100/$($orphanedProjFolders.Count+$newProjs.Count+$existingProjs.Count))]%) in [$($matchingProjsToClients.TotalSeconds)] seconds. [$($misplacedProjs.Count)] Projs don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term)"
-    if($($misplacedProjs.Count) -gt 0){
-        if($deltaSync -eq $false){@($misplacedProjs | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalProjName)][$($_.NetSuiteProjId)][$($_.NetSuiteClientId)]"}}
-        $orphanedProjFolders = $orphanedProjFolders | ? {$misplacedProjs.id -notcontains $_.id}
-        $newProjs            = $newProjs            | ? {$misplacedProjs.id -notcontains $_.id}
-        $existingProjs       = $existingProjs       | ? {$misplacedProjs.id -notcontains $_.id}
-        }
-
-        #endregion
 
         #region Orphaned Projects
     if($deltaSync -eq $false){

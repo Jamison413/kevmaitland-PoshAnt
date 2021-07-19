@@ -1574,7 +1574,15 @@ function get-graphUsersFromGroup(){
 
     if($includeLineManager){ #Relationships (like /owners) don't support $expand parameters, so we have to enumerate the Line Managers per-user
         $allMembers | ? {$_.'@odata.type' -eq "#microsoft.graph.user"} | % {
-            Add-Member -InputObject $_ -MemberType NoteProperty -Name manager -Value $(get-graphUserLineManager -tokenResponse $tokenResponse -userIdOrUpn $_.userPrincipalName -selectAllProperties:$selectAllProperties)
+            try{$thisLineManager = $(get-graphUserLineManager -tokenResponse $tokenResponse -userIdOrUpn $_.userPrincipalName -selectAllProperties:$selectAllProperties)}
+            catch{
+                if($_.Exception -match "(404)"){
+                    <#Do nothing - this means the user did not have a Line Manager assigned#>
+                    write-warning "User [$($_.userPrincipalName)] has no Line Manager assigned"
+                    }
+                else{get-errorSummary -errorToSummarise $_}
+                }
+            Add-Member -InputObject $_ -MemberType NoteProperty -Name manager -Value $thisLineManager
             }
         }
     

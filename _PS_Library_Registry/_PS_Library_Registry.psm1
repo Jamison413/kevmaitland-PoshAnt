@@ -1,20 +1,4 @@
-﻿function remove-regLeafKeyMatchingString([Microsoft.Win32.RegistryKey]$branchKey,[string]$regexExpressionString,[boolean]$areYouSure){
-    $branchKey | Get-ItemProperty | Get-Member -MemberType Properties | %{
-        if($_.Name -inotmatch "^PS"-and $_.Name -imatch $regexExpressionString){
-            if($areYouSure){Remove-ItemProperty -Path $branchKey.PSPath -Name $_.Name}
-            else{Remove-ItemProperty -Path $branchKey.PSPath -Name $_.Name -WhatIf}
-            }
-        }
-    }
-
-function remove-regBranchKeyMatchingString([Microsoft.Win32.RegistryKey]$branchKey,[string]$regexExpressionString,[boolean]$areYouSure){
-    if ($(split-path $branchKey -Leaf) -match $regexExpressionString){
-        if($areYouSure){$branchKey | Remove-Item -Recurse -Force}
-        else{$branchKey | Remove-Item -Recurse -Force -WhatIf}
-        }
-    }
-
-function add-registryValue(){
+﻿function add-registryValue(){
     [cmdletbinding()]
         <#
     .SYNOPSIS
@@ -30,32 +14,31 @@ function add-registryValue(){
     
 
     .EXAMPLE
-    Merge-PolicyRules.ps1 .\wksta-basic.PolicyRules .\wksta-kiosk.PolicyRules > .\wksta-merged.PolicyRules
     #>
 
     param(
         [parameter(Mandatory=$true)]
-        [String]
-        $registryPath,
-
-        [parameter(Mandatory=$true)]
-        [String]
-        $registryKey
-        
+            [String]$registryPath
         ,[parameter(Mandatory=$true)]
-        [String]
-        $registryValue
-
+            [String]$registryKey
         ,[parameter(Mandatory=$true)]
-        [ValidateSet("String", "ExpandString", "Binary", "DWord", "MultiString", "QWord")] 
-        [String]
-        $registryType
+            [String]$registryValue
+        ,[parameter(Mandatory=$true)]
+            [ValidateSet("String", "ExpandString", "Binary", "DWord", "MultiString", "QWord")] 
+            [String]$registryType
+        )
 
-    #TODO: Merge arbitrary number of files
-    )
     $registryPath = $registryPath.Replace("Computer\","")
     $registryPath = $registryPath.Replace("HKEY_LOCAL_MACHINE","HKLM:")
     $registryPath = $registryPath.Replace("HKEY_CURRENT_USER","HKCU:")
+
+    $registryPath -split "\\" | % { #Silently create any missing subkeys
+        $thisStub = $thisStub += $_+"\"
+        if((Test-Path $thisStub) -eq $false){
+            Write-Verbose "Sliently creating [$($thisStub)]"
+            New-Item -Path $thisStub | Out-Null
+            }
+        }
 
     try {$existingItem = Get-ItemProperty -Path $registryPath -name $registryKey -ErrorAction SilentlyContinue}
     catch{}
@@ -77,3 +60,19 @@ function add-registryValue(){
     
     
     }
+function remove-regLeafKeyMatchingString([Microsoft.Win32.RegistryKey]$branchKey,[string]$regexExpressionString,[boolean]$areYouSure){
+    $branchKey | Get-ItemProperty | Get-Member -MemberType Properties | %{
+        if($_.Name -inotmatch "^PS"-and $_.Name -imatch $regexExpressionString){
+            if($areYouSure){Remove-ItemProperty -Path $branchKey.PSPath -Name $_.Name}
+            else{Remove-ItemProperty -Path $branchKey.PSPath -Name $_.Name -WhatIf}
+            }
+        }
+    }
+
+function remove-regBranchKeyMatchingString([Microsoft.Win32.RegistryKey]$branchKey,[string]$regexExpressionString,[boolean]$areYouSure){
+    if ($(split-path $branchKey -Leaf) -match $regexExpressionString){
+        if($areYouSure){$branchKey | Remove-Item -Recurse -Force}
+        else{$branchKey | Remove-Item -Recurse -Force -WhatIf}
+        }
+    }
+

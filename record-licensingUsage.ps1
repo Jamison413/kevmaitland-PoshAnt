@@ -1,4 +1,4 @@
-﻿$teamBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\Desktop\teambotdetails.txt"
+﻿$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $itSite = get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl "/teams/IT_Team_All_365" -Verbose

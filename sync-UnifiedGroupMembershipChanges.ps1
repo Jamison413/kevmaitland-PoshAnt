@@ -35,10 +35,10 @@ $adminEmailAddresses = get-groupAdminRoleEmailAddresses -tokenResponse $tokenRes
 $timeForFullCycle = Measure-Command {
 
     for($i=0;$i -lt $365GroupsToProcess.Count;$i++){
-        Write-Host "[$($i)]/[$($365GroupsToProcess.Count)]: [$($365Group.displayName)]"
         $tokenResponseTeams = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseTeams -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails  #Uncomment this when the whole sync processs takes >1h
         $tokenResponseSmtp = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSmtp -renewTokenExpiringInSeconds 300 -aadAppCreds $smtpBotDetails  #Uncomment this when the whole sync processs takes >1h
         $365Group = $365GroupsToProcess[$i]
+        Write-Host "[$($i)]/[$($365GroupsToProcess.Count)]: [$($365Group.displayName)]"
         Write-Progress -Activity "Synchronising Group Memberships" -Status "[$($i)]/[$($365GroupsToProcess.Count)]: [$($365Group.displayName)]"
         try{
             #sync-groupMemberships_deprecated -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true}# -Verbose 
