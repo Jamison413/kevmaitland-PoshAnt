@@ -1223,10 +1223,12 @@ function sync-groupMemberships(){
             $ownersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType Owners -returnOnlyUsers -includeLineManager
             if(@($ownersAfterChanges | Select-Object).Count -eq 0){
                 Write-Verbose "No owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Admins as this will require a brain to resolve"
-                #Scandalous bodge to reduce the number of email alerts generated
+               Add-DistributionGroupMember -Identity $graphExtendedUG.id -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck -Confirm:$false #Add GroupBot in here instead of pissing everyone off with e-mail alerts.
+                <#Scandalous bodge to reduce the number of email alerts generated
                 if((Get-Random -Minimum 1 -Maximum 48) -eq 1){#This runs function is run every 30 minutes, so this should average 1 alert per day
                     send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
                     }
+                #>w
                 }
             if(@($ownersAfterChanges.DisplayName | ? {$_ -match "Ω"} | Select-Object).Count -eq @($ownersAfterChanges | Select-Object).Count){
                 Write-Verbose "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Line Managers to request reassignment"

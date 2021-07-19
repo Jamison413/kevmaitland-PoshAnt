@@ -1,11 +1,11 @@
 ﻿$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
-$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$tokenResponseTeamBot = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
-$itSite = get-graphSite -tokenResponse $tokenResponse -serverRelativeUrl "/teams/IT_Team_All_365" -Verbose
-$licensingList = get-graphList -tokenResponse $tokenResponse -graphSiteId $itSite.id -listName "365 Licensing Logs" -Verbose
-$licensingListItem = get-graphListItems -tokenResponse $tokenResponse -graphSiteId $itSite.id -listId $licensingList.id -expandAllFields -filterId 10000 -Verbose
+$itSite = get-graphSite -tokenResponse $tokenResponseTeamBot -serverRelativeUrl "/teams/IT_Team_All_365" -Verbose
+$licensingList = get-graphList -tokenResponse $tokenResponseTeamBot -graphSiteId $itSite.id -listName "365 Licensing Logs" -Verbose
+$licensingListItem = get-graphListItems -tokenResponse $tokenResponseTeamBot -graphSiteId $itSite.id -listId $licensingList.id -expandAllFields -filterId 10000 -Verbose
 
-$allLicensedUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponse -selectAllProperties -filterNone
+$allLicensedUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamBot -selectAllProperties -filterNone
 
 
 $allLicensedUsers | % {
@@ -25,7 +25,7 @@ $allLicensedUsers | % {
             }
         do{
             try{
-                $newLicenseRecord = new-graphListItem -tokenResponse $tokenResponse -graphSiteId $itSite.id -listId $licensingList.id -listItemFieldValuesHash $licenseRecordHash -Verbose
+                $newLicenseRecord = new-graphListItem -tokenResponse $tokenResponseTeamBot -graphSiteId $itSite.id -listId $licensingList.id -listItemFieldValuesHash $licenseRecordHash -Verbose
                 $retry = $false
                 }
             catch{

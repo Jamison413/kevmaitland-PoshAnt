@@ -1409,8 +1409,15 @@ function get-graphUserLineManager(){
         'fixedManagementLevels' {$refiner = "?`$expand=manager(`$levels=$returnManagementLevels;$select)"}
         'maxManagementLevels'   {$refiner = "?`$expand=manager(`$levels=max;$select)"}
         }
-
-    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users/$userIdOrUpn$refiner"
+    try{
+        invoke-graphGet -tokenResponse $tokenResponse -graphQuery "users/$userIdOrUpn$refiner"
+        }
+    catch{
+        if($_.Exception -match "(404)"){return}#Error 404 means no Line Manager, so just ignore it
+        else {
+            write-host get-errorsummary $_
+            }
+        }
 
     }
 function get-graphUsers(){
@@ -1427,6 +1434,9 @@ function get-graphUsers(){
             [string[]]$filterUpns
         ,[parameter(Mandatory = $false)]
             [hashtable]$filterCustomEq = @{}
+        ,[parameter(Mandatory = $false)]
+            [ValidateSet($null,"Anthesis (UK) Ltd (GBR)","Anthesis Consulting Group (GBR)","Anthesis Consultoria Ambiental ltda (BRA)","Anthesis Energy UK Ltd (GBR)","Anthesis Enveco AB (SWE)","Anthesis Finland Oy (FIN)","Anthesis GmbH (DEU)","Anthesis Ireland Ltd (IRL)","Anthesis LLC (USA)","Anthesis Middle East (ARE)","Anthesis Philippines Inc. (PHL)","Anthesis Srl (ITA)","Caleb Management Services Ltd (GBR)","France (FRA)","Lavola 1981 SAU (ESP)","Lavola Andora SA (AND)","Lavola Columbia (COL)","The Goodbrand Works Ltd (GBR)")]
+            [string]$filterBusinessUnit
         ,[parameter(Mandatory = $false)]
             [switch]$filterLicensedUsers = $false
         ,[parameter(Mandatory = $false)]
@@ -1445,6 +1455,9 @@ function get-graphUsers(){
         }
     if($filterUpns){
         $filter += " and (userPrincipalName eq '$($filterUpns -join "' or userPrincipalName eq '")')"
+        }
+    if($filterBusinessUnit){
+        $filter += " and anthesisgroup_employeeInfo/businessUnit eq '$filterBusinessUnit'"
         }
     $filterCustomEq.Keys | % {
         $filter += " and $_ eq '$($filterCustomEq[$_])'"
@@ -1473,15 +1486,15 @@ function get-graphUsers(){
     $refiner = "?"
     if($select){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
-        $refiner = $refiner+"`$select=$($select.TrimStart(","))"#Add the select to the refiner, trimming off any leading ","
+        $refiner = $refiner+"`$select=$($select -replace "^,",'')"#Add the select to the refiner, trimming off any leading "," (don't use .TrimStart() because it's bafflingly unpredictable)
         }
     if($filter){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
-        $refiner = $refiner+"`$filter=$($filter.TrimStart(" and "))"#Add the filter to the refiner, trimming off any leading " and "
+        $refiner = $refiner+"`$filter=$($filter -replace "^ and ",'')"#Add the filter to the refiner, trimming off any leading " and " (don't use .TrimStart() because it's bafflingly unpredictable)
         }
     if($expand){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
-        $refiner = $refiner+"`$expand=$($expand.TrimStart(","))"#Add the expand to the refiner, trimming off any leading ","
+        $refiner = $refiner+"`$expand=$($expand -replace "^,",'')"#Add the expand to the refiner, trimming off any leading ","  (don't use .TrimStart() because it's bafflingly unpredictable)
         }
 
     Write-Verbose "Graph Query = [users$refiner]"
@@ -1556,11 +1569,11 @@ function get-graphUsersFromGroup(){
     $refiner = "?"
     if($select){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
-        $refiner = $refiner+"`$select=$($select.TrimStart(","))"#Add the select to the refiner, trimming off any leading ","
+        $refiner = $refiner+"`$select=$($select -replace "^,",'')"#Add the select to the refiner, trimming off any leading "," (don't use .TrimStart() because it's bafflingly unpredictable)
         }
     if($filter){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
-        $refiner = $refiner+"`$filter=$($filter.TrimStart(" and "))" #Add the filter to the refiner, trimming off any leading " and "
+        $refiner = $refiner+"`$filter=$($filter -replace "^ and ",'')" #Add the filter to the refiner, trimming off any leading " and " (don't use .TrimStart() because it's bafflingly unpredictable)
         }
 
     Write-Verbose "Graph Query = [groups/$($groupId)/$($memberType+$refiner)]"
@@ -1613,69 +1626,6 @@ function get-graphUserGroupMembership(){
         )
         invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/users/$($userUpn)/memberOf"  -Verbose:$VerbosePreference
 }    
-function get-graphUsersWithEmployeeInfoExtensions(){
-    [cmdletbinding()]
-    param(
-        [parameter(Mandatory = $true,ParameterSetName = "ambiguous")]
-            [parameter(Mandatory = $true,ParameterSetName = "explicitUpn")]
-            [parameter(Mandatory = $true,ParameterSetName = "explicitId")]
-            [parameter(Mandatory = $true,ParameterSetName = "explicitDisplayName")]
-            [psobject]$tokenResponse        
-        ,[parameter(Mandatory = $true,ParameterSetName = "ambiguous")]
-            [switch]$filterNone
-        ,[parameter(Mandatory = $true,ParameterSetName = "explicitUpn")]
-            [ValidatePattern("@")]
-            [string]$filterUpn
-        ,[parameter(Mandatory = $true,ParameterSetName = "explicitId")]
-            [string]$filterId
-        ,[parameter(Mandatory = $true,ParameterSetName = "explicitDisplayName")]
-            [string]$filterDisplayName
-        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitUpn")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitId")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitDisplayName")]
-            [ValidateSet("Employee","Subcontractor","Associate")]
-            [string]$filterContractType
-        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitUpn")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitId")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitDisplayName")]
-            #$(Get-PnPTerm -TermGroup "Anthesis" -TermSet "Business Units").Name
-            [ValidateSet($null,"Anthesis (UK) Ltd (GBR)","Anthesis Consulting Group (GBR)","Anthesis Consultoria Ambiental ltda (BRA)","Anthesis Energy UK Ltd (GBR)","Anthesis Enveco AB (SWE)","Anthesis Finland Oy (FIN)","Anthesis GmbH (DEU)","Anthesis Ireland Ltd (IRL)","Anthesis LLC (USA)","Anthesis Middle East (ARE)","Anthesis Philippines Inc. (PHL)","Anthesis Srl (ITA)","Caleb Management Services Ltd (GBR)","France (FRA)","Lavola 1981 SAU (ESP)","Lavola Andora SA (AND)","Lavola Columbia (COL)","The Goodbrand Works Ltd (GBR)")]
-            [string]$filterBusinessUnit
-        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitUpn")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitId")]
-            [parameter(Mandatory = $false,ParameterSetName = "explicitDisplayName")]
-            [switch]$selectAllProperties
-        )
-    #Add $filters for the various properties
-    $customFilter = @{
-        "anthesisgroup_employeeInfo/extensionType" = "employeeInfo"
-        }
-    if($filterContractType){
-        $customFilter.Add("anthesisgroup_employeeInfo/contractType",$filterContractType)
-        }
-    if($filterBusinessUnit){
-        $filter += " and anthesisgroup_employeeInfo/businessUnit eq '$filterBusinessUnit'"
-        }
-
-    switch ($PsCmdlet.ParameterSetName){
-        "ambiguous"           {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers}
-        "explicitUpn"         {get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers -filterUpns $filterUpn}
-        "explicitDisplayName" {
-            $customFilter.Add("displayName",$filterDisplayName)
-            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers
-            }
-        "explicitId"          {
-            $customFilter.Add("id",$filterId)
-            get-graphUsers -tokenResponse $tokenResponse -filterCustomEq $customFilter -selectCustomProperties @("anthesisgroup_employeeInfo") -selectAllProperties:$selectAllProperties -filterLicensedUsers
-            }
-        }
-
-    
-            
-    }
 function grant-graphSharing(){
     [cmdletbinding()]
     param(
@@ -3030,7 +2980,7 @@ function update-graphListItem(){
         }
    
     $graphBodyHashtable = $fieldHash
-    $reponse = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose
+    $reponse = invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items/$listitemId/fields" -graphBodyHashtable $graphBodyHashtable -Verbose:$VerbosePreference
     $reponse
 }
 function update-graphOpenShiftShared(){

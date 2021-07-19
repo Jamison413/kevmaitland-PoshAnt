@@ -3,13 +3,14 @@ Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 connect-ToExo
 
-$displayName = "Norsk Hydro"
-$primaryEmail = "norsk.pec@anthesisgroup.com"
+$displayName = "SMBX - Service Now"
+$primaryEmail = "AnthesisServNow@anthesisgroup.com"
 $owner = "kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Gerber.Manalo@anthesisgroup.com
-Michael.Malate@anthesisgroup.com
-Wolfgang.Wick@anthesisgroup.com
-acsmailboxaccess@anthesisgroup.com
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Jakob Schenker <Jakob.Schenker@anthesisgroup.com>
+Chantelle Ludski <Chantelle.Ludski@anthesisgroup.com>
+andrew.armstrong@anthesisgroup.com>; 
+Jason Gooden <jason.gooden@anthesisgroup.com
+Wolfgang Wick <Wolfgang.Wick@anthesisgroup.com>
 "
 $additionalEmailAddresses = convertTo-arrayOfEmailAddresses "norskstaging.pec@anthesisgroup.com"
 $allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
@@ -24,6 +25,7 @@ function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hid
         Add-MailboxPermission -AccessRights "FullAccess" -User $_ -AutoMapping $true -Identity $exchangeAlias
         if ($grantSendAsToo){Add-RecipientPermission -Identity $exchangeAlias -Trustee $_ -AccessRights SendAs -Confirm:$false}
         }
+    Set-User -Identity $exchangeAlias -AuthenticationPolicy "Block Basic Auth"
     }
 
 new-sharedMailbox -displayName $displayName -arrayOfFullAccessMembers $arrayOfFullAccessMembers -hideFromGal $hideFromGal -owner $owner -grantSendAsToo $grantSendAsToo

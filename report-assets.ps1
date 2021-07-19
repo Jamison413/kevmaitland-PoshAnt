@@ -8,8 +8,8 @@
 #region Get records to reconcile
 #Get UK Users from AAD
 $tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
-$ukUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis (UK) Ltd (GBR)' -filterNone
-$ukUsers += get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis Energy UK Ltd (GBR)' -filterNone
+$ukUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis (UK) Ltd (GBR)' -selectAllProperties
+$ukUsers += get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis Energy UK Ltd (GBR)' -selectAllProperties 
 
 #Get Asset records from SharePoint
 $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName SharePointBot) -grant_type client_credentials
@@ -207,14 +207,14 @@ $ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
     else{$updateHash.Add("PresentInIntune",$false)}
     if($thisComputer.physicalIds -match "ZTDID"){$updateHash.Add("PresentInAutopilot",$true)}
     else{$updateHash.Add("PresentInAutopilot",$false)}
-    update-graphListItem -tokenResponse $tokenResponseSharePointBot -graphSiteId $itTeamAllSite.id -listId $assetRegister.id -listitemId $thisComputer.asset.id -fieldHash $updateHash -Verbose
-    
+    $null = update-graphListItem -tokenResponse $tokenResponseSharePointBot -graphSiteId $itTeamAllSite.id -listId $assetRegister.id -listitemId $thisComputer.asset.id -fieldHash $updateHash #-Verbose
+    Write-Host -f Yellow "Updated [$($thisComputer.displayName)]"
     #Tag atp device with the asset register status if not already there to help reduce admin time :)
 
     #get any current status options from It Asset Register AssetStatus column
     $possibleAssetTags = $assetRegisterItems.fields.AssetStatus | select -Unique
 
-    If(($thisComputer.atp) -and ($thisComputer.asset) -and ($thisComputer.atp.machineTags -notcontains $thisComputer.asset.AssetStatus)){
+    If(($thisComputer.atp) -and ($thisComputer.asset) -and ![string]::IsNullOrWhiteSpace($thisComputer.atp.machineTags) -and ($thisComputer.atp.machineTags -notcontains $thisComputer.asset.AssetStatus)){
 
     #Remove any old status
     $thisTag = Compare-Object -ReferenceObject $thisComputer.atp.machineTags -differenceobject $possibleAssetTags -IncludeEqual | Where-Object -Property "SideIndicator" -EQ "==" 
