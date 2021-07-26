@@ -298,11 +298,11 @@ $body2 += "(Ps I’m managed by the IT Team, if I have broken or if you have any
 
 Write-Host "Emailing $($leftoversignup.FieldValues.Yourname.Email) to let them know they have been removed" -ForegroundColor Yellow
 #Send-MailMessage -To "$($leftoversignup.FieldValues.Yourname.Email)" -From "buddy.system@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject $subject -BodyAsHtml $body2 -Encoding UTF8 -Credential $adminCreds
-send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "$($leftoversignup)" -subject $subject -bodyHtml $body2 -priority high
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn buddy.system@anthesisgroup.com -toAddresses "$($leftoversignup.FieldValues.Yourname.Email)"  -subject $subject -bodyHtml $body2 -priority high
 
-$summaryleftoverpeople += "$($leftoversignup)<BR>"
+$summaryleftoverpeople += "$($leftoversignup.FieldValues.Yourname.Email)<BR>"
 
-#Remove-PnPListItem -List "Buddy System Repeat Sign Up" -Identity $($leftoversignup.Id) -Force
+Remove-PnPListItem -List "Buddy System Repeat Sign Up" -Identity $($leftoversignup.Id) -Force
 
 }
 
