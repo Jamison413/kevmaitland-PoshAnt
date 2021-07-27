@@ -267,10 +267,10 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash 
 #Get the New User Requests
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -UseWebLogin #-Credentials $msolCredentials
 $requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
-
+$requests = $requests | Where-Object {(($_.FieldValues.Start_x0020_Date | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s)) -and !($_.FieldValues.GraphUserGUID)}
 
 if($requests){#Display a subset of Properties to help the user identify the correct account(s)
-    $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.Start_x0020_Date} -Descending | select {$_.FieldValues.Title},{$_.FieldValues.Start_x0020_Date},{$_.FieldValues.Job_x0020_title},{$_.FieldValues.Primary_x0020_Workplace.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Primary_x0020_Team.LookupValue},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
+    $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.Start_x0020_Date} -Descending | select {$_.FieldValues.Title},{$_.FieldValues.Start_x0020_Date},{$_.FieldValues.Job_x0020_title},{$_.FieldValues.Primary_x0020_Workplace.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Primary_x0020_Team.LookupValue},{$_.FieldValues.GUID.Guid},{$_.FieldValues.GraphUserGUID} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
     #Then return the original requests as these contain the full details
     [array]$selectedRequests = Compare-Object -ReferenceObject $requests -DifferenceObject $selectedRequests -Property Guid -IncludeEqual -ExcludeDifferent -PassThru
     }
@@ -278,6 +278,11 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 
 ForEach($thisUser in $selectedRequests){
+
+If($thisUser.FieldValues.GraphUserGUID){
+Write-Host "It looks like this user has already been created"
+Exit
+}
 
 $thisUser.FieldValues.Title
 $thisUser.FieldValues.Job_x0020_title
@@ -376,18 +381,13 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash 
 
 #Return user to check what was set
 $thisProvisionedUser = ""
-$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn -selectAllProperties
+$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
 
-#Before we start, check the contract type
-write-host "Happy with the provision outcome?"
-write-host "A: Yes"
-write-host "B: No"
-$selection = Read-Host "Type A or B"
-Switch($selection){
-"A" {$provisionOutcome = "Employee"}
-"B" {$ = "Subcontractor"}
+If(($thisProvisionedUser | Measure-Object).count -eq 1){
+
+Write-Host "Graph user object found - updating SPO list item"
+Set-PnPListItem -List "New User Requests" -Identity $thisUser.Id -Values @{"GraphUserGUID" = $thisProvisionedUser.id}
 }
-
 
 
 }
@@ -398,7 +398,25 @@ Switch($selection){
 
 
 
+$requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
+$requests = $requests | Where-Object {($_.FieldValues.Start_x0020_Date | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s)}
+ForEach($user in $requests[5]){
 
+$upn = $($user.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
+
+#Return user to check what was set
+$thisProvisionedUser = ""
+$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
+
+If(($thisProvisionedUser | Measure-Object).count -eq 1){
+
+Write-Host "Graph user object found - updating SPO list item"
+Set-PnPListItem -List "New User Requests" -Identity $user.Id -Values @{"GraphUserGUID" = $thisProvisionedUser.id}
+}
+
+
+
+}
 
 
 
