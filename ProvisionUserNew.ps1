@@ -47,6 +47,12 @@ Connect-MsolService
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
+#email out
+$smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
+$tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
+
+
+
 
 
 <#--------Available License Check--------#>
@@ -144,8 +150,10 @@ write-host "*****************Failed to retrieve msol user account in time: $($up
 #Get the New User Requests that have not been marked as processed
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/" -UseWebLogin #-Credentials $msolCredentials
 $requests = (Get-PnPListItem -List "New Starter Details" -Query "<View><Query><Where><Eq><FieldRef Name='New_x0020_Starter_x0020_Setup_x0'/><Value Type='String'>Waiting</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
+$requests = $requests | Where-Object {(($_.FieldValues.StartDate | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s)) -and !($_.FieldValues.GraphUserGUID)}
+
 if($requests){#Display a subset of Properties to help the user identify the correct account(s)
-    $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.StartDate} -Descending | select {$_.FieldValues.Employee_x0020_Preferred_x0020_N},{$_.FieldValues.jobtitle},{$_.FieldValues.StartDate},{$_.FieldValues.Main_x0020_office0.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Licensing},{$_.FieldValues.Primary_x0020_Team0.Label},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
+    $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.StartDate} -Descending | select {$_.FieldValues.Employee_x0020_Preferred_x0020_N},{$_.FieldValues.jobtitle},{$_.FieldValues.StartDate},{$_.FieldValues.Main_x0020_office0.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Licensing},{$_.FieldValues.Primary_x0020_Team0.Label},{$_.FieldValues.GUID.Guid},{$_.FieldValues.GraphUserGUID} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
     #Then return the original requests as these contain the full details
     [array]$selectedRequests = Compare-Object -ReferenceObject $requests -DifferenceObject $selectedRequests -Property Guid -IncludeEqual -ExcludeDifferent -PassThru
     }
@@ -169,11 +177,14 @@ Switch($selection){
 $officeterm = Get-PnPTerm -Identity $($thisUser.FieldValues.Main_x0020_Office0.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
 $country = $officeTerm.CustomProperties.Country
 
+#Get credential info from term store
+$userProvisionCredentials =  Get-PnPTerm -Identity "UserProvision" -TermGroup "Anthesis" -TermSet "IT" -Includes CustomProperties -ErrorAction Stop
+
  
 #365 user account: Create the 365 user
 write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) first, which will create the unliscensed 365 E1 user"    
     provision-365user -upn ($upn = (remove-diacritics $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Replace(" ",".")+"@anthesisgroup.com"))) `
-    -plaintextpassword ($plaintextpassword = "Anthesis123") `
+    -plaintextpassword ($plaintextpassword = "$($userProvisionCredentials[0].CustomProperties.Values)") `
     -firstname ($firstname = "$($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ")[0].Trim())") `
     -lastname = ($lastname = "$(($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ")[$thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ").Count-1]).Trim())") `
     -displayname = ($displayname = "$(($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N).Trim())") `
@@ -188,7 +199,7 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -managerSAM = ($managerSAM = (($thisUser.FieldValues.Line_x0020_Manager.Email).split("@")[0]).replace("."," ")) `
     -businessunit = ($businessunit = ($thisUser.FieldValues.Business_x0020_Unit0.Label)) `
     -jobtitle = ($jobtitle = ($thisUser.FieldValues.JobTitle)) `
-    -plaintextpassword = "Anthesis123" `
+    -plaintextpassword = "$($userProvisionCredentials[0].CustomProperties.Values)" `
     -adCredentials = $adCredentials `
     -restCredentials = $restCredentials `
     -licensetype = ($licensetype = ($thisUser.FieldValues.Licensing.Split(" ")[1].Trim())) `
@@ -243,6 +254,33 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash 
 }
 if($thisUser.FieldValues.CellPhone){
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.CellPhone).Trim())"}
+}
+
+
+#Return user to check what was set
+sleep -Seconds 10
+$thisProvisionedUser = ""
+$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn -Verbose
+If(($thisProvisionedUser | Measure-Object).count -eq 1){
+
+Write-Host "Graph user object found - updating SPO list item"
+Set-PnPListItem -List "New User Requests" -Identity $thisUser.Id -Values @{"GraphUserGUID" = $thisProvisionedUser.id}
+If($thisProvisionedUser.assignedPlans){
+Write-Host "User appears to be licensed, emailing"
+#Send email
+ $body = "<HTML><BODY><p>Hi $($thisUser.FieldValues.Author.LookupValue),</p>
+                <p>We have created a Microsoft account for $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N):</p>
+                <p><b>username:</b> $($upn)<br>
+                <b>password:</b> $($userProvisionCredentials[0].CustomProperties.Values)</p>
+                <p>We have cc'd in the Line Manager added in the request</p> 
+                <p>Kind regards,<br>
+                The IT Team</p>
+                "
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "Shared_Mailbox_-_IT_Team_GBR@anthesisgroup.com" -toAddresses $thisUser.FieldValues.Author.Email -subject "New User Requests - $($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N)" -bodyHtml $body -ccAddresses $($thisUser.FieldValues.Line_x0020_Manager.Email) -bccAddresses "IT_Team_GBR@anthesisgroup.com" -Verbose
+}
+Else{
+Write-Host "User does not appear to be licensed - you can buy and assign licenses and re-run lines 424-432 to send an automated email"
+}
 }
     
 }
@@ -314,11 +352,13 @@ $country = $officeTerm.CustomProperties.Country
 $regionalgroup = $officeterm
 }
 
+#Get credential info from term store
+$userProvisionCredentials =  Get-PnPTerm -Identity "UserProvision" -TermGroup "Anthesis" -TermSet "IT" -Includes CustomProperties -ErrorAction Stop
 
 #365 user account: Create the 365 user
 write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) first, which will create the unliscensed 365 E1 user"    
     provision-365user -upn ($upn = (remove-diacritics $($thisUser.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com"))) `
-    -plaintextpassword ($plaintextpassword = "Anthesis123") `
+    -plaintextpassword ($plaintextpassword = "$($userProvisionCredentials[0].CustomProperties.Values)") `
     -firstname ($firstname = "$($thisUser.FieldValues.Title.Trim().Split(" ")[0].Trim())") `
     -lastname = ($lastname = "$($thisUser.FieldValues.Title.Trim().Split(" ")[1].Trim())") `
     -displayname = ($displayname = "$(($thisUser.FieldValues.Title).Trim())") `
@@ -333,7 +373,7 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -managerSAM = ($managerSAM = (($thisUser.FieldValues.Line_x0020_Manager.Email).split("@")[0]).replace("."," ")) `
     -businessunit = ($businessunit = ($thisUser.FieldValues.Finance_x0020_Cost_x0020_Attribu.Label)) `
     -jobtitle = ($jobtitle = ($thisUser.FieldValues.Job_x0020_title)) `
-    -plaintextpassword = "Anthesis123" `
+    -plaintextpassword = "$($userProvisionCredentials[0].CustomProperties.Values)" `
     -adCredentials = $adCredentials `
     -restCredentials = $restCredentials `
     -licensetype = ($licensetype = ($thisUser.FieldValues.Office_x0020_365_x0020_license.Split(" ").Trim())) `
@@ -376,46 +416,41 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userEmployeeInfoE
 If($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe){
 $businessnumberhash = @{businessPhones=@("$(($thisUser.FieldValues.Landline_x0020_phone_x0020_numbe).Trim())")}
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash $businessnumberhash
+}
+If($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0){
 set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash @{"mobilePhone" = "$(($thisUser.FieldValues.Mobile_x002f_Cell_x0020_phone_x0).Trim())"}
-
+}
 
 #Return user to check what was set
+sleep -Seconds 10
 $thisProvisionedUser = ""
-$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
-
+$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn -selectAllProperties -Verbose
 If(($thisProvisionedUser | Measure-Object).count -eq 1){
 
 Write-Host "Graph user object found - updating SPO list item"
 Set-PnPListItem -List "New User Requests" -Identity $thisUser.Id -Values @{"GraphUserGUID" = $thisProvisionedUser.id}
+
+If($thisProvisionedUser.assignedPlans){
+Write-Host "User appears to be licensed, emailing"
+#Send email
+ $body = "<HTML><BODY><p>Hi $($thisUser.FieldValues.Author.LookupValue),</p>
+                <p>We have created a Microsoft account for $($thisUser.FieldValues.Employee_x0020_Legal_x0020_Name):</p>
+                <p><b>username:</b> $($upn)<br>
+                <b>password:</b> $($userProvisionCredentials[0].CustomProperties.Values)</p>
+                <p>We have cc'd in the Line Manager added in the request</p> 
+                <p>Kind regards,<br>
+                The IT Team</p>
+                "
+send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "Shared_Mailbox_-_IT_Team_GBR@anthesisgroup.com" -toAddresses $thisUser.FieldValues.Author.Email -subject "New User Requests - $($thisUser.FieldValues.Employee_x0020_Legal_x0020_Name)" -bodyHtml $body -ccAddresses $($thisUser.FieldValues.Line_x0020_Manager.Email) -bccAddresses "IT_Team_GBR@anthesisgroup.com" -Verbose
 }
-
-
-}
-}
-
-
-
-
-
-
-$requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
-$requests = $requests | Where-Object {($_.FieldValues.Start_x0020_Date | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s)}
-ForEach($user in $requests[5]){
-
-$upn = $($user.FieldValues.Title.Trim().Replace(" ",".")+"@anthesisgroup.com") 
-
-#Return user to check what was set
-$thisProvisionedUser = ""
-$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
-
-If(($thisProvisionedUser | Measure-Object).count -eq 1){
-
-Write-Host "Graph user object found - updating SPO list item"
-Set-PnPListItem -List "New User Requests" -Identity $user.Id -Values @{"GraphUserGUID" = $thisProvisionedUser.id}
+Else{
+Write-Host "User does not appear to be licensed - you can buy and assign licenses and re-run lines 424-432 to send an automated email"
 }
 
 
 
+
+}
 }
 
 
