@@ -150,7 +150,7 @@ write-host "*****************Failed to retrieve msol user account in time: $($up
 #Get the New User Requests that have not been marked as processed
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/" -UseWebLogin #-Credentials $msolCredentials
 $requests = (Get-PnPListItem -List "New Starter Details" -Query "<View><Query><Where><Eq><FieldRef Name='New_x0020_Starter_x0020_Setup_x0'/><Value Type='String'>Waiting</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
-$requests = $requests | Where-Object {(($_.FieldValues.StartDate | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s)) -and !($_.FieldValues.GraphUserGUID)}
+$requests = $requests | Where-Object {(($_.FieldValues.StartDate | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s))}
 
 if($requests){#Display a subset of Properties to help the user identify the correct account(s)
     $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.StartDate} -Descending | select {$_.FieldValues.Employee_x0020_Preferred_x0020_N},{$_.FieldValues.jobtitle},{$_.FieldValues.StartDate},{$_.FieldValues.Main_x0020_office0.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Licensing},{$_.FieldValues.Primary_x0020_Team0.Label},{$_.FieldValues.GUID.Guid},{$_.FieldValues.GraphUserGUID} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
@@ -260,11 +260,11 @@ set-graphuser -tokenResponse $tokenResponse -userIdOrUpn $upn -userPropertyHash 
 #Return user to check what was set
 sleep -Seconds 10
 $thisProvisionedUser = ""
-$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn -Verbose
+$thisProvisionedUser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn -selectAllProperties -Verbose
 If(($thisProvisionedUser | Measure-Object).count -eq 1){
 
 Write-Host "Graph user object found - updating SPO list item"
-Set-PnPListItem -List "New User Requests" -Identity $thisUser.Id -Values @{"GraphUserGUID" = $thisProvisionedUser.id}
+Set-PnPListItem -List "New Starter Details" -Identity $thisUser.Id -Values @{"GraphUserGUID" = $thisProvisionedUser.id}
 If($thisProvisionedUser.assignedPlans){
 Write-Host "User appears to be licensed, emailing"
 #Send email
@@ -305,7 +305,7 @@ Write-Host "User does not appear to be licensed - you can buy and assign license
 #Get the New User Requests
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/hr" -UseWebLogin #-Credentials $msolCredentials
 $requests = (Get-PnPListItem -List "New User Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Current_x0020_Status'/><Value Type='String'>1 - Waiting for IT Team to set up accounts</Value></Eq></Where></Query></View>") |  % {Add-Member -InputObject $_ -MemberType NoteProperty -Name Guid -Value $_.FieldValues.GUID.Guid;$_}
-$requests = $requests | Where-Object {(($_.FieldValues.Start_x0020_Date | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s)) -and !($_.FieldValues.GraphUserGUID)}
+$requests = $requests | Where-Object {(($_.FieldValues.Start_x0020_Date | get-date -format s) -gt ((get-date).AddDays(-7) | get-date -Format s))}
 
 if($requests){#Display a subset of Properties to help the user identify the correct account(s)
     $selectedRequests = $requests | Sort-Object -Property {$_.FieldValues.Start_x0020_Date} -Descending | select {$_.FieldValues.Title},{$_.FieldValues.Start_x0020_Date},{$_.FieldValues.Job_x0020_title},{$_.FieldValues.Primary_x0020_Workplace.Label},{$_.FieldValues.Line_x0020_Manager.LookupValue},{$_.FieldValues.Primary_x0020_Team.LookupValue},{$_.FieldValues.GUID.Guid},{$_.FieldValues.GraphUserGUID} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK" | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "Guid" -Value $_.'$_.FieldValues.GUID.Guid';$_}
