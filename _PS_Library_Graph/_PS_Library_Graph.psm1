@@ -527,6 +527,8 @@ function get-graphDevices(){
             [string[]]$filterDisplayNames
         ,[parameter(Mandatory = $false)]
             [hashtable]$filterCustomEq = @{}
+        ,[parameter(Mandatory = $false)]
+            [switch]$includeOwners = $false
         )
 
     #
@@ -544,6 +546,7 @@ function get-graphDevices(){
         $filter += " and $_ eq '$($filterCustomEq[$_])'"
         }
     
+    if($includeOwners){$expand = " and registeredOwners"}
 
     #Build the refiner based on the parameters supplied
     if(![string]::IsNullOrWhiteSpace($select)){
@@ -554,11 +557,19 @@ function get-graphDevices(){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
         }
+    if(![string]::IsNullOrWhiteSpace($expand)){
+        if($expand.StartsWith(" and ")){$expand = $expand.Substring(5,$expand.Length-5)}
+        $expand = "`$expand=$expand"
+        }
 
     $refiner = "?"+$select
     if($filter){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$filter
+        }#>
+    if($expand){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+$expand
         }#>
 
     Write-Verbose "Graph Query = [/devices$refiner]"
@@ -578,7 +589,8 @@ function get-graphDevices(){
                 $($filterOwnerIds -join "|")
             } | Sort-Object displayName
         }
-    elseif($filterDisplayNames2){
+        #/registeredOwners
+    elseif($filterDisplayNames){
         Write-Verbose "Returning all Devices named [$($filterDeviceNames -join ",")]"
         $allDevices | ? {$filterDisplayNames -contains $_.displayName} | Sort-Object displayName
         }
@@ -748,6 +760,12 @@ function get-graphGroups(){
             [ValidateSet("Unified","Security","MailEnabledSecurity","Distribution")]
             [string]$filterGroupType
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterDataManagersGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterMembersGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterCombinedGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [parameter(Mandatory = $false,ParameterSetName = "explicit")]
             [switch]$selectAllProperties = $false
         )
@@ -775,7 +793,13 @@ function get-graphGroups(){
         #"Distribution" {$filter += " and groupTypes/any(a:a ne 'Unified') and mailEnabled eq 'true' and securityEnabled eq 'false'"}
         "Distribution" {$filter += " and mailEnabled eq true and securityEnabled eq false"}
         }
-
+    if($filterDataManagersGroupId){$additionalFilters += " and anthesisgroup_UGSync/dataManagerGroupId eq '$filterDataManagersGroupId'"}
+    if($filterMembersGroupId){$additionalFilters += " and anthesisgroup_UGSync/memberGroupId eq '$filterMembersGroupId'"}
+    if($filterCombinedGroupId){$additionalFilters += " and anthesisgroup_UGSync/combinedGroupId eq '$filterCombinedGroupId'"}
+    if($filterSharedMailboxId){$additionalFilters += " and anthesisgroup_UGSync/sharedMailboxId eq '$filterSharedMailboxId'"}
+    if($filterMasterMembership){$additionalFilters += " and anthesisgroup_UGSync/masterMembershipList eq '$filterMasterMembership'"}
+    if($filterClassifcation){$additionalFilters += " and anthesisgroup_UGSync/classification eq '$filterClassifcation'"}
+    if($filterPrivacy){$additionalFilters += " and anthesisgroup_UGSync/privacy eq '$filterPrivacy'"}
     if(![string]::IsNullOrWhiteSpace($filter)){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
@@ -1587,11 +1611,12 @@ function get-graphUsersFromGroup(){
 
     if($includeLineManager){ #Relationships (like /owners) don't support $expand parameters, so we have to enumerate the Line Managers per-user
         $allMembers | ? {$_.'@odata.type' -eq "#microsoft.graph.user"} | % {
-            try{$thisLineManager = $(get-graphUserLineManager -tokenResponse $tokenResponse -userIdOrUpn $_.userPrincipalName -selectAllProperties:$selectAllProperties)}
+            $thisUser = $_
+            try{$thisLineManager = $(get-graphUserLineManager -tokenResponse $tokenResponse -userIdOrUpn $thisUser.userPrincipalName -selectAllProperties:$selectAllProperties)}
             catch{
                 if($_.Exception -match "(404)"){
                     <#Do nothing - this means the user did not have a Line Manager assigned#>
-                    write-warning "User [$($_.userPrincipalName)] has no Line Manager assigned"
+                    write-warning "User [$($thisUser.userPrincipalName)] has no Line Manager assigned"
                     }
                 else{get-errorSummary -errorToSummarise $_}
                 }

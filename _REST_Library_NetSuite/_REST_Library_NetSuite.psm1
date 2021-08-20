@@ -831,6 +831,39 @@ function delete-netSuiteContactFromNetSuite(){
 
     invoke-netsuiteRestMethod -requestType DELETE -url "$($netsuiteParameters.uri)/contact/$id" -netsuiteParameters $netsuiteParameters #-Verbose 
     }
+function deactivate-netSuiteEmployee(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName="netsuiteEmployeeId")]
+            [int]$netSuiteEmployeeId
+        ,[parameter(Mandatory=$true,ParameterSetName="netsuiteEmployeeId")]
+            [parameter(Mandatory=$true,ParameterSetName="userPrincipalName")]
+            [datetime]$releaseDate
+        ,[parameter(Mandatory=$true,ParameterSetName="netsuiteEmployeeId")]
+            [parameter(Mandatory=$true,ParameterSetName="userPrincipalName")]
+            [psobject]$netsuiteParameters
+        )
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    $employee = (get-netSuiteEmployeesFromNetSuite -netsuiteParameters $netsuiteParameters  -netsuiteEmployeeId $netSuiteEmployeeId).Id
+    If(($employee | Measure-Object).count -eq 1){
+    Write-Verbose "Deactivating user with Id $($employee)"
+    try{
+       $fieldHash = @{employeestatus = 8;releasedate = ($releaseDate);giveAccess = [boolean]$false}
+       invoke-netSuiteRestMethod -requestType PATCH -url "$($netsuiteParameters.uri)/employee/$employee" -netsuiteParameters $netsuiteParameters -requestBodyHashTable $fieldHash
+       }
+    catch{
+       $error[0]
+       Write-Error -Exception "deactivate-netsuiteEmployee:" -Message "Netsuite user not deprovisioned" #define this
+       }
+    }
+    Else{
+       Write-Error -Exception "deactivate-netsuiteEmployee:" -Message "Netsuite user not deprovisioned: Either too many accounts were found or no account exists with the given Netsuite record Id."
+    }
+}
 function get-netSuiteAuthHeaders(){
     [cmdletbinding()]
     Param (
@@ -1027,29 +1060,59 @@ function get-netSuiteCustomListValues(){
     $customListValuesEnumerated
     }
 function get-netSuiteEmployeesFromNetSuite(){
-    [cmdletbinding()]
+    [cmdletbinding(DefaultParameterSetName = 'GetAll')]
     Param (
-        [parameter(Mandatory = $false)]
-        [ValidatePattern('^?[\w+][=][\w+]')]
-        [string]$query
-        ,[parameter(Mandatory=$false)]
-        [psobject]$netsuiteParameters
-        ,[parameter(Mandatory=$false)]
-        [ValidateSet('True','False')]
-        [string]$allNetsuiteEmployees
-        ,[parameter(Mandatory=$false)]
-        [ValidateSet('Actively Employed','Probation','Terminated')]
-        [string]$employeestatus
+        [parameter(Mandatory=$true,ParameterSetName="netsuiteEmployeeId")]
+        [parameter(Mandatory=$true,ParameterSetName="userPrincipalName")]
+        [parameter(Mandatory=$true,ParameterSetName="query")]
+        [parameter(Mandatory=$true,ParameterSetName="allAnthesisEmployees")]
+        [parameter(Mandatory = $false,ParameterSetName="GetAll")]
+            [psobject]$netsuiteParameters
+        ,[parameter(Mandatory = $false,ParameterSetName="userPrincipalName")]
+            [ValidatePattern(".[@].")]
+            [string]$userPrincipalName
+        ,[parameter(Mandatory = $false,ParameterSetName="netsuiteEmployeeId")]
+            [int]$netsuiteEmployeeId
+        ,[parameter(Mandatory=$false,ParameterSetName="allAnthesisEmployees")]
+            [switch]$allAnthesisEmployees
+        ,[parameter(Mandatory=$false,ParameterSetName="allAnthesisEmployees")]
+            [ValidateSet('Actively Employed','Probation','Terminated')]
+            [string]$employeestatus
+        ,[parameter(Mandatory = $false,ParameterSetName="query")]
+            [ValidatePattern('^?[\w+][=][\w+]')]
+            [string]$query
         )
     Write-Verbose "`tget-netSuiteEmployeesFromNetSuite([$($query)])"
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
         $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
         Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
         }
-    Write-Host "Getting all @anthesisgroup.com employees - please use allNetsuiteEmployees switch to pull everything back with no filters" -ForegroundColor Cyan
-    
-    #employeestatus
+    Switch($PSCmdlet.ParameterSetName){
+    "netsuiteEmployeeId"{
+        Write-Verbose "`tget-netSuiteEmployeesFromNetSuite with Netsuite Employee ID ([$($netsuiteEmployeeId)])"
+        $employee = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$netsuiteEmployeeId" -netsuiteParameters $netsuiteParameters -Verbose:$verbosePreference 
+    If(($employee | Measure-Object).Count -eq 1){
+        $employee
+    }
+    Else{
+        throw "Error: Too many accounts found ($(($employee | Measure-Object).count))"
+    }
+    }
+    "userPrincipalName"{
+        Write-Verbose "`tget-netSuiteEmployeesFromNetSuite with userPrincipalName ([$($userPrincipalName)])"
+        $Netquery = "?q=email CONTAIN `"$($userPrincipalName)`""
+        $employee = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters -Verbose:$verbosePreference 
+    If($employee.totalResults -eq 1){
+        $employeeEnumerated = invoke-netsuiteRestMethod -requestType GET -url $employee.items.links[0].href -netsuiteParameters $netsuiteParameters 
+        $employeeEnumerated
+    }
+    Else{
+        throw "Error: Too many accounts found ($($employee.totalResults))"
+    }
+    }
+    "allAnthesisEmployees"{
     If($employeestatus){
+    Write-Verbose "`tget-netSuiteEmployeesFromNetSuite - All Anthesis employees with status [$($employeestatus)]"
     $Netquery = "?q=email CONTAIN `"@anthesisgroup.com`""
     $Netquery += "AND email CONTAIN_NOT `"netsuitebot@anthesisgroup.com`""
     $Netquery += "AND email CONTAIN_NOT `"purchasing@anthesisgroup.com`""
@@ -1058,16 +1121,31 @@ function get-netSuiteEmployeesFromNetSuite(){
     $Netquery += "AND email CONTAIN_NOT `"pieface@anthesisgroup.com`""
     $Netquery += "AND employeestatus CONTAIN `"$($employeestatus)`""
 
-    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters -Verbose:$verbosePreference 
     $employeesEnumerated = [psobject[]]::new($employees.count)
     for ($i=0; $i -lt $employees.count;$i++) {
         $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
         }
     $employeesEnumerated
     }
-
-    #customquery
-    If($query){
+    Else{
+    Write-Verbose "`tget-netSuiteEmployeesFromNetSuite - All Anthesis employees with status"
+    $Netquery = "?q=email CONTAIN `"@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"netsuitebot@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"purchasing@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"noemail@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"group.finance@anthesisgroup.com`""
+    $Netquery += "AND email CONTAIN_NOT `"pieface@anthesisgroup.com`""
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters -Verbose:$verbosePreference  
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
+        }
+    $employeesEnumerated
+    }
+    }
+    "query"{
+    Write-Verbose "`tget-netSuiteEmployeesFromNetSuite - Query [$($query)]"
     $Netquery = "?q=email CONTAIN `"@anthesisgroup.com`""
     $Netquery += "AND email CONTAIN_NOT `"netsuitebot@anthesisgroup.com`""
     $Netquery += "AND email CONTAIN_NOT `"purchasing@anthesisgroup.com`""
@@ -1076,39 +1154,24 @@ function get-netSuiteEmployeesFromNetSuite(){
     $Netquery += "AND email CONTAIN_NOT `"pieface@anthesisgroup.com`""
     $Netquery += " AND $($query)`""
 
-    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters #-Verbose 
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters -Verbose:$verbosePreference  
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
+        }
+    $employeesEnumerated
+}
+    "GetAll"{
+    Write-Verbose "`tget-netSuiteEmployeesFromNetSuite - All employee records"
+    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee" -netsuiteParameters $netsuiteParameters -Verbose:$verbosePreference  
     $employeesEnumerated = [psobject[]]::new($employees.count)
     for ($i=0; $i -lt $employees.count;$i++) {
         $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
         }
     $employeesEnumerated
     }
-
-    #allAnthesisemployees
-    If(!($query) -and !($employeestatus)){
-    $Netquery = "?q=email CONTAIN `"@anthesisgroup.com`""
-    $Netquery += "AND email CONTAIN_NOT `"netsuitebot@anthesisgroup.com`""
-    $Netquery += "AND email CONTAIN_NOT `"purchasing@anthesisgroup.com`""
-    $Netquery += "AND email CONTAIN_NOT `"noemail@anthesisgroup.com`""
-    $Netquery += "AND email CONTAIN_NOT `"group.finance@anthesisgroup.com`""
-    $Netquery += "AND email CONTAIN_NOT `"pieface@anthesisgroup.com`""
-    $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $employeesEnumerated = [psobject[]]::new($employees.count)
-    for ($i=0; $i -lt $employees.count;$i++) {
-        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
-        }
-    $employeesEnumerated
     }
-    
-    #allNetsuiteemployees
-    If($allNetsuiteEmployees){
-        $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee" -netsuiteParameters $netsuiteParameters #-Verbose 
-    $employeesEnumerated = [psobject[]]::new($employees.count)
-    for ($i=0; $i -lt $employees.count;$i++) {
-        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
-        }
-    $employeesEnumerated
-    }
+ 
 }
 function get-netSuiteMetadata(){
     [cmdletbinding()]
@@ -1203,8 +1266,8 @@ function get-netSuiteParameters(){
     Write-Verbose "get-netsuiteParameters()"
     if($connectTo -eq "Production"){
         $placesToLook = @(
-            "$env:USERPROFILE\Downloads\netsuite_live.txt"
             "$env:USERPROFILE\Desktop\netsuite_live.txt"
+            "$env:USERPROFILE\Downloads\netsuite_live.txt"
             ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_live.txt"
             )
         }
@@ -2033,5 +2096,6 @@ function update-netSuiteContactInNetSuiteFromHubSpotObject(){
         }
 
     }
+
 
 #$clientStauses = invoke-netSuiteRestMethod -requestType GET -url "$((get-netsuiteParameters -connectTo Production).uri)/customerstatus/20" -netsuiteParameters $(get-netsuiteParameters -connectTo Production)
