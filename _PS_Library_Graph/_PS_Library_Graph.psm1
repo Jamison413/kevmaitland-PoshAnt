@@ -2537,6 +2537,67 @@ function set-graphDriveItem(){
     invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/drives/$driveId/items/$driveItemId" -graphBodyHashtable $driveItemPropertyHash
     
     }
+function set-graphGroup(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupId")]
+            [string]$groupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [string]$groupUpn
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$groupPropertyHash = @{}
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$groupUGSyncInfoExtensionHash
+        )
+    switch ($PsCmdlet.ParameterSetName){ #Convenience improvement: If we only have the UPN, find the Id
+        “groupUpn”  {
+            try{
+                $graphGroup = get-graphGroups -tokenResponse $tokenResponse -filterUpn $groupUpn -ErrorAction Stop
+                $groupId = $graphGroup.id
+                if([string]::IsNullOrWhiteSpace($groupId)){
+                    Write-Warning "Group with UPN [$($groupUpn)] could not be retrieved. Exiting set-graphGroup()"
+                    }
+                }
+            catch{
+                get-errorSummary $_
+                return
+                }
+            }
+        }
+      
+    $validProperties = @("allowExternalSenders","autoSubscribeNewMembers","description","displayName","groupTypes","mailEnabled","mailNickname","securityEnabled","visibility")
+    $dubiousProperties = @()
+    $validExtensionProperties = @("dataManagerGroupId","memberGroupId","combinedGroupId","sharedMailboxId","masterMembershipList","classification","privacy")
+
+    $duffProperties = @()
+    $groupPropertyHash.Keys | % { #Check the properties we're going to try and update the Group with are valid:
+        if($validProperties -notcontains $_ ){
+            if($dubiousProperties -notcontains $_){
+                $duffProperties += $_
+                }
+            else{Write-Warning "Property [$_] isn't fully supported and might cause problems"}
+            }
+        }
+
+    if($groupUGSyncInfoExtensionHash){
+        $groupUGSyncInfoExtensionHash.Keys | % { #Check the properties we're going to try and update the Group with are valid:
+            if($validExtensionProperties -notcontains $_){
+                $duffProperties += "anthesisgroup_UGSync/$_"
+                }
+            }
+        #Now add the Extension properties into the main hash in the correct format
+        $groupPropertyHash.Add("anthesisgroup_UGSync",$groupUGSyncInfoExtensionHash)
+        }
+
+    if($duffProperties.Count -gt 0){
+        Write-Error -Message "Property(s) [$($duffProperties -join ", ")] is invalild for Graph Group object. Will not attempt to update."
+        break
+        }
+    
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$groupId" -graphBodyHashtable $groupPropertyHash
+    }
 function set-graphGroupSharedMailboxAccess(){
     [cmdletbinding()]
     param(
