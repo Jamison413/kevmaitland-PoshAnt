@@ -527,6 +527,8 @@ function get-graphDevices(){
             [string[]]$filterDisplayNames
         ,[parameter(Mandatory = $false)]
             [hashtable]$filterCustomEq = @{}
+        ,[parameter(Mandatory = $false)]
+            [switch]$includeOwners = $false
         )
 
     #
@@ -544,6 +546,7 @@ function get-graphDevices(){
         $filter += " and $_ eq '$($filterCustomEq[$_])'"
         }
     
+    if($includeOwners){$expand = " and registeredOwners"}
 
     #Build the refiner based on the parameters supplied
     if(![string]::IsNullOrWhiteSpace($select)){
@@ -554,11 +557,19 @@ function get-graphDevices(){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
         }
+    if(![string]::IsNullOrWhiteSpace($expand)){
+        if($expand.StartsWith(" and ")){$expand = $expand.Substring(5,$expand.Length-5)}
+        $expand = "`$expand=$expand"
+        }
 
     $refiner = "?"+$select
     if($filter){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$filter
+        }#>
+    if($expand){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+$expand
         }#>
 
     Write-Verbose "Graph Query = [/devices$refiner]"
@@ -578,7 +589,8 @@ function get-graphDevices(){
                 $($filterOwnerIds -join "|")
             } | Sort-Object displayName
         }
-    elseif($filterDisplayNames2){
+        #/registeredOwners
+    elseif($filterDisplayNames){
         Write-Verbose "Returning all Devices named [$($filterDeviceNames -join ",")]"
         $allDevices | ? {$filterDisplayNames -contains $_.displayName} | Sort-Object displayName
         }
@@ -748,6 +760,12 @@ function get-graphGroups(){
             [ValidateSet("Unified","Security","MailEnabledSecurity","Distribution")]
             [string]$filterGroupType
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterDataManagersGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterMembersGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterCombinedGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [parameter(Mandatory = $false,ParameterSetName = "explicit")]
             [switch]$selectAllProperties = $false
         )
@@ -775,7 +793,13 @@ function get-graphGroups(){
         #"Distribution" {$filter += " and groupTypes/any(a:a ne 'Unified') and mailEnabled eq 'true' and securityEnabled eq 'false'"}
         "Distribution" {$filter += " and mailEnabled eq true and securityEnabled eq false"}
         }
-
+    if($filterDataManagersGroupId){$additionalFilters += " and anthesisgroup_UGSync/dataManagerGroupId eq '$filterDataManagersGroupId'"}
+    if($filterMembersGroupId){$additionalFilters += " and anthesisgroup_UGSync/memberGroupId eq '$filterMembersGroupId'"}
+    if($filterCombinedGroupId){$additionalFilters += " and anthesisgroup_UGSync/combinedGroupId eq '$filterCombinedGroupId'"}
+    if($filterSharedMailboxId){$additionalFilters += " and anthesisgroup_UGSync/sharedMailboxId eq '$filterSharedMailboxId'"}
+    if($filterMasterMembership){$additionalFilters += " and anthesisgroup_UGSync/masterMembershipList eq '$filterMasterMembership'"}
+    if($filterClassifcation){$additionalFilters += " and anthesisgroup_UGSync/classification eq '$filterClassifcation'"}
+    if($filterPrivacy){$additionalFilters += " and anthesisgroup_UGSync/privacy eq '$filterPrivacy'"}
     if(![string]::IsNullOrWhiteSpace($filter)){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
@@ -1632,11 +1656,12 @@ function get-graphUsersFromGroup(){
 
     if($includeLineManager){ #Relationships (like /owners) don't support $expand parameters, so we have to enumerate the Line Managers per-user
         $allMembers | ? {$_.'@odata.type' -eq "#microsoft.graph.user"} | % {
-            try{$thisLineManager = $(get-graphUserLineManager -tokenResponse $tokenResponse -userIdOrUpn $_.userPrincipalName -selectAllProperties:$selectAllProperties)}
+            $thisUser = $_
+            try{$thisLineManager = $(get-graphUserLineManager -tokenResponse $tokenResponse -userIdOrUpn $thisUser.userPrincipalName -selectAllProperties:$selectAllProperties)}
             catch{
                 if($_.Exception -match "(404)"){
                     <#Do nothing - this means the user did not have a Line Manager assigned#>
-                    write-warning "User [$($_.userPrincipalName)] has no Line Manager assigned"
+                    write-warning "User [$($thisUser.userPrincipalName)] has no Line Manager assigned"
                     }
                 else{get-errorSummary -errorToSummarise $_}
                 }
@@ -2581,6 +2606,67 @@ function set-graphDriveItem(){
 
     invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/drives/$driveId/items/$driveItemId" -graphBodyHashtable $driveItemPropertyHash
     
+    }
+function set-graphGroup(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupId")]
+            [string]$groupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "groupUpn")]
+            [string]$groupUpn
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$groupPropertyHash = @{}
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$groupUGSyncInfoExtensionHash
+        )
+    switch ($PsCmdlet.ParameterSetName){ #Convenience improvement: If we only have the UPN, find the Id
+        “groupUpn”  {
+            try{
+                $graphGroup = get-graphGroups -tokenResponse $tokenResponse -filterUpn $groupUpn -ErrorAction Stop
+                $groupId = $graphGroup.id
+                if([string]::IsNullOrWhiteSpace($groupId)){
+                    Write-Warning "Group with UPN [$($groupUpn)] could not be retrieved. Exiting set-graphGroup()"
+                    }
+                }
+            catch{
+                get-errorSummary $_
+                return
+                }
+            }
+        }
+      
+    $validProperties = @("allowExternalSenders","autoSubscribeNewMembers","description","displayName","groupTypes","mailEnabled","mailNickname","securityEnabled","visibility")
+    $dubiousProperties = @()
+    $validExtensionProperties = @("dataManagerGroupId","memberGroupId","combinedGroupId","sharedMailboxId","masterMembershipList","classification","privacy")
+
+    $duffProperties = @()
+    $groupPropertyHash.Keys | % { #Check the properties we're going to try and update the Group with are valid:
+        if($validProperties -notcontains $_ ){
+            if($dubiousProperties -notcontains $_){
+                $duffProperties += $_
+                }
+            else{Write-Warning "Property [$_] isn't fully supported and might cause problems"}
+            }
+        }
+
+    if($groupUGSyncInfoExtensionHash){
+        $groupUGSyncInfoExtensionHash.Keys | % { #Check the properties we're going to try and update the Group with are valid:
+            if($validExtensionProperties -notcontains $_){
+                $duffProperties += "anthesisgroup_UGSync/$_"
+                }
+            }
+        #Now add the Extension properties into the main hash in the correct format
+        $groupPropertyHash.Add("anthesisgroup_UGSync",$groupUGSyncInfoExtensionHash)
+        }
+
+    if($duffProperties.Count -gt 0){
+        Write-Error -Message "Property(s) [$($duffProperties -join ", ")] is invalild for Graph Group object. Will not attempt to update."
+        break
+        }
+    
+    invoke-graphPatch -tokenResponse $tokenResponse -graphQuery "/groups/$groupId" -graphBodyHashtable $groupPropertyHash
     }
 function set-graphGroupSharedMailboxAccess(){
     [cmdletbinding()]

@@ -24,7 +24,7 @@ $tokenResponseIntuneBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClie
 $intuneDevices = get-graphIntuneDevices -tokenResponse $tokenResponseIntuneBot
 $tokenResponseIntuneBotAtp = get-atpTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName IntuneBot) -grant_type client_credentials 
 $atpDevices = get-atpMachines -tokenResponse $tokenResponseIntuneBotAtp
-$allAadDevices = get-graphDevices -tokenResponse $tokenResponseTeamsBot
+$allAadDevices = get-graphDevices -tokenResponse $tokenResponseTeamsBot -includeOwners
 
 #Get encryption state report - we can't pull this by 
 $deviceEncryptionStates = get-DeviceEncryptionStates -tokenResponse $tokenResponseIntuneBot -Verbose
@@ -45,20 +45,20 @@ $allAadDevices | % {
 
     ##Grab atp device by filtering all atp machines for this device's aad DEVICE id - atp object has aad record on it
     Write-Host "Processing [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
-    $correspondingAtpDevice = $atpDevices| ? {$_.aadDeviceId -eq $thisAadDevice.deviceId}
+    $correspondingAtpDevice = $atpDevices | ? {$_.aadDeviceId -eq $thisAadDevice.deviceId} | Sort-Object firstSeen -Descending | Select-Object -First 1
 
     ##If we find a corresponding atp device that lives in aad, add the atp object info into a hash table and add add it to the $thisAadDevice object as a propery/element (whatever, it's on there somewhere and its query-able)
     if($correspondingAtpDevice){
         Write-Host "`tAdding ATP information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
-        $atpHash = @{}
+        $atpHash = [ordered]@{}
         Get-Member -InputObject $correspondingAtpDevice -MemberType Properties | % {
             $atpHash.Add($_.Name, $correspondingAtpDevice.$($_.Name))
             }
-        $_ | Add-Member -MemberType NoteProperty -Name atp -Value $atpHash -Force
+        $thisAadDevice | Add-Member -MemberType NoteProperty -Name atp -Value $atpHash -Force
         }
 
     ##Do the above for Intune as well to see if we can find an Intune device, using the Aad device id
-    $correspondingIntuneDevice = $intuneDevices | ? {$_.azureADDeviceId -eq $thisAadDevice.deviceId}
+    $correspondingIntuneDevice = $intuneDevices | ? {$_.azureADDeviceId -eq $thisAadDevice.deviceId} | Sort-Object enrolledDateTime -Descending | Select-Object -First 1
     if($correspondingIntuneDevice){
         Write-Host "`tAdding Intune information to [$($thisAadDevice.displayName)][$($thisAadDevice.deviceId)]"
         $intuneHash = @{}
