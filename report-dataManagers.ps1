@@ -7,13 +7,13 @@ Write-Host "Script started:" (Get-date)
 #Try{
 #We need Groupbot to manage Mail-Enabled Distribution Group membership (still unavailable via Graph [https://microsoftgraph.uservoice.com/forums/920506-microsoft-graph-feature-requests/suggestions/39551191-add-an-endpoint-to-allow-managing-mail-enabled-sec])
 $groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\GroupBot.txt") 
+$groupAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Downloads\GroupBot.txt") 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $exoCreds
 
 #We need Groupbot to access the User Training Records stored in SharePoint via PnP (Graph doesn't have good enough ListItem functionality yet [https://microsoftgraph.uservoice.com/forums/920506-microsoft-graph-feature-requests/suggestions/40175989-standardise-the-returned-data-for-single-and-multi])
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot

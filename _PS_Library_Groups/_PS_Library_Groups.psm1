@@ -1045,7 +1045,7 @@ function sync-groupMemberships(){
     switch ($PsCmdlet.ParameterSetName){
         “365GroupIdOnly”  {
             Write-Verbose "We've been given a 365 UPN, so we need the Group objects"
-            $graphExtendedUG = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $graphExtendedUGUpn 
+            $graphExtendedUG = get-graphGroups -tokenResponse $tokenResponse -filterUpn $graphExtendedUGUpn -selectAllProperties
             if(!$graphExtendedUG){
                 Write-Error "Could not retrieve Unified Group from UPN [$graphExtendedUGUpn]"
                 break
@@ -1087,11 +1087,13 @@ function sync-groupMemberships(){
                 switch($syncWhat){
                     "Members" {
                         Write-Verbose "No `$graphExtendedUG or `$graphExtendedUGUpn provided - looking for associated 365 Group with `$graphExtendedUG.anthesisgroup_UGSync.memberGroupId -eq [$($graphMesg.Id)]"
-                        $graphExtendedUG = Get-UnifiedGroup -Filter "anthesisgroup_UGSync.memberGroupId -eq '$($graphMesg.Id)'"
+                        #$graphExtendedUG = Get-UnifiedGroup -Filter "anthesisgroup_UGSync.memberGroupId -eq '$($graphMesg.Id)'"
+                        $graphExtendedUG = get-graphGroups -tokenResponse $tokenResponseTeams -filterMembersGroupId $graphMesg.Id -selectAllProperties
                         }
                     "Owners" {
                         Write-Verbose "No `$graphExtendedUG or `$graphExtendedUGUpn provided - looking for associated 365 Group with `$graphExtendedUG.anthesisgroup_UGSync.dataManagerGroupId -eq [$($graphMesg.Id)]"
-                        $graphExtendedUG = Get-UnifiedGroup  -Filter "anthesisgroup_UGSync.dataManagerGroupId -eq '$($graphMesg.Id)'"
+                        #$graphExtendedUG = Get-UnifiedGroup  -Filter "anthesisgroup_UGSync.dataManagerGroupId -eq '$($graphMesg.Id)'"
+                        $graphExtendedUG = get-graphGroups -tokenResponse $tokenResponseTeams -filterDataManagersGroupId $graphMesg.Id -selectAllProperties
                         }
                     }
                 if(!$graphExtendedUG){
@@ -1121,9 +1123,7 @@ function sync-groupMemberships(){
                 }
             }
 
-        if($ugUsersBeforeChanges.Count -lt 1){$ugUsersBeforeChanges = @()}
-        if($aadgUsersBeforeChanges.Count -lt 1){$aadgUsersBeforeChanges = @()}
-        $usersDelta = Compare-Object -ReferenceObject $ugUsersBeforeChanges -DifferenceObject $aadgUsersBeforeChanges -Property userPrincipalName -PassThru -IncludeEqual
+        $usersDelta = Compare-Object -ReferenceObject @($ugUsersBeforeChanges | select-object) -DifferenceObject @($aadgUsersBeforeChanges | select-object) -Property userPrincipalName -PassThru -IncludeEqual
          $($usersDelta | % {Write-Verbose "$_"})
 
         $usersAdded = @()
@@ -1211,33 +1211,29 @@ function sync-groupMemberships(){
 
         #Now report any problems/changes    
         if(!$dontSendEmailReport){
-            Write-Verbose "Preparing 365 to MESG $syncWhat sync report to send to Admins & Owners"
-            if($usersFailed.Count -ne 0){
-                Write-Verbose "Found [$($usersFailed.Count)] problems - notifying 365 Group Admins"
-                $ugUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType $syncWhat -returnOnlyUsers
-                $aadgUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphMesg.id -memberType $syncWhat -returnOnlyUsers
-                send-membershipChangeProblemReportToAdmins  -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
-                }
-            else{Write-Verbose "No problems adding/removing users, not sending problem report e-mail to Admins"}
-
             $ownersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType Owners -returnOnlyUsers -includeLineManager
             if(@($ownersAfterChanges | Select-Object).Count -eq 0){
-                Write-Verbose "No owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Admins as this will require a brain to resolve"
+               Write-Warning "No owners for 365 Group [$($graphExtendedUG.DisplayName)] - adding GroupBot"
                Add-DistributionGroupMember -Identity $graphExtendedUG.id -Member groupbot@anthesisgroup.com -BypassSecurityGroupManagerCheck -Confirm:$false #Add GroupBot in here instead of pissing everyone off with e-mail alerts.
-                <#Scandalous bodge to reduce the number of email alerts generated
-                if((Get-Random -Minimum 1 -Maximum 48) -eq 1){#This runs function is run every 30 minutes, so this should average 1 alert per day
-                    send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
-                    }
-                #>w
                 }
             if(@($ownersAfterChanges.DisplayName | ? {$_ -match "Ω"} | Select-Object).Count -eq @($ownersAfterChanges | Select-Object).Count){
-                Write-Verbose "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - notifying Line Managers to request reassignment"
-                #Scandalous bodge to reduce the number of email alerts generated
-                if((Get-Random -Minimum 1 -Maximum 48) -eq 1){#This runs function is run every 30 minutes, so this should average 1 alert per day
+                $now = Get-Date
+                if($now.Hour -eq 8 -and $now.Minute -ge 0 -and $now.Minute -lt 30){#This function is run every 30 minutes, so this should generate 1 alert per day
+                    Write-Warning "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - Notifying Line Managers to request reassignment"
                     send-dataManagerReassignmentRequest -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -currentOwners $ownersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
                     }
+                else {Write-Warning "No active owners for 365 Group [$($graphExtendedUG.DisplayName)] - Suppressing notification to Line Managers (to cut down on spam)"}
                 }
-            else{Write-Verbose "Owners look normal, not sending problem report e-mail to Admins"}
+            else{#If there is a problem _other than_ groups managed by deprovisioned users, notify IT
+                Write-Verbose "Preparing 365<>MESG $syncWhat sync report to send to Admins & Owners"
+                if($usersFailed.Count -ne 0){
+                    Write-Warning "Found [$($usersFailed.Count)] problems - notifying 365 Group Admins"
+                    $ugUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.id -memberType $syncWhat -returnOnlyUsers
+                    $aadgUsersAfterChanges = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphMesg.id -memberType $syncWhat -returnOnlyUsers
+                    send-membershipChangeProblemReportToAdmins  -tokenResponse $tokenResponseSmtp -UnifiedGroup $graphExtendedUG -changesAreTo $syncWhat -usersWithProblemsArray $usersFailed -usersIn365GroupAfterChanges $ugUsersAfterChanges -usersInAADGroupAfterChanges $aadgUsersAfterChanges -adminEmailAddresses $adminEmailAddresses -WhatIf:$WhatIfPreference
+                    }
+                else{Write-Verbose "No problems adding/removing users, not sending problem report e-mail to Admins"}                
+                }
 
             if($usersAdded.Count -ne 0 -or $usersRemoved.Count -ne 0){
                 Write-Verbose "[$($usersAdded.Count + $usersRemoved.Count)] changes made - sending the change report to managers and admins"
