@@ -1242,15 +1242,23 @@ function get-graphteamstructure(){
             [string]$filter365DisplayName
         ,[parameter(Mandatory = $false)]
             [string]$filter365UPN
+        ,[parameter(Mandatory = $false)]
+            [string]$filter365Id
+
         )
 
 if(![string]::IsNullOrWhiteSpace($filter365DisplayName)){
 
     $365 = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName $filter365DisplayName
     If($365){
-        $managers = @( get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.dataManagerGroupId -memberType Members)
+        $managers = @(get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.dataManagerGroupId -memberType Members)
         $members = @(get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.memberGroupId -memberType Members)
-    
+        
+        $result = New-Object psobject -Property @{
+            managers = $managers.userPrincipalName
+            members = $members.userPrincipalName
+        }
+        <#    
         Write-Host -f Cyan "$($team)"
         Write-Host -f White "Data Managers:"
         ForEach($manager in $managers){
@@ -1259,7 +1267,8 @@ if(![string]::IsNullOrWhiteSpace($filter365DisplayName)){
         Write-Host -f White "Members:"
         ForEach($member in $members){
         Write-Host -f DarkYellow "$($member.userPrincipalName)"
-        }
+        }#>
+        return $result
     }
     Else{
         Write-Host "$($filter365DisplayName): 365 group not found" -ForegroundColor Red
@@ -1270,7 +1279,12 @@ if(![string]::IsNullOrWhiteSpace($filter365UPN)){
     If($365){
         $managers = @( get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.dataManagerGroupId -memberType Members)
         $members = @(get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.memberGroupId -memberType Members)
-    
+        
+        $result = New-Object psobject -Property @{
+            managers = $managers.userPrincipalName
+            members = $members.userPrincipalName
+        }
+        <#   
         Write-Host -f Cyan "$($team)"
         Write-Host -f DarkYellow "Data Managers:"
         ForEach($manager in $managers){
@@ -1280,12 +1294,43 @@ if(![string]::IsNullOrWhiteSpace($filter365UPN)){
         ForEach($member in $members){
         Write-Host -f White "$($member.userPrincipalName)"
         }
+        #>
+        return $result
     }
     Else{
         Write-Host "$($filter365UPN): group not found" -ForegroundColor Red
     }
 
 }
+if(![string]::IsNullOrWhiteSpace($filter365Id)){
+    $365 = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId $filter365Id
+    If($365){
+        $managers = @( get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.dataManagerGroupId -memberType Members)
+        $members = @(get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $365.anthesisgroup_UGSync.memberGroupId -memberType Members)
+        
+        $result = New-Object psobject -Property @{
+            managers = $managers.userPrincipalName
+            members = $members.userPrincipalName
+        }
+        <#   
+        Write-Host -f Cyan "$($team)"
+        Write-Host -f DarkYellow "Data Managers:"
+        ForEach($manager in $managers){
+        Write-Host -f White "$($manager.userPrincipalName)"
+        }
+        Write-Host -f DarkYellow "Members:"
+        ForEach($member in $members){
+        Write-Host -f White "$($member.userPrincipalName)"
+        }
+        #>
+        return $result
+    }
+    Else{
+        Write-Host "$($filter365UPN): group not found" -ForegroundColor Red
+    }
+
+}
+
 }
 function get-graphTeamsPrivateChannels(){
     [cmdletbinding()]
