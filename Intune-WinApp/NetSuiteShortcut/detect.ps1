@@ -1,6 +1,5 @@
 ﻿$thisApp = "NetSuite shortcut"
-$filePathToTest = "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\NetSuite (SSO).url"
-$scheduledTaskToTest = "$env:ProgramData\CustomScripts\redo-choco$thisApp-scheduledTaskCreated.log"
+$filePathToTest = "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\NetSuite (SSO).lnk"
 
 if(Test-Path $filePathToTest){
     Write-Host "Path [$($filePathToTest)] exists!"
