@@ -10,6 +10,9 @@
 $tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
 $ukUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis (UK) Ltd (GBR)' -selectAllProperties
 $ukUsers += get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis Energy UK Ltd (GBR)' -selectAllProperties 
+$phlUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterUsageLocation PH -selectAllProperties
+$phlUsers += get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis Philippines Inc. (PHL)' -selectAllProperties
+$phlUsers = $phlUsers | Sort-Object -Unique -Property 'userPrincipalName' 
 
 #Get Asset records from SharePoint
 $tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName SharePointBot) -grant_type client_credentials
@@ -36,7 +39,7 @@ $deviceEncryptionStates = get-DeviceEncryptionStates -tokenResponse $tokenRespon
 
 #Iteration steps: #Get Aad device as main interation object -> Try to find the Atp device -> try to find the Intune device -> try to find the asset register device -> #~Add all the info onto the Aad object as properties~#
 
-$allAadDevices | % { 
+$allAadDevices | foreach-object { 
     $thisAadDevice = $_
     ##Clear any existing variables ready to go for the next run
     if($correspondingAtpDevice){rv correspondingAtpDevice}
@@ -65,7 +68,7 @@ $allAadDevices | % {
         Get-Member -InputObject $correspondingIntuneDevice -MemberType Properties | % {
             $intuneHash.Add($_.Name, $correspondingIntuneDevice.$($_.Name))
             }
-        $_ | Add-Member -MemberType NoteProperty -Name intune -Value $intuneHash -Force
+        $thisAadDevice | Add-Member -MemberType NoteProperty -Name intune -Value $intuneHash -Force
 
     ##Do the above for advanced encryption state information stored *somewhere* in Intune and not on the direct Intune device object, using the Aad device id
      $correspondingEncryptionDevice = $deviceEncryptionStates | ? {$_.Id -eq $thisAadDevice.intune.id}
@@ -124,7 +127,10 @@ $allAadDevices | % {
 #Filter & de-dupe the objects that belong to UK users
 $ukAadDevices = $allAadDevices | ? {$_.intune.userId -match $($ukUsers.id -join "|")}
 $ukAadDevices = $ukAadDevices | Group-Object {$_.intune.serialNumber} | % {$_.Group | Sort-Object approximateLastSignInDateTime | Select-Object -Last 1} #DeDupe and keep only the most recent
+$phlAadDevices = $allAadDevices | Where-Object {$_.intune.userId -match $($phlUsers.id -join "|")}
+$phlAadDevices = $phlAadDevices | Group-Object {$_.intune.serialNumber} | % {$_.Group | Sort-Object approximateLastSignInDateTime | Select-Object -Last 1} #DeDupe and keep only the most recent
 
+$interestingAadDevices = $ukAadDevices + $phlAadDevices
 <#
 #Find any assets that are missing from AAD (for gap analysis)
 $extraAssets = @()
@@ -160,7 +166,7 @@ $assetRegisterPhonesUseful | % {
 
 #region Report stuff
 #region Update the Computers Asset Register with data fron AAD, Intune & ATP
-$ukAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
+$interestingAadDevices | ? {$_.asset.ContentType -eq "Computers"} | % {
 
     $thisComputer = $_
     $thisUserId = $thisComputer.physicalIds | ? {$_ -match "USER-GID"} | % {$($_ -split ":")[1]}
