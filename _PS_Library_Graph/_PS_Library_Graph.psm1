@@ -435,7 +435,7 @@ function get-graphAppClientCredentials{
         "ShiftBot" {$encryptedCredsFile = "shiftBotDetails.txt"}
         "ReportBot"{$encryptedCredsFile = "ReportBotDetails.txt"}
         "SmtpBot"{$encryptedCredsFile = "SmtpBot.txt"}
-        "SmtpBot"{$encryptedCredsFile = "UserBot.txt"}
+        "UserBot"{$encryptedCredsFile = "UserBot.txt"}
         }
     
     $placesToLook = @( #Figure out where to look
