@@ -6022,8 +6022,12 @@ $sources += "X:\Suppliers\_SUPPLIER FOLDER TEMPLATE"
 
 #$destination = "https://gbrenergy.file.core.windows.net/ecodata"
 #$sasToken = "sv=2020-02-10&ss=f&srt=sco&sp=rwdlc&se=2021-06-13T17:20:16Z&st=2021-05-30T09:20:16Z&sip=89.197.96.6&spr=https&sig=90ixyZkDRN6oEX1lqVrXbi6hMHxsw8c5eSNZ0SJgQCQ%3D"
-$destination = "https://gbrsustain.file.core.windows.net/x-drive"
-$sasToken = "?sv=2020-02-10&ss=f&srt=sco&sp=rwdlc&se=2021-07-05T14:41:43Z&st=2021-06-17T06:41:43Z&sip=89.197.96.6&spr=https&sig=RIi%2F8hwfPedQPHh%2FmTp7%2BUGC5K7URhWlrFcWCdPVVHQ%3D"
+#$destination = "https://gbrsustain.file.core.windows.net/x-drive"
+#$sasToken = "?sv=2020-02-10&ss=f&srt=sco&sp=rwdlc&se=2021-07-05T14:41:43Z&st=2021-06-17T06:41:43Z&sip=89.197.96.6&spr=https&sig=RIi%2F8hwfPedQPHh%2FmTp7%2BUGC5K7URhWlrFcWCdPVVHQ%3D"
+
+$destination = "https://gbrbff.file.core.windows.net/share"
+$sasToken = "?sv=2020-08-04&ss=f&srt=sco&sp=rwdlc&se=2021-09-03T16:43:34Z&st=2021-08-27T08:43:34Z&sip=89.197.96.6&spr=https&sig=j%2FRsyv7%2FarKSYO4m%2FCubSRqvc0HetsWw%2BLJDMcKqcIQ%3D"
+
 
 $sources | % {
     $thisSource = $_
