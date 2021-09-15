@@ -146,13 +146,6 @@ foreach($request in $selectedRequests){
     Write-Verbose "Opening in browser - no further steps, it's just to eyeball the Site and check it's worked."
     start-Process $newPnpTeam.SiteUrl
 
-    if($addExecutingUserAsTemporaryOwner){
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-DistributionGroupMember -Identity $newTeam.anthesisgroup_UGSync.dataManagerGroupId -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
-        }
-    if($addExecutingUserAsTemporaryMember){
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        }
 
     Write-Host -f DarkYellow "`tset-standardSitePermissions [$($newTeam.DisplayName)]"
     try{
@@ -160,6 +153,15 @@ foreach($request in $selectedRequests){
         set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $newTeam -pnpAppCreds $teamBotDetails -pnpCreds $365creds -Verbose:$VerbosePreference -suppressEmailNotifications -ErrorAction Continue
         }
     catch{$_}
+
+
+    if($addExecutingUserAsTemporaryOwner){
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-DistributionGroupMember -Identity $newTeam.anthesisgroup_UGSync.dataManagerGroupId -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        }
+    if($addExecutingUserAsTemporaryMember){
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        }
 
 
     Write-Verbose "Updating Team Request: Status = [Created]"
