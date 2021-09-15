@@ -423,7 +423,7 @@ function get-graphAppClientCredentials{
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-            [ValidateSet("TeamsBot","SchemaBot","IntuneBot","SharePointBot","ShiftBot","ReportBot","SmtpBot")]
+            [ValidateSet("TeamsBot","SchemaBot","IntuneBot","SharePointBot","ShiftBot","ReportBot","SmtpBot","UserBot")]
             [String]$appName
         )
     
@@ -435,6 +435,7 @@ function get-graphAppClientCredentials{
         "ShiftBot" {$encryptedCredsFile = "shiftBotDetails.txt"}
         "ReportBot"{$encryptedCredsFile = "ReportBotDetails.txt"}
         "SmtpBot"{$encryptedCredsFile = "SmtpBot.txt"}
+        "UserBot"{$encryptedCredsFile = "UserBot.txt"}
         }
     
     $placesToLook = @( #Figure out where to look

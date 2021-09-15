@@ -44,7 +44,7 @@ Connect-MsolService
 
 
 #Graph
-$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
+$teamBotDetails = get-graphAppClientCredentials -appName UserBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #email out
@@ -319,7 +319,7 @@ ForEach($thisUser in $selectedRequests){
 
 If($thisUser.FieldValues.GraphUserGUID){
 Write-Host "It looks like this user has already been created"
-Exit
+break
 }
 
 $thisUser.FieldValues.Title
