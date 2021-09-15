@@ -85,7 +85,7 @@ $offices += [ordered]@{
     OfficeColour="Pink"
     OfficeWeekendColour="darkPink"
     OfficeDesks=7
-    ShiftNotes="Office currently not available until we move to new premises in July 2021"
+    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
     OfficeName="GBR-Oxford"
