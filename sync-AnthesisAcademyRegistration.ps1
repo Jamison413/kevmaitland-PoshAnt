@@ -228,7 +228,7 @@ Else{
                 <p>The Anthesis Academy</p>
                 </BODY></HTML>"
                 #Send-MailMessage  -BodyAsHtml $body -Subject "You've Signed Up to an Anthesis Academy Module!" -to $($newregistrant.FieldValues.RegistrantName.Email) -from "AnthesisAcademy@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8    
-                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses $($newregistrant.FieldValues.RegistrantName.Email) -subject "You've Signed Up to an Anthesis Academy Module!" -bodyHtml $body -bccAddresses "rebecca.hughes@anthesisgroup.com"
+                send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses $($newregistrant.FieldValues.RegistrantName.Email) -subject "You've Signed Up to an Anthesis Academy Module!" -bodyHtml $body -bccAddresses "Jodie.Chapman@anthesisgroup.com"
                 send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $smtpBotAccount -toAddresses "emily.pressey@anthesisgroup.com" -subject "You've Signed Up to an Anthesis Academy Module!" -bodyHtml $body
     }
     Else{
