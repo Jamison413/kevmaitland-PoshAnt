@@ -2643,7 +2643,7 @@ function set-graphGroup(){
       
     $validProperties = @("allowExternalSenders","autoSubscribeNewMembers","description","displayName","groupTypes","mailEnabled","mailNickname","securityEnabled","visibility")
     $dubiousProperties = @()
-    $validExtensionProperties = @("dataManagerGroupId","memberGroupId","combinedGroupId","sharedMailboxId","masterMembershipList","classification","privacy")
+    $validExtensionProperties = @("dataManagerGroupId","memberGroupId","combinedGroupId","sharedMailboxId","masterMembershipList","classification","privacy","deviceGroupId")
 
     $duffProperties = @()
     $groupPropertyHash.Keys | % { #Check the properties we're going to try and update the Group with are valid:
