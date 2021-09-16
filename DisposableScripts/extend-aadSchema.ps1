@@ -1,6 +1,5 @@
 $schemaBotDetails = import-encryptedCsv -pathToEncryptedCsv "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\SchemaBot.txt"
-$tokenResponse = get-graphTokenResponse -grant_type device_code -aadAppCreds $schemaBotDetails
-
+$tokenResponse = get-graphTokenResponse -grant_type device_code -aadAppCreds $(get-graphAppClientCredentials -appName SchemaBot)
 $newSchemaDefinition = @{
     id = "anthesisgroup_employeeInfo"
     description = "Additional information about Anthesis employees"
@@ -71,6 +70,10 @@ $newSchemaDefinition3 = @{
             },
         @{
             "name" = "privacy"
+            "type" = "String"
+            }
+        @{
+            "name" = "deviceGroupId"
             "type" = "String"
             }
         )

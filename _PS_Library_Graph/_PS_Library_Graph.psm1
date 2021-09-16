@@ -216,7 +216,7 @@ function add-graphUsersToGroup(){
             [string]$graphGroupId
         ,[parameter(Mandatory = $true,ParameterSetName = "UserIds")]
             [parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
-            [ValidateSet("Members","Owners")]
+            [ValidateSet("members","owners")]
             [string]$memberType 
         ,[parameter(Mandatory = $true,ParameterSetName = "UserUpns")]
             [string[]]$graphUserUpns
@@ -767,6 +767,8 @@ function get-graphGroups(){
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [string]$filterCombinedGroupId
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterDeviceGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [parameter(Mandatory = $false,ParameterSetName = "explicit")]
             [switch]$selectAllProperties = $false
         )
@@ -801,6 +803,7 @@ function get-graphGroups(){
     if($filterMasterMembership){$additionalFilters += " and anthesisgroup_UGSync/masterMembershipList eq '$filterMasterMembership'"}
     if($filterClassifcation){$additionalFilters += " and anthesisgroup_UGSync/classification eq '$filterClassifcation'"}
     if($filterPrivacy){$additionalFilters += " and anthesisgroup_UGSync/privacy eq '$filterPrivacy'"}
+    if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/deviceGroupId eq '$filterDeviceGroupId'"}
     if(![string]::IsNullOrWhiteSpace($filter)){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
@@ -2076,9 +2079,9 @@ function new-graphGroup(){
         ,[parameter(Mandatory = $true)]
             [ValidateSet ("Assigned")]
             [string]$membershipType
-        ,[parameter(Mandatory = $true)]
+        ,[parameter(Mandatory = $false)]
             [string[]]$groupOwners
-        ,[parameter(Mandatory = $true)]
+        ,[parameter(Mandatory = $false)]
             [string[]]$groupMembers
         )    
 

@@ -919,7 +919,7 @@ function get-microsoftProductInfo(){
     Write-Verbose "getId = [$getId]"
     Write-Verbose "fromId = [$fromId]"
     $productList = @(
-        @("AudioConferencing","AUDIO CONFERENCING","MCOMEETADV","0c266dff-15dd-4b49-8397-2bb16070ed52","Skype for Business PSTN Conferencing (CSP)"),
+        @("Teams Audio Conferencing License","AUDIO CONFERENCING","MCOMEETADV","0c266dff-15dd-4b49-8397-2bb16070ed52","Skype for Business PSTN Conferencing (CSP)"),
         @("AZURE ACTIVE DIRECTORY BASIC","AZURE ACTIVE DIRECTORY BASIC","AAD_BASIC","2b9c8e7c-319c-43a2-a2a0-48c5c6161de7","AZURE ACTIVE DIRECTORY BASIC"),
         @("AZURE ACTIVE DIRECTORY PREMIUM P1","AZURE ACTIVE DIRECTORY PREMIUM P1","AAD_PREMIUM","078d2b04-f1bd-4111-bbd4-b4b1b354cef4","AZURE ACTIVE DIRECTORY PREMIUM P1"),
         @("AZURE ACTIVE DIRECTORY PREMIUM P2","AZURE ACTIVE DIRECTORY PREMIUM P2","AAD_PREMIUM_P2","84a661c4-e949-4bd2-a560-ed7766fcaf2b","AZURE ACTIVE DIRECTORY PREMIUM P2"),
@@ -948,15 +948,15 @@ function get-microsoftProductInfo(){
         @("Microsoft 365 A5 for faculty","Microsoft 365 A5 for faculty","M365EDU_A5_FACULTY","e97c048c-37a4-45fb-ab50-922fbf07a370","Microsoft 365 A5 for faculty"),
         @("Microsoft 365 A5 for students","Microsoft 365 A5 for students","M365EDU_A5_STUDENT","46c119d4-0379-4a9d-85e4-97c66d3f909e","Microsoft 365 A5 for students"),
         @("MICROSOFT 365 BUSINESS","MICROSOFT 365 BUSINESS","SPB","cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46","MICROSOFT 365 BUSINESS"),
-        @("M3","MICROSOFT 365 E3","SPE_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","MICROSOFT 365 E3"),
-        @("M5","Microsoft 365 E5","SPE_E5","06ebc4ee-1bb5-47dd-8120-11324bc54e06","Microsoft 365 E5"),
+        @("Microsoft E3","MICROSOFT 365 E3","SPE_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","MICROSOFT 365 E3"),
+        @("Microsoft E5","Microsoft 365 E5","SPE_E5","06ebc4ee-1bb5-47dd-8120-11324bc54e06","Microsoft 365 E5"),
         @("Microsoft 365 E3_USGOV_DOD","Microsoft 365 E3_USGOV_DOD","SPE_E3_USGOV_DOD","d61d61cc-f992-433f-a577-5bd016037eeb","Microsoft 365 E3_USGOV_DOD"),
         @("Microsoft 365 E3_USGOV_GCCHIGH","Microsoft 365 E3_USGOV_GCCHIGH","SPE_E3_USGOV_GCCHIGH","ca9d1dd9-dfe9-4fef-b97c-9bc1ea3c3658","Microsoft 365 E3_USGOV_GCCHIGH"),
         @("Microsoft 365 E5 Compliance","Microsoft 365 E5 Compliance","INFORMATION_PROTECTION_COMPLIANCE","184efa21-98c3-4e5d-95ab-d07053a96e67","Microsoft 365 E5 Compliance"),
         @("Microsoft 365 E5 Security","Microsoft 365 E5 Security","IDENTITY_THREAT_PROTECTION","26124093-3d78-432b-b5dc-48bf992543d5","Microsoft 365 E5 Security"),
         @("Microsoft 365 E5 Security for EMS E5","Microsoft 365 E5 Security for EMS E5","IDENTITY_THREAT_PROTECTION_FOR_EMS_E5","44ac31e7-2999-4304-ad94-c948886741d4","Microsoft 365 E5 Security for EMS E5"),
         @("Microsoft 365 F1","Microsoft 365 F1","SPE_F1","66b55226-6b4f-492c-910c-a3b7a3c9d993","Microsoft 365 F1"),
-        @("ATP","Microsoft Defender Advanced Threat Protection","WIN_DEF_ATP","b126b073-72db-4a9d-87a4-b17afe41d4ab","Microsoft Defender Advanced Threat Protection"),
+        @("Microsoft Defender for EndPoint","Microsoft Defender Advanced Threat Protection","WIN_DEF_ATP","b126b073-72db-4a9d-87a4-b17afe41d4ab","Microsoft Defender Advanced Threat Protection"),
         @("MICROSOFT DYNAMICS CRM ONLINE BASIC","MICROSOFT DYNAMICS CRM ONLINE BASIC","CRMPLAN2","906af65a-2970-46d5-9b58-4e9aa50f0657","MICROSOFT DYNAMICS CRM ONLINE BASIC"),
         @("MICROSOFT DYNAMICS CRM ONLINE","MICROSOFT DYNAMICS CRM ONLINE","CRMSTANDARD","d17b27af-3f49-4822-99f9-56a661538792","MICROSOFT DYNAMICS CRM ONLINE"),
         @("MS IMAGINE ACADEMY","MS IMAGINE ACADEMY","IT_ACADEMY_AD","ba9a34de-4489-469d-879c-0f0f145321cd","MS IMAGINE ACADEMY"),
@@ -988,7 +988,7 @@ function get-microsoftProductInfo(){
         @("ONEDRIVE FOR BUSINESS (PLAN 2)","ONEDRIVE FOR BUSINESS (PLAN 2)","WACONEDRIVEENTERPRISE","ed01faf2-1d88-4947-ae91-45ca18703a96","ONEDRIVE FOR BUSINESS (PLAN 2)"),
         @("POWER APPS PER USER PLAN","POWER APPS PER USER PLAN","POWERAPPS_PER_USER","b30411f5-fea1-4a59-9ad9-3db7c7ead579","POWER APPS PER USER PLAN"),
         @("POWER BI FOR OFFICE 365 ADD-ON","POWER BI FOR OFFICE 365 ADD-ON","POWER_BI_ADDON","45bc2c81-6072-436a-9b0b-3b12eefbc402","POWER BI FOR OFFICE 365 ADD-ON"),
-        @("PowerBIFree","POWER BI FREE","POWER_BI_FREE","a403ebcc-fae0-4ca2-8c8c-7a907fd6c235","POWER BI FREE"),
+        @("PowerBIFree","POWER BI FREE","POWER_BI_FREE","a403ebcc-fae0-4ca2-8c8c-7a907fd6c235","Zero cost Power BI licence"),
         @("POWER BI PRO","POWER BI PRO","POWER_BI_PRO","f8a1db68-be16-40ed-86d5-cb42ce701560","POWER BI PRO"),
         @("PROJECT FOR OFFICE 365","PROJECT FOR OFFICE 365","PROJECTCLIENT","a10d5e58-74da-4312-95c8-76be4e5b75a0","PROJECT FOR OFFICE 365"),
         @("PROJECT ONLINE ESSENTIALS","PROJECT ONLINE ESSENTIALS","PROJECTESSENTIALS","776df282-9fc0-4862-99e2-70e561b9909e","PROJECT ONLINE ESSENTIALS"),
@@ -1008,7 +1008,7 @@ function get-microsoftProductInfo(){
         @("Visio","VISIO Online Plan 2","VISIOCLIENT","c5928f49-12ba-48f7-ada3-0d743a3601d5","Visio Pro for Office 365 (CSP)"),
         @("WinE3","WINDOWS 10 ENTERPRISE E3","WIN10_PRO_ENT_SUB","6a0f6da5-0b87-4190-a6ae-9bb5a2b9546a","WINDOWS 10 ENTERPRISE E3"),
         @("WinE5","Windows 10 Enterprise E5","WIN10_VDA_E5","488ba24a-39a9-4473-8ee5-19291e71b002","Windows 10 Enterprise E5"),
-        @("PowerAutomateFree","FLOW_FREE","FLOW_FREE","f30db892-07e9-47e9-837c-80727f46fd3d","FLOW_FREE"),
+        @("PowerAutomateFree","FLOW_FREE","FLOW_FREE","f30db892-07e9-47e9-837c-80727f46fd3d","Zero cost Power Automate (Flow) licence"),
         @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM")
 
          
