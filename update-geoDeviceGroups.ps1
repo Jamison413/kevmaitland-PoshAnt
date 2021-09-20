@@ -3,15 +3,22 @@
 $userBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $userBotTokenResponse = get-graphTokenResponse -aadAppCreds $userBotDetails
 
+Write-host "Getting Geographic Unified Groups"
 $geoUGs = get-graphGroups -tokenResponse $userBotTokenResponse -filterGroupType Unified -filterDisplayNameStartsWith "All (" -selectAllProperties
 $geoUGs  = $geoUGs | Where-Object {$_.displayName -ne "All (All)"}
+Write-host "`tRetrieved [$($geoUGs.Count)] Geographic Unified Groups"
 
+
+Write-host "Getting all AAD devices"
 $allAadDevices = get-graphDevices -tokenResponse $userBotTokenResponse -includeOwners
 $allAadDevices | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.registeredOwners[0].id}
+Write-host "`tRetrieved [$($allAadDevices.Count)] AD devices"
+
 
 $duffDevices = @()
 $geoUGs | ForEach-Object {
     $thisGeoUG = $_
+    write-host "Processing [$($thisGeoUG.displayName)]"
     #continue
     $thisGeoUsers = get-graphUsersFromGroup -tokenResponse $userBotTokenResponse -groupId $thisGeoUG.id -memberType TransitiveMembers -returnOnlyLicensedUsers #-selectAllProperties
     $thisGeoUsers | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.id}
@@ -40,14 +47,14 @@ $geoUGs | ForEach-Object {
         #Add/Remove the delta device as appropriate
         if($_.SideIndicator -eq "<="){
             try{
-                Write-Host "Adding device [$($_.displayName)][$($_.id)] owned by [$($_.registeredOwners.userPrincipalName -join "; ")] to [$($relevantGroup.displayName)]"
+                Write-Host "`tAdding device [$($_.displayName)][$($_.id)] owned by [$($_.registeredOwners.userPrincipalName -join "; ")] to [$($relevantGroup.displayName)]"
                 add-graphUsersToGroup -tokenResponse $userBotTokenResponse -graphGroupId $relevantGroup.id -memberType members -graphUserIds $_.id
                 }
             catch{if($_.Exception -notmatch "(400)"){get-errorSummary $_}}
             }
         elseif($_.SideIndicator -eq "=>"){
             try{
-                Write-Host "Removing device [$($_.displayName)][$($_.id)] owned by [$($_.registeredOwners.userPrincipalName -join "; ")] from [$($relevantGroup.displayName)]"
+                Write-Host "`tRemoving device [$($_.displayName)][$($_.id)] owned by [$($_.registeredOwners.userPrincipalName -join "; ")] from [$($relevantGroup.displayName)]"
                 remove-graphUsersFromGroup -tokenResponse $userBotTokenResponse -graphGroupId $relevantGroup.id -memberType members -graphUserIds $_.id
                 }
             catch{get-errorSummary $_}

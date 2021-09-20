@@ -44,7 +44,7 @@ Connect-MsolService
 
 
 #Graph
-$teamBotDetails = get-graphAppClientCredentials -appName UserBot
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #email out
@@ -199,7 +199,6 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -managerSAM = ($managerSAM = (($thisUser.FieldValues.Line_x0020_Manager.Email).split("@")[0]).replace("."," ")) `
     -businessunit = ($businessunit = ($thisUser.FieldValues.Business_x0020_Unit0.Label)) `
     -jobtitle = ($jobtitle = ($thisUser.FieldValues.JobTitle)) `
-    -plaintextpassword = "$($userProvisionCredentials[0].CustomProperties.Values)" `
     -adCredentials = $adCredentials `
     -restCredentials = $restCredentials `
     -licensetype = ($licensetype = ($thisUser.FieldValues.Licensing.Split(" ")[1].Trim())) `
@@ -373,7 +372,6 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -managerSAM = ($managerSAM = (($thisUser.FieldValues.Line_x0020_Manager.Email).split("@")[0]).replace("."," ")) `
     -businessunit = ($businessunit = ($thisUser.FieldValues.Finance_x0020_Cost_x0020_Attribu.Label)) `
     -jobtitle = ($jobtitle = ($thisUser.FieldValues.Job_x0020_title)) `
-    -plaintextpassword = "$($userProvisionCredentials[0].CustomProperties.Values)" `
     -adCredentials = $adCredentials `
     -restCredentials = $restCredentials `
     -licensetype = ($licensetype = ($thisUser.FieldValues.Office_x0020_365_x0020_license.Split(" ").Trim())) `
