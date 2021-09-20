@@ -120,7 +120,7 @@ function connect-ToExo($credential){
                 }
             Write-Host -f DarkYellow "Importing New-PSSession"
             #Import-Module (Import-PSSession $ExchangeSession -DisableNameChecking -AllowClobber -CommandName *) -Global        
-            Import-Module (Import-PSSession $ExchangeSession -DisableNameChecking) -Global
+            Import-Module (Import-PSSession $ExchangeSession -DisableNameChecking -AllowClobber) -Global
             }
         1 {
             if((Get-Module | ? {$_.ExportedCommands.Keys -contains "Get-Mailbox"}).Count -gt 0)

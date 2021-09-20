@@ -1,11 +1,13 @@
-﻿$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
+﻿start-transcriptLog -thisScriptName "record-licensingUsage"
+
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponseTeamBot = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $itSite = get-graphSite -tokenResponse $tokenResponseTeamBot -serverRelativeUrl "/teams/IT_Team_All_365" -Verbose
 $licensingList = get-graphList -tokenResponse $tokenResponseTeamBot -graphSiteId $itSite.id -listName "365 Licensing Logs" -Verbose
 $licensingListItem = get-graphListItems -tokenResponse $tokenResponseTeamBot -graphSiteId $itSite.id -listId $licensingList.id -expandAllFields -filterId 10000 -Verbose
 
-$allLicensedUsers = get-graphUsersWithEmployeeInfoExtensions -tokenResponse $tokenResponseTeamBot -selectAllProperties -filterNone
+$allLicensedUsers = get-graphUsers -tokenResponse $tokenResponseTeamBot -selectAllProperties -filterLicensedUsers
 
 
 $allLicensedUsers | % {
@@ -41,3 +43,5 @@ $allLicensedUsers | % {
         }
     
     }
+
+Stop-Transcript

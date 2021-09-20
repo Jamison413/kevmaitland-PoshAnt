@@ -94,6 +94,14 @@ $offices += [ordered]@{
     OfficeDesks=0
     ShiftNotes="Oxford employees to use Wheelhouse booking system - do not need to duplicate bookings on Shifts"
     }
+$offices += [ordered]@{
+    OfficeName="GBR-Edinburgh"
+    OfficeColour="Yellow"
+    OfficeWeekendColour="darkPurple"
+    OfficeDesks=6
+    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office pleas"
+    }
+
 
 #$teamId = "2bea0e44-9491-4c30-9e8f-7620ccacac73" #Teams Testing Team
 $teamId = "549dd0d0-251f-4c23-893e-9d0c31c2dc13" #All (GBR)

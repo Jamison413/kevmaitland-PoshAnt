@@ -151,16 +151,18 @@ function new-mdmLocalAdminPolicy(){
         ,[parameter(Mandatory = $true)]
             [ValidatePattern(".[@].")]
             [string]$userUPN
-        ,[parameter(Mandatory = $true,ParameterSet="DeviceName")]
+        ,[parameter(Mandatory = $true,ParameterSetName="DeviceName")]
             [string]$deviceName
-        ,[parameter(Mandatory = $true,ParameterSet="FindCurrentDevice")]
+        ,[parameter(Mandatory = $true,ParameterSetName="FindCurrentDevice")]
             [Switch]$currentWindowsDevice
         ,[parameter(Mandatory = $false)]
             [Switch]$removeOtherMembers
         ,[parameter(Mandatory = $false)]
             [Switch]$overrideOtherPolicies
         ,[parameter(Mandatory = $false)]
-            [Switch]$includeDeviceAdmins
+            [Switch]$excludeDeviceAdmins
+        ,[parameter(Mandatory = $false)]
+            [Switch]$excludeGlobalAdmins
         ,[parameter(Mandatory = $false)]
             [Switch]$includeMe
         )
@@ -208,9 +210,13 @@ function new-mdmLocalAdminPolicy(){
         $additionalAdmins = "
     <member name = `"$(Invoke-Expression "whoami")`""
         }
-    if($includeDeviceAdmins){ #This will ad the AAD Device Administrators Role/Group to the Local Admin group
+    if(!$excludeDeviceAdmins){ #This will ad the AAD Device Administrators Role/Group to the Local Admin group
         $additionalAdmins += "
     <member name = `"S-1-12-1-2392505957-1079223134-2636866998-1702916978`""
+        }
+    if(!$excludeGlobalAdmins){ #This will ad the Global Administrators Role/Group to the Local Admin group
+        $additionalAdmins += "
+    <member name = `"S-1-12-1-1468013570-1207587608-3581030542-2751513082`""
         }
     $omaSettingsLocalAdmin = @{
         '@odata.type' = "#microsoft.graph.omaSettingString"

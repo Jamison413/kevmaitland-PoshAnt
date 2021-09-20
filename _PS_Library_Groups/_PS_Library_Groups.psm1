@@ -415,7 +415,7 @@ function new-365Group(){
         else{Write-Error "Combined Security Group [$combinedSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}}
     if(!$managersSg){
         if($WhatIfPreference){Write-Verbose "Managers Security Group [$combinedSgDisplayName] not created because we're only pretending."}
-        else{Write-Error "Managers Security Group [$managersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}}
+        else{Write-Error "Managers Security Group [$managersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation"; break}}
     if(!$membersSg){
         if($WhatIfPreference){Write-Verbose "Members Security Group [$combinedSgDisplayName] not created because we're only pretending."}
         else{Write-Error "Members Security Group [$membersSgDisplayName] not available. Cannot proceed with UnifiedGroup creation";break}}
@@ -529,6 +529,24 @@ function new-365Group(){
     delete-graphDriveItem -tokenResponse $tokenResponse -graphDriveId $graphDrive.id -graphDriveItemId $dummyFolder.id -eTag $dummyFolder.eTag | Out-Null
 
     }
+function new-aliasFromDisplayName(){
+    [CmdletBinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+        [string]$displayName
+        ,[parameter(Mandatory = $false)]
+        [string]$fixedSuffix
+        )
+    #Write-Host -ForegroundColor Magenta "guess-aliasFromDisplayName($displayName)"
+    $newGuid = [GUID]::NewGuid()
+    if(![string]::IsNullOrWhiteSpace($displayName)){$guessedAlias = $displayName.replace(" ","_").Replace("(","").Replace(")","").Replace(",","").Replace("@","").Replace("\","").Replace("[","").Replace("]","").Replace("`"","").Replace(";","").Replace(":","").Replace("<","").Replace(">","")}
+    $newSuffix =  set-suffixAndMaxLength -string $newGuid.Guid -suffix $fixedSuffix -maxLength 64
+    $newAlias = set-suffixAndMaxLength -string $displayName -suffix $newSuffix -maxLength 64
+    $newAlias = sanitise-forMicrosoftEmailAddress -dirtyString $newAlias
+    $newAlias = remove-diacritics -String $newAlias
+    Write-Verbose -Message "new-aliasFromDisplayName($displayName) = [$newAlias]"
+    $newAlias
+    }
 function new-mailEnabledSecurityGroup(){
     [CmdletBinding(SupportsShouldProcess=$true)]
     param(
@@ -550,8 +568,8 @@ function new-mailEnabledSecurityGroup(){
             [bool]$blockExternalMail
         )
     Write-Verbose "new-mailEnabledSecurityGroup([$dgDisplayName], [$description], [$($ownersUpns -join ", ")], [$($membersUpns -join ", ")], [$($memberOf -join ", ")], $hideFromGal, $blockExternalMail)"
-    $mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64 -Verbose
-    write-verbose "#####Mailname: $($mailName)"
+    #$mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64 -Verbose
+    #write-verbose "#####Mailname: $($mailName)"
 
     #Check to see if this already exists. This is based on Alias, which is mutable :(    
     $mesg = rummage-forDistributionGroup -displayName $dgDisplayName
@@ -563,9 +581,9 @@ function new-mailEnabledSecurityGroup(){
         }
     else{ #If the group doesn't exist, try creating it
         try{
-            $mailAlias = $(guess-aliasFromDisplayName $dgDisplayName)
-            Write-Verbose "New-DistributionGroup -Name [$mailName] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($mailAlias+"@anthesisgroup.com") -Notes [$description] -Alias [$mailAlias] -WhatIf:$WhatIfPreference"
-            $mesg = New-DistributionGroup -Name $mailName -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(guess-aliasFromDisplayName -displayName $dgDisplayName -fixedSuffix $fixedSuffix)+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference -ErrorAction Stop
+            $mailAlias = $(new-aliasFromDisplayName $dgDisplayName)
+            Write-Verbose "New-DistributionGroup -Name [$mailAlias] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($(sanitise-forMicrosoftEmailAddress -dirtyString $(set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 100))+"@anthesisgroup.com") -Notes [$description] -Alias [$mailAlias] -WhatIf:$WhatIfPreference"
+            $mesg = New-DistributionGroup -Name $mailAlias -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(sanitise-forMicrosoftEmailAddress -dirtyString $(set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 100))+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference -ErrorAction Stop
             }
         catch{
             if($_ -match "is already being used by the proxy addresses or LegacyExchangeDN of"){ #Name collision, but no DisplayName collision
@@ -583,7 +601,7 @@ function new-mailEnabledSecurityGroup(){
                 }
             else{
                 Write-Error "Error creating new Distribution Group [$($dgDisplayName)] in new-mailEnabledSecurityGroup()"
-                $Error
+                get-errorSummary -errorToSummarise $_
                 }
             }
         }
