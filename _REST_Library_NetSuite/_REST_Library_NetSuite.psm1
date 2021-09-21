@@ -1304,6 +1304,7 @@ function get-netSuiteProjectFromNetSuite(){
     Param (
         [parameter(Mandatory = $true,ParameterSetName="Query")]
             [ValidatePattern('^?[\w+][=][\w+]|^$')]
+            [AllowEmptyString()]
             [string]$query
         ,[parameter(Mandatory=$true,ParameterSetName="Id")]
             [string]$projectId
