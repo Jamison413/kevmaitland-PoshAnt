@@ -76,6 +76,10 @@ $newSchemaDefinition3 = @{
             "name" = "deviceGroupId"
             "type" = "String"
             }
+        @{
+            "name" = "powerBiWorkspaceId"
+            "type" = "String"
+            }
         )
     }
 invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/schemaExtensions" -graphBodyHashtable $newSchemaDefinition -Verbose
