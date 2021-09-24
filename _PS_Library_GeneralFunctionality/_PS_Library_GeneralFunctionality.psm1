@@ -662,34 +662,46 @@ function get-available365licensecount{
         [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true,ParameterSetName="LicenseType")]
-            [ValidateSet("E1", "E3", "EMS", "All")]
+            [ValidateSet("Office_E1", "Office_E3", "EMS_E3", "All")]
             [string[]]$licensetype
             )
             if(![string]::IsNullOrWhiteSpace($licensetype)){
                     switch ($licensetype){
-                        "E1" {
+                        "Office_E1" {
                             $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
                         }
-                        "E3" {
+                        "Office_E3" {
                             $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
                         }
-                        "EMS"{
+                        "EMS_E3"{
                             $availableLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
                         }
                         "All"{
-                            $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:STANDARDPACK"
-                            $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:ENTERPRISEPACK"
-                            $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:EMS"
+                            $availableE1Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Office_E1")" #"AnthesisLLC:STANDARDPACK"
+                            $availableE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Office_E3")" #"AnthesisLLC:ENTERPRISEPACK"
+                            $availableE5Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Office_E5")" #"AnthesisLLC:ENTERPRISEPACK"
+                            $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "EMS_E3")" #"AnthesisLLC:EMS"
+                            $availableMDELicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "MDE")" #"AnthesisLLC:EMS"
+                            $availableAudioLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "TeamsAudioConferencing")" #"AnthesisLLC:EMS"
+                            $availableWinE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Win_E3")" #"AnthesisLLC:EMS"
+                            $availableME3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Microsoft_E3")" #"AnthesisLLC:EMS"
+                            $availableME5Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Microsoft_E5")" #"AnthesisLLC:EMS"
                             }
                         
                         }
-                        If(("E1" -eq $licensetype) -or ("E3" -eq $licensetype) -or ("EMS" -eq $licensetype)){
+                        If(("Office_E1" -eq $licensetype) -or ("Office_E3" -eq $licensetype) -or ("EMS_E3" -eq $licensetype)){
                             Write-Host "$($licensetype)" "license count:" "$($availableLicenses.ConsumedUnits)"  "/"  "$($availableLicenses.ActiveUnits)" -ForegroundColor Yellow
                         }
                         Else{
-                            Write-Host "Available E1 license count: "$($availableE1Licenses.ConsumedUnits)"  "/"  "$($availableE1Licenses.ActiveUnits)"" -ForegroundColor Yellow
-                            Write-Host "Available E3 license count: "$($availableE3Licenses.ConsumedUnits)"  "/"  "$($availableE3Licenses.ActiveUnits)"" -ForegroundColor Yellow
-                            Write-Host "Available EMS license count: "$($availableEMSLicenses.ConsumedUnits)"  "/"  "$($availableEMSLicenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available Office_E1 license count:`t`t"$($availableE1Licenses.ConsumedUnits)"`t/`t"$($availableE1Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available Office_E3 license count:`t`t"$($availableE3Licenses.ConsumedUnits)"`t/`t"$($availableE3Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available Office_E5 license count:`t`t"$($availableE5Licenses.ConsumedUnits)"`t/`t"$($availableE5Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available EMS_E3 license count:`t`t`t"$($availableEMSLicenses.ConsumedUnits)"`t/`t"$($availableEMSLicenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available MDE license count:`t`t`t"$($availableMDELicenses.ConsumedUnits)"`t/`t"$($availableMDELicenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available TeamsAudioConf license count:`t"$($availableAudioLicenses.ConsumedUnits)"`t/`t"$($availableAudioLicenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available Win_E3 license count:`t`t`t"$($availableWinE3Licenses.ConsumedUnits)"`t/`t"$($availableWinE3Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available Microsoft_E3 license count:`t"$($availableME3Licenses.ConsumedUnits)"`t/`t"$($availableME3Licenses.ActiveUnits)"" -ForegroundColor Yellow
+                            Write-Host "Available Microsoft_E5 license count:`t"$($availableME5Licenses.ConsumedUnits)"`t/`t"$($availableME5Licenses.ActiveUnits)"" -ForegroundColor Yellow
                         }
             }
 }
@@ -892,7 +904,7 @@ function get-microsoftProductInfo(){
     [cmdletbinding()]
     Param (
         [parameter(Mandatory = $true)]
-            [ValidateSet("FriendlyName","MSProductName","MSStringID","GUID","intY")]
+            [ValidateSet("FriendlyName","MSProductName","MSStringID","GUID","intY","Cost")]
             [string]$getType
         ,[parameter(Mandatory = $true)]
             [ValidateSet("FriendlyName","MSProductName","MSStringID","GUID","intY")]
@@ -908,17 +920,111 @@ function get-microsoftProductInfo(){
         "MSStringID" {$getId = 2}
         "GUID" {$getId = 3}
         "intY" {$getId = 4}
+        "Cost" {$getId = 5}
         }
     switch($fromType){
         "FriendlyName" {$fromId = 0}
         "MSProductName" {$fromId = 1}
         "MSStringID" {$fromId = 2}
         "GUID" {$fromId = 3}
-        "intY" {$getId = 4}
+        "intY" {$fromId = 4}
         }
     Write-Verbose "getId = [$getId]"
     Write-Verbose "fromId = [$fromId]"
     $productList = @(
+<<<<<<< HEAD
+        @("TeamsAudioConferencing","AUDIO CONFERENCING","MCOMEETADV","0c266dff-15dd-4b49-8397-2bb16070ed52","Skype for Business PSTN Conferencing (CSP)","4"),
+        @("AZURE ACTIVE DIRECTORY BASIC","AZURE ACTIVE DIRECTORY BASIC","AAD_BASIC","2b9c8e7c-319c-43a2-a2a0-48c5c6161de7","AZURE ACTIVE DIRECTORY BASIC",""),
+        @("AZURE ACTIVE DIRECTORY PREMIUM P1","AZURE ACTIVE DIRECTORY PREMIUM P1","AAD_PREMIUM","078d2b04-f1bd-4111-bbd4-b4b1b354cef4","AZURE ACTIVE DIRECTORY PREMIUM P1",""),
+        @("AZURE ACTIVE DIRECTORY PREMIUM P2","AZURE ACTIVE DIRECTORY PREMIUM P2","AAD_PREMIUM_P2","84a661c4-e949-4bd2-a560-ed7766fcaf2b","AZURE ACTIVE DIRECTORY PREMIUM P2",""),
+        @("AZURE INFORMATION PROTECTION PLAN 1","AZURE INFORMATION PROTECTION PLAN 1","RIGHTSMANAGEMENT","c52ea49f-fe5d-4e95-93ba-1de91d380f89","AZURE INFORMATION PROTECTION PLAN 1",""),
+        @("DYNAMICS 365 CUSTOMER ENGAGEMENT PLAN ENTERPRISE EDITION","DYNAMICS 365 CUSTOMER ENGAGEMENT PLAN ENTERPRISE EDITION","DYN365_ENTERPRISE_PLAN1","ea126fc5-a19e-42e2-a731-da9d437bffcf","DYNAMICS 365 CUSTOMER ENGAGEMENT PLAN ENTERPRISE EDITION",""),
+        @("DYNAMICS 365 FOR CUSTOMER SERVICE ENTERPRISE EDITION","DYNAMICS 365 FOR CUSTOMER SERVICE ENTERPRISE EDITION","DYN365_ENTERPRISE_CUSTOMER_SERVICE","749742bf-0d37-4158-a120-33567104deeb","DYNAMICS 365 FOR CUSTOMER SERVICE ENTERPRISE EDITION",""),
+        @("DYNAMICS 365 FOR FINANCIALS BUSINESS EDITION","DYNAMICS 365 FOR FINANCIALS BUSINESS EDITION","DYN365_FINANCIALS_BUSINESS_SKU","cc13a803-544e-4464-b4e4-6d6169a138fa","DYNAMICS 365 FOR FINANCIALS BUSINESS EDITION",""),
+        @("DYNAMICS 365 FOR SALES AND CUSTOMER SERVICE ENTERPRISE EDITION","DYNAMICS 365 FOR SALES AND CUSTOMER SERVICE ENTERPRISE EDITION","DYN365_ENTERPRISE_SALES_CUSTOMERSERVICE","8edc2cf8-6438-4fa9-b6e3-aa1660c640cc","DYNAMICS 365 FOR SALES AND CUSTOMER SERVICE ENTERPRISE EDITION",""),
+        @("DYNAMICS 365 FOR SALES ENTERPRISE EDITION","DYNAMICS 365 FOR SALES ENTERPRISE EDITION","DYN365_ENTERPRISE_SALES","1e1a282c-9c54-43a2-9310-98ef728faace","DYNAMICS 365 FOR SALES ENTERPRISE EDITION",""),
+        @("DYNAMICS 365 FOR TEAM MEMBERS ENTERPRISE EDITION","DYNAMICS 365 FOR TEAM MEMBERS ENTERPRISE EDITION","DYN365_ENTERPRISE_TEAM_MEMBERS","8e7a3d30-d97d-43ab-837c-d7701cef83dc","DYNAMICS 365 FOR TEAM MEMBERS ENTERPRISE EDITION",""),
+        @("DYNAMICS 365 UNF OPS PLAN ENT EDITION","DYNAMICS 365 UNF OPS PLAN ENT EDITION","Dynamics_365_for_Operations","ccba3cfe-71ef-423a-bd87-b6df3dce59a9","DYNAMICS 365 UNF OPS PLAN ENT EDITION",""),
+        @("EMS_E3","ENTERPRISE MOBILITY + SECURITY E3","EMS","efccb6f7-5641-4e0e-bd10-b4976e1bf68e","Enterprise Mobility + Security (E3) (CSP)","8.36"),
+        @("EMS_E5","ENTERPRISE MOBILITY + SECURITY E5","EMSPREMIUM","b05e124f-c7cc-45a0-a6aa-8cf78c946968","ENTERPRISE MOBILITY + SECURITY E5",""),
+        @("EXCHANGE ONLINE (PLAN 1)","EXCHANGE ONLINE (PLAN 1)","EXCHANGESTANDARD","4b9405b0-7788-4568-add1-99614e613b69","EXCHANGE ONLINE (PLAN 1)",""),
+        @("EXCHANGE ONLINE (PLAN 2)","EXCHANGE ONLINE (PLAN 2)","EXCHANGEENTERPRISE","19ec0d23-8335-4cbd-94ac-6050e30712fa","EXCHANGE ONLINE (PLAN 2)",""),
+        @("EXCHANGE ONLINE ARCHIVING FOR EXCHANGE ONLINE","EXCHANGE ONLINE ARCHIVING FOR EXCHANGE ONLINE","EXCHANGEARCHIVE_ADDON","ee02fd1b-340e-4a4b-b355-4a514e4c8943","EXCHANGE ONLINE ARCHIVING FOR EXCHANGE ONLINE",""),
+        @("EXCHANGE ONLINE ARCHIVING FOR EXCHANGE SERVER","EXCHANGE ONLINE ARCHIVING FOR EXCHANGE SERVER","EXCHANGEARCHIVE","90b5e015-709a-4b8b-b08e-3200f994494c","EXCHANGE ONLINE ARCHIVING FOR EXCHANGE SERVER",""),
+        @("EXCHANGE ONLINE ESSENTIALS","EXCHANGE ONLINE ESSENTIALS","EXCHANGEESSENTIALS","7fc0182e-d107-4556-8329-7caaa511197b","EXCHANGE ONLINE ESSENTIALS",""),
+        @("EXCHANGE ONLINE ESSENTIALS","EXCHANGE ONLINE ESSENTIALS","EXCHANGE_S_ESSENTIALS","e8f81a67-bd96-4074-b108-cf193eb9433b","EXCHANGE ONLINE ESSENTIALS",""),
+        @("Kiosk_K1","EXCHANGE ONLINE KIOSK","EXCHANGEDESKLESS","80b2d799-d2ba-4d2a-8842-fb0d0f3a4b82","Exchange Online Kiosk (CSP)","1.9"),
+        @("EXCHANGE ONLINE POP","EXCHANGE ONLINE POP","EXCHANGETELCO","cb0a98a8-11bc-494c-83d9-c1b1ac65327e","EXCHANGE ONLINE POP",""),
+        @("INTUNE","INTUNE","INTUNE_A","061f9ace-7d42-4136-88ac-31dc755f143f","INTUNE",""),
+        @("Microsoft 365 A1","Microsoft 365 A1","M365EDU_A1","b17653a4-2443-4e8c-a550-18249dda78bb","Microsoft 365 A1",""),
+        @("Microsoft 365 A3 for faculty","Microsoft 365 A3 for faculty","M365EDU_A3_FACULTY","4b590615-0888-425a-a965-b3bf7789848d","Microsoft 365 A3 for faculty",""),
+        @("Microsoft 365 A3 for students","Microsoft 365 A3 for students","M365EDU_A3_STUDENT","7cfd9a2b-e110-4c39-bf20-c6a3f36a3121","Microsoft 365 A3 for students",""),
+        @("Microsoft 365 A5 for faculty","Microsoft 365 A5 for faculty","M365EDU_A5_FACULTY","e97c048c-37a4-45fb-ab50-922fbf07a370","Microsoft 365 A5 for faculty",""),
+        @("Microsoft 365 A5 for students","Microsoft 365 A5 for students","M365EDU_A5_STUDENT","46c119d4-0379-4a9d-85e4-97c66d3f909e","Microsoft 365 A5 for students",""),
+        @("MICROSOFT 365 BUSINESS","MICROSOFT 365 BUSINESS","SPB","cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46","MICROSOFT 365 BUSINESS",""),
+        @("Microsoft_E3","MICROSOFT 365 E3","SPE_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","MICROSOFT 365 E3","32"),
+        @("Microsoft_E5","Microsoft 365 E5","SPE_E5","06ebc4ee-1bb5-47dd-8120-11324bc54e06","Microsoft 365 E5",""),
+        @("Microsoft 365 E3_USGOV_DOD","Microsoft 365 E3_USGOV_DOD","SPE_E3_USGOV_DOD","d61d61cc-f992-433f-a577-5bd016037eeb","Microsoft 365 E3_USGOV_DOD",""),
+        @("Microsoft 365 E3_USGOV_GCCHIGH","Microsoft 365 E3_USGOV_GCCHIGH","SPE_E3_USGOV_GCCHIGH","ca9d1dd9-dfe9-4fef-b97c-9bc1ea3c3658","Microsoft 365 E3_USGOV_GCCHIGH",""),
+        @("Microsoft 365 E5 Compliance","Microsoft 365 E5 Compliance","INFORMATION_PROTECTION_COMPLIANCE","184efa21-98c3-4e5d-95ab-d07053a96e67","Microsoft 365 E5 Compliance",""),
+        @("Microsoft 365 E5 Security","Microsoft 365 E5 Security","IDENTITY_THREAT_PROTECTION","26124093-3d78-432b-b5dc-48bf992543d5","Microsoft 365 E5 Security",""),
+        @("Microsoft 365 E5 Security for EMS E5","Microsoft 365 E5 Security for EMS E5","IDENTITY_THREAT_PROTECTION_FOR_EMS_E5","44ac31e7-2999-4304-ad94-c948886741d4","Microsoft 365 E5 Security for EMS E5",""),
+        @("Microsoft 365 F1","Microsoft 365 F1","SPE_F1","66b55226-6b4f-492c-910c-a3b7a3c9d993","Microsoft 365 F1",""),
+        @("MDE","Microsoft Defender Advanced Threat Protection","MDATP_XPLAT","b126b073-72db-4a9d-87a4-b17afe41d4ab","Microsoft Defender Advanced Threat Protection","5.2"),
+        @("MICROSOFT DYNAMICS CRM ONLINE BASIC","MICROSOFT DYNAMICS CRM ONLINE BASIC","CRMPLAN2","906af65a-2970-46d5-9b58-4e9aa50f0657","MICROSOFT DYNAMICS CRM ONLINE BASIC",""),
+        @("MICROSOFT DYNAMICS CRM ONLINE","MICROSOFT DYNAMICS CRM ONLINE","CRMSTANDARD","d17b27af-3f49-4822-99f9-56a661538792","MICROSOFT DYNAMICS CRM ONLINE",""),
+        @("MS IMAGINE ACADEMY","MS IMAGINE ACADEMY","IT_ACADEMY_AD","ba9a34de-4489-469d-879c-0f0f145321cd","MS IMAGINE ACADEMY",""),
+        @("Office 365 A5 for faculty","Office 365 A5 for faculty","ENTERPRISEPREMIUM_FACULTY","a4585165-0533-458a-97e3-c400570268c4","Office 365 A5 for faculty",""),
+        @("Office 365 A5 for students","Office 365 A5 for students","ENTERPRISEPREMIUM_STUDENT","ee656612-49fa-43e5-b67e-cb1fdf7699df","Office 365 A5 for students",""),
+        @("Office 365 Advanced Compliance","Office 365 Advanced Compliance","EQUIVIO_ANALYTICS","1b1b1f7a-8355-43b6-829f-336cfccb744c","Office 365 Advanced Compliance",""),
+        @("AdvancedSpam","Office 365 Advanced Threat Protection (Plan 1)","ATP_ENTERPRISE","4ef96642-f096-40de-a3e9-d83fb2f90211","Office 365 Advanced Threat Protection (Plan 1)","1.9"),
+        @("OFFICE 365 BUSINESS","OFFICE 365 BUSINESS","O365_BUSINESS","cdd28e44-67e3-425e-be4c-737fab2899d3","OFFICE 365 BUSINESS",""),
+        @("OFFICE 365 BUSINESS","OFFICE 365 BUSINESS","SMB_BUSINESS","b214fe43-f5a3-4703-beeb-fa97188220fc","OFFICE 365 BUSINESS",""),
+        @("OFFICE 365 BUSINESS ESSENTIALS","OFFICE 365 BUSINESS ESSENTIALS","O365_BUSINESS_ESSENTIALS","3b555118-da6a-4418-894f-7df1e2096870","OFFICE 365 BUSINESS ESSENTIALS",""),
+        @("OFFICE 365 BUSINESS ESSENTIALS","OFFICE 365 BUSINESS ESSENTIALS","SMB_BUSINESS_ESSENTIALS","dab7782a-93b1-4074-8bb1-0e61318bea0b","OFFICE 365 BUSINESS ESSENTIALS",""),
+        @("OFFICE 365 BUSINESS PREMIUM","OFFICE 365 BUSINESS PREMIUM","O365_BUSINESS_PREMIUM","f245ecc8-75af-4f8e-b61f-27d8114de5f3","OFFICE 365 BUSINESS PREMIUM",""),
+        @("OFFICE 365 BUSINESS PREMIUM","OFFICE 365 BUSINESS PREMIUM","SMB_BUSINESS_PREMIUM","ac5cef5d-921b-4f97-9ef3-c99076e5470f","OFFICE 365 BUSINESS PREMIUM",""),
+        @("Office_E1","OFFICE 365 E1","STANDARDPACK","18181a46-0d4e-45cd-891e-60aabd171b4e","Office 365 Enterprise E1 (CSP)","7.6"),
+        @("OFFICE 365 E2","OFFICE 365 E2","STANDARDWOFFPACK","6634e0ce-1a9f-428c-a498-f84ec7b8aa2e","OFFICE 365 E2",""),
+        @("Office_E3","OFFICE 365 E3","ENTERPRISEPACK","6fd2c87f-b296-42f0-b197-1e91e994b900","Office 365 Enterprise E3 (CSP)","19"),
+        @("OFFICE 365 E3 DEVELOPER","OFFICE 365 E3 DEVELOPER","DEVELOPERPACK","189a915c-fe4f-4ffa-bde4-85b9628d07a0","OFFICE 365 E3 DEVELOPER",""),
+        @("Office 365 E3_USGOV_DOD","Office 365 E3_USGOV_DOD","ENTERPRISEPACK_USGOV_DOD","b107e5a3-3e60-4c0d-a184-a7e4395eb44c","Office 365 E3_USGOV_DOD",""),
+        @("Office 365 E3_USGOV_GCCHIGH","Office 365 E3_USGOV_GCCHIGH","ENTERPRISEPACK_USGOV_GCCHIGH","aea38a85-9bd5-4981-aa00-616b411205bf","Office 365 E3_USGOV_GCCHIGH",""),
+        @("OFFICE 365 E4","OFFICE 365 E4","ENTERPRISEWITHSCAL","1392051d-0cb9-4b7a-88d5-621fee5e8711","OFFICE 365 E4",""),
+        @("Office_E5","OFFICE 365 E5","ENTERPRISEPREMIUM","c7df2760-2c81-4ef7-b578-5b5392b571df","Office 365 Enterprise E5","35"),
+        @("OFFICE 365 E5 WITHOUT AUDIO CONFERENCING","OFFICE 365 E5 WITHOUT AUDIO CONFERENCING","ENTERPRISEPREMIUM_NOPSTNCONF","26d45bd9-adf1-46cd-a9e1-51e9a5524128","OFFICE 365 E5 WITHOUT AUDIO CONFERENCING",""),
+        @("OFFICE 365 F1","OFFICE 365 F1","DESKLESSPACK","4b585984-651b-448a-9e53-3b10f069cf7f","OFFICE 365 F1",""),
+        @("OFFICE 365 MIDSIZE BUSINESS","OFFICE 365 MIDSIZE BUSINESS","MIDSIZEPACK","04a7fb0d-32e0-4241-b4f5-3f7618cd1162","OFFICE 365 MIDSIZE BUSINESS",""),
+        @("OFFICE 365 PROPLUS","OFFICE 365 PROPLUS","OFFICESUBSCRIPTION","c2273bd0-dff7-4215-9ef5-2c7bcfb06425","OFFICE 365 PROPLUS",""),
+        @("OFFICE 365 SMALL BUSINESS","OFFICE 365 SMALL BUSINESS","LITEPACK","bd09678e-b83c-4d3f-aaba-3dad4abd128b","OFFICE 365 SMALL BUSINESS",""),
+        @("OFFICE 365 SMALL BUSINESS PREMIUM","OFFICE 365 SMALL BUSINESS PREMIUM","LITEPACK_P2","fc14ec4a-4169-49a4-a51e-2c852931814b","OFFICE 365 SMALL BUSINESS PREMIUM",""),
+        @("OneDrive","ONEDRIVE FOR BUSINESS (PLAN 1)","WACONEDRIVESTANDARD","e6778190-713e-4e4f-9119-8b8238de25df","ONEDRIVE FOR BUSINESS (PLAN 1)",""),
+        @("ONEDRIVE FOR BUSINESS (PLAN 2)","ONEDRIVE FOR BUSINESS (PLAN 2)","WACONEDRIVEENTERPRISE","ed01faf2-1d88-4947-ae91-45ca18703a96","ONEDRIVE FOR BUSINESS (PLAN 2)",""),
+        @("POWER APPS PER USER PLAN","POWER APPS PER USER PLAN","POWERAPPS_PER_USER","b30411f5-fea1-4a59-9ad9-3db7c7ead579","POWER APPS PER USER PLAN",""),
+        @("POWER BI FOR OFFICE 365 ADD_ON","POWER BI FOR OFFICE 365 ADD-ON","POWER_BI_ADDON","45bc2c81-6072-436a-9b0b-3b12eefbc402","POWER BI FOR OFFICE 365 ADD-ON",""),
+        @("PowerBIFree","POWER BI FREE","POWER_BI_FREE","a403ebcc-fae0-4ca2-8c8c-7a907fd6c235","Zero cost Power BI licence",""),
+        @("POWER_BI_PRO","POWER BI PRO","POWER_BI_PRO","f8a1db68-be16-40ed-86d5-cb42ce701560","POWER BI PRO","10"),
+        @("PROJECT FOR OFFICE 365","PROJECT FOR OFFICE 365","PROJECTCLIENT","a10d5e58-74da-4312-95c8-76be4e5b75a0","PROJECT FOR OFFICE 365",""),
+        @("PROJECT ONLINE ESSENTIALS","PROJECT ONLINE ESSENTIALS","PROJECTESSENTIALS","776df282-9fc0-4862-99e2-70e561b9909e","PROJECT ONLINE ESSENTIALS",""),
+        @("PROJECT ONLINE PREMIUM","PROJECT ONLINE PREMIUM","PROJECTPREMIUM","09015f9f-377f-4538-bbb5-f75ceb09358a","PROJECT ONLINE PREMIUM",""),
+        @("PROJECT ONLINE PREMIUM WITHOUT PROJECT CLIENT","PROJECT ONLINE PREMIUM WITHOUT PROJECT CLIENT","PROJECTONLINE_PLAN_1","2db84718-652c-47a7-860c-f10d8abbdae3","PROJECT ONLINE PREMIUM WITHOUT PROJECT CLIENT",""),
+        @("Project","PROJECT ONLINE PROFESSIONAL","PROJECTPROFESSIONAL","53818b1b-4a27-454b-8896-0dba576410e6","Microsoft Project Plan 3","28.5"),
+        @("PROJECT ONLINE WITH PROJECT FOR OFFICE 365","PROJECT ONLINE WITH PROJECT FOR OFFICE 365","PROJECTONLINE_PLAN_2","f82a60b8-1ee3-4cfb-a4fe-1c6a53c2656c","PROJECT ONLINE WITH PROJECT FOR OFFICE 365",""),
+        @("SHAREPOINT ONLINE (PLAN 1)","SHAREPOINT ONLINE (PLAN 1)","SHAREPOINTSTANDARD","1fc08a02-8b3d-43b9-831e-f76859e04e1a","SHAREPOINT ONLINE (PLAN 1)",""),
+        @("SHAREPOINT ONLINE (PLAN 2)","SHAREPOINT ONLINE (PLAN 2)","SHAREPOINTENTERPRISE","a9732ec9-17d9-494c-a51c-d6b45b384dcb","SHAREPOINT ONLINE (PLAN 2)",""),
+        @("SKYPE FOR BUSINESS CLOUD PBX","SKYPE FOR BUSINESS CLOUD PBX","MCOEV","e43b5b99-8dfb-405f-9987-dc307f34bcbd","SKYPE FOR BUSINESS CLOUD PBX",""),
+        @("SKYPE FOR BUSINESS ONLINE (PLAN 1)","SKYPE FOR BUSINESS ONLINE (PLAN 1)","MCOIMP","b8b749f8-a4ef-4887-9539-c95b1eaa5db7","SKYPE FOR BUSINESS ONLINE (PLAN 1)",""),
+        @("SKYPE FOR BUSINESS ONLINE (PLAN 2)","SKYPE FOR BUSINESS ONLINE (PLAN 2)","MCOSTANDARD","d42c793f-6c78-4f43-92ca-e8f6a02b035f","SKYPE FOR BUSINESS ONLINE (PLAN 2)",""),
+        @("CallingPlan_International","SKYPE FOR BUSINESS PSTN DOMESTIC AND INTERNATIONAL CALLING","MCOPSTN2","d3b4fe1f-9992-4930-8acb-ca6ec609365e","Skype for Business PSTN Domestic/Local and International Calling","24"),
+        @("CallingPlan_Domestic","SKYPE FOR BUSINESS PSTN DOMESTIC CALLING","MCOPSTN1","0dab259f-bf13-4952-b7f8-7db8f131b28d","Skype for Business PSTN Domestic/Local Calling","12"),
+        @("InternationalCalling","SKYPE FOR BUSINESS PSTN DOMESTIC CALLING (120 Minutes)","MCOPSTN5","54a152dc-90de-4996-93d2-bc47e670fc06","SKYPE FOR BUSINESS PSTN DOMESTIC CALLING (120 Minutes)",""),
+        @("VISIO ONLINE PLAN 1","VISIO ONLINE PLAN 1","VISIOONLINE_PLAN1","4b244418-9658-4451-a2b8-b5e2b364e9bd","VISIO ONLINE PLAN 1",""),
+        @("Visio","VISIO Online Plan 2","VISIOCLIENT","c5928f49-12ba-48f7-ada3-0d743a3601d5","Visio Pro for Office 365 (CSP)","14.25"),
+        @("Win_E3","WINDOWS 10 ENTERPRISE E3","Win10_VDA_E3","6a0f6da5-0b87-4190-a6ae-9bb5a2b9546a","WINDOWS 10 ENTERPRISE E3","7"),
+        @("Win_E5","Windows 10 Enterprise E5","WIN10_VDA_E5","488ba24a-39a9-4473-8ee5-19291e71b002","Windows 10 Enterprise E5",""),
+        @("PowerAutomateFree","FLOW_FREE","FLOW_FREE","f30db892-07e9-47e9-837c-80727f46fd3d","Zero cost Power Automate (Flow) licence",""),
+        @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM","")
+=======
         @("AudioConferencing","AUDIO CONFERENCING","MCOMEETADV","0c266dff-15dd-4b49-8397-2bb16070ed52","Skype for Business PSTN Conferencing (CSP)"),
         @("AZURE ACTIVE DIRECTORY BASIC","AZURE ACTIVE DIRECTORY BASIC","AAD_BASIC","2b9c8e7c-319c-43a2-a2a0-48c5c6161de7","AZURE ACTIVE DIRECTORY BASIC"),
         @("AZURE ACTIVE DIRECTORY PREMIUM P1","AZURE ACTIVE DIRECTORY PREMIUM P1","AAD_PREMIUM","078d2b04-f1bd-4111-bbd4-b4b1b354cef4","AZURE ACTIVE DIRECTORY PREMIUM P1"),
@@ -1012,6 +1118,7 @@ function get-microsoftProductInfo(){
         @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM")
 
          
+>>>>>>> 36c96981b5e8b2e9801b6465b05c92a49e716e54
         )
     $foundProduct = $productList | ? {$_[$fromId] -eq $fromValue} 
     $foundProduct[$getId]
