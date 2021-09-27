@@ -6,7 +6,7 @@ Import-Module _PNP_Library_SPO
 
 
 $Admin = "kimblebot@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
+$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\kimblebot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass

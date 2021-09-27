@@ -80,7 +80,7 @@ Import-Module _PS_Library_UserManagement.psm1
 
 $Admin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
+$AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Downloads\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
@@ -97,7 +97,7 @@ $spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -Argu
 #$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Downloads\KimbleBot.txt") 
 
 
 $spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
