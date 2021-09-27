@@ -932,7 +932,7 @@ function get-microsoftProductInfo(){
     Write-Verbose "getId = [$getId]"
     Write-Verbose "fromId = [$fromId]"
     $productList = @(
-<<<<<<< HEAD
+#<<<<<<< HEAD
         @("TeamsAudioConferencing","AUDIO CONFERENCING","MCOMEETADV","0c266dff-15dd-4b49-8397-2bb16070ed52","Skype for Business PSTN Conferencing (CSP)","4"),
         @("AZURE ACTIVE DIRECTORY BASIC","AZURE ACTIVE DIRECTORY BASIC","AAD_BASIC","2b9c8e7c-319c-43a2-a2a0-48c5c6161de7","AZURE ACTIVE DIRECTORY BASIC",""),
         @("AZURE ACTIVE DIRECTORY PREMIUM P1","AZURE ACTIVE DIRECTORY PREMIUM P1","AAD_PREMIUM","078d2b04-f1bd-4111-bbd4-b4b1b354cef4","AZURE ACTIVE DIRECTORY PREMIUM P1",""),
@@ -1118,7 +1118,7 @@ function get-microsoftProductInfo(){
         @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM")
 
          
->>>>>>> 36c96981b5e8b2e9801b6465b05c92a49e716e54
+#>>>>>>> 36c96981b5e8b2e9801b6465b05c92a49e716e54
         )
     $foundProduct = $productList | ? {$_[$fromId] -eq $fromValue} 
     $foundProduct[$getId]
