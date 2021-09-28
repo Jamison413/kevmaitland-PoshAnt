@@ -625,6 +625,10 @@ function get-graphDriveItems(){
             [parameter(Mandatory = $false,ParameterSetName = "itemId")]
             [parameter(Mandatory = $false,ParameterSetName = "path")]
             [string]$filterNameRegex
+        ,[parameter(Mandatory = $false,ParameterSetName = "root")]
+            [parameter(Mandatory = $false,ParameterSetName = "itemId")]
+            [parameter(Mandatory = $false,ParameterSetName = "path")]
+            [switch]$includePreviousVersions
         )
     
     if($returnWhat -eq "Children"){$getChildren = "/children"}
@@ -633,22 +637,27 @@ function get-graphDriveItems(){
         "root" {
             $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root$getChildren" #-ErrorAction $ErrorActionPreference
             if($filterNameRegex){$results | ? {$_.name -match $filterNameRegex}}
-            else{$results}
-            return
             }
         "itemId" { 
             $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/items/$itemGraphId$getChildren" #-ErrorAction $ErrorActionPreference
             if($filterNameRegex){$results | ? {$_.name -match $filterNameRegex}}
-            else{$results}
-            return
             }
         "path" { 
             $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$driveGraphId/root:/$folderPathRelativeToRoot`:$getChildren" #-ErrorAction $ErrorActionPreference
             if($filterNameRegex){$results | ? {$_.name -match $filterNameRegex}}
-            else{$results}
-            return
             }
         }
+    if($includePreviousVersions){
+        $results | % {
+            $thisItem = $_
+            $thisItemPreviousVersions = @()
+            $thisItemPreviousVersions += invoke-graphGet -tokenResponse $tokenResponseSharePointBot -graphQuery "/drives/$($thisItem.parentReference.driveId)/items/$($thisItem.id)/versions"
+            $thisItem | Add-Member -MemberType NoteProperty -Name PreviousVersions -Value $thisItemPreviousVersions
+            }
+        $results
+        }
+    else{$results}
+    return
     
     }
 function get-graphDrives(){
