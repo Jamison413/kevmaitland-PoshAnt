@@ -932,7 +932,7 @@ function get-microsoftProductInfo(){
     Write-Verbose "getId = [$getId]"
     Write-Verbose "fromId = [$fromId]"
     $productList = @(
-        @("TeamsAudioConferencing","AUDIO CONFERENCING","MCOMEETADV","0c266dff-15dd-4b49-8397-2bb16070ed52","Skype for Business PSTN Conferencing (CSP)","4"),
+        @("TeamsAudioConferencing","AUDIO CONFERENCING","MCOMEETADV","0c266dff-15dd-4b49-8397-2bb16070ed52","Microsoft 365 Audio Conferencing","4"),
         @("AZURE ACTIVE DIRECTORY BASIC","AZURE ACTIVE DIRECTORY BASIC","AAD_BASIC","2b9c8e7c-319c-43a2-a2a0-48c5c6161de7","AZURE ACTIVE DIRECTORY BASIC",""),
         @("AZURE ACTIVE DIRECTORY PREMIUM P1","AZURE ACTIVE DIRECTORY PREMIUM P1","AAD_PREMIUM","078d2b04-f1bd-4111-bbd4-b4b1b354cef4","AZURE ACTIVE DIRECTORY PREMIUM P1",""),
         @("AZURE ACTIVE DIRECTORY PREMIUM P2","AZURE ACTIVE DIRECTORY PREMIUM P2","AAD_PREMIUM_P2","84a661c4-e949-4bd2-a560-ed7766fcaf2b","AZURE ACTIVE DIRECTORY PREMIUM P2",""),
@@ -961,7 +961,7 @@ function get-microsoftProductInfo(){
         @("Microsoft 365 A5 for faculty","Microsoft 365 A5 for faculty","M365EDU_A5_FACULTY","e97c048c-37a4-45fb-ab50-922fbf07a370","Microsoft 365 A5 for faculty",""),
         @("Microsoft 365 A5 for students","Microsoft 365 A5 for students","M365EDU_A5_STUDENT","46c119d4-0379-4a9d-85e4-97c66d3f909e","Microsoft 365 A5 for students",""),
         @("MICROSOFT 365 BUSINESS","MICROSOFT 365 BUSINESS","SPB","cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46","MICROSOFT 365 BUSINESS",""),
-        @("Microsoft_E3","MICROSOFT 365 E3","SPE_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","MICROSOFT 365 E3","32"),
+        @("Microsoft_E3","MICROSOFT 365 E3","SPE_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","Microsoft 365 Enterprise E3","32"),
         @("Microsoft_E5","Microsoft 365 E5","SPE_E5","06ebc4ee-1bb5-47dd-8120-11324bc54e06","Microsoft 365 E5",""),
         @("Microsoft 365 E3_USGOV_DOD","Microsoft 365 E3_USGOV_DOD","SPE_E3_USGOV_DOD","d61d61cc-f992-433f-a577-5bd016037eeb","Microsoft 365 E3_USGOV_DOD",""),
         @("Microsoft 365 E3_USGOV_GCCHIGH","Microsoft 365 E3_USGOV_GCCHIGH","SPE_E3_USGOV_GCCHIGH","ca9d1dd9-dfe9-4fef-b97c-9bc1ea3c3658","Microsoft 365 E3_USGOV_GCCHIGH",""),
@@ -1421,9 +1421,9 @@ function start-transcriptLog(){
             [string]$alternativeLogLocation 
         )
 
-    #if(![string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-    #    $thisScriptName = $MyInvocation.ScriptName
-    #    }
+    if(![string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+        $thisScriptName = $MyInvocation.ScriptName
+        }
 
     if(![string]::IsNullOrWhiteSpace($alternativeLogLocation)){
         $logPath = "$alternativeLogLocation\$thisScriptName".Replace('\\','\')
