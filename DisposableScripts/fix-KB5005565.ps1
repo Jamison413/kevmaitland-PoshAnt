@@ -60,4 +60,4 @@
     
     
     }
-add-registryValue -registryPath HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Policies\Microsoft\FeatureManagement -registryKey Overrides -registryValue 2767781516 -registryType DWord 
+add-registryValue -registryPath HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Policies\Microsoft\FeatureManagement\Overrides -registryKey 2767781516 -registryValue 0 -registryType DWord 
