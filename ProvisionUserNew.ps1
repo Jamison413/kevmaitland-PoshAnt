@@ -44,9 +44,14 @@ connect-toAAD -credential $myAdminCreds
 Connect-MsolService -Credential $myAdminCreds
 
 
-#Graph
+#Graph - with Teamsbot
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+
+#Graph - with userBot
+$userBotDetails = get-graphAppClientCredentials -appName UserBot
+$tokenResponse = get-graphTokenResponse -aadAppCreds $userBotDetails
+
 
 #email out
 $smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
@@ -216,10 +221,10 @@ If($selection -ne "B"){
         add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
         $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
         add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
-}
-Else{
-Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
-Write-Error "More than 1 group found for regional group. They haven't been added"
+    }
+    Else{
+    Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
+    Write-Error "More than 1 group found for regional group. They haven't been added"
 }
     #Add to MDM groups - this is for Intune enrollment
     $BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
@@ -314,7 +319,6 @@ if($requests){#Display a subset of Properties to help the user identify the corr
     }
 
 
-
 ForEach($thisUser in $selectedRequests){
 
 If($thisUser.FieldValues.GraphUserGUID){
@@ -389,11 +393,11 @@ If($selection -ne "B"){
     add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
     $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
     add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
-}
-Else{
-Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
-Write-Error "More than 1 group found for regional group. They haven't been added"
-}
+    }
+    Else{
+    Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
+    Write-Error "More than 1 group found for regional group. They haven't been added"
+    }
 }
 Else{
 Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor White
@@ -445,10 +449,6 @@ send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "Shared_Mailbox
 Else{
 Write-Host "User does not appear to be licensed - you can buy and assign licenses and re-run lines 424-432 to send an automated email"
 }
-
-
-
-
 }
 }
 
