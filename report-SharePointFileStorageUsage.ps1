@@ -1,6 +1,7 @@
 ﻿start-transcriptLog -thisScriptName "report-SharePointFileStorageUsage"
 
-$tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName SharePointBot) -grant_type client_credentials
+$sharePointBotDetails = get-graphAppClientCredentials -appName SharePointBot
+$tokenResponseSharePointBot = get-graphTokenResponse -aadAppCreds $sharePointBotDetails -grant_type client_credentials
 $sitesToProcess = @("/clients")
 
 $sitesToProcess | % {
@@ -8,6 +9,7 @@ $sitesToProcess | % {
     Write-Host "Processing Site [$($thisSite.name)][$($thisSite.id)][$($thisSite.webUrl)]"
     $theseDrives = get-graphDrives -tokenResponse $tokenResponseSharePointBot -siteGraphId $thisSite.id
     $theseDrives | % {
+        $tokenResponseSharePointBot = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSharePointBot -renewTokenExpiringInSeconds 60 -aadAppCreds $sharePointBotDetails
         $thisDrive = $_
         Write-Host "`tProcessing Drive [$($thisDrive.name)][$($thisDrive.id)][$($thisDrive.webUrl)]"
         $theseDriveItems = get-graphDriveItems -tokenResponse $tokenResponseSharePointBot -driveGraphId $thisDrive.id -returnWhat Children -includePreviousVersions
@@ -16,6 +18,7 @@ $sitesToProcess | % {
         for ($i=0;$i -lt $output.Count; $i++){
             $output[$i] = [pscustomobject][ordered]@{
                 Name=$theseDriveItems[$i].name
+                DocLib=$thisDrive.name
                 Type=$(
                     if(![string]::IsNullOrWhiteSpace($theseDriveItems[$i].folder)){"folder"}
                     elseif(![string]::IsNullOrWhiteSpace($theseDriveItems[$i].file)){"file"}
@@ -30,7 +33,8 @@ $sitesToProcess | % {
                 }
             }
 
-        $output | Sort-Object WebUrl | Select-Object * | Export-Csv  -Path "$env:USERPROFILE\Downloads\$($thisSite.name)_$($thisDrive.name)_$((Get-Date -f u).Split(" ")[0]).csv" -NoTypeInformation -Force
+        $output | Sort-Object WebUrl | Select-Object * | Export-Csv  -Path "$env:USERPROFILE\Downloads\$($thisSite.name)_$((Get-Date -f u).Split(" ")[0]).csv" -NoTypeInformation -Force -Append
+        #Write-Host "`t`tOutput written to [$("$env:USERPROFILE\Downloads\$($thisSite.name)_$($thisDrive.name)_$((Get-Date -f u).Split(" ")[0]).csv")]"
         Write-Host "`t`tOutput written to [$("$env:USERPROFILE\Downloads\$($thisSite.name)_$($thisDrive.name)_$((Get-Date -f u).Split(" ")[0]).csv")]"
         Write-Host
         }

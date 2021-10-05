@@ -651,7 +651,7 @@ function get-graphDriveItems(){
         $results | % {
             $thisItem = $_
             $thisItemPreviousVersions = @()
-            $thisItemPreviousVersions += invoke-graphGet -tokenResponse $tokenResponseSharePointBot -graphQuery "/drives/$($thisItem.parentReference.driveId)/items/$($thisItem.id)/versions"
+            $thisItemPreviousVersions += invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/drives/$($thisItem.parentReference.driveId)/items/$($thisItem.id)/versions"
             $thisItem | Add-Member -MemberType NoteProperty -Name PreviousVersions -Value $thisItemPreviousVersions
             }
         $results

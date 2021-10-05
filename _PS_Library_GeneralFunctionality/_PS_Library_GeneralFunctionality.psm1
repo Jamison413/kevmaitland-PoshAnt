@@ -1421,9 +1421,9 @@ function start-transcriptLog(){
             [string]$alternativeLogLocation 
         )
 
-    if(![string]::IsNullOrEmpty($MyInvocation.ScriptName)){
-        $thisScriptName = $MyInvocation.ScriptName
-        }
+    #if(![string]::IsNullOrEmpty($MyInvocation.ScriptName)){
+    #    $thisScriptName = $MyInvocation.ScriptName
+    #    }
 
     if(![string]::IsNullOrWhiteSpace($alternativeLogLocation)){
         $logPath = "$alternativeLogLocation\$thisScriptName".Replace('\\','\')

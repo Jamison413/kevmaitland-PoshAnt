@@ -10,6 +10,7 @@
 $tokenResponseTeamsBot = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
 $ukUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis (UK) Ltd (GBR)' -selectAllProperties
 $ukUsers += get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis Energy UK Ltd (GBR)' -selectAllProperties 
+$ukUsers += get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis Consulting Group (GBR)' -selectAllProperties 
 $phlUsers = get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterUsageLocation PH -selectAllProperties
 $phlUsers += get-graphUsers -tokenResponse $tokenResponseTeamsBot -filterBusinessUnit 'Anthesis Philippines Inc. (PHL)' -selectAllProperties
 $phlUsers = $phlUsers | Sort-Object -Unique -Property 'userPrincipalName' 

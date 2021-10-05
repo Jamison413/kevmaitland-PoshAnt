@@ -1,11 +1,13 @@
-﻿$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
+﻿start-transcriptLog -thisScriptName "update-mdmTescoDevices"
+
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $teamBotTokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 $tescoUsersGroupId = "3c48c759-8ce8-4eab-9dc3-984305593446"
 $tescoDevicesGroupId = "35847d50-69c2-4b76-8737-5942954754c4"
 
 $tescoUsers = get-graphUsersFromGroup -tokenResponse $teamBotTokenResponse -groupId $tescoUsersGroupId -memberType TransitiveMembers -returnOnlyLicensedUsers
-$tescoWindowsDevices = get-graphDevices -tokenResponse $teamBotTokenResponse -filterOwnerIds $tescoUsers.id -filterOperatingSystem Windows
+$tescoWindowsDevices = get-graphDevices -tokenResponse $teamBotTokenResponse -filterOwnerIds $tescoUsers.id -filterOperatingSystem Windows -includeOwners
 $currentTescoDevices = get-graphUsersFromGroup -tokenResponse $teamBotTokenResponse -groupId $tescoDevicesGroupId -memberType TransitiveMembers
 if([string]::IsNullOrWhiteSpace($tescoWindowsDevices.Id)){$tescoWindowsDevices = @()}
 if([string]::IsNullOrWhiteSpace($currentTescoDevices.Id)){$currentTescoDevices = @()}
@@ -23,7 +25,15 @@ $delta = $delta.Where({$_.trustType -ne "Workplace"})
 
 
 $toAdd = $delta | ? {$_.SideIndicator -eq "=>"}
-If($toAdd){add-graphUsersToGroup -tokenResponse $teamBotTokenResponse -graphGroupId $tescoDevicesGroupId -memberType Members -graphUserIds $toAdd.id -Verbose}
+If($toAdd){
+    Write-Host "Adding [$($toAdd.displayName)] owned by [$($($tescoUsers | ? {$_.id -eq $([regex]::Matches($toAdd.physicalIds,'\[USER-GID\]\:(.*?)\:').Groups[1].Value)}).displayName)] to [MDM - Tesco Devices]"
+    add-graphUsersToGroup -tokenResponse $teamBotTokenResponse -graphGroupId $tescoDevicesGroupId -memberType Members -graphUserIds $toAdd.id #-Verbose
+    }
 
 $toRemove = $delta | ? {$_.SideIndicator -eq "<="}
-If($toRemove){remove-graphUsersFromGroup -tokenResponse $teamBotTokenResponse -graphGroupId $tescoDevicesGroupId -memberType Members -graphUserIds $toRemove.id -Verbose}
+If($toRemove){
+    Write-Host "Removing [$($toRemove.displayName)] owned by [$($($tescoUsers | ? {$_.id -eq $([regex]::Matches($toRemove.physicalIds,'\[USER-GID\]\:(.*?)\:').Groups[1].Value)}).displayName)] from [MDM - Tesco Devices]"
+    remove-graphUsersFromGroup -tokenResponse $teamBotTokenResponse -graphGroupId $tescoDevicesGroupId -memberType Members -graphUserIds $toRemove.id #-Verbose
+    }
+
+Stop-Transcript
