@@ -21,7 +21,7 @@ $allLicensedUsers | % {
             LicenseName=$(get-microsoftProductInfo -getType intY -fromType GUID -fromValue $thisLicense.skuId -Verbose:$VerbosePreference)
             FriendlyLicenseName=$(get-microsoftProductInfo -getType FriendlyName -fromType GUID -fromValue $thisLicense.skuId -Verbose:$VerbosePreference)
             LicenseCostUSD=$(get-microsoftProductInfo -getType Cost -fromType GUID -fromValue $thisLicense.skuId -Verbose:$VerbosePreference)
-            BusinessUnit=$thisUser.companyName
+            BusinessUnit=$thisUser.anthesisgroup_employeeInfo.businessUnit
             Country=$thisUser.country
             UserPrincipalName=$thisUser.userPrincipalName
             ContractType=$thisUser.anthesisgroup_employeeInfo.contractType
