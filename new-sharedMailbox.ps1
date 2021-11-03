@@ -1,18 +1,15 @@
 ﻿Import-Module _PS_Library_MSOL.psm1
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
+connect-msolService
 connect-ToExo
 
-$displayName = "SMBX - Service Now"
-$primaryEmail = "AnthesisServNow@anthesisgroup.com"
-$owner = "kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Jakob Schenker <Jakob.Schenker@anthesisgroup.com>
-Chantelle Ludski <Chantelle.Ludski@anthesisgroup.com>
-andrew.armstrong@anthesisgroup.com>; 
-Jason Gooden <jason.gooden@anthesisgroup.com
-Wolfgang Wick <Wolfgang.Wick@anthesisgroup.com>
-"
-$additionalEmailAddresses = convertTo-arrayOfEmailAddresses "norskstaging.pec@anthesisgroup.com"
+
+$displayName = "TEST.BlockSignin"
+$primaryEmail = "TEST.BlockSignin@anthesisgroup.com"
+$owner = "rae.victorio@anthesisgroup.com"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Rae Victorio <rae.victorio@anthesisgroup.com>"
+$additionalEmailAddresses = convertTo-arrayOfEmailAddresses "TestBlockSignin@anthesisgroup.com"
 $allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
 $grantSendAsToo = $true
 $hideFromGal = $true
@@ -30,7 +27,20 @@ function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hid
 
 new-sharedMailbox -displayName $displayName -arrayOfFullAccessMembers $arrayOfFullAccessMembers -hideFromGal $hideFromGal -owner $owner -grantSendAsToo $grantSendAsToo
 
-#Set current shared mailbox authentication policy
+
+#Block sign-in for new shared mailbox
+$newsharedmailbox = get-user -Identity $primaryEmail
+If($newsharedmailbox){
+Set-MsolUser -UserPrincipalName $newsharedmailbox.UserPrincipalName -BlockCredential $true
+}
+Else{
+Write-Host "Couldn't find new shared mailbox $($primaryEmail), this could be a time delay - try again in a few minutes" -ForegroundColor Red
+}
+
+
+
+
+<#Set current shared mailbox authentication policy
 $newsharedmailbox = get-user -Identity $primaryEmail
 If($newsharedmailbox){
 Set-User -Identity $newsharedmailbox.UserPrincipalName -AuthenticationPolicy "Allow IMAP"
@@ -38,6 +48,7 @@ Set-User -Identity $newsharedmailbox.UserPrincipalName -AuthenticationPolicy "Al
 Else{
 Write-Host "Couldn't find new shared mailbox $($primaryEmail), this could be a time delay - try again in a few minutes" -ForegroundColor Red
 }
+#>
 
 
 #Add-MailboxPermission -AccessRights fullaccess -Identity nigel.arnott -User mary.short -AutoMapping $true
