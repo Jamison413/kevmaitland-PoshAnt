@@ -73,7 +73,8 @@ foreach ($currentRequest in $selectedRequests){
         "t0-kevin.maitland@anthesisgroup.com" {$thisITuser = "Kevin.Maitland@anthesisgroup.com"}
         "t1-andrew.ost@anthesisgroup.com" {$thisITuser = "Andrew.Ost@anthesisgroup.com"}
         "t1-emily.pressey@anthesisgroup.com" {$thisITuser = "Emily.Pressey@anthesisgroup.com"}
-    }    
+        "t1-rae.victorio@anthesisgroup.com" {$thisITuser = "Rae.Victorio@anthesisgroup.com"}
+        }    
     $managers = $thisITuser
     }
 
