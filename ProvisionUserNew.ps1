@@ -447,7 +447,7 @@ Write-Host "User appears to be licensed, emailing"
 send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "Shared_Mailbox_-_IT_Team_GBR@anthesisgroup.com" -toAddresses $thisUser.FieldValues.Author.Email -subject "New User Requests - $($thisUser.FieldValues.Employee_x0020_Legal_x0020_Name)" -bodyHtml $body -ccAddresses $($thisUser.FieldValues.Line_x0020_Manager.Email) -bccAddresses "IT_Team_GBR@anthesisgroup.com" -Verbose
 }
 Else{
-Write-Host "User does not appear to be licensed - you can buy and assign licenses and re-run lines 424-432 to send an automated email"
+Write-Host "User does not appear to be licensed - you can buy and assign licenses and re-run lines 436-448 to send an automated email"
 }
 }
 }
