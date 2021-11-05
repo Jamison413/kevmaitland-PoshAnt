@@ -189,7 +189,11 @@ foreach($user in $upnsToDeactivate){
             #Initiate Retire on Intune devices
             #
             # ?
-
+            #get line reports and save to clipboard to send in email (we can't define who this needs to be sent to per region as this is an ad-hoc request process at the moment)
+            $userLineReports = Get-AzureADUserDirectReport -ObjectId $userAadObject.ObjectId -All $true
+            Write-Host "User's line reports are (we've copied to your clipboard):" -ForegroundColor Yellow
+            $userLineReports.userPrincipalName
+            Set-Clipboard -Value $userLineReports.userPrincipalName
             }
         }
     }

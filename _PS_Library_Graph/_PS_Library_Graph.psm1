@@ -814,6 +814,8 @@ function get-graphGroups(){
     if($filterClassifcation){$additionalFilters += " and anthesisgroup_UGSync/classification eq '$filterClassifcation'"}
     if($filterPrivacy){$additionalFilters += " and anthesisgroup_UGSync/privacy eq '$filterPrivacy'"}
     if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/deviceGroupId eq '$filterDeviceGroupId'"}
+    if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/powerBiWorkspaceId eq '$filterDeviceGroupId'"}
+    if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/powerBiManagerGroupId eq '$filterDeviceGroupId'"}
     if(![string]::IsNullOrWhiteSpace($filter)){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
