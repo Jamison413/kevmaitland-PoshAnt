@@ -219,3 +219,5 @@ pause
 EXIT /B %errorCode%
 
 #>
+
+Invoke-Command -ScriptBlock {"$env:ProgramFiles\Windows Defender\MpCmdRun.exe -ReloadEngine"}
