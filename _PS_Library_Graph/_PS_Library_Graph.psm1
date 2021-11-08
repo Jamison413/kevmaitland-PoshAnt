@@ -2811,7 +2811,11 @@ function set-graphGroupUGSyncSchemaExtensions(){
         ,[parameter(Mandatory = $false)]
             [string]$combinedGroupId        
         ,[parameter(Mandatory = $false)]
-            [string]$sharedMailboxId        
+            [string]$sharedMailboxId
+        ,[parameter(Mandatory = $false)]
+            [string]$powerBiWorkspaceId
+        ,[parameter(Mandatory = $false)]
+            [string]$powerBiManagerGroupId        
         ,[parameter(Mandatory = $false)]
             [string]$masterMembershipList        
         ,[parameter(Mandatory = $false)]
@@ -2827,6 +2831,8 @@ function set-graphGroupUGSyncSchemaExtensions(){
     if($memberGroupId){$bodyHash["anthesisgroup_UGSync"].Add("memberGroupId",$memberGroupId)}
     if($combinedGroupId){$bodyHash["anthesisgroup_UGSync"].Add("combinedGroupId",$combinedGroupId)}
     if($sharedMailboxId){$bodyHash["anthesisgroup_UGSync"].Add("sharedMailboxId",$sharedMailboxId)}
+    if($powerBiWorkspaceId){$bodyHash["anthesisgroup_UGSync"].Add("powerBiWorkspaceId",$powerBiWorkspaceId)}
+    if($powerBiManagerGroupId){$bodyHash["anthesisgroup_UGSync"].Add("powerBiManagerGroupId",$powerBiManagerGroupId)}
     if($masterMembershipList){$bodyHash["anthesisgroup_UGSync"].Add("masterMembershipList",$masterMembershipList)}
     if($classification){$bodyHash["anthesisgroup_UGSync"].Add("classification",$classification)}
     if($privacy){$bodyHash["anthesisgroup_UGSync"].Add("privacy",$privacy)}
