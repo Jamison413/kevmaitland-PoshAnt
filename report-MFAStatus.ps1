@@ -33,6 +33,17 @@ $tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
 $enabledUsers = Get-MsolUser -EnabledFilter EnabledOnly -All | ? {$_.UserType -eq "Member"} | ? {$_.IsLicensed -eq "True"}  
 Write-Information "$($enabledUsers.Count) Enabled User accounts found"
+
+#AVD MFA amends
+$AVDGBR = get-graphUsersFromGroup -tokenResponse $tokenResponseTeams -groupId "1e15404b-f737-45f2-bc04-c3d0c3173ab5" -memberType Members -returnOnlyUsers
+$AVDNA = get-graphUsersFromGroup -tokenResponse $tokenResponseTeams -groupId "c9e78db8-9ad1-43ed-a414-f9968e013ad5" -memberType Members -returnOnlyUsers
+
+$enabledUsers = Compare-Object -ReferenceObject $enabledUsers -DifferenceObject $AVDGBR -Property "userPrincipalName" -IncludeEqual -PassThru #remove AVD GBR users
+$enabledUsers = $enabledUsers.Where({$_.SideIndicator -ne "=="})
+$enabledUsers = Compare-Object -ReferenceObject $enabledUsers -DifferenceObject $AVDNA -Property "userPrincipalName" -IncludeEqual -PassThru #remove AVD NA users
+$enabledUsers = $enabledUsers.Where({$_.SideIndicator -ne "=="})
+
+#Process remaining targetted users
 $enabledUsersWithoutMFA = $enabledUsers | ? {[string]::IsNullOrWhiteSpace($_.StrongAuthenticationRequirements)} | Sort-Object UsageLocation, DisplayName 
 Write-Information "$($enabledUsersWithoutMFA.Count) Enabled User accounts without MFA enabled found"
 $enabledUsersWithMFA = $enabledUsers | ? {![string]::IsNullOrWhiteSpace($_.StrongAuthenticationRequirements)}
