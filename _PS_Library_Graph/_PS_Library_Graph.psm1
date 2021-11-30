@@ -3167,7 +3167,7 @@ function update-graphOpenShiftShared(){
         if([string]::IsNullOrWhiteSpace($shiftName)){$shiftName = $currentShift.sharedOpenShift.displayName}
         if([string]::IsNullOrWhiteSpace($shiftNotes)){$shiftNotes = $currentShift.sharedOpenShift.notes}
         if([string]::IsNullOrWhiteSpace($shiftColour)){$shiftColour = $currentShift.sharedOpenShift.theme}
-        if(!$availableSlots){$availableSlots = $currentShift.sharedOpenShift.openSlotCount}
+        if((!$availableSlots) -and ($availableSlots -ne 0)){$availableSlots = $currentShift.sharedOpenShift.openSlotCount}
 
         #Create an already-shared OpenShift object to apply
         $shiftDetails=@{
