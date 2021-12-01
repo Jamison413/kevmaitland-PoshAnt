@@ -32,6 +32,45 @@ Catch{
 }
 $result
     }
+function get-powerBiAuthCode() {
+     [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [string]$clientID
+        ,[parameter(Mandatory = $true)]
+            [string]$redirectUri
+        ,[parameter(Mandatory = $false)]
+            [string]$scope
+        )
+
+    $clientIDEncoded = [System.Web.HttpUtility]::UrlEncode($clientID)
+    $redirectUriEncoded =  [System.Web.HttpUtility]::UrlEncode($redirectUri)
+    $resourceEncoded = [System.Web.HttpUtility]::UrlEncode("https://analysis.windows.net/powerbi/api")
+    $scopeEncoded = [System.Web.HttpUtility]::UrlEncode($scope) #"https://outlook.office.com/user.readwrite.all" "https://outlook.office.com/Directory.AccessAsUser.All"
+
+    Add-Type -AssemblyName System.Windows.Forms
+    if($scope){$url = "https://login.windows.net/common/oauth2/authorize/?response_type=code&redirect_uri=$redirectUriEncoded&client_id=$clientID&resource=$resourceEncoded&prompt=admin_consent&scope=$scopeEncoded"}
+    #else{$url = "https://login.microsoftonline.com/common/oauth2/authorize?response_type=code&redirect_uri=$redirectUriEncoded&client_id=$clientID&resource=$resourceEncoded&prompt=admin_consent"}
+    else{$url = "https://login.windows.net/common/oauth2/authorize/?response_type=code&redirect_uri=$redirectUriEncoded&client_id=$clientID&prompt=admin_consent"}
+    #else{$url = "https://login.windows.net/common/oauth2/authorize/?response_type=code&redirect_uri=$redirectUriEncoded&client_id=$clientID&resource=$resourceEncoded&prompt=admin_consent"}
+    $form = New-Object -TypeName System.Windows.Forms.Form -Property @{Width=440;Height=640}
+    $web  = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{Width=420;Height=600;Url=($url -f ($Scope -join "%20")) }
+    $docComp  = {
+        $uri = $web.Url.AbsoluteUri        
+        if ($uri -match "error=[^&]*|code=[^&]*") {$form.Close() }
+        }
+    $web.ScriptErrorsSuppressed = $true
+    $web.Add_DocumentCompleted($docComp)
+    $form.Controls.Add($web)
+    $form.Add_Shown({$form.Activate()})
+    $form.ShowDialog() | Out-Null
+    $queryOutput = [System.Web.HttpUtility]::ParseQueryString($web.Url.Query)
+    $output = @{}
+    foreach($key in $queryOutput.Keys){
+        $output["$key"] = $queryOutput[$key]
+        }
+    $output
+    }
 function get-powerBITokenResponse{
      [cmdletbinding()]
     param(
@@ -43,20 +82,20 @@ function get-powerBITokenResponse{
         ,[parameter(Mandatory = $false)]
             [string]$resource = "https://analysis.windows.net/powerbi/api"
         )
-        $scope = "Tenant.ReadWrite.All" #
+        $scope = "https://analysis.windows.net/powerbi/api/.default" #
     switch($grant_type){
         "authorization_code" {if(!$scope){$scope = "https://graph.microsoft.com/.default"}
-            $authCode = get-graphAuthCode -clientID $aadAppCreds.ClientID -redirectUri $aadAppCreds.Redirect -scope $scope
+            $authCode = get-powerBiAuthCode -clientID $aadAppCreds.ClientID -redirectUri $aadAppCreds.Redirect #-scope $scope
             $ReqTokenBody = @{
                 Grant_Type    = "authorization_code"
-                #Scope         = $scope
+                Scope         = $scope
                 client_Id     = $aadAppCreds.ClientID
                 Client_Secret = $aadAppCreds.Secret
                 redirect_uri  = $aadAppCreds.Redirect
-                code          = $authCode
-                resource      = "https://graph.microsoft.com"
+                code          = $authCode.code
+                resource      = "https://analysis.windows.net/powerbi/api"
                 }
-            if($resource){$ReqTokenBody.Add("resource",$resource)}
+            #if($resource){$ReqTokenBody.Add("resource",$resource)}
             }
         "client_credentials" {
             $ReqTokenBody = @{
@@ -72,6 +111,7 @@ function get-powerBITokenResponse{
             $authUrl = "https://login.microsoftonline.com/$tenant"
             $postParams = @{
                 client_id = $aadAppCreds.ClientId
+                Client_Secret = $aadAppCreds.Secret
                 }
             if($resource){$postParams.Add("resource",$resource)}
             else{$postParams.Add("resource","https://graph.microsoft.com/")}
@@ -94,15 +134,21 @@ function get-powerBITokenResponse{
             $Form.StartPosition = 'CenterScreen'
             $form.ShowDialog() | Out-Null     
 
+    write-host "Hello ReqTokenBody:"
             $ReqTokenBody = @{
                 grant_type    = "device_code"
                 client_Id     = $aadAppCreds.ClientID
+                client_secret = $aadAppCreds.Secret
                 code          = $response.device_code
                 }
+    Write-Host $(stringify-hashTable -hashtable $ReqTokenBody -interlimiter "=" -delimiter "; ")
 
             }
         }
 
+    write-host "Hello2!"
+    Set-Variable dummy -Value $ReqTokenBody -Scope Global
+    Write-Host $(stringify-hashTable -hashtable $ReqTokenBody -interlimiter "=" -delimiter "; ")
     $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$($aadAppCreds.TenantId)/oauth2/token" -Method POST -Body $ReqTokenBody
     $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
     $tokenResponse
