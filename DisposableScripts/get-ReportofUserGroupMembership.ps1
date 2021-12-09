@@ -59,6 +59,6 @@ $final = @()
 $final += $finalMasterList365
 $final += $finalMasterListgroups
 $CurrentDate = Get-Date
-$CurrentDate = $CurrentDate.ToString('yyyy;MM;dd-hh;mm;ss')
+$CurrentDate = $CurrentDate.ToString('yyyyMMdd-hhmmss')
 
-$final | export-csv -Path C:\Users\$env:USERNAME\Downloads\list_$CurrentDate.csv
+$final | export-csv -Path C:\Users\$env:USERNAME\Downloads\CoworkersGroupList_$CurrentDate.csv
