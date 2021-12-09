@@ -1,9 +1,18 @@
-﻿Import-Module _PS_Library_GeneralFunctionality
+﻿param(
+    [CmdletBinding()]
+    [parameter(Mandatory = $true)]
+    [ValidateNotNull()]
+    [ValidatePattern(".[@].")]
+    [string]$coworkerEmails
+    )
 
-$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
+Import-Module _PS_Library_GeneralFunctionality
+
+$teamBotDetails = get-graphAppClientCredentials -appName UserBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
-$coworkerEmails = "emily.pressey@anthesisgroup.com, Andrew.ost@anthesisgroup.com, george.gaisford@anthesisgroup.com, Rae.Victorio@anthesisgroup.com"
+
+#$coworkerEmails = "example.a@anthesisgroup.com,example.b@anthesisgroup.com"
 $coworkerEmails = convertTo-arrayOfEmailAddresses -blockOfText $coworkerEmails
 
 
@@ -49,6 +58,7 @@ $finalMasterListgroups = $allOtherGroups | Select-Object displayName,User,'What 
 $final = @()
 $final += $finalMasterList365
 $final += $finalMasterListgroups
+$CurrentDate = Get-Date
+$CurrentDate = $CurrentDate.ToString('yyyy;MM;dd-hh;mm;ss')
 
-$final | export-csv -Path 'C:\groupdata.csv'
-
+$final | export-csv -Path C:\Users\$env:USERNAME\Downloads\list_$CurrentDate.csv
