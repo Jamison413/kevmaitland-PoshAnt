@@ -1248,6 +1248,151 @@ function get-graphSite(){
 
     $result
     }
+function get-graphTermGroup(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [string]$graphTermGroupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [string]$graphTermGroupName
+        )
+
+    switch ($PsCmdlet.ParameterSetName){
+        "Id" { 
+            Write-Verbose "get-graphTermGroup | Getting TermGroup from Id [$graphSiteId][$graphTermGroupId]"
+            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/termStore/groups/$graphTermGroupId" 
+            }
+        {@("Name","All") -contains $_} { 
+            Write-Verbose "get-graphTermGroup | Getting TermGroups from Site [$graphSiteId]"
+            $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/termStore/groups/" 
+            switch ($PsCmdlet.ParameterSetName){
+                "Name" {
+                    Write-Verbose "`tclientSide filtering for [$($graphTermGroupName)]"
+                    $result = $results | Where-Object {$_.displayName -eq "$graphTermGroupName"}
+                    }
+                "All"  {$result = $results}
+                }
+            }       
+        }
+
+    $result
+    }
+function get-graphTermSet(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [string]$graphTermGroupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [string]$graphTermSetId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [string]$graphTermSetName
+        )
+
+    switch ($PsCmdlet.ParameterSetName){
+        "Id" { 
+            Write-Verbose "get-graphTermSet | Getting TermSet from Id [$graphSiteId][$graphTermGroupId][$graphTermSetId]"
+            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/termStore/groups/$graphTermGroupId/sets/$graphTermSetId" 
+            }
+        {@("Name","All") -contains $_} { 
+            Write-Verbose "get-graphTermSet | Getting TermSets from Group [$graphSiteId][$graphTermGroupId]"
+            $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/termStore/groups/$graphTermGroupId/sets" 
+            switch ($PsCmdlet.ParameterSetName){
+                "Name" {
+                    Write-Verbose "`tclientSide filtering for [$($graphTermSetName)]"
+                    $result = $results | Where-Object {$_.localizedNames.name -contains "$graphTermSetName"}
+                    }
+                "All"  {$result = $results}
+                }
+            }       
+        }
+
+    $result
+    }
+function get-graphTerm(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [string]$graphTermGroupId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [parameter(Mandatory = $true,ParameterSetName = "All")]
+            [string]$graphTermSetId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [string]$graphTermId
+        ,[parameter(Mandatory = $true,ParameterSetName = "Name")]
+            [string]$graphTermName
+        ,[parameter(Mandatory = $false)]
+            [switch]$selectAllProperties
+        
+        )
+
+    if($graphTermName){
+        $filter += " labels/any(s:s/name eq '$graphTermName')" #it doesn't look like lambda functions are supported for this endpoint yet (2021-11-25).
+        }
+    if($selectAllProperties){
+        $select = "createdDateTime,descriptions,id,labels,lastModifiedDateTime,properties"
+        }
+
+    
+    #Build the refiner based on the parameters supplied
+    $refiner = "?"
+    if($select){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+"`$select=$($select -replace "^,",'')"#Add the select to the refiner, trimming off any leading "," (don't use .TrimStart() because it's bafflingly unpredictable)
+        }
+    if($filter){
+        #if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        #$refiner = $refiner+"`$filter=$($filter -replace "^ and ",'')"#Add the filter to the refiner, trimming off any leading " and " (don't use .TrimStart() because it's bafflingly unpredictable)
+        }
+
+    switch ($PsCmdlet.ParameterSetName){
+        "Id" { 
+            Write-Verbose "get-graphTerm | Getting Term from Id [$graphSiteId][$graphTermGroupId][$graphTermSetId][$graphTerm]"
+            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/termStore/groups/$graphTermGroupId/sets/$graphTermSetId/terms/$graphTermId$refiner" 
+            }
+        {@("Name","All") -contains $_} { 
+            Write-Verbose "get-graphTerm | Getting Terms from Set [$graphSiteId][$graphTermGroupId][$graphTermSetId]"
+            $results = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/termStore/groups/$graphTermGroupId/sets/$graphTermSetId/terms$refiner" -firstPageOnly
+            switch ($PsCmdlet.ParameterSetName){
+                "Name" {
+                    Write-Warning "`tclientSide filtering for [$($graphTermSetName)] as lambda functions are not supported"
+                    $result = $results | Where-Object {$_.labels.name -contains "$graphTermSetName"}
+                    }
+                "All"  {$result = $results}
+                }
+            }       
+        }
+
+    $result
+    }
 function get-graphteamsitedetails(){
     [cmdletbinding()]
     param(
@@ -2906,6 +3051,30 @@ Else{
 Write-Error "Please provide a valid upn or guid"
 }
 }
+function set-graphTerm(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$graphSiteId
+        ,[parameter(Mandatory = $true)]
+            [string]$graphTermGroupId
+        ,[parameter(Mandatory = $true)]
+            [string]$graphTermSetId
+        ,[parameter(Mandatory = $true)]
+            [string]$graphTermId
+        ,[parameter(Mandatory = $false)]
+            [string]$newName
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$labelHash = @{}
+        ,[parameter(Mandatory = $false)]
+            [hashtable]$propertyHash = @{}
+        )
+
+    Write-Verbose "set-graphTerm | [$graphSiteId][$graphTermGroupId][$graphTermSetId][$graphTermId] = []"
+    invoke-graphPatch -tokenResponse $tokenResponse -
+    }
 function set-graphUnifiedGroupGuestSettings(){
     [CmdletBinding()]
     param(

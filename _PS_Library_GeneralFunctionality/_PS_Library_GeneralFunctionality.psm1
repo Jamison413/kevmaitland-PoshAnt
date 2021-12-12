@@ -495,37 +495,50 @@ function convertTo-exTimeZoneValue($pAmbiguousTimeZone){
         }
     }
 function convertTo-localisedSecureString($plainText){
-    if ($(Get-Module).Name -notcontains "_PS_Library_Forms"){Import-Module _PS_Library_Forms}
-    if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
-    ConvertTo-SecureString $plainText -AsPlainText -Force | ConvertFrom-SecureString
+    #if ($(Get-Module).Name -notcontains "_PS_Library_Forms"){Import-Module _PS_Library_Forms}
+    #if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
+    if(![string]::IsNullOrWhitespace($plainText)){
+        ConvertTo-SecureString $plainText -AsPlainText -Force | ConvertFrom-SecureString
+        }
     }
 function decrypt-SecureString($secureString){
     $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
     [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
     }
-function export-encryptedCsv(){
+function export-encryptedCache(){
     [cmdletbinding()]
     param(
-        [parameter(Mandatory = $true,ParameterSetName = "PreEncrypted")]
-            [psobject]$encryptedCsvData        
-        ,[parameter(Mandatory = $true,ParameterSetName = "NotEncrypted")]
-            [psobject]$unencryptedCsvData
-        ,[parameter(Mandatory = $true,ParameterSetName = "PreEncrypted")]
-            [parameter(Mandatory = $true,ParameterSetName = "NotEncrypted")]
-            [string]$pathToOutputCsv
-        ,[parameter(Mandatory = $false,ParameterSetName = "PreEncrypted")]
-            [parameter(Mandatory = $false,ParameterSetName = "NotEncrypted")]
-            [switch]$force
+        [Parameter(Mandatory = $true, Position = 0)]
+            [AllowNull()]
+            [array]$objects 
+        ,[Parameter(Mandatory = $true, Position = 1)]
+            [ValidateSet("Client","Subcontractor","Employee","Opportunity","Project","Folders")]
+            [array]$objectType 
+        ,[Parameter(Mandatory = $true, Position = 1)]
+            [ValidateSet("NetSuite","TermStore","SharePoint")]
+            [array]$objectSource
         )
-    if(!$encryptedCsvData){
-        $encryptedCsvData = convert-csvToSecureStrings -rawCsvData $unencryptedCsvData
+    
+    $objectSchema = [ordered]@{}
+    $objects | % {
+        $thisObject = $_
+        Compare-Object -ReferenceObject @($($objectSchema.Keys) | % {$_.ToString()} | Select-Object) -DifferenceObject $thisObject.PSObject.Properties.Name  | ? {$_.SideIndicator -eq "=>"} | % {
+            $objectSchema.Add($_.InputObject,$null)# | Add-Member -MemberType NoteProperty -Name $_ -Value $null
+            #Write-Host "Adding [$($_.InputObject)] from [$($thisobject.id)]"
+            }
         }
-    if(Test-Path $pathToOutputCsv){
-        if($force){Remove-Item -Path $pathToOutputCsv -Force}
-        else{Write-Error "File [$pathToOutputCsv] already exists";break}
+    $prettyNetSuiteObjects = @($null)*$objects.Count
+    $i=0
+    $objects | %{
+        $thisObject = $_
+        $prettyNetSuiteObjects[$i] = New-Object -TypeName PSCustomObject -Property $objectSchema
+        $thisObject.PSObject.Properties.Name | % {
+            $prettyNetSuiteObjects[$i].$_ = $(convertTo-localisedSecureString $thisObject.$_)
+            }
+        $i++
         }
-    Export-Csv -InputObject $encryptedCsvData -Path $pathToOutputCsv -NoTypeInformation -NoClobber
-    remove-doubleQuotesFromCsv -inputFile $pathToOutputCsv
+        
+    $prettyNetSuiteObjects | Select-Object @($($netObjectSchema.Keys) | % {$_.ToString()} | Select-Object) | Export-Csv -Path "$env:TEMP\$objectSource_$objectType.csv" -NoTypeInformation -Force -Encoding UTF8
     }
 function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[boolean]$localise){
     if($pDirtyNumber.Length -gt 0){
@@ -608,6 +621,20 @@ function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[
         }
     if($cleanNumber -eq $null){$cleanNumber = $pDirtyNumber}
     $cleanNumber
+    }
+function format-measureCommandResults(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [TimeSpan]$timeSpan
+            )
+    switch($timeSpan){
+        {$_.TotalSeconds -lt 1} {"[$($timeSpan.TotalMilliseconds)] milliseconds"}
+        {$_.TotalSeconds -ge 1 -and $_.TotalMinutes -lt 1} {"[$($timeSpan.TotalSeconds)] seconds"}
+        {$_.TotalMinutes -ge 1 -and $_.TotalHours -lt 1} {"[$($timeSpan.TotalMinutes)] minutes [$($timeSpan.Seconds)] seconds"}
+        {$_.TotalHours -ge 1 -and $_.TotalDays -lt 1} {"[$($timeSpan.TotalHours)] hours [$($timeSpan.Minutes)] minutes"}
+        {$_.TotalDays -ge 1} {"[$($timeSpan.TotalDays)] days [$($timeSpan.Hours)] hours"}
+        }
     }
 function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verboseLogging){
     if($stringMaybeContaining3LettersInBrackets -match '\([a-zA-Z]{3}\)'){
@@ -1165,12 +1192,17 @@ function import-encryptedCsv(){
         [string]$pathToEncryptedCsv        
         )
 
-    $encryptedCsvData = import-csv $pathToEncryptedCsv
-    $decryptedObject = New-Object psobject
-    $encryptedCsvData.PSObject.Properties | ForEach-Object {
-        $decryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $(decrypt-SecureString -secureString $(ConvertTo-SecureString $_.Value))
+    [array]$encryptedCsvData = import-csv $pathToEncryptedCsv
+    [array]$decryptedCsvData = @($null)*$encryptedCsvData.Count
+    for ($i=0; $i -lt $encryptedCsvData.Count; $i++){
+        $decryptedObject = New-Object psobject
+        $encryptedCsvData[$i].PSObject.Properties | ForEach-Object {
+            if([string]::IsNullOrWhiteSpace($_.Value)){$decryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $null}
+            else{$decryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $(decrypt-SecureString -secureString $(ConvertTo-SecureString $_.Value))}
+            }
+        $decryptedCsvData[$i] = $decryptedObject
         }
-    $decryptedObject
+    $decryptedCsvData
     }
 function log-action($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`tACTION:`t$myMessage") -Path $logFile}

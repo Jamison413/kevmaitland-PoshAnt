@@ -79,7 +79,7 @@ $allAadDevices | foreach-object {
         Get-Member -InputObject $correspondingEncryptionDevice -MemberType Properties | % {
             $encryptionHash.Add($_.Name, $correspondingEncryptionDevice.$($_.Name))
             }
-        $_ | Add-Member -MemberType NoteProperty -Name encryptiondata -Value $encryptionHash -Force
+        $thisAadDevice | Add-Member -MemberType NoteProperty -Name encryptiondata -Value $encryptionHash -Force
         }
 
     ##Then try matching the Asset using the manufacturer serial number - this lives on the Intune object which we found using the Aad device id
@@ -120,7 +120,7 @@ $allAadDevices | foreach-object {
         Get-Member -InputObject $correspondingAsset.fields -MemberType Properties | % {
             $assetHash.Add($_.Name, $correspondingAsset.fields.$($_.Name))
             }
-        $_ | Add-Member -MemberType NoteProperty -Name asset -Value $assetHash -Force
+        $thisAadDevice | Add-Member -MemberType NoteProperty -Name asset -Value $assetHash -Force
         }
 
     }
