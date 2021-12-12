@@ -540,6 +540,30 @@ function export-encryptedCache(){
         
     $prettyNetSuiteObjects | Select-Object @($($netObjectSchema.Keys) | % {$_.ToString()} | Select-Object) | Export-Csv -Path "$env:TEMP\$objectSource_$objectType.csv" -NoTypeInformation -Force -Encoding UTF8
     }
+function export-encryptedCsv(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true,ParameterSetName = "PreEncrypted")]
+            [psobject]$encryptedCsvData        
+        ,[parameter(Mandatory = $true,ParameterSetName = "NotEncrypted")]
+            [psobject]$unencryptedCsvData
+        ,[parameter(Mandatory = $true,ParameterSetName = "PreEncrypted")]
+            [parameter(Mandatory = $true,ParameterSetName = "NotEncrypted")]
+            [string]$pathToOutputCsv
+        ,[parameter(Mandatory = $false,ParameterSetName = "PreEncrypted")]
+            [parameter(Mandatory = $false,ParameterSetName = "NotEncrypted")]
+            [switch]$force
+        )
+    if(!$encryptedCsvData){
+        $encryptedCsvData = convert-csvToSecureStrings -rawCsvData $unencryptedCsvData
+        }
+    if(Test-Path $pathToOutputCsv){
+        if($force){Remove-Item -Path $pathToOutputCsv -Force}
+        else{Write-Error "File [$pathToOutputCsv] already exists";break}
+        }
+    Export-Csv -InputObject $encryptedCsvData -Path $pathToOutputCsv -NoTypeInformation -NoClobber
+    remove-doubleQuotesFromCsv -inputFile $pathToOutputCsv
+    }
 function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[boolean]$localise){
     if($pDirtyNumber.Length -gt 0){
         $dirtynumber = $pDirtyNumber.Split("ext")[0]
@@ -629,11 +653,11 @@ function format-measureCommandResults(){
             [TimeSpan]$timeSpan
             )
     switch($timeSpan){
-        {$_.TotalSeconds -lt 1} {"[$($timeSpan.TotalMilliseconds)] milliseconds"}
-        {$_.TotalSeconds -ge 1 -and $_.TotalMinutes -lt 1} {"[$($timeSpan.TotalSeconds)] seconds"}
-        {$_.TotalMinutes -ge 1 -and $_.TotalHours -lt 1} {"[$($timeSpan.TotalMinutes)] minutes [$($timeSpan.Seconds)] seconds"}
-        {$_.TotalHours -ge 1 -and $_.TotalDays -lt 1} {"[$($timeSpan.TotalHours)] hours [$($timeSpan.Minutes)] minutes"}
-        {$_.TotalDays -ge 1} {"[$($timeSpan.TotalDays)] days [$($timeSpan.Hours)] hours"}
+        {$_.TotalSeconds -lt 1} {"[$([int]$timeSpan.TotalMilliseconds)] milliseconds"}
+        {$_.TotalSeconds -ge 1 -and $_.TotalMinutes -lt 1} {"[$([int]$timeSpan.TotalSeconds)] seconds"}
+        {$_.TotalMinutes -ge 1 -and $_.TotalHours -lt 1} {"[$([int]$timeSpan.TotalMinutes)] minutes [$([int]$timeSpan.Seconds)] seconds"}
+        {$_.TotalHours -ge 1 -and $_.TotalDays -lt 1} {"[$([int]$timeSpan.TotalHours)] hours [$([int]$timeSpan.Minutes)] minutes"}
+        {$_.TotalDays -ge 1} {"[$([int]$timeSpan.TotalDays)] days [$([int]$timeSpan.Hours)] hours"}
         }
     }
 function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verboseLogging){
@@ -1488,6 +1512,70 @@ function test-isGuid(){
 
     # Check guid against regex
     return $objectGuid -match $guidRegex
+    }
+function test-mobileHandsetIsSupported(){
+    Param (
+        [parameter(Mandatory = $true)]
+            [string]$modelCode
+        )
+
+    switch ($modelCode){
+		"iPad Air"	{$true}
+		"iPad Air 2"	{$true}
+		"iPad Pro"	{$true}
+		"iPhone 11"	{$true}
+		"iPhone 11 Pro"	{$true}
+		"iPhone 12"	{$true}
+		"iPhone 12 mini"	{$true}
+		"iPhone 12 Pro"	{$true}
+		"iPhone 13 Pro"	{$true}
+		"iPhone 6s"	{$true}
+		"iPhone 7"	{$true}
+		"iPhone 7 Plus"	{$true}
+		"iPhone 8"	{$true}
+		"iPhone 8 Plus"	{$true}
+		"iPhone SE"	{$true}
+		"iPhone X"	{$true}
+		"iPhone XR"	{$true}
+		"iPhone XS"	{$true}
+		"Pixel 2"	{$false}
+		"Pixel 3"	{$false}
+		"Pixel 3a"	{$true}
+		"Pixel 4a"	{$true}
+		"Pixel 6"	{$true}
+		"Nokia 6.1"	{$false}
+		"TA-1012"	{$false}
+		"ANE-LX1"	{$true}
+		"CLT-L09"	{$true}
+		"ELE-L09"	{$true}
+		"FIG-LX1"	{$false}
+		"Moto G (5S)"	{$false}
+		"moto g(8) plus"	{$false}
+		"ONEPLUS A3003"	{$false}
+		"SM-A025G"	{$true}
+		"SM-A217F"	{$true}
+		"SM-A326B"	{$true}
+		"SM-A505FN"	{$true}
+		"SM-A515F"	{$true}
+		"SM-A530F"	{$true}
+		"SM-A705FN"	{$true}
+		"SM-A715F"	{$true}
+		"SM-A920F"	{$true}
+		"SM-G780F"	{$true}
+		"SM-G950F"	{$false}
+		"SM-G950W"	{$false}
+		"SM-G970F"	{$true}
+		"SM-G973F"	{$true}
+		"SM-G975F"	{$true}
+		"SM-G977B"	{$true}
+		"SM-G981B"	{$true}
+		"SM-G996B"	{$true}
+		"SM-N986B"	{$true}
+		"SM-T720"	{$true}
+		"M2007J20CG"	{$true}
+		"Redmi Note 5"	{$false}
+		
+        }
     }
 
 #endregion
