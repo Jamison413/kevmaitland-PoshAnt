@@ -1,14 +1,16 @@
 ﻿Import-Module _PS_Library_MSOL.psm1
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
-connect-msolService
-connect-ToExo
+
+$creds = set-MsolCredentials
+connect-msolService -Credential $creds
+connect-ToExo -Credential $creds
 
 
-$displayName = "TEST.BlockSignin"
-$primaryEmail = "TEST.BlockSignin@anthesisgroup.com"
-$owner = "rae.victorio@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Rae Victorio <rae.victorio@anthesisgroup.com>"
+$displayName = "NetSuite 2.0"
+$primaryEmail = "NetSuite2.0@anthesisgroup.com"
+$owner = "t0-kevin.maitland@anthesisgroup.com"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Chantelle.Ludski@anthesisgroup.com; brad.blundell@anthesisgroup.com"
 $additionalEmailAddresses = convertTo-arrayOfEmailAddresses "TestBlockSignin@anthesisgroup.com"
 $allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
 $grantSendAsToo = $true

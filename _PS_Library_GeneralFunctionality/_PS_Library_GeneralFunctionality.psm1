@@ -495,13 +495,50 @@ function convertTo-exTimeZoneValue($pAmbiguousTimeZone){
         }
     }
 function convertTo-localisedSecureString($plainText){
-    if ($(Get-Module).Name -notcontains "_PS_Library_Forms"){Import-Module _PS_Library_Forms}
-    if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
-    ConvertTo-SecureString $plainText -AsPlainText -Force | ConvertFrom-SecureString
+    #if ($(Get-Module).Name -notcontains "_PS_Library_Forms"){Import-Module _PS_Library_Forms}
+    #if (!$plainText){$plainText = form-captureText -formTitle "PlainText" -formText "Enter the plain text to be converted to a secure string" -sizeX 300 -sizeY 200}
+    if(![string]::IsNullOrWhitespace($plainText)){
+        ConvertTo-SecureString $plainText -AsPlainText -Force | ConvertFrom-SecureString
+        }
     }
 function decrypt-SecureString($secureString){
     $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
     [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+    }
+function export-encryptedCache(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+            [AllowNull()]
+            [array]$objects 
+        ,[Parameter(Mandatory = $true, Position = 1)]
+            [ValidateSet("Client","Subcontractor","Employee","Opportunity","Project","Folders")]
+            [array]$objectType 
+        ,[Parameter(Mandatory = $true, Position = 1)]
+            [ValidateSet("NetSuite","TermStore","SharePoint")]
+            [array]$objectSource
+        )
+    
+    $objectSchema = [ordered]@{}
+    $objects | % {
+        $thisObject = $_
+        Compare-Object -ReferenceObject @($($objectSchema.Keys) | % {$_.ToString()} | Select-Object) -DifferenceObject $thisObject.PSObject.Properties.Name  | ? {$_.SideIndicator -eq "=>"} | % {
+            $objectSchema.Add($_.InputObject,$null)# | Add-Member -MemberType NoteProperty -Name $_ -Value $null
+            #Write-Host "Adding [$($_.InputObject)] from [$($thisobject.id)]"
+            }
+        }
+    $prettyNetSuiteObjects = @($null)*$objects.Count
+    $i=0
+    $objects | %{
+        $thisObject = $_
+        $prettyNetSuiteObjects[$i] = New-Object -TypeName PSCustomObject -Property $objectSchema
+        $thisObject.PSObject.Properties.Name | % {
+            $prettyNetSuiteObjects[$i].$_ = $(convertTo-localisedSecureString $thisObject.$_)
+            }
+        $i++
+        }
+        
+    $prettyNetSuiteObjects | Select-Object @($($netObjectSchema.Keys) | % {$_.ToString()} | Select-Object) | Export-Csv -Path "$env:TEMP\$objectSource_$objectType.csv" -NoTypeInformation -Force -Encoding UTF8
     }
 function export-encryptedCsv(){
     [cmdletbinding()]
@@ -608,6 +645,20 @@ function format-internationalPhoneNumber($pDirtyNumber,$p3letterIsoCountryCode,[
         }
     if($cleanNumber -eq $null){$cleanNumber = $pDirtyNumber}
     $cleanNumber
+    }
+function format-measureCommandResults(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [TimeSpan]$timeSpan
+            )
+    switch($timeSpan){
+        {$_.TotalSeconds -lt 1} {"[$([int]$timeSpan.TotalMilliseconds)] milliseconds"}
+        {$_.TotalSeconds -ge 1 -and $_.TotalMinutes -lt 1} {"[$([int]$timeSpan.TotalSeconds)] seconds"}
+        {$_.TotalMinutes -ge 1 -and $_.TotalHours -lt 1} {"[$([int]$timeSpan.TotalMinutes)] minutes [$([int]$timeSpan.Seconds)] seconds"}
+        {$_.TotalHours -ge 1 -and $_.TotalDays -lt 1} {"[$([int]$timeSpan.TotalHours)] hours [$([int]$timeSpan.Minutes)] minutes"}
+        {$_.TotalDays -ge 1} {"[$([int]$timeSpan.TotalDays)] days [$([int]$timeSpan.Hours)] hours"}
+        }
     }
 function get-3lettersInBrackets($stringMaybeContaining3LettersInBrackets,$verboseLogging){
     if($stringMaybeContaining3LettersInBrackets -match '\([a-zA-Z]{3}\)'){
@@ -1165,12 +1216,17 @@ function import-encryptedCsv(){
         [string]$pathToEncryptedCsv        
         )
 
-    $encryptedCsvData = import-csv $pathToEncryptedCsv
-    $decryptedObject = New-Object psobject
-    $encryptedCsvData.PSObject.Properties | ForEach-Object {
-        $decryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $(decrypt-SecureString -secureString $(ConvertTo-SecureString $_.Value))
+    [array]$encryptedCsvData = import-csv $pathToEncryptedCsv
+    [array]$decryptedCsvData = @($null)*$encryptedCsvData.Count
+    for ($i=0; $i -lt $encryptedCsvData.Count; $i++){
+        $decryptedObject = New-Object psobject
+        $encryptedCsvData[$i].PSObject.Properties | ForEach-Object {
+            if([string]::IsNullOrWhiteSpace($_.Value)){$decryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $null}
+            else{$decryptedObject | Add-Member -MemberType NoteProperty -Name $_.Name -Value $(decrypt-SecureString -secureString $(ConvertTo-SecureString $_.Value))}
+            }
+        $decryptedCsvData[$i] = $decryptedObject
         }
-    $decryptedObject
+    $decryptedCsvData
     }
 function log-action($myMessage, $logFile, $doNotLogToFile, $doNotLogToScreen){
     if(!$doNotLogToFile -or $logToFile){Add-Content -Value ((Get-Date -Format "yyyy-MM-dd HH:mm:ss")+"`tACTION:`t$myMessage") -Path $logFile}
@@ -1456,6 +1512,70 @@ function test-isGuid(){
 
     # Check guid against regex
     return $objectGuid -match $guidRegex
+    }
+function test-mobileHandsetIsSupported(){
+    Param (
+        [parameter(Mandatory = $true)]
+            [string]$modelCode
+        )
+
+    switch ($modelCode){
+		"iPad Air"	{$true}
+		"iPad Air 2"	{$true}
+		"iPad Pro"	{$true}
+		"iPhone 11"	{$true}
+		"iPhone 11 Pro"	{$true}
+		"iPhone 12"	{$true}
+		"iPhone 12 mini"	{$true}
+		"iPhone 12 Pro"	{$true}
+		"iPhone 13 Pro"	{$true}
+		"iPhone 6s"	{$true}
+		"iPhone 7"	{$true}
+		"iPhone 7 Plus"	{$true}
+		"iPhone 8"	{$true}
+		"iPhone 8 Plus"	{$true}
+		"iPhone SE"	{$true}
+		"iPhone X"	{$true}
+		"iPhone XR"	{$true}
+		"iPhone XS"	{$true}
+		"Pixel 2"	{$false}
+		"Pixel 3"	{$false}
+		"Pixel 3a"	{$true}
+		"Pixel 4a"	{$true}
+		"Pixel 6"	{$true}
+		"Nokia 6.1"	{$false}
+		"TA-1012"	{$false}
+		"ANE-LX1"	{$true}
+		"CLT-L09"	{$true}
+		"ELE-L09"	{$true}
+		"FIG-LX1"	{$false}
+		"Moto G (5S)"	{$false}
+		"moto g(8) plus"	{$false}
+		"ONEPLUS A3003"	{$false}
+		"SM-A025G"	{$true}
+		"SM-A217F"	{$true}
+		"SM-A326B"	{$true}
+		"SM-A505FN"	{$true}
+		"SM-A515F"	{$true}
+		"SM-A530F"	{$true}
+		"SM-A705FN"	{$true}
+		"SM-A715F"	{$true}
+		"SM-A920F"	{$true}
+		"SM-G780F"	{$true}
+		"SM-G950F"	{$false}
+		"SM-G950W"	{$false}
+		"SM-G970F"	{$true}
+		"SM-G973F"	{$true}
+		"SM-G975F"	{$true}
+		"SM-G977B"	{$true}
+		"SM-G981B"	{$true}
+		"SM-G996B"	{$true}
+		"SM-N986B"	{$true}
+		"SM-T720"	{$true}
+		"M2007J20CG"	{$true}
+		"Redmi Note 5"	{$false}
+		
+        }
     }
 
 #endregion
