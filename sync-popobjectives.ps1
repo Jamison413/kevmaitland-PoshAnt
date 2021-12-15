@@ -101,7 +101,7 @@ Else{
     $6 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Group "People Services Team (All) Owners" -AddRole "Full Control" -ClearExisting
     $7 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
     $8 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -User $($objective.FieldValues.Line_x0020_Manager.Email) -AddRole Contribute
-    $28 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Group 1188 -AddRole "Full Control" #App Administrators for POP SPO group
+    $28 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Group 1188 -AddRole "Full Control" #App Administrators for POP SPO group
     }
     Catch{
     $error
@@ -146,7 +146,7 @@ $thisuserManager = Get-AzureADUserManager -ObjectId "$($liveobjective.FieldValue
     $15 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($liveobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
     $16 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
     $17 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $liveobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
-    $29 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Group 1188 -AddRole "Full Control" #App Administrators for POP SPO group
+    $29 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($liveobjective.Id) -Group 1188 -AddRole "Full Control" #App Administrators for POP SPO group
     }
 }
 
@@ -163,7 +163,7 @@ $thisuserManager = Get-AzureADUserManager -ObjectId "$($completeobjective.FieldV
     $20 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($completeobjective.FieldValues.Employee_x0020_Name.Email) -AddRole Contribute
     $21 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User $($thisuserManager.UserPrincipalName) -AddRole Contribute
     $22 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $completeobjective.Id -User "emily.pressey@anthesisgroup.com" -RemoveRole "Full Control" 	
-    $30 = Set-PnPListItemPermission -List "POP Objectives List (UK)" -Identity $($newobjective.Id) -Group 1188 -AddRole "Full Control" #App Administrators for POP SPO group
+    $30 = Set-PnPListItemPermission -List "POP Completed Objectives (UK)" -Identity $($completeobjective.Id) -Group 1188 -AddRole "Full Control" #App Administrators for POP SPO group
 
     }
 }
