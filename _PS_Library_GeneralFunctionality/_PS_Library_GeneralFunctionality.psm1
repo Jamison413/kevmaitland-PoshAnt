@@ -515,7 +515,7 @@ function export-encryptedCache(){
             [ValidateSet("Client","Subcontractor","Employee","Opportunity","Project","Folders")]
             [array]$objectType 
         ,[Parameter(Mandatory = $true, Position = 1)]
-            [ValidateSet("NetSuite","TermStore","SharePoint")]
+            [ValidateSet("NetSuite","TermStore","SharePoint","Pretty")]
             [array]$objectSource
         )
     
