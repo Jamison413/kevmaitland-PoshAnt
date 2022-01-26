@@ -359,10 +359,10 @@ $timeForFullCycle = Measure-Command {
     #region getTermData
         $sharePointAdmin = "kimblebot@anthesisgroup.com"
         #convertTo-localisedSecureString "KimbleBotPasswordHere"
-        try{$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt)}
+        try{$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt)}
         catch{
             if($_.Exception -match "Key not valid for use in specified state"){
-                Write-Error "[$env:USERPROFILE\Desktop\KimbleBot.txt] Key not valid for use in specified state."
+                Write-Error "[$env:USERPROFILE\Downloads\KimbleBot.txt] Key not valid for use in specified state."
                 exit
                 }
             else{get-errorSummary -errorToSummarise $_}

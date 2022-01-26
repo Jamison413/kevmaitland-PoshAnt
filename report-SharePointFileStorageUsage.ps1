@@ -32,10 +32,10 @@ $sitesToProcess | % {
                     )
                 }
             }
-
-        $output | Sort-Object WebUrl | Select-Object * | Export-Csv  -Path "$env:USERPROFILE\Downloads\$($thisSite.name)_$((Get-Date -f u).Split(" ")[0]).csv" -NoTypeInformation -Force -Append
+        $outputPath = "$env:USERPROFILE\Downloads\$($thisSite.name)_$((Get-Date -f u).Split(" ")[0]).csv"
+        $output | Sort-Object WebUrl | Select-Object * | Export-Csv  -Path $outputPath -NoTypeInformation -Force -Append
         #Write-Host "`t`tOutput written to [$("$env:USERPROFILE\Downloads\$($thisSite.name)_$($thisDrive.name)_$((Get-Date -f u).Split(" ")[0]).csv")]"
-        Write-Host "`t`tOutput written to [$("$env:USERPROFILE\Downloads\$($thisSite.name)_$($thisDrive.name)_$((Get-Date -f u).Split(" ")[0]).csv")]"
+        Write-Host "`t`tOutput for [$($thisDrive.name)] written to [$($outputPath)]"
         Write-Host
         }
     }

@@ -2,7 +2,7 @@
 Import-Module _PS_Library_GeneralFunctionality
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $sharePointCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 
 connect-ToSpo -credential $sharePointAdmin

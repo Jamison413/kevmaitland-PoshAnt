@@ -15,7 +15,7 @@ if($PSCommandPath){
 
 $groupAdmin = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString ""
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\GroupBot.txt) 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 
 connect-ToExo -credential $exoCreds

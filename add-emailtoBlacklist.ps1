@@ -1,7 +1,7 @@
 ﻿$exoCreds = set-MsolCredentials
 connect-ToExo -credential $exoCreds
 
-[array]$newChumps = convertTo-arrayOfEmailAddresses "files@sharepa.com"
+[array]$newChumps = convertTo-arrayOfEmailAddresses "techradar@smartbrief.com"
 
 $blackListTheseChumpsRuleName = "Blacklist these chumps"
 $blackListRepliesToTheseChumpsRuleName = "Blacklist replies to these chumps"

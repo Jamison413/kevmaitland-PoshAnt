@@ -12,7 +12,7 @@ Import-Module _PS_Library_GeneralFunctionality
 
 $aadUser = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$aadUserPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$aadUserPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\GroupBot.txt) 
 $aadCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $aadUser, $aadUserPass
 
     #$userDevices = Get-AzureADUser -SearchString $SearchString | Get-AzureADUserRegisteredDevice -All:$true

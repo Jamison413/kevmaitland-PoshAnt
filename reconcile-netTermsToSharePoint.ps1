@@ -404,7 +404,7 @@ cls
         try{$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt)}
         catch{
             if($_.Exception -match "Key not valid for use in specified state"){
-                Write-Error "[$env:USERPROFILE\Desktop\KimbleBot.txt] Key not valid for use in specified state."
+                Write-Error "[$env:USERPROFILE\Downloads\KimbleBot.txt] Key not valid for use in specified state."
                 exit
                 }
             else{get-errorSummary -errorToSummarise $_}
@@ -539,9 +539,9 @@ cls
         [array]$misplacedOpps += $existingOpps      | ? {[string]::IsNullOrWhiteSpace($_.DriveClientId)}
         if($($misplacedOpps.Count) -gt 0){
             if($deltaSync -eq $false){@($misplacedOpps | Select-Object) | % {Write-Host "`t`t`t[$($_.UniversalOppName)][$($_.NetSuiteOppId)][$($_.NetSuiteClientId)]"}}
-            $orphanedOppFolders = $orphanedOppFolders | ? {$misplacedProjs.id -notcontains $_.id}
-            $newOpps            = $newOpps            | ? {$misplacedProjs.id -notcontains $_.id}
-            $existingOpps       = $existingOpps       | ? {$misplacedProjs.id -notcontains $_.id}
+            $orphanedOppFolders = $orphanedOppFolders | ? {$misplacedOpps.id -notcontains $_.id}
+            $newOpps            = $newOpps            | ? {$misplacedOpps.id -notcontains $_.id}
+            $existingOpps       = $existingOpps       | ? {$misplacedOpps.id -notcontains $_.id}
             }
         }
     Write-Host "`t[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)]/[$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count)] Opps matched to Client Terms ([$($($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count-$misplacedOpps.Count)*100/$($orphanedOppFolders.Count+$newOpps.Count+$existingOpps.Count))]%) in [$($matchingOppsToClients.TotalSeconds)] seconds. [$($misplacedOpps.Count)] Opps don't have a corresponding Client Term (there's probably a duplicate Prospect/Client in NetSuite blocking creation of the Term)"

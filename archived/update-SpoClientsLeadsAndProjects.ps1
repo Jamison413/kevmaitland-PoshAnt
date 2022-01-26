@@ -26,7 +26,7 @@ $mailTo = "kevin.maitland@anthesisgroup.com"
 
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password

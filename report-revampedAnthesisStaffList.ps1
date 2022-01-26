@@ -61,7 +61,7 @@ function format-emailAddress($dirtyString){
 #endregion
 
 $sharePointAdmin = "groupbot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\GroupBot.txt) 
 $o365Creds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $csomCreds = new-csomCredentials -username $o365Creds.UserName -password $o365Creds.Password
 connect-ToMsol -credential $o365Creds

@@ -7,7 +7,7 @@ Import-Module _PS_Library_UserManagement.psm1
 
 #Conn - CSOM for SharepointUserID
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $peopleservicessite = "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/"
 $conn = Connect-PnPOnline -Url $peopleservicessite -Credentials $spoCreds
@@ -66,7 +66,7 @@ Write-Host "Resetting the connection!" -ForegroundColor Green
 
 #Conn - CSOM for SharepointUserID
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $peopleservicessite = "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/"
 $conn = Connect-PnPOnline -Url $peopleservicessite -Credentials $spoCreds

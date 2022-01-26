@@ -1266,9 +1266,9 @@ function get-netSuiteParameters(){
     Write-Verbose "get-netsuiteParameters()"
     if($connectTo -eq "Production"){
         $placesToLook = @(
-            "$env:USERPROFILE\Desktop\netsuite_live.txt"
-            "$env:USERPROFILE\Downloads\netsuite_live.txt"
-            ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_live.txt"
+            "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_live.txt"
+            ,"$env:USERPROFILE\Downloads\netsuite_live.txt"
+            ,"$env:USERPROFILE\Desktop\netsuite_live.txt"
             )
         }
     else{

@@ -153,7 +153,7 @@ if($PSCommandPath){
 #/Ignore if running manually
 $userAdmin = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString "IntuneAdminPasswordHere"
-$userAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Groupbot.txt) 
+$userAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\GroupBot.txt) 
 #$adminCreds = set-MsolCredentials -username $intuneAdmin
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $userAdmin, $userAdminPass
 #/

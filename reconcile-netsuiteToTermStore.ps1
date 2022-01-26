@@ -15,6 +15,38 @@ if($PSCommandPath){
     Start-Transcript $transcriptLogName -Append
     }
 
+function export-encryptedCache(){
+    [cmdletbinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+            [AllowNull()]
+            [array]$netObjects 
+        ,[Parameter(Mandatory = $true, Position = 1)]
+            [ValidateSet("Client","Subcontractor","Employee","Opportunity","Project")]
+            [array]$netObjectType 
+        )
+    
+    $netObjectSchema = [ordered]@{}
+    $netObjects | % {
+        $thisNetObject = $_
+        Compare-Object -ReferenceObject @($($netObjectSchema.Keys) | % {$_.ToString()} | Select-Object) -DifferenceObject $thisNetObject.PSObject.Properties.Name  | ? {$_.SideIndicator -eq "=>"} | % {
+            $netObjectSchema.Add($_.InputObject,$null)# | Add-Member -MemberType NoteProperty -Name $_ -Value $null
+            #Write-Host "Adding [$($_.InputObject)] from [$($thisNetObject.id)]"
+            }
+        }
+    $prettyNetSuiteObjects = @($null)*$netObjects.Count
+    $i=0
+    $netObjects | %{
+        $thisNetObject = $_
+        $prettyNetSuiteObjects[$i] = New-Object -TypeName PSCustomObject -Property $netObjectSchema
+        $thisNetObject.PSObject.Properties.Name | % {
+            $prettyNetSuiteObjects[$i].$_ = $(convertTo-localisedSecureString $thisNetObject.$_)
+            }
+        $i++
+        }
+        
+    $prettyNetSuiteObjects | Select-Object @($($netObjectSchema.Keys) | % {$_.ToString()} | Select-Object) | Export-Csv -Path "$env:TEMP\Net$netObjectType.csv" -NoTypeInformation -Force -Encoding UTF8
+    }
 function process-comparison(){
     [cmdletbinding()]
     param(
@@ -141,7 +173,7 @@ $timeForFullCycle = Measure-Command {
     #region GetData
     $sharePointAdmin = "kimblebot@anthesisgroup.com"
     #convertTo-localisedSecureString "KimbleBotPasswordHere"
-    $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+    $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
     $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
     Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
     $netSuiteProductionParamaters = $(get-netSuiteParameters -connectTo Production)
@@ -189,6 +221,8 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteProjs.Count)] Projects retrieved from NetSuite in [$($netProjRetrieval.TotalSeconds)] seconds ([$($netProjRetrieval.TotalMinutes)] minutes or [$($netSuiteProjsToCheck.Count/$netProjRetrieval.TotalMinutes)] per minute)"
+        if($allNetSuiteProjs.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteProjs -netObjectType Project}
+
         $script:netSuiteProjsToCheck = @($allNetSuiteProjs | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         $netSuiteProjsToCheck = $netSuiteProjsToCheck | ? {![string]::IsNullOrWhiteSpace($_.parent.id)} #Remove the weird Projects with no Client (as we can't create folders for them anyway)
         if($deltaSync -eq $true){
@@ -254,6 +288,8 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteOpps.Count)] opportunities retrieved from NetSuite in [$($netOppRetrieval.TotalSeconds)] seconds ([$($netOppRetrieval.TotalMinutes)] minutes or [$($netSuiteOppsToCheck.Count / $netOppRetrieval.TotalMinutes)] per minute)"
+        if($allNetSuiteOpps.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteOpps -netObjectType Opportunity}
+
         $netSuiteOppsToCheck = @($allNetSuiteOpps | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
             [array]$processedAtExactlyLastTimestamp = $netSuiteOppsToCheck | ? {$(Get-Date $_.lastModifiedDate) -ge $(Get-Date $lastProcessed)} #Find how many Clients match the $lastProcessed timestamp exactly
@@ -319,6 +355,8 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteClients.Count)] clients retrieved from NetSuite in [$($netClientRetrieval.TotalSeconds)] seconds or [$($netSuiteClientsToCheck.Count / $netClientRetrieval.TotalMinutes)] per minute"
+        if($allNetSuiteClients.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteClients -netObjectType Client}
+
         $netSuiteClientsToCheck = @($allNetSuiteClients | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
             [array]$processedAtExactlyLastTimestamp = $netSuiteClientsToCheck | ? {$(Get-Date $_.lastModifiedDate) -ge $(Get-Date $lastProcessed)} #Find how many Clients match the $lastProcessed timestamp exactly

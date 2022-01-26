@@ -1,6 +1,6 @@
 ﻿$sharePointAdmin = "t0-kevin.maitland@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content 'C:\Users\KevMaitland\OneDrive - Anthesis LLC\Desktop\KimbleBot.txt') 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content 'C:\Users\KevMaitland\OneDrive - Anthesis LLC\Downloads\KimbleBot.txt') 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
 

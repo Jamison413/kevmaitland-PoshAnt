@@ -180,7 +180,7 @@ Switch($selection){
 
 
 #Get secondary geographic data from the term store
-$officeterm = Get-PnPTerm -Identity $($thisUser.FieldValues.Main_x0020_Office0.Label) -TermGroup "Anthesis" -TermSet "offices" -Includes CustomProperties
+$officeterm = Get-PnPTerm -Identity $($thisUser.FieldValues.Main_x0020_Office0.Label) -TermGroup "Anthesis" -TermSet "Primary Workplaces" -Includes CustomProperties
 $country = $officeTerm.CustomProperties.Country
 
 #Get credential info from term store

@@ -114,7 +114,7 @@ $errorLogFile = "C:\ScriptLogs\process-ukCareersEmail_error.log"
 $verboseLogging = $true
 $upnSMA = "kimblebot@anthesisgroup.com"
 #$passSMA = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
-$passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+$passSMA =  ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 log-action -myMessage "Transcript saved to $($MyInvocation.MyCommand.Definition).log" -logFile $logFile
 
 #Connect to Exchange using EWS

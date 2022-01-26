@@ -20,7 +20,7 @@ $tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
 #Unbelievbly, you still can't manage MESGs via Graph.
 $groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\GroupBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $adminCreds
 

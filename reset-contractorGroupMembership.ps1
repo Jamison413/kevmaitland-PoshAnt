@@ -27,7 +27,7 @@ Import-Module _PS_Library_MSOL
 
 $365admin = "groupbot@anthesisgroup.com"
 #convertTo-localisedSecureString "KimbleBotPasswordHere"
-$365AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Groupbot.txt) 
+$365AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\GroupBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $365admin, $365AdminPass
 Connect-AzureAD -Credential $adminCreds
 connect-ToExo -credential $adminCreds

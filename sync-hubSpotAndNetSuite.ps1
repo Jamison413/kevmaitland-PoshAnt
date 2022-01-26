@@ -62,6 +62,7 @@ $filterCompanyUpdatedSinceLastSync = [ordered]@{
     }
 if($deltaSync -eq $false){
     [array]$hubSpotCompaniesToCheck = get-hubspotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync,$filterCompanyNotBroken,$filterExcludeCompaniesCalledAnthesis)} -pageSize 100 #-firstPageOnly 
+    if($hubSpotCompaniesToCheck.Count -gt 0){export-encryptedCache -arrayOfObjects $hubSpotCompaniesToCheck -fileName hubCompanies.csv }
     }
 else{
     [array]$hubSpotCompaniesToCheck = get-hubspotObjects -apiKey $apiKey.HubApiKey -objectType companies -filterGroup1 @{filters=@($filterCompanyFlaggedForSync,$filterCompanyUpdatedSinceLastSync,$filterExcludeCompaniesCalledAnthesis)} -pageSize 100 #-firstPageOnly 
@@ -413,6 +414,7 @@ if($deltaSync -eq $true){
     $netContactQuery +=  " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $hubspotContactMaxLastModifiedInNetSuite.properties.lastmodifiedinnetsuite -Format g))`"" #Excludes any Contacts that haven't been updated since X
     }
 $netSuiteContactsToCheck = get-netSuiteContactFromNetSuite -netsuiteParameters $netSuiteParameters -query $netContactQuery 
+if($deltaSync -eq $false -and $netSuiteContactsToCheck.Count -gt 0){export-encryptedCache -arrayOfObjects $netSuiteContactsToCheck -fileName netContacts.csv}
 #endregion
 
 #region Process HubSpot Contacts

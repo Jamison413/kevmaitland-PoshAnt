@@ -28,7 +28,7 @@ $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 $mailFrom = "scriptrobot@sustain.co.uk"
 $mailTo = "kevin.maitland@anthesisgroup.com"
 #convertTo-localisedSecureString "kimbleBotPasswordHere"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $restCreds = new-spoCred -Credential -username $adminCreds.UserName -securePassword $adminCreds.Password
 $csomCreds = new-csomCredentials -username $adminCreds.UserName -password $adminCreds.Password

@@ -90,7 +90,7 @@ connect-ToExo -credential $exoCreds
 #Conn - CSOM for SharepointUserID
 <#
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 #>
 #$sharePointAdmin = "emily.pressey@anthesisgroup.com"

@@ -515,7 +515,7 @@ function export-encryptedCache(){
             [ValidateSet("Client","Subcontractor","Employee","Opportunity","Project","Folders")]
             [array]$objectType 
         ,[Parameter(Mandatory = $true, Position = 1)]
-            [ValidateSet("NetSuite","TermStore","SharePoint")]
+            [ValidateSet("NetSuite","TermStore","SharePoint","Pretty")]
             [array]$objectSource
         )
     
@@ -538,7 +538,7 @@ function export-encryptedCache(){
         $i++
         }
         
-    $prettyNetSuiteObjects | Select-Object @($($netObjectSchema.Keys) | % {$_.ToString()} | Select-Object) | Export-Csv -Path "$env:TEMP\$objectSource_$objectType.csv" -NoTypeInformation -Force -Encoding UTF8
+    $prettyNetSuiteObjects | Select-Object @($($netObjectSchema.Keys) | % {$_.ToString()} | Select-Object) | Export-Csv -Path "$env:TEMP\$($objectSource)_$($objectType).csv" -NoTypeInformation -Force -Encoding UTF8
     }
 function export-encryptedCsv(){
     [cmdletbinding()]

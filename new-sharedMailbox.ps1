@@ -7,14 +7,14 @@ connect-msolService -Credential $creds
 connect-ToExo -Credential $creds
 
 
-$displayName = "NetSuite 2.0"
-$primaryEmail = "NetSuite2.0@anthesisgroup.com"
+$displayName = "Ethics Board Shared Mailbox"
+$primaryEmail = "ethics@anthesisgroup.com"
 $owner = "t0-kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "Chantelle.Ludski@anthesisgroup.com; brad.blundell@anthesisgroup.com"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "chris.jones@anthesisgroup.com; tanya.lightbody@anthesisgroup.com; mike.thompson@anthesisgroup.com"
 $additionalEmailAddresses = convertTo-arrayOfEmailAddresses "TestBlockSignin@anthesisgroup.com"
 $allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
 $grantSendAsToo = $true
-$hideFromGal = $true
+$hideFromGal = $false
 
 
 function new-sharedMailbox($displayName, $owner, $arrayOfFullAccessMembers, $hideFromGal, $grantSendAsToo){

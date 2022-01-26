@@ -1,6 +1,6 @@
 ﻿#Kimblebot for Teams email-to-channel reporting
 $Admin = "kimblebot@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Desktop\KimbleBot.txt") 
+$AdminPass = ConvertTo-SecureString (Get-Content "$env:USERPROFILE\Downloads\KimbleBot.txt") 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 connect-ToExo -credential $exoCreds

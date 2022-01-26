@@ -75,14 +75,14 @@ Import-Module _PS_Library_UserManagement.psm1
 
 
 $groupAdmin = "groupbot@anthesisgroup.com"
-$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\GroupBot.txt) 
+$groupAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\GroupBot.txt) 
 $exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $groupAdmin, $groupAdminPass
 connect-ToExo -credential $exoCreds
 
 
 #Conn - CSOM for SharepointUserID
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\kimblebot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $spoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 $peopleservicessite = "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/"
 $conn = Connect-PnPOnline -Url $peopleservicessite -Credentials $spoCreds

@@ -13,7 +13,7 @@ $requests += Get-PnPListItem -List "Internal Team Site Requests" -Query "<View><
 if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.Site_x0020_Type},{$_.FieldValues.DataManager.LookupValue},{$_.FieldValues.Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
 
 
-$areDataManagersLineManagers = $true
+$areDataManagersLineManagers = $false
 $managedBy = "365"
 #$memberOf = ??
 $hideFromGal = $false

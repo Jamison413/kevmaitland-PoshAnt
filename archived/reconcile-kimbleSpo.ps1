@@ -42,7 +42,7 @@ $cacheFilePath = "$env:USERPROFILE\KimbleCache\"
 #convertTo-localisedSecureString ""
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 #$sharePointAdminPass = ConvertTo-SecureString -String '' -AsPlainText -Force | ConvertFrom-SecureString
-$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\KimbleBot.txt) 
+$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
 #$restCreds = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($adminCreds.UserName,$adminCreds.Password)
 #new-spoCred  -username $adminCreds.UserName -securePassword $adminCreds.Password

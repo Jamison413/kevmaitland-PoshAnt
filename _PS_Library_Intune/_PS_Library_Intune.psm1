@@ -204,6 +204,9 @@ function new-mdmLocalAdminPolicy(){
     else{
         $mdmGroup = new-graphGroup -tokenResponse $tokenResponseTeams -groupDisplayName $namingConvention -groupDescription "Used to assign $userUPN as Local Admin" -groupType Security -membershipType Assigned -groupOwners "00aa81e4-2e8f-4170-bc24-843b917fd7cf" -groupMembers $userUPN
         }
+    $device = get-graphDevices -tokenResponse $tokenResponseTeams -filterDisplayNames $deviceName -includeOwners
+    if($device.registeredOwners[0].userPrincipalName -ne $user.userPrincipalName){Write-Warning "Assigning [$($user.userPrincipalName)] as local admin for [$($device.displayName)], but [$($device.registeredOwners[0].userPrincipalName)] is the registered owner in Intune!"}
+    add-graphUsersToGroup -tokenResponse $tokenResponseTeams -graphGroupId $mdmGroup.id -memberType members -graphUserIds $device.id
 
     #Define the new Policy
     if($includeMe){ #This will ad the AAD Device Administrators Role/Group to the Local Admin group
