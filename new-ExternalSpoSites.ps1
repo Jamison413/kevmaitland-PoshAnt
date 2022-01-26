@@ -1,9 +1,7 @@
 ﻿$365creds = set-MsolCredentials
 connect-ToExo -credential $365creds
 
-Remove-Module PnP.PowerShell
 Import-Module SharePointPnPPowerShellOnline
-Remove-Module SharePointPnPPowerShellOnline
 import-Module PnP.PowerShell
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
 $tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
@@ -74,6 +72,7 @@ foreach ($currentRequest in $selectedRequests){
         "t1-andrew.ost@anthesisgroup.com" {$thisITuser = "Andrew.Ost@anthesisgroup.com"}
         "t1-emily.pressey@anthesisgroup.com" {$thisITuser = "Emily.Pressey@anthesisgroup.com"}
         "t1-rae.victorio@anthesisgroup.com" {$thisITuser = "Rae.Victorio@anthesisgroup.com"}
+        "t2-george.gaisford@anthesisgroup.com" {$thisITuser = "george.gaisford@anthesisgroup.com"}
         }    
     $managers = $thisITuser
     }
@@ -394,44 +393,6 @@ foreach ($currentRequest in $selectedRequests){
     }
     catch{get-errorSummary -errorToSummarise $_}
     
-
-
-
-<#Testing Jira Ticket#>
-Set-JiraConfigServer 'https://anthesisit.atlassian.net'
-$jiraCreds = import-encryptedCsv -pathToEncryptedCsv "$($env:USERPROFILE)\Downloads\jira.txt"
-$jiraPsCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $jiraCreds.UserName, $(ConvertTo-SecureString -AsPlainText $jiraCreds.Password -Force)
-
-New-JiraSession -Credential $jiraPsCreds 
-function New-JiraServiceRequest(){
-[cmdletbinding()]
-param(
-        [parameter(Mandatory = $false)]
-        [ValidateSet(“Bristol”,”Barcelona")]
-            [string]$ITTeam
-       ,[parameter(Mandatory = $false)]
-            [string]$summary
-       ,[parameter(Mandatory = $false)]
-            [string]$description
-        )
-#Get the team metadata
-Switch($ITTeam){
-"Bristol" {$id = "10129"}
-"Barcelona" {$id = "10128"}
-}
-#Build the object to post
-$fields = @{
-            #IT Team Responsible
-            customfield_10048 = @{
-            value = "$($ITTeam)"
-            id = "$($id)"
-            }
-           }
-Write-host "Creating Jira Ticket (service request type). Title is $($summary), Description is $($description)." -ForegroundColor Yellow
-New-JiraIssue -Project ITC -IssueType 'Service Request' -Summary "$($summary)" -Description $($description) -Fields $fields
-}
-
-New-JiraServiceRequest -ITTeam Bristol -summary "New External Site Request: $($fullRequest.FieldValues.Title)" -description "External Site Requested by $($fullRequest.FieldValues.Site_x0020_Admin.Email)" -Verbose
     
 }
 

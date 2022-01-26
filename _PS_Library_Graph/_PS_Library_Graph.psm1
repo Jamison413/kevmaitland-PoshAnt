@@ -3330,7 +3330,8 @@ function update-graphOpenShiftShared(){
             )
 
         #Get the Shift - we can't amend the start and end times of a shift as it RECREATES the shift, which means a new ID and subsequently all Shift requests are declined... 
-        $currentShift = get-graphShiftOpenShifts -tokenResponse $tokenResponse -teamId $teamId -MsAppActsAsUserId $msAppActsAsUserId | Where-Object -Property "Id" -EQ $openShiftId
+        $currentShift = get-graphShiftOpenShifts -tokenResponse $tokenResponse -teamId $teamId -MsAppActsAsUserId $msAppActsAsUserId -openShiftid $openShiftId -Verbose
+
         if($currentShift){
         #Swap out anything that's missing with existing information from the Shift
         if([string]::IsNullOrWhiteSpace($shiftName)){$shiftName = $currentShift.sharedOpenShift.displayName}
