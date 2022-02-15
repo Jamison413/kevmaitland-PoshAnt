@@ -70,21 +70,21 @@ $offices += [ordered]@{
     OfficeName="GBR-Bristol"
     OfficeColour="Green"
     OfficeWeekendColour="darkGreen"
-    OfficeDesks=18
+    OfficeDesks=42
     ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
     OfficeName="GBR-London"
     OfficeColour="Blue"
     OfficeWeekendColour="darkBlue"
-    OfficeDesks=16
+    OfficeDesks=30
     ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
     OfficeName="GBR-Manchester"
     OfficeColour="Pink"
     OfficeWeekendColour="darkPink"
-    OfficeDesks=7
+    OfficeDesks=14
     ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
@@ -99,7 +99,7 @@ $offices += [ordered]@{
     OfficeColour="Yellow"
     OfficeWeekendColour="darkPurple"
     OfficeDesks=6
-    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office pleas"
+    ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 
 
