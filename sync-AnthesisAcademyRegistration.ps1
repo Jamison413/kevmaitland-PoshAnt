@@ -21,8 +21,8 @@ $Admin = "kimblebot@anthesisgroup.com"
 $AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\kimblebot.txt) 
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
 
-$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
-connect-ToExo -credential $exoCreds
+#$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
+#connect-ToExo -credential $exoCreds
 Connect-AzureAD -credential $adminCreds
 connect-toAAD -credential $adminCreds
 
