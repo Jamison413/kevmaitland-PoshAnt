@@ -14,8 +14,6 @@ $allAadDevices = get-graphDevices -tokenResponse $userBotTokenResponse -includeO
 $allAadDevices | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.registeredOwners[0].id}
 Write-host "`tRetrieved [$($allAadDevices.Count)] AD devices"
 
-#Remove baseline testing devices (Nov 2021 - testing Jan 2022)
-$allAadDevices = $allAadDevices.Where({($_.deviceId -ne "e0212c77-12be-4d86-8acb-e8efcfbf1ee8") -and ($_.deviceId -ne "b8584707-0c3f-4a1a-9418-187937c955c3") -and ($_.deviceId -ne "378f8497-1433-417e-a524-94fee14e8002") -and ($_.deviceId -ne "1065721f-4f3a-4ae8-8541-ff87e0b9343a")})
 
 
 
