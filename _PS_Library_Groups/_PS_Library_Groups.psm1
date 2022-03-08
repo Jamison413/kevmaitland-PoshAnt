@@ -702,7 +702,7 @@ function send-dataManagerReassignmentRequest(){
             $body = "<HTML><FONT FACE=`"Calibri`">Hello $($_.manager.givenName),`r`n`r`n<BR><BR>"
             $body += "The 365 Site/Team [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.id)] is currently managed by one of your ex-reportees:`r`n`t<BR>"
             $body += "<PRE>&#9;$($_.displayName)</PRE>`r`n`r`n<BR>"
-            $body += "Please could you let the <A HREF='mailto:IT_Team_GBR@anthesisgroup.com'>IT Team</A> know who to reassign this to? You can find a list of everyone with current Data Manager training by <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-296'>expanding the <B>Data Manager - Authorised (All)</B> group in Outlook</A>.`r`n`r`n<BR><BR>"
+            $body += "Please could you let the <A HREF='mailto:itsupport@anthesisgroup.com'>IT Team</A> know who to reassign this to? You can find a list of everyone with current Data Manager training by <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-296'>expanding the <B>Data Manager - Authorised (All)</B> group in Outlook</A>.`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
             send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses $_.manager.mail -bccAddresses "t0-kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
             #send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body

@@ -1361,6 +1361,45 @@ function get-netSuiteProjectFromSqlCache{
     else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
     $result
     }
+function get-netSuiteSubcontractorsFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="Query")]
+            [ValidatePattern('^?[\w+][=][\w+]')]
+            [string]$query
+        ,[parameter(Mandatory=$true,ParameterSetName="Id")]
+            [string]$subcontractorId
+        ,[parameter(Mandatory=$false,ParameterSetName="Query")]
+            [parameter(Mandatory = $false,ParameterSetName="GetAll")]
+            [parameter(Mandatory = $false,ParameterSetName="Id")]
+            [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteSubcontractorsFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    switch ($PsCmdlet.ParameterSetName){
+        "Id"    {
+            $vendorsEnumerated = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/vendor/$subcontractorId" -netsuiteParameters $netsuiteParameters 
+            }
+        default {
+            $vendors = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/vendor$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+            #$vendorsEnumerated = [psobject[]]::new($vendors.count)
+            [array]$vendorsEnumerated = @($null) * $vendors.count
+            for ($i=0; $i -lt $vendors.count;$i++) {
+                write-progress -activity "Retrieving NetSuite Subcontractor details..." -Status "[$($i)]/[$($vendors.count)]" -PercentComplete $(($i*100)/$vendors.count)
+                if($i%100 -eq 0){Write-Verbose "[$($i)]/[$($vendors.count)] ($($i / $vendors.count)%)"}
+                $vendorsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($vendors.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
+                }
+            }
+        }
+
+
+    $vendorsEnumerated
+    }
 function get-oAuthSignature(){
     [cmdletbinding()]
     Param (

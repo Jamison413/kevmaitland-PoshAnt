@@ -2469,6 +2469,26 @@ function new-graphTeam(){
         }
     $attempt
     }
+function new-graphTeamChannel(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet ("standard","private")]
+            [string]$membershipType
+        ,[parameter(Mandatory = $true)]
+            [string]$channelName
+        ,[parameter(Mandatory = $false)]
+            [string]$channelDescription
+        ,[parameter(Mandatory = $false)]
+            [bool]$isFavourite
+        )
+    $bodyHash = @{"displayName"=$channelName;"description"=$channelDescription;isFavoriteByDefault=$isFavourite;membershipType=$membershipType}
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels" -graphBodyHashtable $bodyHash
+    }
 function remove-graphUsersFromGroup(){
     [cmdletbinding()]
     Param (
