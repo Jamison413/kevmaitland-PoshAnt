@@ -2494,6 +2494,7 @@ function New-GraphGuestInvitation(){
     param(
         [parameter(Mandatory = $true)]
             [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
             [string]$invitedUserEmailAddress
         ,[parameter(Mandatory = $true)]
             [string]$inviteRedirectUrl
