@@ -2489,6 +2489,31 @@ function new-graphTeamChannel(){
     $bodyHash = @{"displayName"=$channelName;"description"=$channelDescription;isFavoriteByDefault=$isFavourite;membershipType=$membershipType}
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels" -graphBodyHashtable $bodyHash
     }
+function New-GraphGuestInvitation(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+            [string]$invitedUserEmailAddress
+        ,[parameter(Mandatory = $true)]
+            [string]$inviteRedirectUrl
+        ,[parameter(Mandatory = $true)]
+            [boolean]$sendInvitationMessage
+        )
+	$invitationHashTable = @{
+		"invitedUserEmailAddress" = $invitedUserEmailAddress;
+		"inviteRedirectUrl" = $inviteRedirectUrl
+		"sendInvitationMessage" = $sendInvitationMessage
+		}
+
+	Try{
+		$result = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/invitations" -graphBodyHashtable $invitationHashTable
+		}
+	Catch{
+		$Error[0]
+		}
+	$result
+	}
 function remove-graphUsersFromGroup(){
     [cmdletbinding()]
     Param (
