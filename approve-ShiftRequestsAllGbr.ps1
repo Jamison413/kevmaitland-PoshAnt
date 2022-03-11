@@ -9,12 +9,6 @@ if($PSCommandPath){
     }
 
 
-<#$Admin = "emily.pressey@anthesisgroup.com"
-$AdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Desktop\Emily.txt) 
-$adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
-$exoCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $Admin, $AdminPass
-connect-ToExo -credential $exoCreds
-#>
 
 $TeamsReport = @()
 
@@ -105,6 +99,26 @@ $groupbotshifts = get-graphShiftUserShifts -tokenResponse $tokenResponseShiftBot
 ForEach($groupbotshift in $groupbotshifts){delete-graphShiftUserShifts -tokenResponse $tokenResponseShiftBot -teamId $teamId -shiftId $groupbotshift.id -MsAppActsAsUserId $msAppActsAsUserId -Verbose:$VerbosePreference}
 
 
+#Update Scheduling group users, all new users added daily will be able to access GBR office booking
+$officeSchedulingGroups = invoke-graphGet -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups" -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId}
+$teamMembers = get-graphUsersFromGroup -tokenResponse $tokenResponseTeams -groupId $teamId -memberType TransitiveMembers -returnOnlyLicensedUsers 
+Write-Host "Updating SchedulingGroups with user ID's" -ForegroundColor Cyan
+
+ForEach($schedulingGroup in $officeSchedulingGroups){
+
+        $updatedHash = @{ #Keep the SchedulingGroups up-to-date
+            displayName= $schedulingGroup.displayName #This will update the SchedulingGroup Name if the number of available desks changes
+            isActive = $schedulingGroup.isActive
+            userIds = @($teamMembers.id) #This will automaticlly add all Team Members to each SchedulingGroup
+            }
+            Try{
+                invoke-graphPut -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups/$($thisSchedulingGroup.id)" -graphBodyHashtable $updatedHash -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId} -Verbose:$VerbosePreference #PATCH doesn't work on schedulingGroups yet :'( But PUT works!
+            }
+            Catch{
+                $TeamsReport += @{"(Scheduling Group User Updates - $($schedulingGroup.displayName)) ERROR" = "Error updating scheduling groups with user ID's"}
+            }
+}
+
 
 If($TeamsReport){
 
@@ -118,5 +132,8 @@ $report = $report | out-string
 #Send-MailMessage -To "c6167716.anthesisgroup.com@amer.teams.ms" -From "ShiftsRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Subject "Shifts Approval Error" -BodyAsHtml $report -Encoding UTF8 -Credential $exocreds
 send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn "groupbot@anthesisgroup.com" -toAddresses "c6167716.anthesisgroup.com@amer.teams.ms" -subject "Shifts Approval Error" -bodyHtml $report
 }
+
+
+
 
 Stop-Transcript
