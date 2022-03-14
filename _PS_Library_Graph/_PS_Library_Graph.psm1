@@ -2493,7 +2493,8 @@ function New-GraphGuestInvitation(){
     [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-            [psobject]$tokenResponse        
+            [psobject]$tokenResponse    
+        ,[parameter(Mandatory = $true)]
             [string]$invitedUserEmailAddress
         ,[parameter(Mandatory = $true)]
             [string]$inviteRedirectUrl
