@@ -2136,6 +2136,48 @@ function update-netSuiteContactInNetSuiteFromHubSpotObject(){
         }
 
     }
+function get-netSuiteParametersUserBot(){
+    [cmdletbinding()]
+    Param([parameter(Mandatory = $false)]
+        [ValidateSet("Production","Sandbox")]
+        [string]$connectTo = "Sandbox"
+        )
+    Write-Verbose "get-netsuiteParametersUserBot()"
+    if($connectTo -eq "Production"){
+        $placesToLook = @(
+            "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_userbotlive.txt"
+            ,"$env:USERPROFILE\Downloads\netsuite_userbotlive.txt"
+            ,"$env:USERPROFILE\Desktop\netsuite_userbotlive.txt"
+            )
+        }
+    else{
+        $placesToLook = @(
+            "$env:USERPROFILE\Downloads\netsuite_userbotsandbox.txt"
+            "$env:USERPROFILE\Desktop\netsuite_userbotsandbox.txt"
+            ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_userbotsandbox.txt"
+            )
+        
+        }
+    for($i=0; $i -lt $placesToLook.Count; $i++){
+        if(Test-Path $placesToLook[$i]){
+            $pathToEncryptedCsv = $placesToLook[$i]
+            continue
+            }
+        }
+    if([string]::IsNullOrWhiteSpace($pathToEncryptedCsv)){
+        Write-Error "NetSuite Paramaters CSV file not found in any of these locations: $($placesToLook -join ", ")"
+        break
+        }
+    else{
+        Write-Verbose "Importing NetSuite Paramaters fvrom [$pathToEncryptedCsv]"
+        $importedParameters = import-encryptedCsv $pathToEncryptedCsv
+        $importedParameters.oauth_consumer_key = $importedParameters.oauth_consumer_key.ToUpper()
+        $importedParameters.oauth_consumer_secret = $importedParameters.oauth_consumer_secret.ToLower()
+        $importedParameters.oauth_token = $importedParameters.oauth_token.ToUpper()
+        $importedParameters.oauth_token_secret = $importedParameters.oauth_token_secret.ToLower()
+        $importedParameters
+        }
+    }
 
 
 #$clientStauses = invoke-netSuiteRestMethod -requestType GET -url "$((get-netsuiteParameters -connectTo Production).uri)/customerstatus/20" -netsuiteParameters $(get-netsuiteParameters -connectTo Production)
