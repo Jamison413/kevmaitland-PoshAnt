@@ -2318,6 +2318,32 @@ function new-graphGroup(){
 
     $newGroup
     }
+function New-GraphGuestInvitation(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse    
+        ,[parameter(Mandatory = $true)]
+            [string]$invitedUserEmailAddress
+        ,[parameter(Mandatory = $true)]
+            [string]$inviteRedirectUrl
+        ,[parameter(Mandatory = $true)]
+            [boolean]$sendInvitationMessage
+        )
+	$invitationHashTable = @{
+		"invitedUserEmailAddress" = $invitedUserEmailAddress;
+		"inviteRedirectUrl" = $inviteRedirectUrl
+		"sendInvitationMessage" = $sendInvitationMessage
+		}
+
+	Try{
+		$result = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/invitations" -graphBodyHashtable $invitationHashTable
+		}
+	Catch{
+		$Error[0]
+		}
+	$result
+	}
 function new-graphList(){
     [cmdletbinding()]
     param(
