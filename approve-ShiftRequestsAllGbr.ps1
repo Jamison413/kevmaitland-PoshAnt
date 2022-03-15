@@ -112,7 +112,7 @@ ForEach($schedulingGroup in $officeSchedulingGroups){
             userIds = @($teamMembers.id) #This will automaticlly add all Team Members to each SchedulingGroup
             }
             Try{
-                invoke-graphPut -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups/$($thisSchedulingGroup.id)" -graphBodyHashtable $updatedHash -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId} -Verbose:$VerbosePreference #PATCH doesn't work on schedulingGroups yet :'( But PUT works!
+                invoke-graphPut -tokenResponse $tokenResponseshiftBot -graphQuery "/teams/$teamId/schedule/schedulingGroups/$($SchedulingGroup.id)" -graphBodyHashtable $updatedHash -additionalHeaders @{"MS-APP-ACTS-AS"=$msAppActsAsUserId} -Verbose:$VerbosePreference #PATCH doesn't work on schedulingGroups yet :'( But PUT works!
             }
             Catch{
                 $TeamsReport += @{"(Scheduling Group User Updates - $($schedulingGroup.displayName)) ERROR" = "Error updating scheduling groups with user ID's"}
