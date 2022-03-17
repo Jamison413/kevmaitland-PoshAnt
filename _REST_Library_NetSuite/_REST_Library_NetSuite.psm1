@@ -1066,6 +1066,7 @@ function get-netSuiteEmployeesFromNetSuite(){
         [parameter(Mandatory=$true,ParameterSetName="userPrincipalName")]
         [parameter(Mandatory=$true,ParameterSetName="query")]
         [parameter(Mandatory=$true,ParameterSetName="allAnthesisEmployees")]
+        [parameter(Mandatory = $false,ParameterSetName="developers")]
         [parameter(Mandatory = $false,ParameterSetName="GetAll")]
             [psobject]$netsuiteParameters
         ,[parameter(Mandatory = $false,ParameterSetName="userPrincipalName")]
@@ -1081,6 +1082,12 @@ function get-netSuiteEmployeesFromNetSuite(){
         ,[parameter(Mandatory = $false,ParameterSetName="query")]
             [ValidatePattern('^?[\w+][=][\w+]')]
             [string]$query
+        ,[parameter(Mandatory=$false,ParameterSetName="developers")]
+         [switch]$developers
+        ,[parameter(Mandatory=$false,ParameterSetName="developers")]
+         [ValidateSet('True','False','returnAll')]
+         [string]$giveAccess
+
         )
     Write-Verbose "`tget-netSuiteEmployeesFromNetSuite([$($query)])"
     if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
@@ -1143,6 +1150,23 @@ function get-netSuiteEmployeesFromNetSuite(){
         }
     $employeesEnumerated
     }
+    }
+    "developers"{
+    Write-Verbose "`tget-netSuiteEmployeesFromNetSuite - Developers [@netsuite.com]"
+
+    $Netquery = "?q=email CONTAIN `"@netsuite.com`""
+        $employees = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/employee/$Netquery" -netsuiteParameters $netsuiteParameters -Verbose:$verbosePreference  
+    $employeesEnumerated = [psobject[]]::new($employees.count)
+    for ($i=0; $i -lt $employees.count;$i++) {
+        $employeesEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url $employees.items[$i].links[0].href -netsuiteParameters $netsuiteParameters
+        }
+    #client-side filtering as Powershell is faster, boolean issue for giveAccess field also needs solving at some point, the search isn't quite right
+    switch($giveAccess){
+    "True"{$employeesEnumerated = $employeesEnumerated | Where-Object -Property "giveAccess" -eq ([boolean]$true)}
+    "False"{$employeesEnumerated = $employeesEnumerated | Where-Object -Property "giveAccess" -eq ([boolean]$false)}
+    "returnAll"{}
+    }
+    $employeesEnumerated 
     }
     "query"{
     Write-Verbose "`tget-netSuiteEmployeesFromNetSuite - Query [$($query)]"
@@ -1257,6 +1281,48 @@ function get-netSuitePaddedCode(){
 
     $prefix + $("{0:d$padToXDigits}" -f [int]$suffix)    
     }
+function get-netSuiteParametersUserBot(){
+    [cmdletbinding()]
+    Param([parameter(Mandatory = $false)]
+        [ValidateSet("Production","Sandbox")]
+        [string]$connectTo = "Sandbox"
+        )
+    Write-Verbose "get-netsuiteParametersUserBot()"
+    if($connectTo -eq "Production"){
+        $placesToLook = @(
+            "$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_userbotlive.txt"
+            ,"$env:USERPROFILE\Downloads\netsuite_userbotlive.txt"
+            ,"$env:USERPROFILE\Desktop\netsuite_userbotlive.txt"
+            )
+        }
+    else{
+        $placesToLook = @(
+            "$env:USERPROFILE\Downloads\netsuite_userbotsandbox.txt"
+            "$env:USERPROFILE\Desktop\netsuite_userbotsandbox.txt"
+            ,"$env:USERPROFILE\OneDrive - Anthesis LLC\Desktop\netsuite_userbotsandbox.txt"
+            )
+        
+        }
+    for($i=0; $i -lt $placesToLook.Count; $i++){
+        if(Test-Path $placesToLook[$i]){
+            $pathToEncryptedCsv = $placesToLook[$i]
+            continue
+            }
+        }
+    if([string]::IsNullOrWhiteSpace($pathToEncryptedCsv)){
+        Write-Error "NetSuite Paramaters CSV file not found in any of these locations: $($placesToLook -join ", ")"
+        break
+        }
+    else{
+        Write-Verbose "Importing NetSuite Paramaters fvrom [$pathToEncryptedCsv]"
+        $importedParameters = import-encryptedCsv $pathToEncryptedCsv
+        $importedParameters.oauth_consumer_key = $importedParameters.oauth_consumer_key.ToUpper()
+        $importedParameters.oauth_consumer_secret = $importedParameters.oauth_consumer_secret.ToLower()
+        $importedParameters.oauth_token = $importedParameters.oauth_token.ToUpper()
+        $importedParameters.oauth_token_secret = $importedParameters.oauth_token_secret.ToLower()
+        $importedParameters
+        }
+    }
 function get-netSuiteParameters(){
     [cmdletbinding()]
     Param([parameter(Mandatory = $false)]
@@ -1360,6 +1426,45 @@ function get-netSuiteProjectFromSqlCache{
     if($result -eq 1){Write-Verbose "`t`tSUCCESS!"}
     else{Write-Verbose "`t`tFAILURE :( - Code: $result"}
     $result
+    }
+function get-netSuiteSubcontractorsFromNetSuite(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="Query")]
+            [ValidatePattern('^?[\w+][=][\w+]')]
+            [string]$query
+        ,[parameter(Mandatory=$true,ParameterSetName="Id")]
+            [string]$subcontractorId
+        ,[parameter(Mandatory=$false,ParameterSetName="Query")]
+            [parameter(Mandatory = $false,ParameterSetName="GetAll")]
+            [parameter(Mandatory = $false,ParameterSetName="Id")]
+            [psobject]$netsuiteParameters
+        )
+
+    Write-Verbose "`tget-netSuiteSubcontractorsFromNetSuite([$($query)])"
+    if([string]::IsNullOrWhiteSpace($netsuiteParameters)){
+        $netsuiteParameters = get-netsuiteParameters -connectTo Sandbox
+        Write-Warning "NetSuite environment unspecified - connecting to Sandbox"
+        }
+
+    switch ($PsCmdlet.ParameterSetName){
+        "Id"    {
+            $vendorsEnumerated = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/vendor/$subcontractorId" -netsuiteParameters $netsuiteParameters 
+            }
+        default {
+            $vendors = invoke-netsuiteRestMethod -requestType GET -url "$($netsuiteParameters.uri)/vendor$query" -netsuiteParameters $netsuiteParameters #-Verbose 
+            #$vendorsEnumerated = [psobject[]]::new($vendors.count)
+            [array]$vendorsEnumerated = @($null) * $vendors.count
+            for ($i=0; $i -lt $vendors.count;$i++) {
+                write-progress -activity "Retrieving NetSuite Subcontractor details..." -Status "[$($i)]/[$($vendors.count)]" -PercentComplete $(($i*100)/$vendors.count)
+                if($i%100 -eq 0){Write-Verbose "[$($i)]/[$($vendors.count)] ($($i / $vendors.count)%)"}
+                $vendorsEnumerated[$i] = invoke-netsuiteRestMethod -requestType GET -url "$($vendors.items[$i].links[0].href)/?expandSubResources=$true" -netsuiteParameters $netsuiteParameters 
+                }
+            }
+        }
+
+
+    $vendorsEnumerated
     }
 function get-oAuthSignature(){
     [cmdletbinding()]

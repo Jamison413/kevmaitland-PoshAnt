@@ -221,7 +221,7 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteProjs.Count)] Projects retrieved from NetSuite in [$($netProjRetrieval.TotalSeconds)] seconds ([$($netProjRetrieval.TotalMinutes)] minutes or [$($netSuiteProjsToCheck.Count/$netProjRetrieval.TotalMinutes)] per minute)"
-        if($allNetSuiteProjs.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteProjs -netObjectType Project}
+        if($allNetSuiteProjs.Count -gt 0 -and $deltaSync -eq $false){export-encryptedCache -netObjects $allNetSuiteProjs -netObjectType Project}
 
         $script:netSuiteProjsToCheck = @($allNetSuiteProjs | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         $netSuiteProjsToCheck = $netSuiteProjsToCheck | ? {![string]::IsNullOrWhiteSpace($_.parent.id)} #Remove the weird Projects with no Client (as we can't create folders for them anyway)
@@ -288,7 +288,7 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteOpps.Count)] opportunities retrieved from NetSuite in [$($netOppRetrieval.TotalSeconds)] seconds ([$($netOppRetrieval.TotalMinutes)] minutes or [$($netSuiteOppsToCheck.Count / $netOppRetrieval.TotalMinutes)] per minute)"
-        if($allNetSuiteOpps.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteOpps -netObjectType Opportunity}
+        if($allNetSuiteOpps.Count -gt 0 -and $deltaSync -eq $false){export-encryptedCache -netObjects $allNetSuiteOpps -netObjectType Opportunity}
 
         $netSuiteOppsToCheck = @($allNetSuiteOpps | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
@@ -355,7 +355,7 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteClients.Count)] clients retrieved from NetSuite in [$($netClientRetrieval.TotalSeconds)] seconds or [$($netSuiteClientsToCheck.Count / $netClientRetrieval.TotalMinutes)] per minute"
-        if($allNetSuiteClients.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteClients -netObjectType Client}
+        if($allNetSuiteClients.Count -gt 0 -and $deltaSync -eq $false){export-encryptedCache -netObjects $allNetSuiteClients -netObjectType Client}
 
         $netSuiteClientsToCheck = @($allNetSuiteClients | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
