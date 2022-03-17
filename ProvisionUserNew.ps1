@@ -37,11 +37,11 @@ $smtpServer = "anthesisgroup-com.mail.protection.outlook.com"
 <#--------Service Connections--------#>
 
 #365 services
-$myAdminCreds = set-MsolCredentials
-connect-ToMsol -credential $myAdminCreds
-connect-ToExo -credential $myAdminCreds
-connect-toAAD -credential $myAdminCreds
-Connect-MsolService -Credential $myAdminCreds
+
+connect-ToMsol 
+connect-ToExo 
+connect-toAAD 
+Connect-MsolService 
 
 
 #Graph - with Teamsbot
