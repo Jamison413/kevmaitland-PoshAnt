@@ -1,5 +1,5 @@
 $thisApp = "FoxitReader"
-$filePathToTest = "${env:ProgramFiles(x86)}\Foxit Software\Foxit PDF Reader\FoxitPDFReader.exe"
+$filePathToTest = "${env:ProgramFiles(x86)}\Foxit Software\Foxit Reader"
 #$thisApp = "%%PLACEHOLDERAPPNAME%%"
 #$filePathToTest = "%%PLACEHOLDERDETECTIONFILE%%"
 $scheduledTaskToTest = "$env:ProgramData\CustomScripts\redo-choco$thisApp-scheduledTaskCreated.log"
@@ -15,4 +15,3 @@ if(Test-Path $filePathToTest){
 else{
     Throw "Path [$($filePathToTest)] not found - [$($thisApp)] is not installed"
     }
-
