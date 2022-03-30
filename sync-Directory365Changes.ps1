@@ -451,10 +451,10 @@ If($officeterm){
     set-graphuser -tokenResponse $tokenResponseTeams -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"postalCode" = $($officeterm.CustomProperties.'Postal Code')}
     set-graphuser -tokenResponse $tokenResponseTeams -userIdOrUpn $graphuser.userPrincipalName -userPropertyHash  @{"country" = $($officeterm.CustomProperties.'Country')}
     #Set SPO timezone
-    Set-SPOTimezone -upn $graphuser.userPrincipalName -office $officeterm.Name
+    #Set-SPOTimezone -upn $graphuser.userPrincipalName -office $officeterm.Name
     #Set EXO timezone
-    $mailboxupdate = set-graphMailboxSettings -tokenResponse $tokenResponseTeams -identity $graphuser.userPrincipalName -timeZone "$($officeterm.CustomProperties.Timezone)"
-    
+    #$mailboxupdate = set-graphMailboxSettings -tokenResponse $tokenResponseTeams -identity $graphuser.userPrincipalName -timeZone "$($officeterm.CustomProperties.Timezone)"
+    <#
     #Check timezones after waiting 10 seconds for changes to sync up and run checks
     $timezonesync = @()
     Start-Sleep -Seconds 10
@@ -515,7 +515,7 @@ If($officeterm){
             friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype 'ERROR DETAILS' -logstring "$($Error[0].Exception.Message)"
             $TeamsReport += @{"$(get-date) (365 > Directory List) ERROR - Office not changed to $($change.Office)" = "[$($graphuser.userPrincipalName)]"}
             }
-    }
+    }#>
 }
 Else{
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype ERROR -logstring "(365) Something went wrong updating the Office for [$($graphuser.userPrincipalName)], we couldn't retrieve the Term for the office from Sharepoint: $($graphuser.officeLocation)"
