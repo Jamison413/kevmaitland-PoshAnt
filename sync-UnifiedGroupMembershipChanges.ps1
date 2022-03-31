@@ -25,7 +25,7 @@ $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 connect-ToExo -credential $adminCreds
 
 
-all365Groups = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponseTeams
+$all365Groups = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponseTeams
 $toExclude = @("Sym - Supply Chain","Apparel Team (All)","Teams Testing Team","All Homeworkers (All)","Archived Finance Team (North America)")
 $365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential"}# -and $_.DisplayName -notmatch "All "}
 
