@@ -1057,6 +1057,11 @@ function sync-groupMemberships(){
             [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
             [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
             [bool]$enumerateSubgroups = $false
+        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
+            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
+            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+            [psobject]$syncException
         )
 
     #region Get $graphExtendedUG and $graphMesg, regardless of which parameters we've been given
@@ -1140,6 +1145,15 @@ function sync-groupMemberships(){
                 get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $graphExtendedUG.Id -memberType Owners -returnOnlyUsers | %{[array]$ugUsersBeforeChanges += New-Object psobject -Property $([ordered]@{"userPrincipalName"= $_.UserPrincipalName;"displayName"=$_.DisplayName;"objectId"=$_.Id})}
                 }
             }
+        #If exception group, remove users from passed exception object from the UG array to omit from being compared to the AADG (which they will not be in, these groups in the geographic structure will be tied to other infrastructure we do not want applied to exception users)
+        If($syncException){
+        write-verbose "This AAD group is an exception - not syncing members from the defined exception user group"
+            $syncExceptionUsers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $syncException.exceptionTargetUserGroupToOmit -memberType Members -returnOnlyLicensedUsers
+            $syncExceptionUsers | % {Add-Member -InputObject $_ -MemberType NoteProperty -Name "objectID" -Value $_.Id}
+            $ugUsersBeforeChanges =  Compare-Object -ReferenceObject $ugUsersBeforeChanges -DifferenceObject $syncExceptionUsers -Property objectId -PassThru -IncludeEqual | Where-Object {$_.SideIndicator -ne "=="}
+            Write-Verbose "$($ugUsersBeforeChanges.userPrincipalName)"
+        }
+        
 
         $usersDelta = Compare-Object -ReferenceObject @($ugUsersBeforeChanges | select-object) -DifferenceObject @($aadgUsersBeforeChanges | select-object) -Property userPrincipalName -PassThru -IncludeEqual
          $($usersDelta | % {Write-Verbose "$_"})
