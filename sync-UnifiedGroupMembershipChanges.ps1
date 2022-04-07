@@ -29,6 +29,14 @@ $all365Groups = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse
 $toExclude = @("Sym - Supply Chain","Apparel Team (All)","Teams Testing Team","All Homeworkers (All)","Archived Finance Team (North America)")
 $365GroupsToProcess = $all365Groups | ? {$toExclude -notcontains $($_.DisplayName) -and $_.DisplayName -notmatch "Confidential"}# -and $_.DisplayName -notmatch "All "}
 
+#For migrations, sometimes we want to add users into existing geographic functionality (e.g. access to regional Teams chat and mail groups). We still want the geographic group to sync from its' nested subgroups, so we add to the 365 group only and omit from the user removal in the process below.
+[array]$migrationExceptionSGs += New-Object psobject -Property $([ordered]@{"exceptionTargetGroup"= "21b68006-9d6e-417c-b388-474fdca35503";"exceptionTargetUserGroupToOmit"="a21a92e7-37d5-4445-82b7-d09096537788"})
+#add new exceptions here
+
+ForEach($migrationExceptionSG in $migrationExceptionSGs){
+$365GroupsToProcess | select -Index $365GroupsToProcess.IndexOf(($365GroupsToProcess | ? {$_.Id -eq $migrationExceptionSG.exceptionTargetGroup})) | Add-Member -MemberType NoteProperty -Name "exception" -Value $migrationExceptionSG -Force
+}
+
 $adminEmailAddresses = get-groupAdminRoleEmailAddresses -tokenResponse $tokenResponseTeams
 
 #$365GroupsToProcess | % {
@@ -42,7 +50,7 @@ $timeForFullCycle = Measure-Command {
         Write-Progress -Activity "Synchronising Group Memberships" -Status "[$($i)]/[$($365GroupsToProcess.Count)]: [$($365Group.displayName)]"
         try{
             #sync-groupMemberships_deprecated -UnifiedGroup $365Group -syncWhat Members -sourceGroup $365Group.CustomAttribute6 -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true}# -Verbose 
-            sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Members -sourceGroup $365Group.anthesisgroup_UGSync.masterMembershipList -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
+            sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Members -sourceGroup $365Group.anthesisgroup_UGSync.masterMembershipList -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -syncException $365Group.exception -ErrorAction:Continue
             }
         catch{
             Write-Host -ForegroundColor Red $(get-errorSummary $_)
