@@ -19,18 +19,18 @@
             [validateSet("User","Group","App")]$PrincipalType
 
         )
-Write-Verbose "https://api.powerbi.com/v1.0/myorg/groups/$($workspaceID)/users"
-Switch ($PsCmdlet.ParameterSetName){
-    "aadObjectId" {$identifier = $aadObjectId}
-    "userPrincipalName" {$identifier = $userPrincipalName}
-}
-Try{
-    $result = invoke-powerBIPost -tokenResponse $powerBIBottokenResponse -powerBIQuery "groups/$($workspaceID)/users" -powerBIBodyHashtable @{"identifier"="$($identifier)";"groupUserAccessRight" = "$($groupUserAccessRight)";"principalType" = $PrincipalType} -Verbose
-}
-Catch{
-    $error[0]
-}
-$result
+    #Write-Verbose "https://api.powerbi.com/v1.0/myorg/groups/$($workspaceID)/users"
+    Switch ($PsCmdlet.ParameterSetName){
+        "aadObjectId" {$identifier = $aadObjectId}
+        "userPrincipalName" {$identifier = $userPrincipalName}
+        }
+    Try{
+        $result = invoke-powerBIPost -tokenResponse $tokenResponse -powerBIQuery "admin/groups/$($workspaceID)/users" -powerBIBodyHashtable @{"identifier"="$($identifier)";"groupUserAccessRight" = "$($groupUserAccessRight)";"principalType" = $PrincipalType} -Verbose
+        }
+    Catch{
+        get-errorSummary $_
+        }
+    $result
     }
 function get-powerBiAuthCode() {
      [cmdletbinding()]
@@ -142,7 +142,9 @@ function get-powerBITokenResponse{
                 code          = $response.device_code
                 }
     Write-Host $(stringify-hashTable -hashtable $ReqTokenBody -interlimiter "=" -delimiter "; ")
-
+            $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$($aadAppCreds.TenantId)/oauth2/devicecode" -Method POST -Body $ReqTokenBody
+            $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
+            return $tokenResponse
             }
         }
 
@@ -151,7 +153,8 @@ function get-powerBITokenResponse{
     Write-Host $(stringify-hashTable -hashtable $ReqTokenBody -interlimiter "=" -delimiter "; ")
     $tokenResponse = Invoke-RestMethod -Uri "https://login.microsoftonline.com/$($aadAppCreds.TenantId)/oauth2/token" -Method POST -Body $ReqTokenBody
     $tokenResponse | Add-Member -MemberType NoteProperty -Name OriginalExpiryTime -Value $((Get-Date).AddSeconds($tokenResponse.expires_in))
-    $tokenResponse
+    return $tokenResponse
+
     }
 function get-usersFromPowerBIWorkspace(){
     [cmdletbinding()]
@@ -161,9 +164,9 @@ function get-usersFromPowerBIWorkspace(){
         ,[parameter(Mandatory = $true)]
             [string]$workspaceID
         )
-    Write-Verbose "https://api.powerbi.com/v1.0/myorg/groups/$($workspaceID)/users"
+    Write-Verbose "https://api.powerbi.com/v1.0/myorg/admin/groups/$($workspaceID)/users"
 Try{
-    $result = invoke-powerBIGet -tokenResponse $powerBIBottokenResponse -powerBIQuery "groups/$($workspaceID)/users" -Verbose
+    $result = invoke-powerBIGet -tokenResponse $tokenResponse -powerBIQuery "admin/groups/$($workspaceID)/users" -Verbose
 }
 Catch{
     $error[0]
@@ -242,7 +245,7 @@ function invoke-powerBIPost(){
     $powerBIBodyJson = ConvertTo-Json -InputObject $powerBIBodyHashtable -Depth 10
     Write-Verbose $powerBIBodyJson
     $powerBIBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($powerBIBodyJson)
-    
+    write-host "Hello there :)"
     Invoke-RestMethod -Uri "https://api.powerbi.com/v1.0/myorg/$sanitisedpowerBIQuery" -Body $powerBIBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers $headers -Method Post
     }
 function invoke-powerBIPut(){

@@ -1,14 +1,14 @@
 ﻿#region Retrieve and prepare NetObjects
 $importClientsTime = Measure-Command {
-    $allNetSuiteClients = import-encryptedCsv -pathToEncryptedCsv $env:TEMP\Client.csv
+    $allNetSuiteClients = import-encryptedCsv -pathToEncryptedCsv $env:TEMP\NetSuite_Client.csv
     }
 Write-Host "[$($allNetSuiteClients.Count)] Clients read from cache in $(format-measureCommandResults $importClientsTime)"
 $importOppsTime = Measure-Command {
-    $allNetSuiteOpps = import-encryptedCsv -pathToEncryptedCsv $env:TEMP\Opportunity.csv
+    $allNetSuiteOpps = import-encryptedCsv -pathToEncryptedCsv $env:TEMP\NetSuite_Opportunity.csv
     }
 Write-Host "[$($allNetSuiteOpps.Count)] Opps read from cache in $(format-measureCommandResults $importOppsTime)"
 $importProjTime = Measure-Command {
-    $allNetSuiteProjs = import-encryptedCsv -pathToEncryptedCsv $env:TEMP\project.csv
+    $allNetSuiteProjs = import-encryptedCsv -pathToEncryptedCsv $env:TEMP\NetSuite_Project.csv
     }
 Write-Host "[$($allNetSuiteProjs.Count)] Projs read from cache in $(format-measureCommandResults $importProjTime)"
 Write-Host "NetObject data import from cache took $(format-measureCommandResults $($importClientsTime+$importOppsTime+$importProjTime)) in total" -f Yellow
@@ -17,7 +17,7 @@ Write-Host "NetObject data import from cache took $(format-measureCommandResults
 #region Retrieve and prepare FoldObjects
 $importFoldersTime = Measure-Command {
     $topLevelFolders = import-encryptedCsv -pathToEncryptedCsv $env:TEMP\folders.csv
-    $topLevelFolders | % { #Generate the URL for the Document Library if it's missing (this seems to be a common problem)
+    $topLevelFolders | ForEach-Object { #Generate the URL for the Document Library if it's missing (this seems to be a common problem)
         $thisTlf = $_
         if([string]::IsNullOrWhiteSpace($thisTlf.DriveClientUrl)){
             $thisTlf.DriveClientUrl = $($thisTlf.DriveItemUrl -replace [regex]::Escape($($thisTlf.DriveItemUrl -replace '^([^/]*\/){4}[^/]*')))
@@ -25,10 +25,10 @@ $importFoldersTime = Measure-Command {
         }
     #Create an array of Client Document Library objects (so we can differentiate these from Opp/Proj folders later)
     $allFolderClients = $topLevelFolders | Select-Object DriveClientId, DriveClientName, DriveClientUrl
-    [array]$allFolderClientsUnique = $allFolderClients | Group-Object -Property DriveClientId | % {$_.Group | Select-Object -First 1}
+    [array]$allFolderClientsUnique = $allFolderClients | Group-Object -Property DriveClientId | ForEach-Object {$_.Group | Select-Object -First 1}
     #Filter out all folders other than Opp/Proj ones
     $allOppProjFolders = $topLevelFolders | Where-Object {$_.DriveItemFirstWord -match 'O-\d\d\d\d\d\d|P-\d\d\d\d\d\d'}
-    $allOppProjFolders | % {$_ | Add-Member -Name FolderClientDriveId -MemberType AliasProperty -Value DriveClientId -Force}
+    $allOppProjFolders | ForEach-Object {$_ | Add-Member -Name FolderClientDriveId -MemberType AliasProperty -Value DriveClientId -Force}
     }
 Write-Host "[$($topLevelFolders.Count)] Top-level Folders read from cache, filtered to [$($allOppProjFolders.Count)] Opp/Proj folders in $(format-measureCommandResults $importFoldersTime)"
 #$topLevelFolders = Import-Csv C:\Users\KEVMAI~1\AppData\Local\Temp\NetRec_AllFolders_20211206T1053496934Z.csv
@@ -405,6 +405,8 @@ $preparingClients2 = Measure-Command {
     }
 Write-Host "[$($prettyClients.Count)] NetTermClients linked to FoldClients in $(format-measureCommandResults $preparingClients2)"
 Write-Host "PrettyClients preparation took $(format-measureCommandResults $($preparingClients+$preparingClients2)) in total" -f Yellow
+if($prettyClients.Count -gt 0){export-encryptedCache -objects $prettyClients -objectType Client -objectSource Pretty}
+
 
 $preparingOpps = Measure-Command {
     #Get the NetOpps LEFT OUTER JOIN TermOpps data
@@ -435,6 +437,7 @@ $preparingOpps2 = Measure-Command {
     }
 Write-Host "[$($prettyOpps.Count)] NetTermOpps linked to FoldOpps in $(format-measureCommandResults $preparingOpps2)"
 Write-Host "PrettyOpps preparation took $(format-measureCommandResults $($preparingOpps+$preparingOpps2)) in total" -f Yellow
+if($prettyOpps.Count -gt 0){export-encryptedCache -objects $prettyOpps -objectType Opportunity -objectSource Pretty}
 
 $preparingProjs = Measure-Command {
     #Get the NetProjs LEFT OUTER JOIN TermProjs data
@@ -465,23 +468,24 @@ $preparingProjs2 = Measure-Command {
     }
 Write-Host "[$($prettyProjs.Count)] NetTermProjs linked to FoldProjs in $(format-measureCommandResults $preparingProjs2)"
 Write-Host "PrettyProjs preparation took $(format-measureCommandResults $($preparingProjs+$preparingProjs2)) in total" -f Yellow
+if($prettyProjs.Count -gt 0){export-encryptedCache -objects $prettyProjs -objectType Project -objectSource Pretty}
 Write-Host "PrettyObject preparation took $(format-measureCommandResults $($preparingClients+$preparingClients2+$preparingOpps+$preparingOpps2+$preparingProjs+$preparingProjs2)) in total" -f Magenta
 
-rv prettyClientsInterim
-rv prettyClientsInterimRight
-rv prettyTermClientsWithoutNetClients
-rv prettyClientsRight
-rv prettyFoldClientsWithoutNetTermClients
-rv prettyOppsInterim
-rv prettyOppsInterimRight
-rv prettyTermOppsWithoutNetOpps
-rv prettyOppsRight
-rv prettyFoldOppsWithoutNetTermOpps
-rv prettyProjsInterim
-rv prettyProjsInterimRight
-rv prettyTermProjsWithoutNetProjs
-rv prettyProjsRight
-rv prettyFoldProjsWithoutNetTermProjs
+Remove-Variable prettyClientsInterim
+Remove-Variable prettyClientsInterimRight
+Remove-Variable prettyTermClientsWithoutNetClients
+Remove-Variable prettyClientsRight
+Remove-Variable prettyFoldClientsWithoutNetTermClients
+Remove-Variablemove-Variable prettyOppsInterim
+Remove-Variable prettyOppsInterimRight
+Remove-Variable prettyTermOppsWithoutNetOpps
+Remove-Variable prettyOppsRight
+Remove-Variable prettyFoldOppsWithoutNetTermOpps
+Remove-Variable prettyProjsInterim
+Remove-Variable prettyProjsInterimRight
+Remove-Variable prettyTermProjsWithoutNetProjs
+Remove-Variable prettyProjsRight
+Remove-Variable prettyFoldProjsWithoutNetTermProjs
 #endregion
 
 #region Cross-reference PrettyClients, PrettyOpps & PrettyProjs to build "Beautiful" objects
@@ -536,7 +540,7 @@ $prettyProjsWithoutOpps2.Count
 
 $prettyClientsAndOppsAndProjects = get-linqLeftJoin -dataSet1 $prettyClientsAndOpps -dataSet1PropertyToCompare TermOppProjId -dataSet2 $prettyProjs -dataSet2PropertyToCompare NetSuiteProjId -dataSet1PropertiesToReturn $($(get-prettyNetOppHash) + $(get-prettyTermOppHash) + $(get-prettyFolderOppHash) + $(get-prettyNetClientHash) + $(get-prettyTermClientHash) + $(get-prettyFolderClientHash)) -dataSet2PropertiesToReturn $($(get-prettyNetProjHash) + $(get-prettyTermProjHash) + $(get-prettyFolderProjHash))
 
-$prettyOppsAndProjects | % {
+$prettyOppsAndProjects | ForEach-Object {
     $thisPrettyLittleThing = $_
     $thisPrettyLittleThing | Add-Member -MemberType NoteProperty -Name Errors -Value @()
     if([string]::IsNullOrWhiteSpace($thisPrettyLittleThing.TermClientDriveId)){$thisPrettyLittleThing.Errors += ""}
@@ -602,26 +606,26 @@ Projs
 #>
 
 #Error Checking
-[array]$netProjectsWithNoClientId = $allNetSuiteProjs | ? {[string]::IsNullOrWhiteSpace($_.parent.id)} #Find the weird Projects with no Client (as we can't create folders for them anyway)
-[array]$netProjsWithOvertlyDuffNames = $allNetSuiteProjs | ? {$(test-validNameForTermStore -stringToTest $_.entityId) -eq $false}
+[array]$netProjectsWithNoClientId = $allNetSuiteProjs | Where-Object {[string]::IsNullOrWhiteSpace($_.parent.id)} #Find the weird Projects with no Client (as we can't create folders for them anyway)
+[array]$netProjsWithOvertlyDuffNames = $allNetSuiteProjs | Where-Object {$(test-validNameForTermStore -stringToTest $_.entityId) -eq $false}
 
-[array]$netOppsWithNoClientId = $allNetSuiteOpps | ? {[string]::IsNullOrWhiteSpace($_.parent.id)} #Find the weird Projects with no Client (as we can't create folders for them anyway)
-[array]$netOppsWithOvertlyDuffNames = $allNetSuiteOpps | ? {$(test-validNameForTermStore -stringToTest $_.title) -eq $false}
+[array]$netOppsWithNoClientId = $allNetSuiteOpps | Where-Object {[string]::IsNullOrWhiteSpace($_.parent.id)} #Find the weird Projects with no Client (as we can't create folders for them anyway)
+[array]$netOppsWithOvertlyDuffNames = $allNetSuiteOpps | Where-Object {$(test-validNameForTermStore -stringToTest $_.title) -eq $false}
 
-[array]$netClientsWithOvertlyDuffNames = $allNetSuiteClients | ? {$(test-validNameForTermStore -stringToTest $_.companyName) -eq $false}
+[array]$netClientsWithOvertlyDuffNames = $allNetSuiteClients | Where-Object {$(test-validNameForTermStore -stringToTest $_.companyName) -eq $false}
 
 $netProjectsWithNoClientId.entityId
 Write-Warning "[$($netProjectsWithNoClientId.Count)] Projects with no Clients (there are at least 74 known internal/broken projects like this)"
 $netProjsWithOvertlyDuffNames.entityId
 if($netProjsWithOvertlyDuffNames.Count -gt 0){
     Write-Warning "[$($netProjsWithOvertlyDuffNames.Count)] Projects have illegal characters in their name, which means the Term cannot be created:"#`r`n`t[$($netProjsWithOvertlyDuffNames.entityId -join ']`r`n`t`[')]"
-    $netProjsWithOvertlyDuffNames | % {Write-Warning "`t[$($_.entityId)] contains [$(test-validNameForTermStore -stringToTest $_.entityId -returnSpecifcProblem)]"}
+    $netProjsWithOvertlyDuffNames | ForEach-Object {Write-Warning "`t[$($_.entityId)] contains [$(test-validNameForTermStore -stringToTest $_.entityId -returnSpecifcProblem)]"}
     }
 $netOppsWithNoClientId.entityId
 $netOppsWithOvertlyDuffNames.entityId
 if($netOppsWithOvertlyDuffNames.Count -gt 0){
     Write-Warning "[$($netOppsWithOvertlyDuffNames.Count)] Projects have illegal characters in their name (; < > \ | `t), which means the Term cannot be created:"#`r`n`t[$($netOppsWithOvertlyDuffNames.title -join "]$([Environment]::NewLine)`t[")]"
-    $netOppsWithOvertlyDuffNames | % {Write-Warning "`t[$($_.tranId) $($_.title)] contains [$(test-validNameForTermStore -stringToTest $_.title -returnSpecifcProblem)]"}
+    $netOppsWithOvertlyDuffNames | ForEach-Object {Write-Warning "`t[$($_.tranId) $($_.title)] contains [$(test-validNameForTermStore -stringToTest $_.title -returnSpecifcProblem)]"}
     }
 $netClientsWithOvertlyDuffNames.entityId
 
@@ -629,8 +633,8 @@ $netClientsWithOvertlyDuffNames.entityId
 # Num Unique Opps
 # + Projects without Opps
 # + Clients without Opps or Projects
-$numOpps = $($allNetSuiteOpps | select id -Unique).Count
-$numProjectsWithoutOpps = compare-object $allNetSuiteOpps $allNetSuiteProjs -Property "" -PassThru | ? {$_.SideIndicator -eq "=>"}
-$numClientsWithoutOpps = $(compare-object $allNetSuiteOpps $allNetSuiteClients -Property "" -PassThru | ? {$_.SideIndicator -eq "=>"}).Count
-$numClientsWithoutProjs = $(compare-object $allNetSuiteProjs $allNetSuiteClients -Property "" -PassThru | ? {$_.SideIndicator -eq "=>"}).Count
-$numClientsWithoutOppsOrProjs = $(compare-object $numClientsWithoutOpps $numClientsWithoutProjs -Property "" -PassThru -IncludeEqual -ExcludeDifferent | ? {$_.SideIndicator -eq "=="}).Count
+$numOpps = $($allNetSuiteOpps | Select-Object id -Unique).Count
+$numProjectsWithoutOpps = compare-object $allNetSuiteOpps $allNetSuiteProjs -Property "" -PassThru | Where-Object {$_.SideIndicator -eq "=>"}
+$numClientsWithoutOpps = $(compare-object $allNetSuiteOpps $allNetSuiteClients -Property "" -PassThru | Where-Object {$_.SideIndicator -eq "=>"}).Count
+$numClientsWithoutProjs = $(compare-object $allNetSuiteProjs $allNetSuiteClients -Property "" -PassThru | Where-Object {$_.SideIndicator -eq "=>"}).Count
+$numClientsWithoutOppsOrProjs = $(compare-object $numClientsWithoutOpps $numClientsWithoutProjs -Property "" -PassThru -IncludeEqual -ExcludeDifferent | Where-Object {$_.SideIndicator -eq "=="}).Count

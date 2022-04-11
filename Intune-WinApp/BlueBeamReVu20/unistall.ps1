@@ -1,0 +1,1 @@
+﻿Get-Package | ? {$_.name -match "Bluebeam Revu x64"} | Uninstall-Package -AllVersions -Force
