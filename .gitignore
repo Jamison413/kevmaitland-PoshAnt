@@ -938,3 +938,7 @@ PackageManagement/1.4.7/PackageManagement.psm1
 PackageManagement/1.4.7/PackageManagement.Resources.psd1
 PackageManagement/1.4.7/PackageProviderFunctions.psm1
 PackageManagement/1.4.7/PSGetModuleInfo.xml
+Intune-WinApp/BlueBeamReVu20/Bluebeam Revu x64 20.msi
+Intune-WinApp/BlueBeamReVu20/BluebeamOCR x64 20.msi
+Intune-WinApp/BlueBeamReVu20/installOpen.intunewin
+Intune-WinApp/BlueBeamReVu20/installPerpetual.intunewin
