@@ -779,6 +779,10 @@ function get-graphGroups(){
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [string]$filterDeviceGroupId
         ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterPowerBiWorkspaceId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
+            [string]$filterPowerBiManagerGroupId
+        ,[parameter(Mandatory = $false,ParameterSetName = "ambiguous")]
             [parameter(Mandatory = $false,ParameterSetName = "explicit")]
             [switch]$selectAllProperties = $false
         )
@@ -788,7 +792,7 @@ function get-graphGroups(){
 
     switch ($PsCmdlet.ParameterSetName){
         “explicit”  {
-            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$filterId$select"
+            invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$($filterId)?$($select)"
             return
             }
         }
@@ -814,8 +818,8 @@ function get-graphGroups(){
     if($filterClassifcation){$additionalFilters += " and anthesisgroup_UGSync/classification eq '$filterClassifcation'"}
     if($filterPrivacy){$additionalFilters += " and anthesisgroup_UGSync/privacy eq '$filterPrivacy'"}
     if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/deviceGroupId eq '$filterDeviceGroupId'"}
-    if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/powerBiWorkspaceId eq '$filterDeviceGroupId'"}
-    if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/powerBiManagerGroupId eq '$filterDeviceGroupId'"}
+    if($filterPowerBiWorkspaceId){$additionalFilters += " and anthesisgroup_UGSync/powerBiWorkspaceId eq '$filterDeviceGroupId'"}
+    if($filterPowerBiManagerGroupId){$additionalFilters += " and anthesisgroup_UGSync/powerBiManagerGroupId eq '$filterDeviceGroupId'"}
     if(![string]::IsNullOrWhiteSpace($filter)){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
