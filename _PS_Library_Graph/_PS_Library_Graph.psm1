@@ -814,12 +814,12 @@ function get-graphGroups(){
     if($filterMembersGroupId){$additionalFilters += " and anthesisgroup_UGSync/memberGroupId eq '$filterMembersGroupId'"}
     if($filterCombinedGroupId){$additionalFilters += " and anthesisgroup_UGSync/combinedGroupId eq '$filterCombinedGroupId'"}
     if($filterSharedMailboxId){$additionalFilters += " and anthesisgroup_UGSync/sharedMailboxId eq '$filterSharedMailboxId'"}
+    if($filterPowerBiWorkspaceId){$additionalFilters += " and anthesisgroup_UGSync/powerBiWorkspaceId eq '$filterPowerBiWorkspaceId'"}
+    if($filterPowerBiManagerGroupId){$additionalFilters += " and anthesisgroup_UGSync/powerBiManagerGroupId eq '$filterPowerBiManagerGroupId'"}
     if($filterMasterMembership){$additionalFilters += " and anthesisgroup_UGSync/masterMembershipList eq '$filterMasterMembership'"}
     if($filterClassifcation){$additionalFilters += " and anthesisgroup_UGSync/classification eq '$filterClassifcation'"}
     if($filterPrivacy){$additionalFilters += " and anthesisgroup_UGSync/privacy eq '$filterPrivacy'"}
     if($filterDeviceGroupId){$additionalFilters += " and anthesisgroup_UGSync/deviceGroupId eq '$filterDeviceGroupId'"}
-    if($filterPowerBiWorkspaceId){$additionalFilters += " and anthesisgroup_UGSync/powerBiWorkspaceId eq '$filterDeviceGroupId'"}
-    if($filterPowerBiManagerGroupId){$additionalFilters += " and anthesisgroup_UGSync/powerBiManagerGroupId eq '$filterDeviceGroupId'"}
     if(![string]::IsNullOrWhiteSpace($filter)){
         if($filter.StartsWith(" and ")){$filter = $filter.Substring(5,$filter.Length-5)}
         $filter = "`$filter=$filter"
@@ -2225,6 +2225,32 @@ function new-graphCalendarEvent(){
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userId/calendar/events" -graphBodyHashtable $event
     #https://docs.microsoft.com/en-us/graph/api/calendar-post-events?view=graph-rest-1.0&tabs=http
     }
+function New-GraphGuestInvitation(){
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse    
+        ,[parameter(Mandatory = $true)]
+            [string]$invitedUserEmailAddress
+        ,[parameter(Mandatory = $true)]
+            [string]$inviteRedirectUrl
+        ,[parameter(Mandatory = $true)]
+            [boolean]$sendInvitationMessage
+        )
+	$invitationHashTable = @{
+		"invitedUserEmailAddress" = $invitedUserEmailAddress;
+		"inviteRedirectUrl" = $inviteRedirectUrl
+		"sendInvitationMessage" = $sendInvitationMessage
+		}
+
+	Try{
+		$result = invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/invitations" -graphBodyHashtable $invitationHashTable
+		}
+	Catch{
+		$Error[0]
+		}
+	$result
+	}
 function new-graphGroup(){
     [cmdletbinding()]
     param(
