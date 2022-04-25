@@ -233,45 +233,6 @@ function add-graphUsersToGroup(){
         invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/`$ref" -graphBodyHashtable $bodyHash
         }
     }
-function add-graphWebsiteTabToChannel(){
-    [CmdletBinding()]
-    param(
-        [parameter(Mandatory = $true)]
-            [psobject]$tokenResponse        
-        ,[parameter(Mandatory = $true)]
-            [string]$teamId
-        ,[parameter(Mandatory = $true)]
-            [string]$channelName
-        ,[parameter(Mandatory = $true)]
-            [string]$tabName
-        ,[parameter(Mandatory = $true)]
-            [string]$tabDestinationUrl
-        )
-
-    Write-Verbose "add-graphWebsiteTabToChannel | Getting Channels"
-    $newGraphTeamChannel = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels?`$filter displayName eq '$channelName'" | ? {$_.DisplayName -eq $channelName} #$filter doesn't currently work on this endpoint :/
-    Write-Verbose "add-graphWebsiteTabToChannel | Getting Channels Tabs"
-    $newGraphTeamGeneralChannelTabs = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels/$($newGraphTeamChannel.id)/tabs"
-    $newGraphTeamGeneralChannelTabs | ? {$_.displayName -eq "$tabName"} | % {
-        Write-Verbose "Removing old [$tabName] tab"
-        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels/$($newGraphTeamChannel.id)/tabs/$($_.id)" 
-        }
-    $tabConfiguration = @{
-        "entityId"=$null
-        "contentUrl"=$tabDestinationUrl
-        "websiteUrl"=$tabDestinationUrl
-        "removeUrl"=$null
-        }
-    $tabBody = @{
-        "displayName"=$tabName
-        "teamsApp@odata.bind"="https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/com.microsoft.teamspace.tab.web"
-        "configuration"=$tabConfiguration
-        }
-
-    Write-Verbose "add-graphWebsiteTabToChannel | Creating new [$tabName] Tab in [$channelName] Channel linking to [$tabDestinationUrl]"
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels/$($newGraphTeamChannel.id)/tabs" -graphBodyHashtable $tabBody
-    
-    }
 function delete-graphDriveItem(){
     [cmdletbinding()]
     Param (
@@ -2601,6 +2562,78 @@ function new-graphTeamChannel(){
         )
     $bodyHash = @{"displayName"=$channelName;"description"=$channelDescription;isFavoriteByDefault=$isFavourite;membershipType=$membershipType}
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels" -graphBodyHashtable $bodyHash
+    }
+function new-graphTeamChannelTab(){
+    [CmdletBinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$teamId
+        ,[parameter(Mandatory = $true)]
+            [string]$channelId
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet(“DocumentLibrary”,"SharePoint",”Website”)]
+            [string]$tabType
+        ,[parameter(Mandatory = $true)]
+            [string]$tabName
+        ,[parameter(Mandatory = $true)]
+            [string]$tabDestinationUrl
+        )
+
+    Write-Verbose "add-graphWebsiteTabToChannel | Getting Channels Tabs"
+    $channelTabs = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels/$channelId/tabs"
+    $channelTabs | ? {$_.displayName -eq "$tabName"} | % {
+        Write-Verbose "Removing old [$tabName] tab"
+        invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels/$channelId/tabs/$($_.id)" 
+        }
+
+    switch($tabType){
+        (“DocumentLibrary”) {
+            $tabConfiguration = @{
+                "entityId"=$null
+                "contentUrl"=$tabDestinationUrl
+                "websiteUrl"=$null
+                "removeUrl"=$null
+                }
+            $tabBody = @{
+                "displayName"=$tabName
+                "teamsApp@odata.bind"="https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/com.microsoft.teamspace.tab.files.sharepoint"
+                "configuration"=$tabConfiguration
+                }
+        }
+        (“SharePoint”) {
+            #$thisTeamDrive = $(get-graphDrives -tokenResponse $tokenResponse -groupGraphId $teamId)
+            $tabConfiguration = @{
+                "entityId"=$null
+                "contentUrl"="$(Split-Path $tabDestinationUrl -Parent)/_layouts/15/teamslogon.aspx?spfx=true&dest="+$([uri]::EscapeDataString([uri]::UnescapeDataString($($(Split-Path $tabDestinationUrl -Parent) -replace "\\","/")+"/_layouts/15/listallitems.aspx?app=teamsPage&listUrl="+$([uri]$tabDestinationUrl).AbsolutePath))) -replace "\\","/"
+                "websiteUrl"=$null
+                "removeUrl"=$null
+                }
+            $tabBody = @{
+                "displayName"=$tabName
+                "teamsApp@odata.bind"="https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/2a527703-1f6f-4559-a332-d8a7d288cd88"
+                "configuration"=$tabConfiguration
+                }
+        }
+        (“Website”) {
+            $tabConfiguration = @{
+                "entityId"=$null
+                "contentUrl"=$tabDestinationUrl
+                "websiteUrl"=$tabDestinationUrl
+                "removeUrl"=$null
+                }
+            $tabBody = @{
+                "displayName"=$tabName
+                "teamsApp@odata.bind"="https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/com.microsoft.teamspace.tab.web"
+                "configuration"=$tabConfiguration
+                }
+            }
+        }
+
+    Write-Verbose "add-graphWebsiteTabToChannel | Creating new [$tabName] Tab in [$channelId] Channel linking to [$tabDestinationUrl]"
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/teams/$teamId/channels/$channelId/tabs" -graphBodyHashtable $tabBody
+    
     }
 function remove-graphUsersFromGroup(){
     [cmdletbinding()]
