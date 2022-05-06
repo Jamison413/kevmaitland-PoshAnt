@@ -181,7 +181,8 @@ function license-msolUser{
         write-host "Adding licenses: $($licenseToAssign.AccountSkuId)" -ForegroundColor Yellow
         Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses $($licenseToAssign.AccountSkuId)
         write-host "Removing licenses: Yammer" -ForegroundColor Yellow
-        Set-MsolUserLicense -UserPrincipalName $upn -RemoveLicenses $($licenseToRemove.AccountSkuId) -LicenseOptions $LO     
+        Set-MsolUserLicense -UserPrincipalName $upn -RemoveLicenses $($licenseToRemove.AccountSkuId) -LicenseOptions $LO   
+        Set-MsolUserLicense -UserPrincipalName $upn -AddLicenses "AnthesisLLC:Microsoft_Teams_Audio_Conferencing_select_dial_out"
         }
         Catch{
         Write-Error "Failed to license new Msol user [$($upn)] in license-msoluser (Core 365 Licensing)"
