@@ -1,4 +1,4 @@
-﻿$certName = $env:USERNAME
+﻿$certName = $(whoami /upn)
 $cert = New-SelfSignedCertificate -Subject "CN=$certName" -CertStoreLocation "Cert:\CurrentUser\My" -KeyExportPolicy Exportable -KeySpec Signature -KeyLength 2048 -KeyAlgorithm RSA -HashAlgorithm SHA256
 
 Export-Certificate -Cert $cert -FilePath "$env:USERPROFILE\Downloads\$certName.cer"   ## Specify your preferred location and replace {certificateName}

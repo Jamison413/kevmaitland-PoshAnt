@@ -942,3 +942,8 @@ Intune-WinApp/BlueBeamReVu20/Bluebeam Revu x64 20.msi
 Intune-WinApp/BlueBeamReVu20/BluebeamOCR x64 20.msi
 Intune-WinApp/BlueBeamReVu20/installOpen.intunewin
 Intune-WinApp/BlueBeamReVu20/installPerpetual.intunewin
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+mslearn-tailspin-spacegame-web/

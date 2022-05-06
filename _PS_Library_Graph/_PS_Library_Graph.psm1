@@ -414,12 +414,13 @@ function get-graphAppClientCredentials{
      [cmdletbinding()]
     param(
         [parameter(Mandatory = $true)]
-            [ValidateSet("IntuneBot","PowerBIBot","ReportBot","SchemaBot","SharePointBot","ShiftBot","SmtpBot","TeamsBot","UserBot")]
+            [ValidateSet("IntuneBot","MyBot","PowerBIBot","ReportBot","SchemaBot","SharePointBot","ShiftBot","SmtpBot","TeamsBot","UserBot")]
             [String]$appName
         )
     
     switch($appName){ #Figure out the name of the file
         "IntuneBot" {$encryptedCredsFile = "intunebot.txt"}
+        "MyBot"     {$encryptedCredsFile = "mybot.txt"}
         "PowerBIBot" {$encryptedCredsFile = "PowerBIBot.txt"}
         "ReportBot"{$encryptedCredsFile = "ReportBotDetails.txt"}
         "SchemaBot" {$encryptedCredsFile = "schemabot.txt"}
@@ -450,6 +451,31 @@ function get-graphAppClientCredentials{
         $clientCredentials = import-encryptedCsv -pathToEncryptedCsv $pathToEncryptedCsv
         }
     $clientCredentials
+    }
+function get-graphApplication {
+    [cmdletbinding(DefaultParameterSetName = "All")]
+    param (
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+            ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [string]$objectId
+            ,[parameter(Mandatory = $true,ParameterSetName = "ClientId")]
+            [string]$clientId
+        ,[parameter(Mandatory = $false,ParameterSetName = "Name")]
+            [string]$name
+    )
+
+    if(-not [string]::IsNullOrWhiteSpace($objectId)){
+        $specificId = "/$objectId"
+    }
+    if(-not [string]::IsNullOrWhiteSpace($clientId)){
+        $filter = "?`$filter=appId eq `'$clientId`'"
+    }
+    if(-not [string]::IsNullOrWhiteSpace($name)){
+        $filter = "?`$filter=displayName eq `'$name`'"
+    }
+    #GET https://graph.microsoft.com/v1.0/servicePrincipals/{id}
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/applications$specificId$filter"
     }
 function get-graphAuthCode() {
      [cmdletbinding()]
@@ -983,17 +1009,15 @@ function get-graphIntuneDevices(){
 function get-graphList(){
     [cmdletbinding()]
     param(
-        [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
-            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
-            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
-            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
-            [parameter(Mandatory = $true,ParameterSetName = "driveId")]
+        [parameter(Mandatory = $true)]
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "IdAll")]
             [string]$graphSiteId
         ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+            [parameter(Mandatory = $true,ParameterSetName = "URLAll")]
             [string]$serverRelativeSiteUrl
         ,[parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
@@ -1031,10 +1055,7 @@ function get-graphList(){
 function get-graphListItems(){
     [cmdletbinding()]
     param(
-        [parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
-            [parameter(Mandatory = $true,ParameterSetName = "URLAndId")]
-            [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
-            [parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
+        [parameter(Mandatory = $true)]
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "IdAndId")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
@@ -1048,16 +1069,12 @@ function get-graphListItems(){
         ,[parameter(Mandatory = $true,ParameterSetName = "URLAndName")]
             [parameter(Mandatory = $true,ParameterSetName = "IdAndName")]
             [string]$listName
-        ,[parameter(Mandatory = $false,ParameterSetName = "IdAndId")]
-            [parameter(Mandatory = $false,ParameterSetName = "URLAndId")]
-            [parameter(Mandatory = $false,ParameterSetName = "IdAndName")]
-            [parameter(Mandatory = $false,ParameterSetName = "URLAndName")]
+        ,[parameter(Mandatory = $false)]
             [switch]$expandAllFields
-        ,[parameter(Mandatory = $false,ParameterSetName = "IdAndId")]
-            [parameter(Mandatory = $false,ParameterSetName = "URLAndId")]
-            [parameter(Mandatory = $false,ParameterSetName = "IdAndName")]
-            [parameter(Mandatory = $false,ParameterSetName = "URLAndName")]
+            ,[parameter(Mandatory = $false)]
             [string]$filterId
+        ,[parameter(Mandatory = $false)]
+            [string]$filterQuery
         )
 
     switch ($PsCmdlet.ParameterSetName){
@@ -1083,16 +1100,26 @@ function get-graphListItems(){
     if($expandAllFields){$expand += " and fields"}
 
     $refiner = "?"+$select
+    if(-not [string]::IsNullOrWhiteSpace($filterQuery)){
+        if($filterQuery.StartsWith(" and ")){$filterQuery = $filterQuery.Substring(5,$filterQuery.Length-5)}
+        $filter = "`$filter=$filterQuery"
+        $additionalHeaders = @{prefer="HonorNonIndexedQueriesWarningMayFailRandomly"}
+        }
     if(![string]::IsNullOrWhiteSpace($expand)){
         if($expand.StartsWith(" and ")){$expand = $expand.Substring(5,$expand.Length-5)}
         $expand = "`$expand=$expand"
         }
+
+    $refiner = "?"+$select
+    if($filter){
+        if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
+        $refiner = $refiner+$filter
+        }#>
     if($expand){
         if($refiner.Length -gt 1){$refiner = $refiner+"&"} #If there is already another parameter in the refiner, use the '&' symbol to concatenate the strings
         $refiner = $refiner+$expand
         }
-
-    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items$refiner"
+        invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId/lists/$listId/items$refiner" -additionalHeaders $additionalHeaders
 
     }
 function get-graphMailboxSettings(){
@@ -1237,13 +1264,14 @@ function get-graphShiftUserShifts(){
 function get-graphSite(){
     [cmdletbinding()]
     param(
-        [parameter(Mandatory = $true,ParameterSetName = "IdLonger")]
-            [parameter(Mandatory = $true,ParameterSetName = "URLLonger")]
+        [parameter(Mandatory = $true)]
             [psobject]$tokenResponse        
         ,[parameter(Mandatory = $true,ParameterSetName = "IdLonger")]
             [string]$graphSiteId
-        ,[parameter(Mandatory = $true,ParameterSetName = "URLLonger")]
+            ,[parameter(Mandatory = $true,ParameterSetName = "URLLonger")]
             [string]$serverRelativeUrl
+        ,[parameter(Mandatory = $true,ParameterSetName = "GroupId")]
+            [string]$groupId
         )
 
     switch ($PsCmdlet.ParameterSetName){
@@ -1253,9 +1281,13 @@ function get-graphSite(){
             Write-Verbose "get-graphSite | Getting Site from URL [$sanitisedServerRelativeUrl][$serverRelativeUrl]"
             $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/anthesisllc.sharepoint.com:$sanitisedServerRelativeUrl"
             }
-        "IdLonger" { #If we're working with $siteUrl, we'll need to get $siteGraphId (which is more of a faff)
-            Write-Verbose "get-graphSite | Getting SiteId from URL [$siteUrl]"
+        "IdLonger" { 
+            Write-Verbose "get-graphSite | Getting Site from [$graphSiteId]"
             $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/$graphSiteId" 
+            }       
+        "GroupId" { #If we're working with $groupId, we'll need to get $siteGraphId (which is more of a faff)
+            Write-Verbose "get-graphSite | Getting Site from GroupId [$groupId]"
+            $result = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/groups/$groupId/sites/root" 
             }       
         }
 
@@ -1599,10 +1631,12 @@ function get-graphTokenResponse{
         [parameter(Mandatory = $true)]
             [PSCustomObject]$aadAppCreds
         ,[parameter(Mandatory = $false)]
-            [ValidateSet(“client_credentials”,”authorization_code”,"device_code")]
+            [ValidateSet(“client_credentials”,”authorization_code”,"device_code","certificate")]
             [string]$grant_type = "client_credentials"
         ,[parameter(Mandatory = $false)]
             [string]$scope = "https://graph.microsoft.com/.default"
+        ,[parameter(Mandatory = $false)]
+            [System.Security.Cryptography.X509Certificates.X509Certificate]$cert
         )
     switch($grant_type){
         "authorization_code" {if(!$scope){$scope = "https://graph.microsoft.com/.default"}
@@ -1657,6 +1691,38 @@ function get-graphTokenResponse{
                 code          = $response.device_code
                 }
 
+            }
+        "certificate" {
+            if($null -eq $cert){$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object {$_.Subject -match $(whoami /upn)}}
+            $clientAssertion = new-clientAssertionWithCertificate -X509cert $cert -clientId $aadAppCreds.ClientID -tenantId $aadAppCreds.TenantId -resource "https://graph.microsoft.com" -loginEndpoint "https://login.microsoftonline.com"
+            #Write-Verbose "`$clientAssertion = [$($clientAssertion)]"
+            #This also works, but's different from the way our other otkens work and it's more opaque:
+            <#$ClientApplicationBuilder = [Microsoft.Identity.Client.ConfidentialClientApplicationBuilder]::Create($aadAppCreds.ClientID)
+            [void]$ClientApplicationBuilder.WithAuthority($("https://login.microsoftonline.com/$($aadAppCreds.TenantId)"))
+            [void]$ClientApplicationBuilder.WithCertificate($myCert)
+            $confidentialClientApplication = $ClientApplicationBuilder.Build()
+
+            #[Microsoft.Identity.Client.AuthenticationResult] $authResult  = $null
+            $AquireTokenParameters = $confidentialClientApplication.AcquireTokenForClient([string[]]$scope)
+            try {
+                [Microsoft.Identity.Client.AuthenticationResult]$authResult = $AquireTokenParameters.ExecuteAsync().GetAwaiter().GetResult()
+                $authResult | Add-Member -MemberType NoteProperty -Name access_token -Value $authResult.AccessToken
+            }
+            catch {
+                get-errorSummary $_
+            }
+            #>
+            $ReqTokenBody = @{
+                Grant_Type    = "client_credentials"
+                Scope         = $scope
+                client_Id     = $aadAppCreds.ClientID
+                client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+                client_assertion = $clientAssertion
+                }
+            Write-Verbose "`$ReqTokenBody:"
+            $ReqTokenBody.Keys | ForEach-Object {
+                    Write-Verbose "`t[$_]`t`t[$($ReqTokenBody[$_])]"
+            }
             }
         }
 
@@ -1952,6 +2018,72 @@ function grant-graphSharing(){
         }
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/drives/$driveId/items/$itemId/invite" -graphBodyHashtable $graphParams
     }
+function grant-graphSiteSelectedPermissions {
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+        ,[parameter(Mandatory = $true)]
+            [string]$siteId
+            ,[parameter(Mandatory = $true,ParameterSetName = "SP")]
+            [PSCustomObject]$servicePrincipal
+            ,[parameter(Mandatory = $true,ParameterSetName = "App")]
+            [PSCustomObject]$application
+        ,[parameter(Mandatory = $true)]
+            [ValidateSet("Read","Write")]
+            [string]$role
+        )
+    
+    switch ($PsCmdlet.ParameterSetName){
+        "SP"  {
+            $clientId = $servicePrincipal.appId
+            $appName  = $servicePrincipal.displayName
+        }
+        "App" {
+            $clientId = $application.appId
+            $appName  = $application.displayName
+        }
+    }
+
+    $application = @{
+        "id"=$clientId
+        "displayName"=$appName
+    }
+    $grantedToIdentities = @{
+        application = $application
+    }
+    $graphParams =@{
+        "roles"=@($role)
+        "grantedToIdentities"= @($grantedToIdentities)
+        }
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/sites/$siteId/permissions" -graphBodyHashtable $graphParams
+
+}
+function get-graphServicePrincipal {
+    [cmdletbinding(DefaultParameterSetName = "All")]
+    param (
+        [parameter(Mandatory = $true)]
+            [psobject]$tokenResponse        
+            ,[parameter(Mandatory = $true,ParameterSetName = "Id")]
+            [string]$servicePrincipalId
+            ,[parameter(Mandatory = $true,ParameterSetName = "ClientId")]
+            [string]$clientId
+        ,[parameter(Mandatory = $false,ParameterSetName = "Name")]
+            [string]$name
+    )
+
+    if(-not [string]::IsNullOrWhiteSpace($servicePrincipalId)){
+        $specificId = "/$servicePrincipalId"
+    }
+    if(-not [string]::IsNullOrWhiteSpace($clientId)){
+        $filter = "?`$filter=appId eq `'$clientId`'"
+    }
+    if(-not [string]::IsNullOrWhiteSpace($name)){
+        $filter = "?`$filter=displayName eq `'$name`'"
+    }
+    #GET https://graph.microsoft.com/v1.0/servicePrincipals/{id}
+    invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/servicePrincipals$specificId$filter"
+}
 function invoke-graphDelete(){
     [cmdletbinding()]
     param(

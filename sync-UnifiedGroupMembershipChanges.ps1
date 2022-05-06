@@ -58,7 +58,7 @@ $timeForFullCycle = Measure-Command {
                 try{ #If we've got enough data to automtacilly repair the broken group, try repairing and reporocessing the group
                     repair-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponseTeams -graphGroup $365Group -groupClassifcation $365Group.anthesisgroup_UGSync.classification -masterMembership $365Group.anthesisgroup_UGSync.masterMembershipList -createGroupsIfMissing -Verbose:$VerbosePreference
                     $365Group = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponseTeams -filterId $365Group.id
-                    sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Members -sourceGroup $365Group.anthesisgroup_UGSync.masterMembershipList -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
+                    #sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Members -sourceGroup $365Group.anthesisgroup_UGSync.masterMembershipList -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
                     }
                 catch{
                     send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Members`r`n`r`n$(get-errorSummary $_)" -priority high
@@ -82,7 +82,7 @@ $timeForFullCycle = Measure-Command {
                 try{ #If we've got enough data to automtacilly repair the broken group, try repairing and reporocessing the group
                     repair-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponseTeams -graphGroup $365Group -groupClassifcation $365Group.anthesisgroup_UGSync.classification -masterMembership $365Group.anthesisgroup_UGSync.masterMembershipList -createGroupsIfMissing -Verbose:$VerbosePreference
                     $365Group = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponseTeams -filterId $365Group.id
-                    sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
+                    #sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
                     }
                 catch{
                     send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses $adminEmailAddresses -subject "FAILED: sync-UnifiedGroupMembership [$($365Group.DisplayName)]" -bodyText "$_`r`n`r`nError recorded in [$transcriptLogName] on [$env:COMPUTERNAME]`r`n`r`nError occurred synchronising Owners`r`n`r`n$(get-errorSummary $_)" -priority high

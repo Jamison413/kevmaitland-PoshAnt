@@ -693,16 +693,30 @@ function send-dataManagerReassignmentRequest(){
         send-noOwnersForGroupAlertToAdmins -tokenResponse $tokenResponse -UnifiedGroup $unifiedGroup -currentOwners $currentOwners -adminEmailAddresses $adminEmailAddresses
         return
         }
+    else{
+        $authorisedDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId 'daf56fbd-ebce-457e-a10a-4fce50a2f99c' -memberType Members -returnOnlyLicensedUsers
+        $otherMembers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $unifiedGroup.id -memberType Members -returnOnlyLicensedUsers
+        $potentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $otherMembers -Property userPrincipalName -ExcludeDifferent -IncludeEqual -PassThru
+        $groupSite = get-graphSite -tokenResponse $tokenResponse -groupId $UnifiedGroup.id
+    }
 
 
-    $currentOwners | % {
+    $currentOwners | ForEach-Object {
         if([string]::IsNullOrWhiteSpace($_.manager)){<#Do nothing - leave it to one of the Ex-Employees who does have a Line Manager assigned#>}
         else{
             $subject = "Unmanaged Site/Team Group found: [$($UnifiedGroup.DisplayName)]"
             $body = "<HTML><FONT FACE=`"Calibri`">Hello $($_.manager.givenName),`r`n`r`n<BR><BR>"
-            $body += "The 365 Site/Team [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.id)] is currently managed by one of your ex-reportees:`r`n`t<BR>"
+            $body += "The 365 Site/Team [<A HREF=`"$($groupSite.webUrl)`"><B>$($UnifiedGroup.DisplayName)</B></A>] is currently managed by one of your ex-reportees:`r`n`t<BR>"
             $body += "<PRE>&#9;$($_.displayName)</PRE>`r`n`r`n<BR>"
-            $body += "Please could you let the <A HREF='mailto:IT_Team_GBR@anthesisgroup.com'>IT Team</A> know who to reassign this to? You can find a list of everyone with current Data Manager training by <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-296'>expanding the <B>Data Manager - Authorised (All)</B> group in Outlook</A>.`r`n`r`n<BR><BR>"
+            $body += "Please could you let the <A HREF='mailto:IT_Team_GBR@anthesisgroup.com'>IT Team</A> know who to reassign this to?`r`n`r`n<BR><BR>"
+            if($potentialDataManagers.Count -gt 0){
+                $body += "These Members have already completed Data Manager training:`r`n`t<BR><PRE>&#9;$($potentialDataManagers.DisplayName -join "`r`n`t")</PRE>`r`n`r`n<BR>"
+
+            }
+            else{
+                    $body+= "Unfortunately, no other Members of the Team currently have Data Manager training. You can find a list of everyone with current Data Manager training by <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-296'>expanding the <B>Data Manager - Authorised (All)</B> group in Outlook</A>.`r`n`r`n<BR><BR>"
+            }
+            $body += "<B>If you can tell the IT Team who to reassign this to, you will stop receiving these emails</B>.`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
             send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses $_.manager.mail -bccAddresses "t0-kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
             #send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
@@ -838,16 +852,29 @@ function send-noOwnersForGroupAlertToAdmins(){
             [string[]]$adminEmailAddresses
         )
 
+    $groupSite = get-graphSite -tokenResponse $tokenResponse -groupId $UnifiedGroup.id
+    $groupMembers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $UnifiedGroup.id -memberType Members -returnOnlyLicensedUsers -includeLineManager
     $subject = "Unowned 365 Group found: [$($UnifiedGroup.DisplayName)]"
     $body = "<HTML><FONT FACE=`"Calibri`">Hello 365 Group Admins,`r`n`r`n<BR><BR>"
-    $body += "365 Group [$($UnifiedGroup.DisplayName)][$($UnifiedGroup.id)] has no active owners:`r`n`t<BR><PRE>&#9;"
-
+    $body += "There are no active owners for [<B>$($UnifiedGroup.DisplayName)</B>][$($UnifiedGroup.id)][<A HREF=`"$($groupSite.webUrl)`">Site URL</A>][<A HREF=`"https://admin.microsoft.com/AdminPortal/Home#/groups/:/TeamDetails/$($UnifiedGroup.id)`">365</A>][<A HREF=`"https://portal.azure.com/#blade/Microsoft_AAD_IAM/GroupDetailsMenuBlade/Overview/groupId/$($UnifiedGroup.id)`">AAD<A/>][<A HREF=`"https://portal.azure.com/#blade/Microsoft_AAD_IAM/GroupDetailsMenuBlade/Overview/groupId/$($UnifiedGroup.anthesisgroup_UGSync.dataManagerGroupId)`">Data Manager Group</A>] `r`n`r`n<BR><BR>"
+    
     if($currentOwners.Count -gt 0){
         $currentOwners = $currentOwners | Sort-Object DisplayName
         $body += "The full list of 365 group Owners looks like this:`r`n`t<BR><PRE>&#9;$($currentOwners.DisplayName -join "`r`n`t")</PRE>`r`n`r`n<BR>"
-        }
+        $body += "<B>These owners either have no Line Manager, or their Line Manager has also been deactivated!</B>`r`n`r`n<BR><BR>"
+    }
     else{$body += "It looks like the Owners group is now empty...`r`n`r`n<BR><BR>"}
-    $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"    
+    
+    $body += "<B>This can only be fixed manually!</B>`r`n`r`n<BR><BR>"
+    
+    if($groupMembers.Count -gt 0){
+        $groupMembers = $groupMembers | Sort-Object DisplayName
+        $body += "The remaining members of the group, or their [Line Manager]s might be able to help:`r`n`t<BR><PRE>&#9;"
+        $groupMembers | ForEach-Object {
+            $body += "$($_.userPrincipalName)`t[$($_.manager.userPrincipalName)]`r`n`t"
+        }
+    }
+    $body += "</PRE>`r`n`r`n<BR>Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"    
 
     if([string]::IsNullOrWhiteSpace($adminEmailAddresses)){$adminEmailAddresses = get-groupAdminRoleEmailAddresses}
 
