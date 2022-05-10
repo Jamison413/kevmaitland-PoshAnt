@@ -733,7 +733,7 @@ function get-available365licensecount{
                             $availableE5Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Office_E5")" #"AnthesisLLC:ENTERPRISEPACK"
                             $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "EMS_E3")" #"AnthesisLLC:EMS"
                             $availableMDELicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "MDE")" #"AnthesisLLC:EMS"
-                            $availableAudioLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "TeamsAudioConferencing")" #"AnthesisLLC:EMS"
+                            $availableAudioLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "TeamsAudioConferencingSelect")" #"AnthesisLLC:EMS"
                             $availableWinE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Win_E3")" #"AnthesisLLC:EMS"
                             $availableME3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Microsoft_E3")" #"AnthesisLLC:EMS"
                             $availableME5Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Microsoft_E5")" #"AnthesisLLC:EMS"
@@ -1074,10 +1074,47 @@ function get-microsoftProductInfo(){
         @("Win_E3","WINDOWS 10 ENTERPRISE E3","Win10_VDA_E3","6a0f6da5-0b87-4190-a6ae-9bb5a2b9546a","WINDOWS 10 ENTERPRISE E3","7"),
         @("Win_E5","Windows 10 Enterprise E5","WIN10_VDA_E5","488ba24a-39a9-4473-8ee5-19291e71b002","Windows 10 Enterprise E5",""),
         @("PowerAutomateFree","FLOW_FREE","FLOW_FREE","f30db892-07e9-47e9-837c-80727f46fd3d","Zero cost Power Automate (Flow) licence",""),
-        @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM","")
+        @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM",""),
+        @("TeamsAudioConferencingSelect","Microsoft Teams Audio Conferencing with dial-out to USA/CAN","Microsoft_Teams_Audio_Conferencing_select_dial_out","1c27243e-fb4d-42b1-ae8c-fe25c9616588","STREAM","0")
         )
     $foundProduct = $productList | ? {$_[$fromId] -eq $fromValue} 
     $foundProduct[$getId]
+    }
+function Get-Shortcut {
+    param(
+        $path = $null
+        )
+
+    $obj = New-Object -ComObject WScript.Shell
+
+    if ($path -eq $null) {
+        $pathUser = [System.Environment]::GetFolderPath('StartMenu')
+        $pathCommon = $obj.SpecialFolders.Item('AllUsersStartMenu')
+        $path = dir $pathUser, $pathCommon -Filter *.lnk -Recurse 
+        }
+    if ($path -is [string]) {
+        $path = dir $path -Filter *.lnk
+        }
+    $path | ForEach-Object { 
+        if ($_ -is [string]) {
+            $_ = dir $_ -Filter *.lnk
+            }
+        if ($_) {
+            $link = $obj.CreateShortcut($_.FullName)
+
+            $info = @{}
+            $info.Hotkey = $link.Hotkey
+            $info.TargetPath = $link.TargetPath
+            $info.LinkPath = $link.FullName
+            $info.Arguments = $link.Arguments
+            $info.Target = try {Split-Path $info.TargetPath -Leaf } catch { 'n/a'}
+            $info.Link = try { Split-Path $info.LinkPath -Leaf } catch { 'n/a'}
+            $info.WindowStyle = $link.WindowStyle
+            $info.IconLocation = $link.IconLocation
+
+            New-Object PSObject -Property $info
+            }
+        }
     }
 function get-timeZones(){
     $timeZones = Get-ChildItem "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Time zones" | foreach {Get-ItemProperty $_.PSPath}; $TimeZone | Out-Null
@@ -1268,6 +1305,156 @@ function matchContains($term, $arrayOfStrings){
 
     # match against that regex
     $term -match $singleRegex
+    }
+function new-clientAssertionWithCertificate{
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [System.Security.Cryptography.X509Certificates.X509Certificate]$X509cert
+        ,[parameter(Mandatory = $true)]
+        [string]$clientId
+        ,[parameter(Mandatory = $true)]
+        [string]$tenantId
+        ,[parameter(Mandatory = $false)]
+        [string]$resource='https://graph.microsoft.com'
+        ,[parameter(Mandatory = $false)]
+        [string]$loginEndpoint='https://login.microsoftonline.com'
+        )
+
+    <#
+    .SYNOPSIS
+    Generates a signed client_assertion using the provided certificate, ready to present to Graph API for authentication.
+    **REQUIRES PowerShell 5**
+    
+    .DESCRIPTION
+    #Adapted from https://gist.github.com/jformacek/aecc4f379b88b3a330ee19b045252462
+    There are alternative methods for authenticating with Graph using certificates (see get-graphTokenResponse), but this is in-keping with our 5.1 codebase.
+    
+    .PARAMETER X509cert
+    A certificate with a Private Key (to sign the assertion)
+
+    .PARAMETER clientId
+    The ClientId/ApplicationId of the App Registration to authenticate with
+
+    .PARAMETER tenantId
+    The Id of Azure tenant to authenticate with
+
+    .PARAMETER resource
+    Future compatibility to support alternative resources (default is [https://graph.microsoft.com])
+
+    .PARAMETER loginEndpoint
+    Future compatibility to support alternative auth endpoints (default is [https://login.microsoftonline.com])
+    #>
+        
+    
+    #load required assembly that is not loaded by default by PowerShell
+    [System.Reflection.Assembly]::LoadWithPartialName('system.identitymodel') | Out-Null
+
+    #retrieve certificate from cert store
+    #$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object {$_.Thumbprint -eq $certThumbprint}[0]
+
+    # Create base64 hash of the certificate
+    $certHash = [System.Convert]::ToBase64String($X509cert.GetCertHash())
+
+    #JWT expiration timestamp - valid for 5 minutes - just to allow token request to complete
+    $StartDate = (Get-Date "1970-01-01T00:00:00Z" ).ToUniversalTime()
+    $JWTExpiration = [int]((New-TimeSpan -Start $StartDate -End (Get-Date).ToUniversalTime().AddMinutes(5)).TotalSeconds)
+
+    #JWT Start timestamp - optional
+    $NotBefore = [int]((New-TimeSpan -Start $StartDate -End ((Get-Date).ToUniversalTime())).TotalSeconds)
+
+    # Create JWT header
+    $JWTHeader = @{
+        alg = "RS256"
+        typ = "JWT"
+        x5t = ($certHash -replace '\+','-' -replace '/','_' -replace '=')
+        }
+
+    #create request payload - notice that we do not include nbf (but we could, if needed)
+    $JWTPayLoad = @{
+        aud = "$loginEndpoint/$tenantId/oauth2/token"
+        exp = $JWTExpiration
+        iss = $clientId
+        jti = [guid]::NewGuid()
+        #nbf = $NotBefore
+        sub = $clientId
+        }
+
+    # Convert header and payload to base64 and create JWT assertion
+    $EncodedHeader = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes(($JWTHeader | ConvertTo-Json)))
+    $EncodedPayload = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes(($JWTPayload | ConvertTo-Json)))
+    $JWT = $EncodedHeader + "." + $EncodedPayload
+
+    #now sign the assertion
+    $dataToSign = [byte[]] [System.Text.Encoding]::UTF8.GetBytes($JWT)
+    #original RSA CSP from cert is not guaranteed to support SHA256
+    #so we need to create new CSP with proper params and with private key from cert for signing
+    $algo = (new-object System.IdentityModel.Tokens.X509AsymmetricSecurityKey($X509cert)).GetAsymmetricAlgorithm("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256", $true) -as [System.Security.Cryptography.RSA]
+
+    if($algo -is [System.Security.Cryptography.RSACryptoServiceProvider]){
+        #cert uses CryptoAPI CSP
+        if(($algo.CspKeyContainerInfo.ProviderType -ne 1) -and ($algo.CspKeyContainerInfo.ProviderType -ne 12) -or $algo.CspKeyContainerInfo.HardwareDevice){
+            #we have SHA256 compatible provider, just use it
+            $csp = $algo -as [System.Security.Cryptography.RSACryptoServiceProvider]
+            }
+        else {
+            #we have to create new compatible CSP with key from cert
+            $cspParams = new-object System.Security.Cryptography.CspParameters
+            $cspParams.ProviderType=24 #MS Enhanced RSA and AES CSP - this supports SHA256; see Computer\HKLM\SOFTWARE\Microsoft\Cryptography\Defaults\Provider Types\Type 024
+            $cspParams.KeyContainerName=$algo.CspKeyContainerInfo.KeyContainerName
+            $cspParams.KeyNumber = $algo.CspKeyContainerInfo.KeyNumber
+            $cspParams.Flags = 'UseExistingkey'
+            if($algo.CspKeyContainerInfo.MachineKeyStore) {$cspParams.Flags = $cspParams.Flags -bor 'UseMachineKeyStore'}
+
+            $csp = new-object System.Security.Cryptography.RSACryptoServiceProvider($cspParams)
+            }
+
+        $sha256 = new-object System.Security.Cryptography.SHA256Cng
+
+        # Create a signature of the JWT
+        $Signature = [Convert]::ToBase64String($csp.SignData($dataToSign,$sha256))
+        }
+    else{
+        #we will use CNG - use the provider
+        $csp = $algo -as [System.Security.Cryptography.RsaCng]
+        $sha256 = new-object System.Security.Cryptography.SHA256Cng
+        #and create a signature
+        $hash = $sha256.ComputeHash($dataToSign)
+        $Signature = [Convert]::ToBase64String($csp.SignHash($hash,[System.Security.Cryptography.HashAlgorithmName]::SHA256,[System.Security.Cryptography.RSASignaturePadding]::Pkcs1))
+        }
+
+    # add signature to assertion
+    $JWT = $JWT + "." + ($Signature -replace '\+','-' -replace '/','_' -replace '=')
+    return $JWT
+    }
+function new-shortcut {
+    [cmdletbinding()]
+    param(
+        [parameter(Mandatory = $true)]
+        [string]$name
+        ,[parameter(Mandatory = $true)]
+        [string]$path        
+        ,[parameter(Mandatory = $true)]
+        [string]$target        
+        ,[parameter(Mandatory = $false)]
+        [string]$runasUser
+        )
+    
+    $path = $path.TrimEnd("\")
+    $name = $name.TrimEnd(".lnk")
+    $WshShell = New-Object -comObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut("$path\$name.lnk")
+    if([string]::IsNullOrWhiteSpace($runasUser)){
+        $Shortcut.TargetPath = $target
+        $Shortcut.IconLocation = "$target,0"
+        }
+    else{
+        $Shortcut.TargetPath = "runas.exe"
+        $Shortcut.Arguments = "/user:$runasUser `"$target`""
+        $Shortcut.IconLocation = "$target,0"
+        
+        }
+    $Shortcut.Save()    
     }
 function remove-diacritics{
     PARAM ([string]$String)
