@@ -733,7 +733,7 @@ function get-available365licensecount{
                             $availableE5Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Office_E5")" #"AnthesisLLC:ENTERPRISEPACK"
                             $availableEMSLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "EMS_E3")" #"AnthesisLLC:EMS"
                             $availableMDELicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "MDE")" #"AnthesisLLC:EMS"
-                            $availableAudioLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "TeamsAudioConferencing")" #"AnthesisLLC:EMS"
+                            $availableAudioLicenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "TeamsAudioConferencingSelect")" #"AnthesisLLC:EMS"
                             $availableWinE3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Win_E3")" #"AnthesisLLC:EMS"
                             $availableME3Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Microsoft_E3")" #"AnthesisLLC:EMS"
                             $availableME5Licenses = Get-MsolAccountSku | Where-Object -Property "AccountSkuId" -EQ "AnthesisLLC:$(get-microsoftProductInfo -getType MSStringID -fromType FriendlyName "Microsoft_E5")" #"AnthesisLLC:EMS"
@@ -1074,7 +1074,8 @@ function get-microsoftProductInfo(){
         @("Win_E3","WINDOWS 10 ENTERPRISE E3","Win10_VDA_E3","6a0f6da5-0b87-4190-a6ae-9bb5a2b9546a","WINDOWS 10 ENTERPRISE E3","7"),
         @("Win_E5","Windows 10 Enterprise E5","WIN10_VDA_E5","488ba24a-39a9-4473-8ee5-19291e71b002","Windows 10 Enterprise E5",""),
         @("PowerAutomateFree","FLOW_FREE","FLOW_FREE","f30db892-07e9-47e9-837c-80727f46fd3d","Zero cost Power Automate (Flow) licence",""),
-        @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM","")
+        @("Microsoft Stream Trial","STREAM","STREAM_TRIAL","1f2f344a-700d-42c9-9427-5cea1d5d7ba6","STREAM",""),
+        @("TeamsAudioConferencingSelect","Microsoft Teams Audio Conferencing with dial-out to USA/CAN","Microsoft_Teams_Audio_Conferencing_select_dial_out","1c27243e-fb4d-42b1-ae8c-fe25c9616588","STREAM","0")
         )
     $foundProduct = $productList | ? {$_[$fromId] -eq $fromValue} 
     $foundProduct[$getId]

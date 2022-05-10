@@ -1006,6 +1006,53 @@ function get-graphIntuneDevices(){
         $allIntuneDevices | Sort-Object userPrincipalName,deviceName
         }
     }
+function remove-graphLicense(){
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true,ParameterSetName="Friendly")]
+            [parameter(Mandatory = $true,ParameterSetName="Guid")]
+            [parameter(Mandatory = $true,ParameterSetName="Guids")]
+            [psobject]$tokenResponse
+        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+            [parameter(Mandatory = $true,ParameterSetName="Guid")]
+            [parameter(Mandatory = $true,ParameterSetName="Guids")]
+            [string]$userIdOrUpn
+        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+            [ValidateSet("Kiosk","E1","E3","E5","EMS","ATP","PowerBIFree","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio","M3","WinE3")]
+            [string]$licenseFriendlyName 
+        ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
+            [string]$licenseGuid
+        ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
+            [string[]]$licenseGuids
+        )
+
+    switch ($PsCmdlet.ParameterSetName){
+        "Friendly" {
+            [string[]]$licenseGuids = get-microsoftProductInfo -getType GUID -fromType FriendlyName -fromValue $licenseFriendlyName
+            }
+        "Guid" {
+            [string[]]$licenseGuids = $licenseGuid
+            }
+
+        }
+
+    #Iterate through the supplied/derived licenseGuids
+    <#@($licenseGuids | Select-Object) | % {
+        $thisLicenseDefinition = @{"skuId"=$_}
+        [array]$licenseArray += $thisLicenseDefinition
+        }
+
+    $graphBodyHashtable = @{
+        "removeLicenses"=$licenseArray
+        }
+    #>
+    $graphBodyHashtable = @{
+        "addLicenses"=@()
+        "removeLicenses"=$licenseGuids
+        }
+
+    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable 
+    }
 function get-graphList(){
     [cmdletbinding()]
     param(

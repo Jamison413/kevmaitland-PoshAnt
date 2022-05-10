@@ -330,7 +330,7 @@ $thisUser.FieldValues.Title
 $thisUser.FieldValues.Job_x0020_title
 
 #Before we start, check the contract type
-write-host "Before we start, what is the contract type?"
+<#write-host "Before we start, what is the contract type?"
 write-host "A: Employee"
 write-host "B: Subcontractor"
 $selection = Read-Host "Type A or B"
@@ -338,7 +338,12 @@ Switch($selection){
 "A" {$contracttype = "Employee"}
 "B" {$contracttype = "Subcontractor"}
 }
-
+#>
+switch($thisUser.FieldValues.Is_x0020_a_x0020_Subcontractor_x){
+    {$_ -match "Yes"}  {$contracttype = "Subcontractor"}
+    {$_ -match "No"}   {$contracttype = "Employee"}
+    default {write-host -f Red "[$($thisUser.FieldValues.Title)] does not have a valid Employment Status set. Will not create account.";break}
+    }
 
 #Use Secondary Office location if homeworker - primary for anything else
 If($thisUser.fieldvalues.Primary_x0020_Workplace.Label -eq "Home worker"){
@@ -386,7 +391,7 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
 
 
 #Add to a regional group - this needs rewriting into a function, bodging for now
-If($selection -ne "B"){
+If($contracttype -ne "Subcontractor"){
     $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
     $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
     If(($regionalmembersgroup | Measure-Object).Count -eq 1){
