@@ -74,7 +74,7 @@ $timeForFullCycle = Measure-Command {
             }
         try{
             #sync-groupMemberships -UnifiedGroup $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true} # -Verbose
-            sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true
+            sync-groupMemberships -tokenResponse $tokenResponseTeams -tokenResponseSmtp $tokenResponseSmtp -graphExtendedUG $365Group -syncWhat Owners -sourceGroup AAD -adminEmailAddresses $adminEmailAddresses -enumerateSubgroups $true -dontSendEmailReport $true #Suppress email reports as we've just sent any required ones when we synced Members
             }
         catch{        
             Write-Host -ForegroundColor Red $(get-errorSummary $_)
