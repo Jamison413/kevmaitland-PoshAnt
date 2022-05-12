@@ -860,8 +860,12 @@ function send-noOwnersForGroupAlertToAdmins(){
     
     if($currentOwners.Count -gt 0){
         $currentOwners = $currentOwners | Sort-Object DisplayName
-        $body += "The full list of 365 group Owners looks like this:`r`n`t<BR><PRE>&#9;$($currentOwners.DisplayName -join "`r`n`t")</PRE>`r`n`r`n<BR>"
-        $body += "<B>These owners either have no Line Manager, or their Line Manager has also been deactivated!</B>`r`n`r`n<BR><BR>"
+        $body += "The full list of 365 group Owners looks like this:`r`n`t<BR><PRE>&#9;"
+        $currentOwners | ForEach-Object {
+            $body += "$($_.userPrincipalName)`t[$($_.manager.userPrincipalName)]`r`n`t"
+        }
+
+        $body += "</PRE>`r`n`r`n<BR><B>These owners either have no Line Manager, or their Line Manager has also been deactivated!</B>`r`n`r`n<BR><BR>"
     }
     else{$body += "It looks like the Owners group is now empty...`r`n`r`n<BR><BR>"}
     
@@ -1052,42 +1056,21 @@ function sync-groupMemberships(){
         ,[Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
             [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
             [string]$graphMesgUpn
-        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
-            [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
-            [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
-            [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
+        ,[Parameter(Mandatory=$true)]
             [ValidateSet("Members", "Owners")]
             [string]$syncWhat
-        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
-            [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
-            [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
-            [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
+        ,[Parameter(Mandatory=$true)]
             [psobject]$tokenResponse
-        ,[Parameter(Mandatory=$true,ParameterSetName="365GroupObjectSupplied")]
-            [Parameter(Mandatory=$true,ParameterSetName="AADGroupObjectSupplied")]
-            [Parameter(Mandatory=$true,ParameterSetName="365GroupIdOnly")]
-            [Parameter(Mandatory=$true,ParameterSetName="AADGroupIdOnly")]
+        ,[Parameter(Mandatory=$true)]
             [ValidateSet("365", "AAD")]
             [string]$sourceGroup
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+        ,[Parameter(Mandatory=$false)]
             [bool]$dontSendEmailReport = $false
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+        ,[Parameter(Mandatory=$false)]
             [string[]]$adminEmailAddresses
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+        ,[Parameter(Mandatory=$false)]
             [bool]$enumerateSubgroups = $false
-        ,[Parameter(Mandatory=$false,ParameterSetName="365GroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupObjectSupplied")]
-            [Parameter(Mandatory=$false,ParameterSetName="365GroupIdOnly")]
-            [Parameter(Mandatory=$false,ParameterSetName="AADGroupIdOnly")]
+        ,[Parameter(Mandatory=$false)]
             [psobject]$syncException
         )
 
