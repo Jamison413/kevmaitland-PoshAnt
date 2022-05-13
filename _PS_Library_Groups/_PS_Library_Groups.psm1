@@ -697,6 +697,7 @@ function send-dataManagerReassignmentRequest(){
         $authorisedDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId 'daf56fbd-ebce-457e-a10a-4fce50a2f99c' -memberType Members -returnOnlyLicensedUsers
         $otherMembers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $unifiedGroup.id -memberType Members -returnOnlyLicensedUsers
         $potentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $otherMembers -Property userPrincipalName -ExcludeDifferent -IncludeEqual -PassThru
+        $notPotentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $groupMembers -Property userPrincipalName -PassThru
         $groupSite = get-graphSite -tokenResponse $tokenResponse -groupId $UnifiedGroup.id
     }
 
@@ -716,7 +717,15 @@ function send-dataManagerReassignmentRequest(){
             else{
                     $body+= "Unfortunately, no other Members of the Team currently have Data Manager training. You can find a list of everyone with current Data Manager training by <A HREF='https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-296'>expanding the <B>Data Manager - Authorised (All)</B> group in Outlook</A>.`r`n`r`n<BR><BR>"
             }
-            $body += "<B>If you can tell the IT Team who to reassign this to, you will stop receiving these emails</B>.`r`n`r`n<BR><BR>"
+            $body += "</PRE>`r`n`r`n<BR>These people are currently <B>not</B> trained Data Managers (but might be able to help):`r`n`t<BR><PRE>&#9;"
+            if($notPotentialDataManagers.Count -gt 0){
+                $notPotentialDataManagers = $notPotentialDataManagers | Sort-Object DisplayName
+                $notPotentialDataManagers | ForEach-Object {
+                    $body += "$($_.userPrincipalName)`t[$($_.manager.userPrincipalName)]`r`n`t"
+                }
+            }
+        
+            $body += "</PRE>`r`n`r`n<BR><B>If you can tell the IT Team who to reassign this to, you will stop receiving these emails</B>.`r`n`r`n<BR><BR>"
             $body += "Love,`r`n`r`n<BR><BR>The Helpful Groups Robot</FONT></HTML>"
             send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses $_.manager.mail -bccAddresses "t0-kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
             #send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "groupbot@anthesisgroup.com" -toAddresses "kevin.maitland@anthesisgroup.com" -subject $subject -bodyHtml $body
