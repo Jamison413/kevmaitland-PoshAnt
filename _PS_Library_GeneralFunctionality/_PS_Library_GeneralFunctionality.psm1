@@ -1688,6 +1688,52 @@ function stringify-hashTable($hashtable,$interlimiter,$delimiter){
         $dirty.Substring(0,$dirty.Length-$delimiter.length)
         }
     }
+function test-containsMatch{
+    [cmdletbinding()]
+    Param(
+        [Parameter(Mandatory =$true)]
+            [string[]]$arrayOfStrings
+        ,[Parameter(Mandatory =$true)]
+            [string]$regexToMatch
+        ,[Parameter(Mandatory =$true)]
+            [ValidateSet("All","Any")]
+            [string]$matchType
+        )
+    <#
+    .SYNOPSIS
+    Tests each item in an array for -match and returns [boolean]
+    
+    .DESCRIPTION
+    There are alternative methods for authenticating with Graph using certificates (see get-graphTokenResponse), but this is in-keping with our 5.1 codebase.
+    
+    .PARAMETER arrayOfStrings
+    An array of Strings to test
+
+    .PARAMETER regexToMatch
+    Regex expression to -match against each item in $arrayOfStrings
+
+    .PARAMETER matchType
+    Test whether all Strings in $arrayOfStrings match $regexToMatch, or 1+ match
+    #>    
+    $isMatched = $false
+    switch($matchType){
+        ("Any") {
+            $arrayOfStrings | ForEach-Object {
+                $isMatched = $_ -match $regexToMatch
+                Write-Verbose "$_ -match $regexToMatch = [$($_ -match $regexToMatch)][$isMatched]"
+                if($isMatched -eq $true){continue}
+            }
+        }
+        ("All") {
+            $arrayOfStrings | ForEach-Object {
+                $isMatched = $_ -match $regexToMatch
+                Write-Verbose "$_ -match $regexToMatch = [$($_ -match $regexToMatch)][$isMatched]"
+                if($isMatched -eq $false){continue}
+            }
+        }
+    }
+    return $isMatched
+}
 function test-isGuid(){
     [OutputType([bool])]
     param(
