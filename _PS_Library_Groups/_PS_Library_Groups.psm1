@@ -568,8 +568,6 @@ function new-mailEnabledSecurityGroup(){
             [bool]$blockExternalMail
         )
     Write-Verbose "new-mailEnabledSecurityGroup([$dgDisplayName], [$description], [$($ownersUpns -join ", ")], [$($membersUpns -join ", ")], [$($memberOf -join ", ")], $hideFromGal, $blockExternalMail)"
-    #$mailName = set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 64 -Verbose
-    #write-verbose "#####Mailname: $($mailName)"
 
     #Check to see if this already exists. This is based on Alias, which is mutable :(    
     $mesg = rummage-forDistributionGroup -displayName $dgDisplayName
@@ -582,8 +580,10 @@ function new-mailEnabledSecurityGroup(){
     else{ #If the group doesn't exist, try creating it
         try{
             $mailAlias = $(new-aliasFromDisplayName $dgDisplayName)
+            If(($fixedSuffix) -and ($dgDisplayName -match $fixedSuffix)){$formattedDisplayName = $dgDisplayName.Replace("$($fixedSuffix)","")}
+            Else{$formattedDisplayName = $dgDisplayName}
             Write-Verbose "New-DistributionGroup -Name [$mailAlias] -DisplayName [$dgDisplayName] -Type Security -Members [$($membersUpns -join ", ")] -PrimarySmtpAddress $($(sanitise-forMicrosoftEmailAddress -dirtyString $(set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 100))+"@anthesisgroup.com") -Notes [$description] -Alias [$mailAlias] -WhatIf:$WhatIfPreference"
-            $mesg = New-DistributionGroup -Name $mailAlias -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(sanitise-forMicrosoftEmailAddress -dirtyString $(set-suffixAndMaxLength -string $dgDisplayName -suffix $fixedSuffix -maxLength 100))+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference -ErrorAction Stop
+            $mesg = New-DistributionGroup -Name $mailAlias -DisplayName $dgDisplayName -Type Security -Members $membersUpns -PrimarySmtpAddress $($(sanitise-forMicrosoftEmailAddress -dirtyString $(set-suffixAndMaxLength -string $formattedDisplayName -suffix $fixedSuffix -maxLength 100))+"@anthesisgroup.com") -Notes $description -Alias $mailAlias -WhatIf:$WhatIfPreference -ErrorAction Stop
             }
         catch{
             if($_ -match "is already being used by the proxy addresses or LegacyExchangeDN of"){ #Name collision, but no DisplayName collision
