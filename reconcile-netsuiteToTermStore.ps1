@@ -161,10 +161,22 @@ function test-validNameForTermStore(){
     param(
          [Parameter(Mandatory = $true,Position=0)]
             [string]$stringToTest
+         ,[Parameter(Mandatory = $false,Position=1)]
+            [switch]$returnSpecifcProblem
         )
     
     #if($stringToTest -match ';|"|<|>|\||\t'){$false} #These are Microsoft's list of invalid characters
-    if($stringToTest -match ';|<|>|\||\t'){$false} #New-PnPTerm silently recodes " and \ but \ will still break foldernames later
+    if($stringToTest -match ';|<|>|\||\t'){
+        if($returnSpecifcProblem){
+            if($stringToTest -match ";"){[array]$specifcProblem+=";"}
+            if($stringToTest -match "<"){[array]$specifcProblem+="<"}
+            if($stringToTest -match ">"){[array]$specifcProblem+=">"}
+            if($stringToTest -match "\|"){[array]$specifcProblem+="|"}
+            if($stringToTest -match "\t"){[array]$specifcProblem+="{tab}"}
+            $specifcProblem
+            }
+        else{$false}
+        } #New-PnPTerm silently recodes " and \ but \ will still break foldernames later
     else{$true}
     }
 
@@ -220,10 +232,22 @@ $timeForFullCycle = Measure-Command {
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.entityId) -Force
                 }
             }
+<<<<<<< Updated upstream
         Write-Host "[$($allNetSuiteProjs.Count)] Projects retrieved from NetSuite in [$($netProjRetrieval.TotalSeconds)] seconds ([$($netProjRetrieval.TotalMinutes)] minutes or [$($netSuiteProjsToCheck.Count/$netProjRetrieval.TotalMinutes)] per minute)"
         if($allNetSuiteProjs.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteProjs -netObjectType Project}
+=======
+        Write-Host "[$($allNetSuiteProjs.Count)] Projects retrieved from NetSuite in [$($netProjRetrieval.TotalSeconds)] seconds ([$($netProjRetrieval.TotalMinutes)] minutes or [$($allNetSuiteProjs.Count/$netProjRetrieval.TotalMinutes)] per minute)"
+        if($allNetSuiteProjs.Count -gt 0){
+            $netProjEncryptedWrite = Measure-Command {
+                export-encryptedCache -objects $allNetSuiteProjs -objectType Project -objectSource NetSuite
+                }
+            Write-Host "[$($allNetSuiteProjs.Count)] Projects written to encrypted store in [$($netProjEncryptedWrite.TotalSeconds)] seconds ([$($netProjEncryptedWrite.TotalMinutes)] minutes or [$($allNetSuiteProjs.Count/$netProjEncryptedWrite.TotalMinutes)] per minute)"
+            }
+>>>>>>> Stashed changes
 
         $script:netSuiteProjsToCheck = @($allNetSuiteProjs | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
+        [array]$netProjectsWithNoClientId = $netSuiteProjsToCheck | ? {[string]::IsNullOrWhiteSpace($_.parent.id)} #Find the weird Projects with no Client (as we can't create folders for them anyway)
+        if($netProjectsWithNoClientId.Count -gt 0){Write-Warning "[$($netProjectsWithNoClientId.Count)] NetSuite Projects have no ClientId: `r`n`t[$($netProjectsWithNoClientId.Id -join ']`r`n`t[')"}
         $netSuiteProjsToCheck = $netSuiteProjsToCheck | ? {![string]::IsNullOrWhiteSpace($_.parent.id)} #Remove the weird Projects with no Client (as we can't create folders for them anyway)
         if($deltaSync -eq $true){
             [array]$processedAtExactlyLastTimestamp = $netSuiteProjsToCheck | ? {$(Get-Date $_.lastModifiedDate) -ge $(Get-Date $lastProcessed)} #Find how many Clients match the $lastProcessed timestamp exactly
@@ -232,15 +256,17 @@ $timeForFullCycle = Measure-Command {
 
     #Weed out the duff records now to prevent errors later on.
         [array]$netSuiteProjsToCheckWithoutDuffGets = $netSuiteProjsToCheck | ? {$_ -notmatch "PSMessageDetails"}
-        if($netSuiteProjsToCheckWithoutDuffGets.Count -ne $netSuiteProjsToCheck.Count){
-            Write-Host "`t[$($netSuiteProjsToCheck.Count-$netSuiteProjsToCheckWithoutDuffGets.Count)] REST errors occured retrieving data from NetSuite. Discarding these records, leaving [$($netSuiteProjsToCheck.Count)] records to process."
+        [array]$netSuiteProjsToCheckWithDuffGets = $netSuiteProjsToCheck | ? {$_ -match "PSMessageDetails"}
+        if($netSuiteProjsToCheckWithDuffGets.Count -gt 0){
+            Write-Host "`t[$($netSuiteProjsToCheckWithDuffGets.Count)] REST errors occured retrieving data from NetSuite. Discarding these records, leaving [$($netSuiteProjsToCheck.Count)] records to process."
             $netSuiteProjsToCheck = $netSuiteProjsToCheckWithoutDuffGets
             }
 
-        [array]$newProjsWithoutOvertlyDuffNames = $netSuiteProjsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalProjName) -eq $true}
-        if($newProjsWithoutOvertlyDuffNames.Count -ne $netSuiteProjsToCheck.Count){
-            Write-Host "`t[$($netSuiteProjsToCheck.Count - $newProjsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Terms, so I'll just process the remaining [$($newProjsWithoutOvertlyDuffNames.Count)]"
-            $netSuiteProjsToCheck = $newProjsWithoutOvertlyDuffNames
+        [array]$netProjsWithOvertlyDuffNames = $netSuiteProjsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalProjName) -eq $false}
+        [array]$newtrojsWithoutOvertlyDuffNames = $netSuiteProjsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalProjName) -eq $true}
+        if($netProjsWithoutOvertlyDuffNames.Count -ne $netSuiteProjsToCheck.Count){
+            Write-Host "`t[$($netSuiteProjsToCheck.Count - $netProjsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Terms, so I'll just process the remaining [$($newProjsWithoutOvertlyDuffNames.Count)]"
+            $netSuiteProjsToCheck = $netProjsWithoutOvertlyDuffNames
             }
 
         #endregion
@@ -288,7 +314,16 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteOpps.Count)] opportunities retrieved from NetSuite in [$($netOppRetrieval.TotalSeconds)] seconds ([$($netOppRetrieval.TotalMinutes)] minutes or [$($netSuiteOppsToCheck.Count / $netOppRetrieval.TotalMinutes)] per minute)"
+<<<<<<< Updated upstream
         if($allNetSuiteOpps.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteOpps -netObjectType Opportunity}
+=======
+        if($allNetSuiteOpps.Count -gt 0){
+            $netOppsEncryptedWrite = Measure-Command {
+                export-encryptedCache -objects $allNetSuiteOpps -objectType Opportunity -objectSource NetSuite
+                }
+            Write-Host "[$($allNetSuiteOpps.Count)] Projects written to encrypted store in [$($netOppsEncryptedWrite.TotalSeconds)] seconds ([$($netOppsEncryptedWrite.TotalMinutes)] minutes or [$($allNetSuiteOpps.Count/$netOppsEncryptedWrite.TotalMinutes)] per minute)"
+            }
+>>>>>>> Stashed changes
 
         $netSuiteOppsToCheck = @($allNetSuiteOpps | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
@@ -303,10 +338,11 @@ $timeForFullCycle = Measure-Command {
             $netSuiteOppsToCheck = $netSuiteOppsToCheckWithoutDuffGets
             }
 
-        [array]$newOppsWithoutOvertlyDuffNames = $netSuiteOppsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalOppName) -eq $true}
-        if($newOppsWithoutOvertlyDuffNames.Count -ne $netSuiteOppsToCheck.Count){
-            Write-Host "`t[$($netSuiteOppsToCheck.Count - $newOppsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Terms, so I'll just process the remaining [$($newOppsWithoutOvertlyDuffNames.Count)]"
-            $netSuiteOppsToCheck = $newOppsWithoutOvertlyDuffNames
+        [array]$netOppsWithOvertlyDuffNames = $netSuiteOppsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalOppName) -eq $false}
+        [array]$netOppsWithoutOvertlyDuffNames = $netSuiteOppsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalOppName) -eq $true}
+        if($netOppsWithoutOvertlyDuffNames.Count -ne $netSuiteOppsToCheck.Count){
+            Write-Host "`t[$($netSuiteOppsToCheck.Count - $netOppsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Terms, so I'll just process the remaining [$($newOppsWithoutOvertlyDuffNames.Count)]"
+            $netSuiteOppsToCheck = $netOppsWithoutOvertlyDuffNames
             }
 
 
@@ -355,7 +391,16 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteClients.Count)] clients retrieved from NetSuite in [$($netClientRetrieval.TotalSeconds)] seconds or [$($netSuiteClientsToCheck.Count / $netClientRetrieval.TotalMinutes)] per minute"
+<<<<<<< Updated upstream
         if($allNetSuiteClients.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteClients -netObjectType Client}
+=======
+        if($allNetSuiteClients.Count -gt 0){
+            $netClientsEncryptedWrite = Measure-Command {
+                export-encryptedCache -objects $allNetSuiteClients -objectType Client -objectSource NetSuite
+                }
+            Write-Host "[$($allNetSuiteClients.Count)] Projects written to encryoted store in [$($netClientsEncryptedWrite.TotalSeconds)] seconds ([$($netClientsEncryptedWrite.TotalMinutes)] minutes or [$($allNetSuiteClients.Count/$netClientsEncryptedWrite.TotalMinutes)] per minute)"
+            }
+>>>>>>> Stashed changes
 
         $netSuiteClientsToCheck = @($allNetSuiteClients | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
@@ -370,10 +415,11 @@ $timeForFullCycle = Measure-Command {
             $netSuiteClientsToCheck = $netSuiteClientsToCheckWithoutDuffGets
             }
 
-        [array]$newClientsWithoutOvertlyDuffNames = $netSuiteClientsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalClientName) -eq $true}
-        if($newClientsWithoutOvertlyDuffNames.Count -ne $netSuiteClientsToCheck.Count){
-            Write-Host "`t[$($netSuiteClientsToCheck.Count - $newClientsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Terms, so I'll just process the remaining [$($newClientsWithoutOvertlyDuffNames.Count)]"
-            $netSuiteClientsToCheck = $newClientsWithoutOvertlyDuffNames
+        [array]$netClientsWithOvertlyDuffNames = $netSuiteClientsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalClientName) -eq $false}
+        [array]$netClientsWithoutOvertlyDuffNames = $netSuiteClientsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalClientName) -eq $true}
+        if($netClientsWithoutOvertlyDuffNames.Count -ne $netSuiteClientsToCheck.Count){
+            Write-Host "`t[$($netSuiteClientsToCheck.Count - $netClientsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Terms, so I'll just process the remaining [$($newClientsWithoutOvertlyDuffNames.Count)]"
+            $netSuiteClientsToCheck = $netClientsWithoutOvertlyDuffNames
             }
 
 

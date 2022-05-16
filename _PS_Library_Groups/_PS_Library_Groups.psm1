@@ -697,7 +697,7 @@ function send-dataManagerReassignmentRequest(){
         $authorisedDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId 'daf56fbd-ebce-457e-a10a-4fce50a2f99c' -memberType Members -returnOnlyLicensedUsers
         $otherMembers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $unifiedGroup.id -memberType Members -returnOnlyLicensedUsers
         $potentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $otherMembers -Property userPrincipalName -ExcludeDifferent -IncludeEqual -PassThru
-        $notPotentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $groupMembers -Property userPrincipalName -PassThru
+        $notPotentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $otherMembers -Property userPrincipalName -PassThru
         $groupSite = get-graphSite -tokenResponse $tokenResponse -groupId $UnifiedGroup.id
     }
 
@@ -862,10 +862,10 @@ function send-noOwnersForGroupAlertToAdmins(){
         )
 
     $groupSite = get-graphSite -tokenResponse $tokenResponse -groupId $UnifiedGroup.id
-    $groupMembers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $UnifiedGroup.id -memberType Members -returnOnlyLicensedUsers -includeLineManager
+    $otherMembers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId $UnifiedGroup.id -memberType Members -returnOnlyLicensedUsers -includeLineManager
     $authorisedDataManagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId 'daf56fbd-ebce-457e-a10a-4fce50a2f99c' -memberType Members -returnOnlyLicensedUsers
-    $potentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $groupMembers -Property userPrincipalName -ExcludeDifferent -IncludeEqual -PassThru
-    $notPotentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $groupMembers -Property userPrincipalName -PassThru
+    $potentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $otherMembers -Property userPrincipalName -ExcludeDifferent -IncludeEqual -PassThru
+    $notPotentialDataManagers = Compare-Object -ReferenceObject $authorisedDataManagers -DifferenceObject $otherMembers -Property userPrincipalName -PassThru
 
     $subject = "Unowned 365 Group found: [$($UnifiedGroup.DisplayName)]"
     $body = "<HTML><FONT FACE=`"Calibri`">Hello 365 Group Admins,`r`n`r`n<BR><BR>"

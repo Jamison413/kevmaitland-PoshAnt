@@ -325,7 +325,7 @@ function test-validNameForSharePointFolder(){
     else{$false}
     }
 $timeForFullCycle = Measure-Command {
-cls
+Clear-Host
     
     #region GetData
     #region getDriveData
@@ -377,7 +377,11 @@ cls
                     $folderObject | Export-Csv -Path "$env:TEMP\NetRec_AllFolders_$now.csv" -Append -NoTypeInformation -Encoding UTF8 -Force #There are going to be a _lot_ of these, but the number is unknown. Rather than += an array (which will get very inefficient at large numbers), append the data to a CSV and import the CSV once the enumeration is complete
                     }
                 }
-            $topLevelFolders = import-csv "$env:TEMP\NetRec_AllFolders_$now.csv"
+            [array]$topLevelFolders = import-csv "$env:TEMP\NetRec_AllFolders_$now.csv"
+            if($topLevelFolders.Count -gt 0){
+                export-encryptedCache -objects $topLevelFolders -objectType Folders -objectSource SharePoint
+                }
+            
             }
         Write-Host "[$($topLevelFolders.count)] ClientDrive top-level folders enumerated in [$($topLevelFolderRetrieval.TotalMinutes)] minutes ([$($allClientDrives.count / $topLevelFolderRetrieval.TotalMinutes)] per minute)"
 
@@ -399,7 +403,11 @@ cls
     #endregion
 
     #region getTermData
-        $sharePointAdmin = "kimblebot@anthesisgroup.com"
+        $termSite = get-graphSite -tokenResponse $tokenResponseSharePointBot -serverRelativeUrl "/"
+        $termGroup = get-graphTermGroup -tokenResponse $tokenResponseSharePointBot -graphSiteId $termSite.id -graphTermGroupName "Kimble"
+        $termSets = get-graphTermSet -tokenResponse $tokenResponseSharePointBot -graphSiteId $termSite.id -graphTermGroupId $termGroup.id 
+
+        <#$sharePointAdmin = "kimblebot@anthesisgroup.com"
         #convertTo-localisedSecureString "KimbleBotPasswordHere"
         try{$sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt)}
         catch{
@@ -411,11 +419,11 @@ cls
             }
         $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
         Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Credentials $adminCreds
-
+        #>
 
         #region getProjectData
     $termProjRetrieval = Measure-Command {
-        $pnpTermGroup = "Kimble"
+        <#$pnpTermGroup = "Kimble"
         $pnpTermSet = "Projects"
         $allProjTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes TermSet,TermSet.Group,TermStore,CustomProperties | ? {$_.IsDeprecated -eq $false}
         $allProjTerms | % {
@@ -429,24 +437,39 @@ cls
             Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjCode -Value $(($_.name -split " ")[0]) -Force
             Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjName -Value $($_.name) -Force
             Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
+            }#>
+        $termSetProjects = $termSets | Where-Object {"Projects" -contains $_.localizedNames.name}
+        $allProjTermsRaw = get-graphTerm -tokenResponse $tokenResponseSharePointBot -graphSiteId $termSite.id -graphTermGroupId $termGroup.id -graphTermSetId $termSetProjects.id -selectAllProperties
+        $allProjTerms = @($null)*$allProjTermsRaw.Count
+        for($i=0; $i -lt $allProjTerms.Count; $i++){
+            $allProjTerms[$i] = New-Object -TypeName psobject -Property @{
+                NetSuiteProjectId = $($allProjTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteProjId"}).value 
+                NetSuiteClientId = $($allProjTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteClientId"}).value 
+                NetSuiteProjLastModifiedDate = $($allProjTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteProjLastModifiedDate"}).value 
+                TermProjName = $($allProjTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name 
+                TermProjCode = $(($($allProjTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name -split " ")[0]) 
+                TermProjId = $($allProjTermsRaw[$i].Id) 
+                DriveItemId = $($allProjTermsRaw[$i].properties | Where-Object {$_.key -eq "DriveItemId"}).value 
+                UniversalProjCode = $(($($allProjTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name -split " ")[0]) 
+                UniversalProjName = $($allProjTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name 
+                UniversalProjNameSanitised = $(sanitise-forNetsuiteIntegration $($allProjTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name) 
+                }
             }
         }
     Write-Host "[$($allProjTerms.Count)] Projects retrieved from TermStore in [$($termProjRetrieval.TotalSeconds)] seconds"
 
     [array]$allProjTermsWithoutOvertlyDuffNames = $allProjTerms | ? {$(test-validNameForSharePointFolder -stringToTest $_.UniversalProjName) -eq $true}
+    [array]$allProjTermsWithOvertlyDuffNames = $allProjTerms | ? {$(test-validNameForSharePointFolder -stringToTest $_.UniversalProjName) -eq $false}
     if($allProjTerms.Count -ne $allProjTermsWithoutOvertlyDuffNames.count){
         Write-Host "`t[$($allProjTerms.Count -$allProjTermsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Folders, so I'll just process the remaining [$($allProjTermsWithoutOvertlyDuffNames.Count)]"
         $allProjTerms = $allProjTermsWithoutOvertlyDuffNames
         }
 
-
-
-
         #endregion
 
         #region getOppData
     $termOppRetrieval = Measure-Command {
-        $pnpTermGroup = "Kimble"
+        <#$pnpTermGroup = "Kimble"
         $pnpTermSet = "Opportunities"
         $allOppTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes TermSet,TermSet.Group,TermStore,CustomProperties | ? {$_.IsDeprecated -eq $false}
         $allOppTerms | % {
@@ -460,11 +483,30 @@ cls
             Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalOppName -Value $($_.name) -Force
             Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalOppNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.name) -Force
             Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteProjectId -Value $($_.CustomProperties.NetSuiteProjectId) -Force
-            }
+            }#>
+        $termSetOpportunities = $termSets | Where-Object {"Opportunities" -contains $_.localizedNames.name}
+        $allOppTermsRaw = get-graphTerm -tokenResponse $tokenResponseSharePointBot -graphSiteId $termSite.id -graphTermGroupId $termGroup.id -graphTermSetId $termSetOpportunities.id -selectAllProperties
+        $allOppTerms = @($null)*$allOppTermsRaw.Count
+        for($i=0; $i -lt $allOppTerms.Count; $i++){
+            $allOppTerms[$i] = New-Object -TypeName psobject -Property @{
+                NetSuiteOppId = $($allOppTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteOppId"}).value
+                NetSuiteClientId = $($allOppTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteClientId"}).value 
+                NetSuiteOppLastModifiedDate = $($allOppTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteOppLastModifiedDate"}).value 
+                TermOppLabel = $($allOppTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name 
+                UniversalOppCode = $(($($allOppTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name -split " ")[0]) 
+                TermProjId = $($allOppTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteProjectId"}).value 
+                DriveItemId = $($allOppTermsRaw[$i].properties | Where-Object {$_.key -eq "DriveItemId"}).value 
+                UniversalOppName = $($allOppTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name 
+                UniversalOppNameSanitised = $(sanitise-forNetsuiteIntegration $($allOppTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name) 
+                NetSuiteProjectId = $($allOppTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteProjectId"}).value 
+                }
+            }#>
+
         }
     Write-Host "[$($allOppTerms.Count)] Opportunities retrieved from TermStore in [$($termOppRetrieval.TotalSeconds)] seconds"
 
     [array]$allOppTermsWithoutOvertlyDuffNames = $allOppTerms | ? {$(test-validNameForSharePointFolder -stringToTest $_.UniversalOppName) -eq $true}
+    [array]$allOppTermsWithOvertlyDuffNames = $allOppTerms | ? {$(test-validNameForSharePointFolder -stringToTest $_.UniversalOppName) -eq $false}
     if($allOppTerms.Count -ne $allOppTermsWithoutOvertlyDuffNames.count){
         Write-Host "`t[$($allOppTerms.Count -$allOppTermsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Folders, so I'll just process the remaining [$($allOppTermsWithoutOvertlyDuffNames.Count)]"
         $allOppTerms = $allOppTermsWithoutOvertlyDuffNames
@@ -474,7 +516,7 @@ cls
 
         #region getClientData
     $termClientRetrieval = Measure-Command {
-        $pnpTermGroup = "Kimble"
+        <#$pnpTermGroup = "Kimble"
         $pnpTermSet = "Clients"
         $allClientTerms = Get-PnPTerm -TermGroup $pnpTermGroup -TermSet $pnpTermSet -Includes TermSet,TermSet.Group,TermStore,CustomProperties | ? {$_.IsDeprecated -eq $false}
         @($allClientTerms | Select-Object) | % {
@@ -485,7 +527,21 @@ cls
             Add-Member -InputObject $_ -MemberType NoteProperty -Name NetSuiteLastModifiedDate -Value $($_.CustomProperties.NetSuiteLastModifiedDate) -Force
             Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientName -Value $($_.Name) -Force
             Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalClientNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.Name) -Force #This helps to avoid weird encoding, diacritic and special character problems when comparing strings
-            }
+            }#>
+        $termSetClients = $termSets | Where-Object {"Clients" -contains $_.localizedNames.name}
+        $allClientTermsRaw = get-graphTerm -tokenResponse $tokenResponseSharePointBot -graphSiteId $termSite.id -graphTermGroupId $termGroup.id -graphTermSetId $termSetClients.id
+        $allClientTerms = @($null)*$allClientTermsRaw.Count
+        for($i=0; $i -lt $allClientTerms.Count; $i++){
+            $allClientTerms[$i] = New-Object -TypeName psobject -Property @{
+                NetSuiteClientId = $($allClientTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteId"}).value 
+                DriveClientId = $($allClientTermsRaw[$i].properties | Where-Object {$_.key -eq "GraphDriveId"}).value 
+                TermClientId = $($allClientTermsRaw[$i].Id) 
+                TermClientName = $($allClientTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name 
+                NetSuiteLastModifiedDate = $($allClientTermsRaw[$i].properties | Where-Object {$_.key -eq "NetSuiteLastModifiedDate"}).value 
+                UniversalClientName = $($allClientTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name
+                UniversalClientNameSanitised = $(sanitise-forNetsuiteIntegration $($allClientTermsRaw[$i].labels | Where-Object {$_.isDefault -eq $true}).Name) 
+                }
+            }#>
         }
     Write-Host "[$($allClientTerms.Count)] Clients Terms retrieved from TermStore in [$($termClientRetrieval.TotalSeconds)] seconds"
 
@@ -962,7 +1018,11 @@ cls
                 Write-Host "`t`tto`t`t`t`t`t`t`t`t[$($existingOppTermsWithMismatchedClients[$i].UniversalClientName)][$($existingOppTermsWithMismatchedClients[$i].DriveClientId)][$($existingOppTermsWithMismatchedClients[$i].NetSuiteClientId)] (OppTerm is [$($existingOppTermsWithMismatchedClients[$i].UniversalOppName)][$($existingOppTermsWithMismatchedClients[$i].NetSuiteOppId)]"
                 try{
                     try{$newDestinationFolder = add-graphFolderToDrive -graphDriveId $existingOppTermsWithMismatchedClients[$i].DriveClientId -folderName $existingOppTermsWithMismatchedClients[$i].UniversalOppName -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail}
+<<<<<<< Updated upstream
                     catch{Write-Verbose = "Condonable fail - if this errors, the target folder has already been created on a previous iteration"}                    
+=======
+                    catch{Write-Verbose = "Condonable fail - if this errors, the target folder has already been created on a previous iteration"}
+>>>>>>> Stashed changes
                     $movedFolders = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $existingOppDrivesWithMismatchedClients[$i] -mergeInto $newDestinationFolder -ErrorAction Continue
                     if($movedFolders[0].parentReference.driveId -eq $existingOppDrivesWithMismatchedClients[$i].DriveClientId){
                         Write-Host "`t`t`tFailed to move these [$($movedFolders.count)] folders:"
