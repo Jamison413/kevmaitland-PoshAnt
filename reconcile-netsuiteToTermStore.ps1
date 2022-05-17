@@ -180,6 +180,8 @@ function test-validNameForTermStore(){
     else{$true}
     }
 
+
+
 $timeForFullCycle = Measure-Command {
 
     #region GetData
@@ -232,18 +234,9 @@ $timeForFullCycle = Measure-Command {
                 Add-Member -InputObject $_ -MemberType NoteProperty -Name UniversalProjNameSanitised -Value $(sanitise-forNetsuiteIntegration $_.entityId) -Force
                 }
             }
-<<<<<<< Updated upstream
+
         Write-Host "[$($allNetSuiteProjs.Count)] Projects retrieved from NetSuite in [$($netProjRetrieval.TotalSeconds)] seconds ([$($netProjRetrieval.TotalMinutes)] minutes or [$($netSuiteProjsToCheck.Count/$netProjRetrieval.TotalMinutes)] per minute)"
         if($allNetSuiteProjs.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteProjs -netObjectType Project}
-=======
-        Write-Host "[$($allNetSuiteProjs.Count)] Projects retrieved from NetSuite in [$($netProjRetrieval.TotalSeconds)] seconds ([$($netProjRetrieval.TotalMinutes)] minutes or [$($allNetSuiteProjs.Count/$netProjRetrieval.TotalMinutes)] per minute)"
-        if($allNetSuiteProjs.Count -gt 0){
-            $netProjEncryptedWrite = Measure-Command {
-                export-encryptedCache -objects $allNetSuiteProjs -objectType Project -objectSource NetSuite
-                }
-            Write-Host "[$($allNetSuiteProjs.Count)] Projects written to encrypted store in [$($netProjEncryptedWrite.TotalSeconds)] seconds ([$($netProjEncryptedWrite.TotalMinutes)] minutes or [$($allNetSuiteProjs.Count/$netProjEncryptedWrite.TotalMinutes)] per minute)"
-            }
->>>>>>> Stashed changes
 
         $script:netSuiteProjsToCheck = @($allNetSuiteProjs | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         [array]$netProjectsWithNoClientId = $netSuiteProjsToCheck | ? {[string]::IsNullOrWhiteSpace($_.parent.id)} #Find the weird Projects with no Client (as we can't create folders for them anyway)
@@ -314,16 +307,7 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteOpps.Count)] opportunities retrieved from NetSuite in [$($netOppRetrieval.TotalSeconds)] seconds ([$($netOppRetrieval.TotalMinutes)] minutes or [$($netSuiteOppsToCheck.Count / $netOppRetrieval.TotalMinutes)] per minute)"
-<<<<<<< Updated upstream
         if($allNetSuiteOpps.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteOpps -netObjectType Opportunity}
-=======
-        if($allNetSuiteOpps.Count -gt 0){
-            $netOppsEncryptedWrite = Measure-Command {
-                export-encryptedCache -objects $allNetSuiteOpps -objectType Opportunity -objectSource NetSuite
-                }
-            Write-Host "[$($allNetSuiteOpps.Count)] Projects written to encrypted store in [$($netOppsEncryptedWrite.TotalSeconds)] seconds ([$($netOppsEncryptedWrite.TotalMinutes)] minutes or [$($allNetSuiteOpps.Count/$netOppsEncryptedWrite.TotalMinutes)] per minute)"
-            }
->>>>>>> Stashed changes
 
         $netSuiteOppsToCheck = @($allNetSuiteOpps | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
@@ -391,16 +375,7 @@ $timeForFullCycle = Measure-Command {
                 }
             }
         Write-Host "[$($allNetSuiteClients.Count)] clients retrieved from NetSuite in [$($netClientRetrieval.TotalSeconds)] seconds or [$($netSuiteClientsToCheck.Count / $netClientRetrieval.TotalMinutes)] per minute"
-<<<<<<< Updated upstream
         if($allNetSuiteClients.Count -gt 0){export-encryptedCache -netObjects $allNetSuiteClients -netObjectType Client}
-=======
-        if($allNetSuiteClients.Count -gt 0){
-            $netClientsEncryptedWrite = Measure-Command {
-                export-encryptedCache -objects $allNetSuiteClients -objectType Client -objectSource NetSuite
-                }
-            Write-Host "[$($allNetSuiteClients.Count)] Projects written to encryoted store in [$($netClientsEncryptedWrite.TotalSeconds)] seconds ([$($netClientsEncryptedWrite.TotalMinutes)] minutes or [$($allNetSuiteClients.Count/$netClientsEncryptedWrite.TotalMinutes)] per minute)"
-            }
->>>>>>> Stashed changes
 
         $netSuiteClientsToCheck = @($allNetSuiteClients | Select-Object) #Remove any $nulls that 401'ed/disappeared in transit
         if($deltaSync -eq $true){
@@ -883,9 +858,9 @@ $timeForFullCycle = Measure-Command {
         }
     Write-Host "Project reconcilliation completed in [$($projReconcile.TotalMinutes)] minutes ([$($projReconcile.TotalSeconds)] seconds)"
     }
-
+    
 Write-Host "Processing complete at [$(get-date -Format s)] in [$($timeForFullCycle.TotalMinutes)] minutes ([$($timeForFullCycle.TotalSeconds)] seconds)"
 
 Stop-Transcript
 
-    #>
+    
