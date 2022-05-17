@@ -325,7 +325,7 @@ function test-validNameForSharePointFolder(){
     else{$false}
     }
 $timeForFullCycle = Measure-Command {
-Clear-Host
+
     
     #region GetData
     #region getDriveData
@@ -1018,11 +1018,8 @@ Clear-Host
                 Write-Host "`t`tto`t`t`t`t`t`t`t`t[$($existingOppTermsWithMismatchedClients[$i].UniversalClientName)][$($existingOppTermsWithMismatchedClients[$i].DriveClientId)][$($existingOppTermsWithMismatchedClients[$i].NetSuiteClientId)] (OppTerm is [$($existingOppTermsWithMismatchedClients[$i].UniversalOppName)][$($existingOppTermsWithMismatchedClients[$i].NetSuiteOppId)]"
                 try{
                     try{$newDestinationFolder = add-graphFolderToDrive -graphDriveId $existingOppTermsWithMismatchedClients[$i].DriveClientId -folderName $existingOppTermsWithMismatchedClients[$i].UniversalOppName -tokenResponse $tokenResponseSharePointBot -conflictResolution Fail}
-<<<<<<< Updated upstream
                     catch{Write-Verbose = "Condonable fail - if this errors, the target folder has already been created on a previous iteration"}                    
-=======
-                    catch{Write-Verbose = "Condonable fail - if this errors, the target folder has already been created on a previous iteration"}
->>>>>>> Stashed changes
+                    
                     $movedFolders = process-folders -tokenResponse $tokenResponseSharePointBot -standardisedSourceFolder $existingOppDrivesWithMismatchedClients[$i] -mergeInto $newDestinationFolder -ErrorAction Continue
                     if($movedFolders[0].parentReference.driveId -eq $existingOppDrivesWithMismatchedClients[$i].DriveClientId){
                         Write-Host "`t`t`tFailed to move these [$($movedFolders.count)] folders:"
