@@ -130,7 +130,7 @@ function copy-spoFile(){
     Write-Verbose "Downloading source file [$($sourceUrl.LocalPath)]"
     try{Get-PnPFile -Url $sourceUrl.LocalPath -Path "$env:TEMP" -Filename $([uri]::UnescapeDataString($(Split-Path $sourceUrl.AbsoluteUri -Leaf))) -AsFile -Force}
     catch{Write-Error "Error retrieving file [$($sourceUrl.LocalPath)] using Get-PnpFile in copy-spoFile";break}
-    try{Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Credentials $pnpCreds}
+    try{Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Interactive }
     catch{Write-Error "Error connecting to Site [$($destinationSite.AbsoluteUri)] using Connect-PnPOnline in copy-spoFile";break}
     if(test-pnpConnectionMatchesResource -resourceUrl $destinationSite.AbsoluteUri){
         try{
@@ -184,13 +184,13 @@ function copy-spoPage(){
             Get-PnPFile -Url $sourceUrl.LocalPath -Path "$env:TEMP" -Filename $([uri]::UnescapeDataString($(Split-Path $sourceUrl.AbsoluteUri -Leaf))) -AsFile -Force
             try{
                 Write-Verbose "Connecting to SPO Admin [https://anthesisllc-admin.sharepoint.com/] (same creds [$($pnpCreds.UserName)], but different permissions required)"
-                Connect-SPOService -Url https://anthesisllc-admin.sharepoint.com/ -Credential $pnpCreds
+                Connect-SPOService -Url https://anthesisllc-admin.sharepoint.com/ 
                 try{
                     Write-Verbose "Allowing upload of .aspx files to destination [$($destinationSite.AbsoluteUri.TrimEnd("/"))]"
                     Set-SPOSite -Identity $destinationSite.AbsoluteUri.TrimEnd("/") -DenyAddAndCustomizePages $false -ErrorAction Stop
                     try{
                         Write-Verbose "Uploading file to [$($destinationSite.AbsoluteUri+"/SitePages/"+$(Split-Path $sourceUrl.AbsoluteUri -Leaf))]"
-                        Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Credentials $pnpCreds
+                        Connect-PnPOnline -Url $destinationSite.AbsoluteUri -Interactive
                         if([string]::IsNullOrWhiteSpace($renameFileAs)){
                             $file = Add-PnPFile -Path "$env:TEMP\$(Split-Path $sourceUrl.AbsoluteUri -Leaf)" -Folder "SitePages" -ErrorAction Stop #Added '$file = ' to avoid https://github.com/SharePoint/PnP-PowerShell/issues/722
                             }
@@ -1109,11 +1109,11 @@ function test-pnpConnectionMatchesResource(){
     if($connectIfDifferent){
         Write-Verbose "Creating new Connect-PnpOnline to [$resourceUrl]"
         if($pnpCreds){
-            try{Connect-PnPOnline -Url $resourceUrl -Credentials $pnpCreds}
+            try{Connect-PnPOnline -Url $resourceUrl -Interactive}
             catch{Write-Error $_}
             }
         else{
-            try{Connect-PnPOnline -Url $resourceUrl -CurrentCredentials}
+            try{Connect-PnPOnline -Url $resourceUrl -Interactive}
             catch{Write-Error $_}
             }
         }

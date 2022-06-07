@@ -1,5 +1,9 @@
 ﻿$365creds = set-MsolCredentials
 connect-to365 -credential $365creds
+<# for running locally 
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub" -Interactive
+connect-exchangeonline
+#>
 
 #email out
 $smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
@@ -8,7 +12,7 @@ $tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
 
 $requests = @()
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub" -Credentials $365creds
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub" -Interactive
 $requests += Get-PnPListItem -List "Internal Team Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
 if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.Site_x0020_Type},{$_.FieldValues.DataManager.LookupValue},{$_.FieldValues.Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
 
@@ -22,6 +26,11 @@ $accessType = "Private"
 $autoSubscribe = $true
 $groupClassification = "Internal"
 $alsoCreateTeam = $true
+
+<#check first
+foreach($request in $selectedRequests){}
+$request
+#>
 
 foreach($request in $selectedRequests){
     $request = $requests | ? {$_.FieldValues.GUID.Guid -eq $request.'$_.FieldValues.GUID.Guid'}
@@ -51,13 +60,13 @@ foreach($request in $selectedRequests){
     $members = $members | Sort-Object | select -Unique
 
     #See if we need to temporarily add the executing user as 
-    if($managers -notcontains ((Get-PnPConnection).PSCredential.UserName)){
+    if($managers -notcontains "t1-$(whoami /upn)"){
         $addExecutingUserAsTemporaryOwner = $true
-        [array]$managers += ((Get-PnPConnection).PSCredential.UserName)
+        [array]$managers += "t1-$(whoami /upn)"
         }
-    if($members -notcontains ((Get-PnPConnection).PSCredential.UserName)){
+    if($members -notcontains "t1-$(whoami /upn)"){
         $addExecutingUserAsTemporaryMember = $true
-        [array]$members += ((Get-PnPConnection).PSCredential.UserName)
+        [array]$members += "t1-$(whoami /upn)"
         }
 
     if($managedBy -eq "AAD"){$managers = "groupbot@anthesisgroup.com"} #Override the ownership of any aggregated / Parent Functional Teams as these are automated separately
@@ -66,18 +75,27 @@ foreach($request in $selectedRequests){
 
 
     $newTeam = new-365Group -displayName $displayName -managerUpns $managers -teamMemberUpns $members -memberOf $memberOf -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType $accessType -autoSubscribe $autoSubscribe -additionalEmailAddresses $additionalEmailAddresses -groupClassification $groupClassification -ownersAreRealManagers $areDataManagersLineManagers -membershipmanagedBy $managedBy -WhatIf:$WhatIfPreference -Verbose:$VerbosePreference -tokenResponse $tokenResponse -alsoCreateTeam $alsoCreateTeam -pnpCreds $365creds
+    #check items above before running the items below
+
     Write-Verbose "Getting PnPUnifiedGroup [$displayName] - this is a faster way to get the SharePoint URL than using the UnifiedGroup object"
     #Connect-PnPOnline -AccessToken $tokenResponse.access_token
-    Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com" -RetryCount 2 -ReturnConnection
-    $newPnpTeam = Get-PnPUnifiedGroup -Identity $newTeam.id
+    #Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com" #-RetryCount 2 -ReturnConnection
+    Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com" -Interactive
+    #$newPnpTeam = Get-PnPUnifiedGroup -Identity $newTeam.id
+    $newPnpTeam = Get-PnPMicrosoft365Group -Identity $newTeam.id
+    $newPnPSite = get-graphSite -tokenResponse $tokenResponse -groupId $newPnpTeam.id
+    $newPnpTeam | Add-Member -MemberType NoteProperty -Name SiteUrl -Value $newPnPSite.webUrl -Force
 
     #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
     if($addExecutingUserAsTemporaryOwner){
-        Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
+        #Connect-PnPOnline -ClientId $teamBotDetails.ClientID -ClientSecret $teamBotDetails.Secret -Url "https://anthesisllc.sharepoint.com"
         $executingUserAlreadySiteCollectionAdmin = test-isUserSiteCollectionAdmin -pnpUnifiedGroupObject $newPnpTeam -pnpAppCreds $teamBotDetails -pnpCreds $365creds -addPermissionsIfMissing $true
         }
+
+
     copy-spoPage -sourceUrl "https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/Candiate-Template-for-Team-Site-Landing-Page.aspx" -destinationSite $newPnpTeam.SiteUrl -pnpCreds $365creds -overwriteDestinationFile $true -renameFileAs "LandingPage.aspx" -Verbose | Out-Null
     test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl -pnpCreds $365creds -connectIfDifferent $true | Out-Null
+    #you can skip the IF part and the the items by part
     if((test-pnpConnectionMatchesResource -resourceUrl $newPnpTeam.SiteUrl) -eq $true){
         Write-Verbose "Setting Homepage"
         Set-PnPHomePage  -RootFolderRelativeUrl "SitePages/LandingPage.aspx" | Out-Null
@@ -90,6 +108,7 @@ foreach($request in $selectedRequests){
         $dummyFolderName = "DummyShareToDelete"
         Write-Verbose "`tAdding Folder [$dummyFolderName] to [$docLibName]"
         Add-PnPFolder -Name $dummyFolderName -Folder $docLibName
+
         $dummyPnpFolderItem = Get-PnPFolderItem -FolderSiteRelativeUrl $docLibName -ItemType Folder -ItemName $dummyFolderName
         [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Sharing")  | Out-Null
         [System.Reflection.Assembly]::LoadWithPartialName("System.Collections") | Out-Null
@@ -156,16 +175,16 @@ foreach($request in $selectedRequests){
 
 
     if($addExecutingUserAsTemporaryOwner){
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
-        Remove-DistributionGroupMember -Identity $newTeam.anthesisgroup_UGSync.dataManagerGroupId -Member $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false -BypassSecurityGroupManagerCheck:$true
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Owner -Links $"t1-$(whoami /upn)" -Confirm:$false
+        Remove-DistributionGroupMember -Identity $newTeam.anthesisgroup_UGSync.dataManagerGroupId -Member $"t1-$(whoami /upn)" -Confirm:$false -BypassSecurityGroupManagerCheck:$true
         }
     if($addExecutingUserAsTemporaryMember){
-        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
+        Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $"t1-$(whoami /upn)" -Confirm:$false
         }
 
 
     Write-Verbose "Updating Team Request: Status = [Created]"
-    Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub" -Credentials $365creds
+    Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/sites/TeamHub" -Interactive
     $dummy = Set-PnPListItem -List "34cad35a-4710-4fc9-bd53-ec35ae54574f" -Identity $request.Id -Values @{Status="Created"} #"Internal Team Site Requests" List 
 
     Write-Verbose "Preparing e-mail(s)"
@@ -201,7 +220,7 @@ foreach($request in $selectedRequests){
 
                 <p>The Team Site Robot</p>
                 </BODY></HTML>"
-            #Send-MailMessage  -BodyAsHtml $body -Subject "[$($newTeam.DisplayName)] Team Site created" -to $thisManager -bcc $((Get-PnPConnection).PSCredential.UserName) -from "TeamSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+            #Send-MailMessage  -BodyAsHtml $body -Subject "[$($newTeam.DisplayName)] Team Site created" -to $thisManager -bcc $"t1-$(whoami /upn)" -from "TeamSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
             send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn teamsiterobot@anthesisgroup.com -toAddresses $thisManager -subject "[$($newTeam.DisplayName)] Team Site created" -bodyHtml $body -bccAddresses $($365creds.UserName)
 
             Write-Verbose "E-mail sent"
