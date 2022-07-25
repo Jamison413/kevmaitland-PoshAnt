@@ -256,7 +256,7 @@ $timeForFullCycle = Measure-Command {
             }
 
         [array]$netProjsWithOvertlyDuffNames = $netSuiteProjsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalProjName) -eq $false}
-        [array]$newtrojsWithoutOvertlyDuffNames = $netSuiteProjsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalProjName) -eq $true}
+        [array]$netProjsWithoutOvertlyDuffNames = $netSuiteProjsToCheck | ? {$(test-validNameForTermStore -stringToTest $_.UniversalProjName) -eq $true}
         if($netProjsWithoutOvertlyDuffNames.Count -ne $netSuiteProjsToCheck.Count){
             Write-Host "`t[$($netSuiteProjsToCheck.Count - $netProjsWithoutOvertlyDuffNames.Count)] of these contain illegal characters for Terms, so I'll just process the remaining [$($newProjsWithoutOvertlyDuffNames.Count)]"
             $netSuiteProjsToCheck = $netProjsWithoutOvertlyDuffNames
