@@ -24,6 +24,26 @@ $geoUGs | ForEach-Object {
     $thisGeoUG = $_
     write-host "Processing [$($thisGeoUG.displayName)]"
     #continue
+    if([string]::IsNullOrWhiteSpace($thisGeoUG.anthesisgroup_UGSync.deviceGroupId)){
+        $allGroup = get-graphGroups -tokenResponse $userBotTokenResponse -filterDisplayName "Devices - $(get-3lettersInBrackets $thisGeoUG.displayName) - All"
+        if([string]::IsNullOrWhiteSpace($allGroup)){
+            $allGroup = new-graphGroup -tokenResponse $userBotTokenResponse -groupDisplayName "Devices - $(get-3lettersInBrackets $thisGeoUG.displayName) - All" -groupType Security -membershipType Assigned -groupDescription "Device Group for $(get-3lettersInBrackets $thisGeoUG.displayName) - All"
+        }
+        set-graphGroup -tokenResponse $userBotTokenResponse -groupId $thisGeoUG.id -groupUGSyncInfoExtensionHash @{deviceGroupId=$allGroup.id}
+        $allAllGroup = get-graphGroups -tokenResponse $userBotTokenResponse -filterDisplayName "Devices - All - All" 
+        add-graphUsersToGroup -tokenResponse $userBotTokenResponse -graphGroupId $allAllGroup.id -memberType members -graphUserIds $allGroup.id
+        $subgroups = @("Win10","iOS","VMs","Android","MacOS")
+        foreach ($group in $subgroups) {
+            $subGroup = get-graphGroups -tokenResponse $userBotTokenResponse -filterDisplayName "Devices - $(get-3lettersInBrackets $thisGeoUG.displayName) - $group"
+            if([string]::IsNullOrWhiteSpace($subGroup)){
+                $subGroup = new-graphGroup -tokenResponse $userBotTokenResponse -groupDisplayName "Devices - $(get-3lettersInBrackets $thisGeoUG.displayName) - $group" -groupType Security -membershipType Assigned -groupDescription "Device Group for $(get-3lettersInBrackets $thisGeoUG.displayName) - All"
+                add-graphUsersToGroup -tokenResponse $userBotTokenResponse -graphGroupId $allGroup.id -memberType members -graphUserIds $subgroup.id
+            }
+            $allSubGroup = get-graphGroups -tokenResponse $userBotTokenResponse -filterDisplayName "Devices - All - $group" 
+            add-graphUsersToGroup -tokenResponse $userBotTokenResponse -graphGroupId $allSubGroup.id -memberType members -graphUserIds $subGroup.id
+    
+        }
+    }
     $thisGeoUsers = get-graphUsersFromGroup -tokenResponse $userBotTokenResponse -groupId $thisGeoUG.id -memberType TransitiveMembers -returnOnlyLicensedUsers #-selectAllProperties
     $thisGeoUsers | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.id}
     #Get the devices owned by people in this Geographic Group

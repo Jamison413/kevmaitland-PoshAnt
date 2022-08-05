@@ -156,7 +156,7 @@ function add-graphLicenseToUser(){
             [parameter(Mandatory = $true,ParameterSetName="Guids")]
             [string]$userIdOrUpn
         ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [ValidateSet("Kiosk","E1","E3","E5","EMS","ATP","PowerBIFree","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio","M3","WinE3")]
+            [ValidateSet("Kiosk","Office_E1","Office_E3","Office_E5","EMS_E3","MDE","PowerBIFree","TeamsAudioConferencingSelect","DomesticCalling","InternationalCalling","Project","Visio","Microsoft_E3","Win_E3")]
             [string]$licenseFriendlyName 
         ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
             [string]$licenseGuid
@@ -1826,7 +1826,7 @@ function get-graphUsers(){
         ,[parameter(Mandatory = $false)]
             [hashtable]$filterCustomEq = @{}
         ,[parameter(Mandatory = $false)]
-            [ValidateSet($null,"Anthesis (UK) Ltd (GBR)","Anthesis Consulting Group (GBR)","Anthesis Consultoria Ambiental ltda (BRA)","Anthesis Energy UK Ltd (GBR)","Anthesis Enveco AB (SWE)","Anthesis Finland Oy (FIN)","Anthesis GmbH (DEU)","Anthesis Ireland Ltd (IRL)","Anthesis LLC (USA)","Anthesis Middle East (ARE)","Anthesis Philippines Inc. (PHL)","Anthesis Srl (ITA)","Caleb Management Services Ltd (GBR)","France (FRA)","Lavola 1981 SAU (ESP)","Lavola Andora SA (AND)","Lavola Columbia (COL)","The Goodbrand Works Ltd (GBR)")]
+            [ValidateSet($null,"Anthesis (UK) Ltd (GBR)","Anthesis Consulting Group (GBR)","Anthesis Consultoria Ambiental ltda (BRA)","Anthesis Energy UK Ltd (GBR)","Anthesis Enveco AB (SWE)","Anthesis Finland Oy (FIN)","Anthesis GmbH (DEU)","Anthesis Ireland Ltd (IRL)","Anthesis LLC (USA)","Anthesis Middle East (ARE)","Anthesis Philippines Inc. (PHL)","Anthesis Srl (ITA)","Caleb Management Services Ltd (GBR)","Climate Neutral Group (NLD)","France (FRA)","Lavola 1981 SAU (ESP)","Lavola Andora SA (AND)","Lavola Columbia (COL)","The Goodbrand Works Ltd (GBR)")]
             [string]$filterBusinessUnit
         ,[parameter(Mandatory = $false)]
             [switch]$filterLicensedUsers = $false
