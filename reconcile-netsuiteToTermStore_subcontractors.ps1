@@ -200,19 +200,19 @@ $timeForFullCycle = Measure-Command {
         Write-Host "[$($allSubcontractorTerms.Count)] subcontractors retrieved from TermStore in [$($termSubcontractorRetrieval.TotalSeconds)] seconds"
 
         $netSubcontractorRetrieval = Measure-Command {
-            $netQuery =  "?q=companyName CONTAIN_NOT `"Anthesis`"" #Excludes any Companies with "Anthesis" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"Best Foot Forward Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"Caleb Management Service`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"LRS Consultancy Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"LRS Environmental Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"Lavola 1981 SAU`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"Lavola Andora SA`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"Lavola Columbia`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"Lavola Sucursal Colombia`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"Media4Change`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            $netQuery += " AND companyName CONTAIN_NOT `"The Goodbrand Works Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
-            #$netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
-            $netQuery += " AND isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them)
+            $netQuerySubcontractors =  "?q=companyName CONTAIN_NOT `"Anthesis`"" #Excludes any Companies with "Anthesis" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"Best Foot Forward Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"Caleb Management Service`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"LRS Consultancy Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"LRS Environmental Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"Lavola 1981 SAU`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"Lavola Andora SA`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"Lavola Columbia`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"Lavola Sucursal Colombia`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"Media4Change`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            $netQuerySubcontractors += " AND companyName CONTAIN_NOT `"The Goodbrand Works Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
+            #$netQuerySubcontractors += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
+            #$netQuerySubcontractors += " AND isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them) # We need to _include_ them for Subcontractors
             #$netQuerySubcontractors = "?q=isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them)
             #$netQuerySubcontractors += " AND entityStatus ANY_OF_NOT [6, 7]" #Excludes LEAD-Unqualified and LEAD-Qualified (https://XXX.app.netsuite.com/app/crm/sales/customerstatuslist.nl?whence=)
             if($deltaSync -eq $true){
