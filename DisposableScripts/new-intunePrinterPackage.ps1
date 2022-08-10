@@ -3,68 +3,43 @@
 #Find and open relevant .INF file (use guide at https://msendpointmgr.com/2022/01/03/install-network-printers-intune-win32apps-powershell/)
 
 #Locate files required for install, paste below:
-$arrayOfFiles = convertTo-arrayOfStrings "x3up02T.dll
-x3rpcl02T.dll
-x3wfuv02T.dll
-x3gui02T.dll
-x3core02T.dll
-x3util02T.dll
-x3rnut02T.dll
-x3txt02T.cab
-x3coms02T.dll
-x3jobt02T.exe
-x3thpr02T.exe
-x3ptpc02T.dll
-x3fput02T.dll
-xUNIVX.tag
-x3UNIV02T.cab
-x3JAR02T.cab 
-x3fpb02T.exe
-x2fpd02.dll
-x3encr02T.dll 
-x5print.dll
-x5pp.dll
-x5lrs.dll
-x5lrsl.dll
-api-ms-win-core-file-l1-2-0.dll
-api-ms-win-core-file-l2-1-0.dll
-api-ms-win-core-localization-l1-2-0.dll
-api-ms-win-core-processthreads-l1-1-1.dll
-api-ms-win-core-synch-l1-2-0.dll
-api-ms-win-core-timezone-l1-1-0.dll
-ucrtbase.dll
-api-ms-win-crt-conio-l1-1-0.dll
-api-ms-win-crt-convert-l1-1-0.dll
-api-ms-win-crt-environment-l1-1-0.dll
-api-ms-win-crt-filesystem-l1-1-0.dll
-api-ms-win-crt-heap-l1-1-0.dll
-api-ms-win-crt-locale-l1-1-0.dll
-api-ms-win-crt-math-l1-1-0.dll
-api-ms-win-crt-multibyte-l1-1-0.dll
-api-ms-win-crt-private-l1-1-0.dll
-api-ms-win-crt-process-l1-1-0.dll
-api-ms-win-crt-runtime-l1-1-0.dll
-api-ms-win-crt-stdio-l1-1-0.dll
-api-ms-win-crt-string-l1-1-0.dll
-api-ms-win-crt-time-l1-1-0.dll
-api-ms-win-crt-utility-l1-1-0.dll
-xUNIVX02T.gpd
-xUNIVX02T.ini
-xUNIVX02T.cfg
+$arrayOfFiles = convertTo-arrayOfStrings "KOAX5J_G.DLL
+KOAX5J_X.DLL
+KOAX5J_F.DLL
+KOAX5J_C.DLL
+KOAX5J_U.DLL
+KOAX5J_S.DLL
+KOAX5J_R.DLL
+KOAX5J_J.DLL
+KOAX5J_D.DLL
+KOAX5J__ZH-TW.chm
+KOAX5J_D.exe
+KOAX5J_O.exe
+KOBDrvAPIIF.dll
+KOBDrvAPIIF32.dll
+KOBDrvAPIW64.exe
 "
-$arrayOfFiles += "x3UNIVx.cat" #Manually add Catalogue file name
-$arrayOfFiles += "x3UNIVX.inf" #Manually add Inf file name
+$arrayOfFiles += "koax5j__.cat" #Manually add Catalogue file name
+$arrayOfFiles += "KOAX5J__.inf" #Manually add Inf file name
 
 #Set variables
-$infFile = "x3UNIVX.inf"
-$driverName = "Xerox Global Print Driver PCL6"
-$printerIP = "10.18.28.250"
-$prettyPrinterName = "NLD-Utrecht-Xerox7845"
+$infFile = "KOAX5J__.inf"
+$driverName = "KONICA MINOLTA Universal PCL"
+$printerIP = "192.168.93.53"
+$prettyPrinterName = "GBR-London-KonicaC257i"
 
 $newDir = New-Item -Path "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Intune-WinApp\$prettyPrinterName" -ItemType Directory
 #$newDir = Get-Item -Path "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Intune-WinApp\$prettyPrinterName"
 $arrayOfFiles | ForEach-Object {
-    Copy-Item "$env:USERPROFILE\Downloads\UNIV_5.887.3.0_PCL6_x64\UNIV_5.887.3.0_PCL6_x64_Driver.inf\$_" -Destination $newDir.FullName -Force
+    $thisFile = $_
+    switch($thisFile.SubString($thisFile.Length - 3,3)){
+        "in_" {$newFileName = $thisFile.TrimEnd("_")+"f"}
+        "dl_" {$newFileName = $thisFile.TrimEnd("_")+"l"}
+        "ex_" {$newFileName = $thisFile.TrimEnd("_")+"e"}
+        "ch_" {$newFileName = $thisFile.TrimEnd("_")+"m"}
+        "ca_" {$newFileName = $thisFile.TrimEnd("_")+"b"}
+    }
+    Copy-Item "$env:USERPROFILE\Downloads\UPDPCL6Win_392120MU\driver\win_x64\$_" -Destination "$($newDir.FullName)\$newFileName" -Force
 }
 Copy-Item "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Install-Printer.ps1"-Destination $newDir.FullName -Force
 Copy-Item "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Remove-Printer.ps1"-Destination $newDir.FullName -Force
