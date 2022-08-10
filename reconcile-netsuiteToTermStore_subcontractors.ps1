@@ -212,7 +212,7 @@ $timeForFullCycle = Measure-Command {
             $netQuery += " AND companyName CONTAIN_NOT `"Media4Change`"" #Excludes any Companies with "(intercompany project)" in the companyName
             $netQuery += " AND companyName CONTAIN_NOT `"The Goodbrand Works Ltd`"" #Excludes any Companies with "(intercompany project)" in the companyName
             #$netQuery += " AND companyName START_WITH_NOT `"x `"" #Excludes any Companies that begin with "x " in the companyName
-            $netQuery += " AND isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them)
+            #$netQuery += " AND isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them) # We need to _include_ them for Subcontractors
             #$netQuerySubcontractors = "?q=isPerson IS $false" #Exclude Individuals (until we figure out how to deal with them)
             #$netQuerySubcontractors += " AND entityStatus ANY_OF_NOT [6, 7]" #Excludes LEAD-Unqualified and LEAD-Qualified (https://XXX.app.netsuite.com/app/crm/sales/customerstatuslist.nl?whence=)
             if($deltaSync -eq $true){
