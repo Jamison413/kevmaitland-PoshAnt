@@ -493,7 +493,7 @@ $allgraphUsers = get-graphUsers -tokenResponse $tokenTeams -selectAllProperties
 $graphUsers = $allgraphUsers | Where-Object {$_.userPrincipalName -in $allMailboxes.anthesisAddress} #get-graphUsers -tokenResponse $tokenTeams -filterUpns $allMailboxes.anthesisAddress -selectAllProperties
 $graphUsers  | ForEach-Object {
     $thisGraphUser = $_
-    [array]$emailsToAdd = "smpt:$thisGraphUser.userPrincipalName.Replace("anthesisgroup","climateneutralgroup")"
+    [array]$emailsToAdd = "smpt:$($thisGraphUser.userPrincipalName.Replace("anthesisgroup","climateneutralgroup"))"
     $emailsToAdd += $thisGraphUser.otherMails
     $thisGraphUser = set-graphUser -tokenResponse $tokenTeams -userIdOrUpn $thisGraphUser.id -userPropertyHash @{proxyAddresses=$emailsToAdd}
 }
@@ -586,6 +586,7 @@ if ($thesePeople.Count -eq $theseUsers.Count){
 
 
 
+#Get migration status
 $allCngUsers = get-graphUsers -tokenResponse $tokenTeams -selectAllProperties -useBetaEndPoint -selectCustomProperties "signInActivity" -filterBusinessUnit "Climate Neutral Group (NLD)"
 $allCngUsers | % {
     $thisUser = $_
@@ -618,7 +619,7 @@ $subs | % {
 
 
 
-#Assign CNG address aas primary
+#Assign CNG address as primary
 Connect-ExchangeOnline -UserPrincipalName t0-kevin.maitland@anthesisgroup.com
 $allCngUsers | % {
     $thisUser = $_
@@ -639,7 +640,7 @@ $allCngUsers | % {
     set-mailbox -Identity $thisUser.userPrincipalName -EmailAddresses $updatedAddresses
 }
 
-#Set default
+#Set default calendar free/busy visibility
 $allCngUsers | % {
     $thisUser = $_
     Write-Output "Setting [$($thisUser.DisplayName)]"
@@ -655,3 +656,25 @@ $allCngUsers | % {
 
 #Set ApplicatinAccessPolicy for website@climateneutralgroup.co.za mailer
 New-ApplicationAccessPolicy -AppId 138da3d8-52e8-49c8-9426-6d36c483383e -PolicyScopeGroupId AAP-climateneutralgroup.co.zamailer@anthesisgroup.com -AccessRight RestrictAccess -Description "Restrict this app to members of mail-enabled security group [AAP - climateneutralgroup.co.za mailer]."
+
+
+#Get InboxRules for Resources
+$rules = Get-InboxRule -Mailbox lease.auto@climateneutralgroup.onmicrosoft.com
+
+
+
+
+#Get ZAF Teams and Members
+$allTeams = get-graphGroups -tokenResponse $tokenTeams -filterGroupType Unified -selectAllProperties
+$zafTeams = $allTeams | Where-Object {
+    $_.displayName -match "(ZAF)"
+}
+$zafTeams | % {
+    $thisTeam = $_
+    $thisTeamMembers = get-graphUsersFromGroup -tokenResponse $tokenTeams -groupId $_.id -memberType TransitiveMembers -returnOnlyUsers
+    $thisTeam | Add-Member NoteProperty -Name Members -Value $thisTeamMembers.userPrincipalName
+    $thisTeamOwners = get-graphUsersFromGroup -tokenResponse $tokenTeams -groupId $_.id -memberType Owners -returnOnlyUsers
+    $thisTeam | Add-Member NoteProperty -Name Owners -Value $thisTeamOwners.userPrincipalName
+}
+
+$zafTeams | Convert-OutputForCSV | Export-Csv -Path "$env:userprofile\Downloads\ZafTeams_$(get-date -f FileDateTimeUniversal).csv" -NoTypeInformation
