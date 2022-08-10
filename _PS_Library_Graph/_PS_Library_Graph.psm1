@@ -233,6 +233,42 @@ function add-graphUsersToGroup(){
         invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/`$ref" -graphBodyHashtable $bodyHash
         }
     }
+function copy-graphItem(){
+        [cmdletbinding()]
+       param(
+           [parameter(Mandatory = $true)]
+               [psobject]$tokenResponse
+            ,[parameter(Mandatory = $true)]
+               [string]$graphSourceDriveID  
+            ,[parameter(Mandatory = $true)]
+               [string]$graphSourceItemID
+            ,[parameter(Mandatory = $true)]
+               [string]$graphParentReferenceDestinationDriveID
+               ,[parameter(Mandatory = $true)]
+               [string]$graphDestinationID
+               ,[parameter(Mandatory = $true)]
+               [ValidateSet(“fail”,”replace”,”rename”)]
+               [string]$conflictBehavior
+           )
+            #Source
+            $sourceItem = get-graphDriveItems -tokenResponse $tokenResponse -driveGraphId $graphSourceDriveID -itemGraphId $graphSourceItemID -returnWhat Item
+            $sourceParentItem = get-graphDriveItems -tokenResponse $tokenResponse -driveGraphId $graphSourceDriveID -returnWhat Item
+            #Destination
+            $destinationItem = get-graphDriveItems -tokenResponse $tokenResponse -driveGraphId $graphParentReferenceDestinationDriveID -itemGraphId $graphDestinationID -returnWhat Item
+            $destinationParentItem = get-graphDriveItems -tokenResponse $tokenResponse -driveGraphId $graphParentReferenceDestinationDriveID -returnWhat Item
+            
+            If(($sourceItem) -and ($destinationItem)){
+                Try{    
+                    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/drives/$($graphSourceDriveID)/items/$($graphSourceItemID)/copy?@microsoft.graph.conflictBehavior=$($conflictBehavior)" -graphBodyHashtable @{"parentReference" = @{"driveId" = "$($graphParentReferenceDestinationDriveID)";"id" = "$($graphDestinationID)"}} -Verbose
+                    write-host "Copied ['$($sourceItem.name)' from '$($sourceParentItem.webUrl)'] to ['$($destinationItem.name)' in '$($destinationParentItem.weburl)']"
+                    Write-Warning "Reflections may take a few minutes to reflect in Sharepoint Online."
+                }
+                Catch{
+                    Write-Error "Graph item could not be copied."
+                    $Error
+                }
+            }
+       }
 function delete-graphDriveItem(){
     [cmdletbinding()]
     Param (
