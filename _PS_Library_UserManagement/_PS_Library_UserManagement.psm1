@@ -152,6 +152,26 @@ Creates Msol User object by first creating a new mailbox, which will create an u
 .EXAMPLE
 create-msolUser -upn "jo.bloggs@anthesisgroup.com" -plaintextpassword $plaintextpassword
 #>
+
+function get-CalendarFolder(){
+<#
+.SYNOPSIS
+Returns name of default Calendar folder in mailbox (helpful for multilingual scenarios where Calendar is called Agenda/Calendario/Calendari/Kalendar in Dutch/Spanish/Catalan/German)
+
+.EXAMPLE
+get-CalendarFolder -upn "jo.bloggs@anthesisgroup.com"
+#>
+
+    [cmdletbinding()]
+    Param (
+        [parameter(Mandatory = $true)]
+            [String]$upn
+            )
+
+    $thisCalendar = $(Get-MailboxFolderStatistics -Identity $upn -FolderScope "Calendar" | Sort-Object CreationTime | Select-Object -First 1)
+    return $thisCalendar
+}
+
 function license-msolUser{
         [cmdletbinding()]
     Param (

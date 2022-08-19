@@ -30,7 +30,7 @@ for ($i=0;$i -lt $naContractors.Count;$i++){
     $naContractorAccounts[$i] | Add-Member -MemberType NoteProperty -Name Groups -Value $thisContractorGroups -Force
 }
 
-$naContractorAccounts | select displayName, userPrincipalName, @{N="LastSignIn"; E={$_.signInActivity.lastSignInDateTime}}, accountEnabled, @{N="LineManager"; E={$_.manager.userPrincipalName}}, @{N="Licenses"; E={@($_.licenseAssignmentStates.FriendlyName)}}, @{N="Groups"; E={$_.Groups.displayName}}, @{N="BusinessUnit"; E={$_.anthesisgroup_employeeInfo.businessUnit}}, @{N="contractTypeAccordingToIT"; E={$_.anthesisgroup_employeeInfo.contractType}} | Export-Csv -Path $env:USERPROFILE\Downloads\NAContractors.csv -NoTypeInformation -Force
+$naContractorAccounts | select displayName, userPrincipalName, @{N="LastSignIn"; E={$_.signInActivity.lastSignInDateTime}}, accountEnabled, @{N="LineManager"; E={$_.manager.userPrincipalName}}, @{N="Licenses"; E={@($_.licenseAssignmentStates.FriendlyName)}}, @{N="Groups"; E={$_.Groups.displayName}}, @{N="BusinessUnit"; E={$_.anthesisgroup_employeeInfo.businessUnit}}, @{N="contractTypeAccordingToIT"; E={$_.anthesisgroup_employeeInfo.contractType}} | Export-Csv -Path $env:USERPROFILE\Downloads\NAContractors_$(get-date -f FileDateTimeUniversal).csv -NoTypeInformation -Force
 
 
 

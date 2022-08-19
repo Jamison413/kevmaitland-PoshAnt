@@ -1,0 +1,12 @@
+﻿
+Connect-ExchangeOnline -UserPrincipalName t1-kevin.maitland@anthesisgroup.com
+
+$tokenTeams = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName TeamsBot) -grant_type client_credentials
+$itTeam = get-graphUsersFromGroup -tokenResponse $tokenTeams -groupUpn IT_Team_All_365@anthesisgroup.com -memberType TransitiveMembers -returnOnlyLicensedUsers
+
+$itTeam | ? {$_.displayName -notmatch "Golding" -and $_.displayName -notmatch "Eulalia"} | % {
+    $thisUser = $_
+    $thisCalendar = $(Get-MailboxFolderStatistics -Identity $thisUser.userPrincipalName -FolderScope "Calendar" | Sort-Object CreationTime | Select-Object -First 1)
+    write-output "Updating [$($thisCalendar.Identity)]"
+    Add-MailboxFolderPermission $($thisCalendar.Identity.Replace("\",":\")) -User "ITTeamAll@anthesisgroup.com" -AccessRights "LimitedDetails"
+}
