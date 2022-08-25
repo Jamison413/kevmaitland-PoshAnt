@@ -168,6 +168,33 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 ForEach($thisUser in $selectedRequests){
 
+
+
+#We don't to create user accounts that are more than 14 days in advance, this creates a security risk - if more than 14 days in advance pop box open and warn script runner with choice box to either continue or break (end loop).
+$timespan = New-TimeSpan -Start ($thisUser.FieldValues.StartDate | get-date -format s) -End ((get-date).AddDays(15) | get-date -Format s)
+If($timespan.days -gt 0){
+Continue
+}
+Else{
+
+    Add-Type -AssemblyName PresentationCore,PresentationFramework
+    $ButtonType = [System.Windows.MessageBoxButton]::YesNoCancel
+    $MessageIcon = [System.Windows.MessageBoxImage]::Error
+    $MessageBody = "The user you are trying to create is more than 14 days out from their start date. Creating users more than two weeks in advance can create a security risk, unless there are extenuating circumstances please check to make sure they are less than two weeks out from starting."
+    $MessageTitle = "Confirm Deletion"
+    $Result = [System.Windows.MessageBox]::Show($MessageBody,$MessageTitle,$ButtonType,$MessageIcon)
+    Write-Host "$Result"
+        If($Result -eq "Yes"){
+            Continue
+        }
+        Else{
+            Break
+        }
+}
+
+
+
+
 #Before we start, check the contract type
 write-host "Before we start, what is the contract type?"
 write-host "A: Employee"
@@ -325,6 +352,29 @@ If($thisUser.FieldValues.GraphUserGUID){
 Write-Host "It looks like this user has already been created"
 break
 }
+
+#We don't to create user accounts that are more than 14 days in advance, this creates a security risk - if more than 14 days in advance pop box open and warn script runner with choice box to either continue or break (end loop).
+$timespan = New-TimeSpan -Start ($thisUser.FieldValues.Start_x0020_Date | get-date -format s) -End ((get-date).AddDays(15) | get-date -Format s)
+If($timespan.days -gt 0){
+Continue
+}
+Else{
+
+    Add-Type -AssemblyName PresentationCore,PresentationFramework
+    $ButtonType = [System.Windows.MessageBoxButton]::YesNoCancel
+    $MessageIcon = [System.Windows.MessageBoxImage]::Error
+    $MessageBody = "The user you are trying to create is more than 14 days out from their start date. Creating users more than two weeks in advance can create a security risk, unless there are extenuating circumstances please check to make sure they are less than two weeks out from starting."
+    $MessageTitle = "Confirm Deletion"
+    $Result = [System.Windows.MessageBox]::Show($MessageBody,$MessageTitle,$ButtonType,$MessageIcon)
+    Write-Host "$Result"
+        If($Result -eq "Yes"){
+            Continue
+        }
+        Else{
+            Break
+        }
+}
+
 
 $thisUser.FieldValues.Title
 $thisUser.FieldValues.Job_x0020_title
