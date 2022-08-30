@@ -173,7 +173,7 @@ ForEach($thisUser in $selectedRequests){
 #We don't to create user accounts that are more than 14 days in advance, this creates a security risk - if more than 14 days in advance pop box open and warn script runner with choice box to either continue or break (end loop).
 $timespan = New-TimeSpan -Start ($thisUser.FieldValues.StartDate | get-date -format s) -End ((get-date).AddDays(15) | get-date -Format s)
 If($timespan.days -gt 0){
-Continue
+ write-host "c1"
 }
 Else{
 
@@ -185,10 +185,12 @@ Else{
     $Result = [System.Windows.MessageBox]::Show($MessageBody,$MessageTitle,$ButtonType,$MessageIcon)
     Write-Host "$Result"
         If($Result -eq "Yes"){
-            Continue
+             write-host "continued"
         }
         Else{
+            write-host "stopped"
             Break
+            
         }
 }
 
@@ -356,7 +358,6 @@ break
 #We don't to create user accounts that are more than 14 days in advance, this creates a security risk - if more than 14 days in advance pop box open and warn script runner with choice box to either continue or break (end loop).
 $timespan = New-TimeSpan -Start ($thisUser.FieldValues.Start_x0020_Date | get-date -format s) -End ((get-date).AddDays(15) | get-date -Format s)
 If($timespan.days -gt 0){
-Continue
 }
 Else{
 
@@ -368,7 +369,6 @@ Else{
     $Result = [System.Windows.MessageBox]::Show($MessageBody,$MessageTitle,$ButtonType,$MessageIcon)
     Write-Host "$Result"
         If($Result -eq "Yes"){
-            Continue
         }
         Else{
             Break
