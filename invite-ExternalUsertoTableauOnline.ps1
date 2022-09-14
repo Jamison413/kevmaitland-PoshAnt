@@ -1,7 +1,6 @@
 ﻿
 #add list of upns
-$listofupns = "
-"
+$listofupns = ""
 
 #connect
 $teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
@@ -51,6 +50,7 @@ $checkIfInGroup = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId
 If($checkIfInGroup.mail -contains $upn){
 #if successful, send email to upn
 #send-graphMailMessage -tokenResponse $tokenResponse -fromUpn "" -toAddresses "" -subject "Anthesis: You Have Now Been Added to Tableau Online" -bodyHtml $body -saveToSentItems $true -Verbose
+Write-Host "User added to Tableau online users group successfully" -ForegroundColor Green -BackgroundColor Black
 }
 Else{
 Throw "Warning: Guest user not found in Tableau Online Viewers group"
