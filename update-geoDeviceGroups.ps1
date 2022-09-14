@@ -32,7 +32,7 @@ $geoUGs | ForEach-Object {
         set-graphGroup -tokenResponse $userBotTokenResponse -groupId $thisGeoUG.id -groupUGSyncInfoExtensionHash @{deviceGroupId=$allGroup.id}
         $allAllGroup = get-graphGroups -tokenResponse $userBotTokenResponse -filterDisplayName "Devices - All - All" 
         add-graphUsersToGroup -tokenResponse $userBotTokenResponse -graphGroupId $allAllGroup.id -memberType members -graphUserIds $allGroup.id
-        $subgroups = @("Win10","iOS","VMs","Android","MacOS")
+        $subgroups = @("Win10","Win11","Win_Other","iOS","VMs","Android","MacOS")
         foreach ($group in $subgroups) {
             $subGroup = get-graphGroups -tokenResponse $userBotTokenResponse -filterDisplayName "Devices - $(get-3lettersInBrackets $thisGeoUG.displayName) - $group"
             if([string]::IsNullOrWhiteSpace($subGroup)){
@@ -58,7 +58,9 @@ $geoUGs | ForEach-Object {
     $thisGeoDevicesDelta | ForEach-Object {
         #Find the appropriate subgroup
         if($_.model -eq "Virtual Machine"){$relevantGroup = $thisGeoDevicesCurrentGroups | Where-Object {$_.displayName -match "VMs"}}
+        elseif($_.operatingSystem -eq "Windows" -and ($_.operatingSystemVersion -match "^10.0.22" -or $_.operatingSystemVersion -eq "Windows 11")){$relevantGroup = $thisGeoDevicesCurrentGroups | Where-Object {$_.displayName -match "Win11"}}
         elseif($_.operatingSystem -eq "Windows" -and ($_.operatingSystemVersion -match "^10" -or $_.operatingSystemVersion -eq "Windows 10")){$relevantGroup = $thisGeoDevicesCurrentGroups | Where-Object {$_.displayName -match "Win10"}}
+        elseif($_.operatingSystem -eq "Windows"){$relevantGroup = $thisGeoDevicesCurrentGroups | Where-Object {$_.displayName -match "Win_Other"}}
         elseif($_.operatingSystem -match "Mac"){$relevantGroup = $thisGeoDevicesCurrentGroups | Where-Object {$_.displayName -match "MacOS"}}
         elseif($_.operatingSystem -match "Android"){$relevantGroup = $thisGeoDevicesCurrentGroups | Where-Object {$_.displayName -match "Android"}}
         elseif($_.operatingSystem -eq "iPad" -or $_.operatingSystem -eq "iPhone" -or $_.operatingSystem -eq "iOS"){$relevantGroup = $thisGeoDevicesCurrentGroups | Where-Object {$_.displayName -match "iOS"}}
