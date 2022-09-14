@@ -161,9 +161,9 @@ $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 #Create a secure credential object
 #$adminCreds = get-credential
 #Connect to services by passing in secure credential object we set above
-connect-ToMsol -Credential $adminCreds
-connect-toAAD -Credential $adminCreds
-connect-ToExo -credential $adminCreds
+connect-ToMsol -Interactive
+connect-toAAD -Interactive
+connect-ToExo -Interactive
 
 #Create an array of email address so we can iterate through them
 $upnsToDeactivate = convertTo-arrayOfEmailAddresses $upnsString
