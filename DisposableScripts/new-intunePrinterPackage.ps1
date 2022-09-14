@@ -3,30 +3,18 @@
 #Find and open relevant .INF file (use guide at https://msendpointmgr.com/2022/01/03/install-network-printers-intune-win32apps-powershell/)
 
 #Locate files required for install, paste below:
-$arrayOfFiles = convertTo-arrayOfStrings "KOAX5J_G.DLL
-KOAX5J_X.DLL
-KOAX5J_F.DLL
-KOAX5J_C.DLL
-KOAX5J_U.DLL
-KOAX5J_S.DLL
-KOAX5J_R.DLL
-KOAX5J_J.DLL
-KOAX5J_D.DLL
-KOAX5J__ZH-TW.chm
-KOAX5J_D.exe
-KOAX5J_O.exe
-KOBDrvAPIIF.dll
-KOBDrvAPIIF32.dll
-KOBDrvAPIW64.exe
+$arrayOfFiles = convertTo-arrayOfStrings "cnp60m.cat
+CNP60MA64.INF
+gppcl6.cab
 "
-$arrayOfFiles += "koax5j__.cat" #Manually add Catalogue file name
-$arrayOfFiles += "KOAX5J__.inf" #Manually add Inf file name
+#$arrayOfFiles += "koax5j__.cat" #Manually add Catalogue file name
+#$arrayOfFiles += "KOAX5J__.inf" #Manually add Inf file name
 
 #Set variables
-$infFile = "KOAX5J__.inf"
-$driverName = "KONICA MINOLTA Universal PCL"
-$printerIP = "192.168.93.53"
-$prettyPrinterName = "GBR-London-KonicaC257i"
+$infFile = "CNP60MA64.inf"
+$driverName = "Canon Generic Plus PCL6"
+$printerIP = "94.190.240.217"
+$prettyPrinterName = "GBR-Bristol-5thFloor"
 
 $newDir = New-Item -Path "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Intune-WinApp\$prettyPrinterName" -ItemType Directory
 #$newDir = Get-Item -Path "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Intune-WinApp\$prettyPrinterName"
@@ -39,7 +27,7 @@ $arrayOfFiles | ForEach-Object {
         "ch_" {$newFileName = $thisFile.TrimEnd("_")+"m"}
         "ca_" {$newFileName = $thisFile.TrimEnd("_")+"b"}
     }
-    Copy-Item "$env:USERPROFILE\Downloads\UPDPCL6Win_392120MU\driver\win_x64\$_" -Destination "$($newDir.FullName)\$newFileName" -Force
+    Copy-Item "$env:USERPROFILE\Downloads\GPlus_PCL6_Driver_V260_32_64_00\x64\Driver\$_" -Destination "$($newDir.FullName)\$newFileName" -Force
 }
 Copy-Item "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Install-Printer.ps1"-Destination $newDir.FullName -Force
 Copy-Item "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Remove-Printer.ps1"-Destination $newDir.FullName -Force
@@ -49,9 +37,12 @@ Copy-Item "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Rem
 "powershell.exe -executionpolicy bypass -file Remove-Printer.ps1 -PrinterName `"$prettyPrinterName`"" | Out-File -FilePath "$($newDir.FullName)\uninstall.ps1"
 "if(Test-Path `"HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Print\Printers\$prettyPrinterName`"){
     Write-Output `"Printer [$($prettyPrinterName)] installed`"
+    Exit 0
 }
 else{
-    Throw `"Printer [$($prettyPrinterName)] failed to install - check [$prettyPrinterName.log] in [$env:TEMP]`"
+    Write-Output `"Printer [$($prettyPrinterName)] failed to install - check [$prettyPrinterName.log] in [%TEMP%]`"
+    Write-Error `"Printer [$($prettyPrinterName)] failed to install - check [$prettyPrinterName.log] in [%TEMP%]`"
+    Exit 1
 }" | Out-File -FilePath "$($newDir.FullName)\detect.ps1"
 
 #Build the Win32 package
