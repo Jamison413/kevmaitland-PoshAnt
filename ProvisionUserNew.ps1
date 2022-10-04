@@ -168,6 +168,35 @@ if($requests){#Display a subset of Properties to help the user identify the corr
 
 ForEach($thisUser in $selectedRequests){
 
+
+
+#We don't to create user accounts that are more than 14 days in advance, this creates a security risk - if more than 14 days in advance pop box open and warn script runner with choice box to either continue or break (end loop).
+$timespan = New-TimeSpan -Start ($thisUser.FieldValues.StartDate | get-date -format s) -End ((get-date).AddDays(15) | get-date -Format s)
+If($timespan.days -gt 0){
+ write-host "c1"
+}
+Else{
+
+    Add-Type -AssemblyName PresentationCore,PresentationFramework
+    $ButtonType = [System.Windows.MessageBoxButton]::YesNoCancel
+    $MessageIcon = [System.Windows.MessageBoxImage]::Error
+    $MessageBody = "The user you are trying to create is more than 14 days out from their start date. Creating users more than two weeks in advance can create a security risk, unless there are extenuating circumstances please check to make sure they are less than two weeks out from starting."
+    $MessageTitle = "Confirm Deletion"
+    $Result = [System.Windows.MessageBox]::Show($MessageBody,$MessageTitle,$ButtonType,$MessageIcon)
+    Write-Host "$Result"
+        If($Result -eq "Yes"){
+             write-host "continued"
+        }
+        Else{
+            write-host "stopped"
+            Break
+            
+        }
+}
+
+
+
+
 #Before we start, check the contract type
 write-host "Before we start, what is the contract type?"
 write-host "A: Employee"
@@ -226,18 +255,18 @@ If($selection -ne "B"){
     Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
     Write-Error "More than 1 group found for regional group. They haven't been added"
 }
+
     #Add to MDM groups - this is for Intune enrollment
     $BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
     If ($BYOD -eq 'y') {
     Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
     }
-    $COBO = Read-Host "Add to MDM - COBO user group (are they in GBR/NA/PHL/CHN)? (y/n)"
+    $COBO = Read-Host "Add to MDM - COBO user group (are they in GBR/NA/PHL/CHN/SWE/BRA/FRA/IRE/NLD/ZAF)? (y/n)"
     If ($COBO -eq 'y') {
     Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
-    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS
-    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName ATP
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS_E3
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName MDE
 }
-
 }
 Else{
 Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor White
@@ -326,6 +355,27 @@ Write-Host "It looks like this user has already been created"
 break
 }
 
+#We don't to create user accounts that are more than 14 days in advance, this creates a security risk - if more than 14 days in advance pop box open and warn script runner with choice box to either continue or break (end loop).
+$timespan = New-TimeSpan -Start ($thisUser.FieldValues.Start_x0020_Date | get-date -format s) -End ((get-date).AddDays(15) | get-date -Format s)
+If($timespan.days -gt 0){
+}
+Else{
+
+    Add-Type -AssemblyName PresentationCore,PresentationFramework
+    $ButtonType = [System.Windows.MessageBoxButton]::YesNoCancel
+    $MessageIcon = [System.Windows.MessageBoxImage]::Error
+    $MessageBody = "The user you are trying to create is more than 14 days out from their start date. Creating users more than two weeks in advance can create a security risk, unless there are extenuating circumstances please check to make sure they are less than two weeks out from starting."
+    $MessageTitle = "Confirm Deletion"
+    $Result = [System.Windows.MessageBox]::Show($MessageBody,$MessageTitle,$ButtonType,$MessageIcon)
+    Write-Host "$Result"
+        If($Result -eq "Yes"){
+        }
+        Else{
+            Break
+        }
+}
+
+
 $thisUser.FieldValues.Title
 $thisUser.FieldValues.Job_x0020_title
 
@@ -402,6 +452,18 @@ If($contracttype -ne "Subcontractor"){
     Else{
     Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
     Write-Error "More than 1 group found for regional group. They haven't been added"
+    
+    #Add to MDM groups - this is for Intune enrollment
+    $BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
+    If ($BYOD -eq 'y') {
+    Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+    }
+    $COBO = Read-Host "Add to MDM - COBO user group (are they in GBR/NA/PHL/CHN/SWE/BRA/FRA/IRE/NLD/ZAF)? (y/n)"
+    If ($COBO -eq 'y') {
+    Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS_E3
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName MDE
+    }    
     }
 }
 Else{
