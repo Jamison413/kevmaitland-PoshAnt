@@ -6,8 +6,9 @@
     Start-Transcript $transcriptLogName -Append
     }
 else{
-    $logFileLocation = "C:\ScriptLogs\"
+    $logFileLocation = "C:\Users\KevMaitland\OneDrive - Anthesis LLC\Documents\Crap\"
     $transcriptLogName = "$($logFileLocation)delete-previousVersions_Transcript_$(Get-Date -Format "yyyy-MM-dd").log"
+    Start-Transcript $transcriptLogName -Append
     }
 
 $tokenSharePoint = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCredentials -appName SharePointBot) -grant_type client_credentials
@@ -15,18 +16,12 @@ $tokenSharePoint = get-graphTokenResponse -aadAppCreds $(get-graphAppClientCrede
 $sharePointAdmin = "kimblebot@anthesisgroup.com"
 $sharePointAdminPass = ConvertTo-SecureString (Get-Content $env:USERPROFILE\Downloads\KimbleBot.txt)
 $adminCreds = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $sharePointAdmin, $sharePointAdminPass
-Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients" -Credentials $adminCreds
+Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients" -Interactive
 
 
 $clientSiteId = "anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99"
 $allClientDrives = get-graphDrives -tokenResponse $tokenSharePoint -siteGraphId $clientSiteId
-
-$allClientDrives | % {
-    $thisDrive = $_
-    $thisList = get-graphList -tokenResponse $tokenSharePoint -graphDriveId $thisDrive.id
-    Write-Output "Setting Versions=50 on [$($thisList.displayName)]"
-    Set-PnPList -Identity $thisList.id -MajorVersions 50
-    }
+$allClientDrives = $allClientDrives | sort-object name
 
 <# Test with a big folder (BEIS)
 $beis = $($allClientDrives | ? {$_.webUrl -match "https://anthesisllc.sharepoint.com/clients/BEIS"})[0]
@@ -55,37 +50,37 @@ for($i=0; $i -lt $allClientDrives.Count; $i++){ #Iterate through all DocLibs in 
     $tokenSharePoint = test-graphBearerAccessTokenStillValid -tokenResponse $tokenSharePoint -renewTokenExpiringInSeconds 60 -aadAppCreds $(get-graphAppClientCredentials -appName SharePointBot)
     $thisDrive = $allClientDrives[$i]
     $storageSpaceRecoveredFromDocLib = 0 #Reset reclaimed storage count for this DocLib
-    Write-Progress -activity "Processing DocLibs in Clients" -Status "[$i/$($allClientDrives.count)]" -PercentComplete ($i/ $allClientDrives.count *100)
+    Write-Progress -activity "Processing DocLibs in Clients" -Status "[$i/$($allClientDrives.count)]" -PercentComplete ($i/ $allClientDrives.count *100) -Id 1
     Write-Output "Processing [$($thisDrive.name)]"
     $thisList = get-graphList -tokenResponse $tokenSharePoint -graphDriveId $thisDrive.id
-    $theseItems =  Get-PnPListItem -List $thisList.id -PageSize 5000
-    $theseItemsToPrune = $theseItems | ? {$_.FieldValues.owshiddenversion -ge 50} #Get Files with >50 versions (not all versions will still exist, but this is a quick way of ruling out any files that *cannot* have >50 versions)
+    [array]$theseItems =  Get-PnPListItem -List $thisList.id -PageSize 5000
+    [array]$theseItemsToPrune = $theseItems | ? {$_.FieldValues.owshiddenversion -ge 50} #Get Files with >50 versions (not all versions will still exist, but this is a quick way of ruling out any files that *cannot* have >50 versions)
     Write-Output "`tProcessing [$($theseItemsToPrune.Count)] items"
     for($j=0; $j -lt $theseItemsToPrune.Count; $j++){
-        Write-Progress -activity "Processing [$($theseItemsToPrune.Count)] files in [$($thisDrive.name)]" -Status "[$j/$($theseItemsToPrune.count)]" -PercentComplete ($j/ $theseItemsToPrune.count *100)
-        $thisItemToPruneVersions = Get-PnPFileVersion -Url $theseItemsToPrune[$j].FieldValues.FileRef #Get the PreviousVersions
+        Write-Progress -activity "Processing [$($theseItemsToPrune.Count)] files in [$($thisDrive.name)]" -Status "[$j/$($theseItemsToPrune.count)]" -PercentComplete ($j/ $theseItemsToPrune.count *100) -ParentId 1 -Id 2
+        [array]$thisItemToPruneVersions = Get-PnPFileVersion -Url $theseItemsToPrune[$j].FieldValues.FileRef #Get the PreviousVersions
         $thisItemToPruneVersions = $thisItemToPruneVersions | Sort-Object Id -Descending #Explicitly sort the PreviousVersions, making the most recent top of the array
         Write-Output "`t`t[$($thisItemToPruneVersions.Count)] Previous Versions found for [$($theseItemsToPrune[$j].FieldValues.FileRef)]"
         $storageSpaceRecoveredFromFile = 0
         for ($k=50; $k -lt $thisItemToPruneVersions.Count; $k++){ #Skip the most recent 50 versions
+            Write-Progress -activity "Removing PV [$($k)] " -Status "[$k/$($thisItemToPruneVersions.count)]" -PercentComplete ($k/ $thisItemToPruneVersions.count *100) -ParentId 2 -Id 3
             $storageSpaceRecoveredFromFile += $thisItemToPruneVersions[$k].Size
             try{
-                #Remove-PnPFileVersion -Url $theseItemsToPrune[$j].FieldValues.FileRef -Identity $thisItemToPruneVersions[$k].ID -Recycle -Force #Remove any Previous Versions >50
+                Remove-PnPFileVersion -Url $theseItemsToPrune[$j].FieldValues.FileRef -Identity $thisItemToPruneVersions[$k].ID -Recycle -Force #Remove any Previous Versions >50
                 }
             catch{
                 [array]$errorLog += New-Object -TypeName psobject @{DocLibId=$thisDrive.id;DocLibName=$thisDrive.name;FileId=$theseItemsToPrune[$j].id;FileName=$theseItemsToPrune[$j].FieldValues.FileLeafRef;webUrl=$theseItemsToPrune[$j].FieldValues.FileRef;PreviousVersionId=$thisItemToPruneVersions[$k].id;ErrorString=$_}
                 }
-
             }
         Write-Output "`t`t`t[$([Math]::Round($storageSpaceRecoveredFromFile/1MB,2))]MB recovered from [$([Math]::Max(0,$thisItemToPruneVersions.Count-50))] deleted Previous Versions [$($thisItemToPruneVersions.Count)] Previous Versions were available"
         $storageSpaceRecoveredFromDocLib += $storageSpaceRecoveredFromFile
         }
-    Write-Output "`t[$([Math]::Round($storageSpaceRecoveredFromDocLib/1GB,2))]GB recovered from [$([Math]::Max(0,$theseItemsToPrune.Count))] files in [$($thisDrive.webUrl)]"
     $totalStorageRecovered += $storageSpaceRecoveredFromDocLib
+    Write-Output "`t[$([Math]::Round($storageSpaceRecoveredFromDocLib/1GB,2))]GB recovered from [$([Math]::Max(0,$theseItemsToPrune.Count))] files in [$($thisDrive.webUrl)] ([$([Math]::Round($totalStorageRecovered/1GB,2))]GB in total) at [$(Get-Date)]"
     }
 Write-Output "`t[$([Math]::Round($totalStorageRecovered/1GB,2))]GB recovered from [$([Math]::Max(0,$allClientDrives.Count))] DocLibs in Clients Site"
-Write-Output ""
-
+Write-Output "[$($errorLog.Count)] errors recorded"
+Stop-Transcript
 <#CAML is shite
 $query = "<View Scope=`"Recursive`">
  <Query>
