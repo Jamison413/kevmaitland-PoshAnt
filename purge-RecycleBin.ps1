@@ -29,29 +29,35 @@ function Clear-RecycleBinItem {
     }
 }
 
+
 $duration = Measure-Command {
     $rbin = Get-PnPRecycleBinItem -RowLimit 10000
     $rbinToDelete = $rbin | ? {$_.DeletedByEmail -eq "t0-kevin.maitland@anthesisgroup.com"}
     Write-Output "[$($rbinToDelete.Count)] items deleted by t0-kevin.maitland@anthesisgroup.com [$([Math]::Round($($rbinToDelete | Measure-Object -Property Size -Sum).Sum/1GB,2))]GB recoverable"
+    Write-Verbose "[$($rbinToDelete.Count)] items deleted by t0-kevin.maitland@anthesisgroup.com [$([Math]::Round($($rbinToDelete | Measure-Object -Property Size -Sum).Sum/1GB,2))]GB recoverable"
     $storageRecoveredInTotal = 0
     for ($i=0; $i -lt $rbinToDelete.Count; $i++){
         Write-Progress -activity "Purging RecycleBin [$([Math]::Round($storageRecoveredInTotal/1GB,2))] GB" -Status "[$i/$($rbinToDelete.count)]" -PercentComplete ($i/ $rbinToDelete.count *100) -Id 1 -CurrentOperation "Purging [$($rbinToDelete[$i].DirName+"/"+$rbinToDelete[$i].LeafName)]"
-        if($lastFilePurged -eq $($rbinToDelete[$i].DirName+"/"+$rbinToDelete[$i].LeafName)){
+        if($lastFilePurged -eq $($rbinToDelete[$i].DirName+"/"+$rbinToDelete[$i].LeafName) -and $versionsPurged -lt 99){
             $versionsPurged++
-            #[array]$idsToPurge += $rbinToDelete[$i].Id
+            [array]$idsToPurge += $rbinToDelete[$i].Id
             }
         else{
+            Write-Output "Purging [$($lastFilePurged)]"
+            Write-Verbose "Purging [$($lastFilePurged)]"
+            $VerbosePreference = 0
+            Clear-RecycleBinItem -Ids $idsToPurge
+            $VerbosePreference = 2
             Write-Output "`t[$($versionsPurged)] versions purged [$([Math]::Round($storageRecoveredFromThisFile/1GB,2))] GB"
-            Write-Output "Purging [$($rbinToDelete[$i].DirName+"/"+$rbinToDelete[$i].LeafName)]"
-            #Clear-RecycleBinItem -Ids $idsToPurge
+            Write-Verbose "`t[$($versionsPurged)] versions purged [$([Math]::Round($storageRecoveredFromThisFile/1GB,2))] GB"
             $storageRecoveredFromThisFile = 0
             $versionsPurged = 1
-            $idsToPurge = @()
+            $idsToPurge = @($rbinToDelete[$i].Id)
             $lastFilePurged = $($rbinToDelete[$i].DirName+"/"+$rbinToDelete[$i].LeafName)
             }
     
         #$rbinToDelete[$i] | Clear-PnPRecycleBinItem -Force 
-        Clear-RecycleBinItem -Ids $rbinToDelete[$i].Id
+        #Clear-RecycleBinItem -Ids $rbinToDelete[$i].Id
         $storageRecoveredInTotal += $rbinToDelete[$i].Size
         $storageRecoveredFromThisFile += $rbinToDelete[$i].Size
         }
