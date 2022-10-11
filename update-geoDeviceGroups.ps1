@@ -18,6 +18,9 @@ $allAadDevices = $allAadDevices.Where({($_.Id -ne "58c0ce09-5ca8-4f33-a369-fefeb
 
 Write-host "`tRetrieved [$($allAadDevices.Count)] AD devices"
 
+
+If(($geoUGs) -and ($allAadDevices)){
+
 $duffDevices = @()
 $geoUGs | ForEach-Object {
     $thisGeoUG = $_
@@ -98,6 +101,10 @@ $geoUGs | ForEach-Object {
         }
     }
 
+}
+Else{
+write-host "Error: GeoUGs or AAD Devices not retrieved"
+}
 Stop-Transcript
 
 
