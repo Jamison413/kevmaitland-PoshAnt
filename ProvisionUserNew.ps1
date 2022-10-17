@@ -255,18 +255,18 @@ If($selection -ne "B"){
     Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
     Write-Error "More than 1 group found for regional group. They haven't been added"
 }
+
     #Add to MDM groups - this is for Intune enrollment
     $BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
     If ($BYOD -eq 'y') {
     Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
     }
-    $COBO = Read-Host "Add to MDM - COBO user group (are they in GBR/NA/PHL/CHN)? (y/n)"
+    $COBO = Read-Host "Add to MDM - COBO user group (are they in GBR/NA/PHL/CHN/SWE/BRA/FRA/IRE/NLD/ZAF)? (y/n)"
     If ($COBO -eq 'y') {
     Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
-    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS
-    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName ATP
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS_E3
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName MDE
 }
-
 }
 Else{
 Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor White
@@ -452,6 +452,18 @@ If($contracttype -ne "Subcontractor"){
     Else{
     Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
     Write-Error "More than 1 group found for regional group. They haven't been added"
+    
+    #Add to MDM groups - this is for Intune enrollment
+    $BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
+    If ($BYOD -eq 'y') {
+    Add-DistributionGroupMember -Identity "MDM-BYOD-MobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+    }
+    $COBO = Read-Host "Add to MDM - COBO user group (are they in GBR/NA/PHL/CHN/SWE/BRA/FRA/IRE/NLD/ZAF)? (y/n)"
+    If ($COBO -eq 'y') {
+    Add-DistributionGroupMember -Identity "MDM-CorporateMobileDeviceUsers@anthesisgroup.com" -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS_E3
+    add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName MDE
+    }    
     }
 }
 Else{

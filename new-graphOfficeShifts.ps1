@@ -70,7 +70,7 @@ $offices += [ordered]@{
     OfficeName="GBR-Bristol"
     OfficeColour="Green"
     OfficeWeekendColour="darkGreen"
-    OfficeDesks=42
+    OfficeDesks=28
     ShiftNotes="Remember to use hand sanitiser when entering/exiting the office please"
     }
 $offices += [ordered]@{
