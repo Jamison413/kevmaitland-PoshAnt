@@ -12,7 +12,7 @@ $allAadDevices = get-graphDevices -tokenResponse $tokenResponseTeamsBot -include
 
 $allAadDevices | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.registeredOwners[0].id  -Force}
 $ukUsers | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.id -Force}
-$thisGeoDevices = $allAadDevices | ? {@($ukUsers.OwnerId) -Contains $_.ownerId -or [string]::IsNullOrWhiteSpace($_.ownerId)}
+$thisGeoDevices = $allAadDevices | ? {@($ukUsers.OwnerId) -Contains $_.ownerId -or $([string]::IsNullOrWhiteSpace($_.ownerId) -and $($_.model -eq "Virtual Machine") -and $($_.displayName -match "GBR" -or $_.displayName -match "GBR"))} #AVD VMs do not have an owner
 #$test = Compare-Object -ReferenceObject @($allAadDevices | Select-Object) -DifferenceObject @($thisGeoUsers | Select-Object) -Property OwnerId -IncludeEqual -ExcludeDifferent -PassThru 
 
 $deviceEncryptionStates = get-DeviceEncryptionStates -tokenResponse $tokenResponseIntuneBot -Verbose
@@ -114,7 +114,31 @@ $thisGeoDevices | % {
         Model = $null
         Serial = $null
         OSType = $null
-        OSVersion = $null
+        OSVersion = $(
+            switch -Regex ($thisDevice.operatingSystemVersion) {
+                '^10.0.22621'{"11, 22H2"}
+                '^10.0.22000'{"11, 21H2"}
+                '^10.0.19045'{"10, 22H2"}
+                '^10.0.19044'{"10, 21H2"}
+                '^10.0.19043'{"10, 21H1"}
+                '^10.0.19042'{"10, 20H2"}
+                '^10.0.19041'{"10, 2004"}
+                '^10.0.18363'{"10, 1909"}
+                '^10.0.18362'{"10, 1903"}
+                '^10.0.17763'{"10, 1809"}
+                '^10.0.17134'{"10, 1803"}
+                '^10.0.16299'{"10, 1709"}
+                '^10.0.15063'{"10, 1703"}
+                '^10.0.14393'{"10, 1607"}
+                '^10.0.10586'{"10, 1511"}
+                '^10.0.10240'{"10, 1507"}
+                default {
+                    try{[int]$thisDevice.operatingSystemVersion}
+                    catch{$thisDevice.operatingSystemVersion.Split(".")[0]}
+                    }
+                }
+            )
+        OSVersionNumber = $null
         EnrollmentType = $thisDevice.enrollmentType
         TrustType = $thisDevice.trustType
         Ownership = $thisDevice.deviceOwnership
@@ -127,6 +151,7 @@ $thisGeoDevices | % {
         $thisDeviceObject.Model = $thisDevice.model
         $thisDeviceObject.Serial = $null
         $thisDeviceObject.OSType = $thisDevice.operatingSystem
+        $thisDeviceObject.OSVersionNumber = $thisDevice.operatingSystemVersion
         $thisDeviceObject.LastSeenIntune = $null
         }
     else{
@@ -134,33 +159,14 @@ $thisGeoDevices | % {
         $thisDeviceObject.Model = $thisDevice.intune.model
         $thisDeviceObject.Serial = $thisDevice.intune.serialNumber
         $thisDeviceObject.OSType = $thisDevice.intune.operatingSystem
+        $thisDeviceObject.OSVersionNumber = $thisDevice.intune.osVersion
         $thisDeviceObject.LastSeenIntune = $thisDevice.intune.lastSyncDateTime
         }
     if([string]::IsNullOrWhiteSpace($thisDevice.atp)){
-        $thisDeviceObject.OSVersion = $(
-            switch -Regex ($thisDevice.operatingSystemVersion) {
-                '^10.0.19043'{"21H1"}
-                '^10.0.19042'{"20H2"}
-                '^10.0.19041'{"2004"}
-                '^10.0.18363'{"1909"}
-                '^10.0.18362'{"1903"}
-                '^10.0.17763'{"1809"}
-                '^10.0.17134'{"1803"}
-                '^10.0.16299'{"1709"}
-                '^10.0.15063'{"1703"}
-                '^10.0.14393'{"1607"}
-                '^10.0.10586'{"1511"}
-                '^10.0.10240'{"1507"}
-                default {
-                    try{[int]$thisDevice.operatingSystemVersion}
-                    catch{$thisDevice.operatingSystemVersion.Split(".")[0]}
-                    }
-                }
-            )
+
         $thisDeviceObject.LastSeenMde = $null
         }
     else{
-        $thisDeviceObject.OSVersion = $thisDevice.atp.version
         $thisDeviceObject.LastSeenMde = $thisDevice.atp.lastSeen
         }
     $prettyDevices[$i] = $thisDeviceObject
@@ -190,19 +196,19 @@ $usersWithNoHardware | % {$prettyDedupededAndPrunedDevices += New-Object -TypeNa
         LastSeenMde = $null
         })}
 
-$prettyDedupededAndPrunedDevices | Select-Object | Sort-Object Owner,Ownership,OSType,OSVersion | export-csv -Path $env:USERPROFILE\Downloads\CyberEssentialsDump.csv -NoTypeInformation -Force
+#$prettyDedupededAndPrunedDevices | Select-Object | Sort-Object Owner,Ownership,OSType,OSVersion | export-csv -Path $env:USERPROFILE\Downloads\CyberEssentialsDump.csv -NoTypeInformation -Force
 
 Write-Host -ForegroundColor Yellow "COBO Windows"
-$coboWindows = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -eq "Company" -and @("Windows") -contains $_.OSType} | Sort-Object OSType, OSVersion | Group-Object OSType, OSVersion | Select-Object Count, Name
+$coboWindows = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -eq "Company" -and @("Windows","macOS","macMDM","Linux") -contains $_.OSType} | Sort-Object Manufacturer, Model, OSType, OSVersion | Group-Object Manufacturer, Model, OSType, OSVersion | Select-Object Count, Name
 $coboWindows | %{
     #Write-Host "$($_.Count)x $($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')"
-    Write-Host "$($_.Count)x $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')).Replace("Windows","Windows 10"))"
+    Write-Host "$($_.Count)x $($_.Manufacturer) $($_.Model) $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')))"
     }
 Write-Host -ForegroundColor Yellow "BYOD Windows"
-$byodWindows = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -ne "Company" -and @("Windows") -contains $_.OSType} | Sort-Object OSType, OSVersion | Group-Object OSType, OSVersion | Select-Object Count, Name
+$byodWindows = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -ne "Company" -and @("Windows","macOS","macMDM","Linux") -contains $_.OSType} | Sort-Object OSType, OSVersion | Group-Object OSType, OSVersion | Select-Object Count, Name
 $byodWindows | %{
     #Write-Host "$($_.Count)x $($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')"
-    Write-Host "$($_.Count)x $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')).Replace("Windows","Windows 10"))"
+    Write-Host "$($_.Count)x $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')))"
     }
 
 Write-Host -ForegroundColor Yellow "COBO Mobile"
@@ -213,8 +219,64 @@ $coboMobile | %{
     }
 
 Write-Host -ForegroundColor Yellow "BYOD Mobile"
-$byodMobile = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -eq "Personal" -and @("Android","AndroidEnterprise","iOS","IPhone") -contains $_.OSType} | Sort-Object Manufacturer, Model, OSVersion | Group-Object Manufacturer, Model, OSVersion #| Select-Object Count, Name
+$bannedAndroid = convertTo-arrayOfStrings "ANE-LX1
+ANE-LX2J
+ASUS_X00TD
+ELE-L09
+EML-L29
+H8324
+INE-LX1r
+INE-LX2
+JKM-LX2
+JSN-L22
+LG-H930
+M2007J3SY
+M2010J19CG
+MAR-LX1A
+Mi A1
+Moto G (5) Plus
+Moto G (5S)
+Nokia 6.1
+NoteAir2P
+ONEPLUS A5000
+ONEPLUS A5010
+ONEPLUS A6003
+Pixel 2
+Pixel 3
+Pixel 3 XL
+Pixel 3a
+Pixel 4
+Pixel 4 XL
+Pixel 3a XL
+RMX1971
+RMX2001
+RMX2103
+SM-A530F
+SM-A750GN
+SM-G610F
+SM-G892A
+SM-G930F
+SM-G950F
+SM-G950U
+SM-G950W
+SM-G960F
+SM-G960W
+SM-G965F
+SM-J600FN
+SM-M315F
+SM-N950F
+SM-N950N
+SM-N960F
+SM-N960U1
+TA-1012
+YAL-L21
+"
+$byodMobile = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -eq "Personal" -and @("Android","AndroidEnterprise","iOS","IPhone") -contains $_.OSType -and $($_.Model -notin $bannedAndroid) -and -not $($_.Model -match "iPhone" -and $_.OsVersion -lt 16)} | Sort-Object Manufacturer, Model, OSVersion | Group-Object Manufacturer, Model, OSVersion #| Select-Object Count, Name
 $byodMobile | %{
     #Write-Host "$($_.Count)x $($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')"
     Write-Host "$($_.Count)x $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')).Replace("Ipad","iPad").Replace("Iphone","iPhone"))"
     }
+
+
+
+$coboWindows[0] | select *
