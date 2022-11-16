@@ -1,0 +1,13 @@
+{
+	"ini_list"	: 
+	[
+		{
+			"PrinterModelName"	: ["MP C3004ex","DSc1230ex","MP C3504ex"],
+			"LoadDll"			: "MFRicr64.dll",
+			"ResDll"			: "RD05Rd64.dll",
+			"Version"			: "1.1.20.0"
+			
+		}
+	]
+}
+

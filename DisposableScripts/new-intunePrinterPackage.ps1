@@ -1,33 +1,85 @@
-#Download driver from manufacturer's website
+﻿#Download driver from manufacturer's website
 
 #Find and open relevant .INF file (use guide at https://msendpointmgr.com/2022/01/03/install-network-printers-intune-win32apps-powershell/)
 
 #Locate files required for install, paste below:
-$arrayOfFiles = convertTo-arrayOfStrings "cnp60m.cat
-CNP60MA64.INF
-gppcl6.cab
+$arrayOfFiles = convertTo-arrayOfStrings "mfricr64.dl_
+oemsetup.dsc
+oemsetup.inf
+rd05rd64.dl_
+Readme.html
+rica5x.cat
+rica5Xcb.dl_
+rica5Xcd.dl_
+rica5Xcd.psz
+rica5Xcf.cfz
+rica5Xch.chm
+rica5Xci.dl_
+rica5Xcj.dl_
+rica5Xcl.ini
+rica5Xct.dl_
+rica5Xcz.dlz
+rica5Xgl.dl_
+rica5Xgr.dl_
+rica5Xlm.dl_
+rica5Xtc.ex_
+rica5Xtf.ex_
+rica5Xtl.ex_
+rica5Xtt.ex_
+rica5Xug.dl_
+rica5Xug.miz
+rica5Xui.dl_
+rica5Xui.irj
+rica5Xui.rcf
+rica5Xui.rdj
+rica5Xur.dl_
+ricdb64.dl_
+rica5Xui.dll,rica5Xui.dl_
+rica5Xui.irj
+rica5Xui.rdj
+rica5Xui.rcf
+rica5Xug.dll,rica5Xug.dl_
+rica5Xug.miz
+rica5Xur.dll,rica5Xur.dl_
+rica5Xgr.dll,rica5Xgr.dl_
+rica5Xgl.dll,rica5Xgl.dl_
+rica5Xci.dll,rica5Xci.dl_
+rica5Xcd.dll,rica5Xcd.dl_
+rica5Xcd.psz
+rica5Xcf.cfz
+rica5Xcl.ini
+rica5Xch.chm
+rica5Xcz.dlz
+rica5Xcj.dll,rica5Xcj.dl_
+rica5Xct.dll,rica5Xct.dl_
+rica5Xcb.dll,rica5Xcb.dl_
+rica5Xtl.exe,rica5Xtl.ex_
+rica5Xtc.exe,rica5Xtc.ex_
+rica5Xtt.exe,rica5Xtt.ex_
+rica5Xtf.exe,rica5Xtf.ex_
 "
 #$arrayOfFiles += "koax5j__.cat" #Manually add Catalogue file name
 #$arrayOfFiles += "KOAX5J__.inf" #Manually add Inf file name
 
 #Set variables
-$infFile = "CNP60MA64.inf"
-$driverName = "Canon Generic Plus PCL6"
-$printerIP = "94.190.240.217"
-$prettyPrinterName = "GBR-Bristol-5thFloor"
+$infFile = "oemsetup.inf"
+$driverName = "RICOH MP C3004ex PCL 6"
+$printerIP = "192.168.0.244"
+$prettyPrinterName = "ESP-Manlleu-Planta2"
 
 $newDir = New-Item -Path "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Intune-WinApp\$prettyPrinterName" -ItemType Directory
 #$newDir = Get-Item -Path "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Intune-WinApp\$prettyPrinterName"
 $arrayOfFiles | ForEach-Object {
     $thisFile = $_
     switch($thisFile.SubString($thisFile.Length - 3,3)){
-        "in_" {$newFileName = $thisFile.TrimEnd("_")+"f"}
+<#        "in_" {$newFileName = $thisFile.TrimEnd("_")+"f"}
         "dl_" {$newFileName = $thisFile.TrimEnd("_")+"l"}
         "ex_" {$newFileName = $thisFile.TrimEnd("_")+"e"}
         "ch_" {$newFileName = $thisFile.TrimEnd("_")+"m"}
         "ca_" {$newFileName = $thisFile.TrimEnd("_")+"b"}
+#>        default {$newFileName = $thisFile}
     }
-    Copy-Item "$env:USERPROFILE\Downloads\GPlus_PCL6_Driver_V260_32_64_00\x64\Driver\$_" -Destination "$($newDir.FullName)\$newFileName" -Force
+    Copy-Item "$env:USERPROFILE\Downloads\z97499L16\disk1\$thisFile" -Destination "$($newDir.FullName)\$newFileName" -Force
 }
 Copy-Item "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Install-Printer.ps1"-Destination $newDir.FullName -Force
 Copy-Item "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Remove-Printer.ps1"-Destination $newDir.FullName -Force
@@ -44,6 +96,8 @@ else{
     Write-Error `"Printer [$($prettyPrinterName)] failed to install - check [$prettyPrinterName.log] in [%TEMP%]`"
     Exit 1
 }" | Out-File -FilePath "$($newDir.FullName)\detect.ps1"
+#Open detect.ps1 in Notepad++ and change the encoding to UTF8
+
 
 #Build the Win32 package
 Start-Process -NoNewWindow -FilePath "$env:USERPROFILE\OneDrive - Anthesis LLC\Documents\GitHub\PoshAnt\Intune-WinApp\IntuneWinAppUtil.exe" -ArgumentList "-c `"$($newDir.FullName)`"","-s install.ps1","-o `"$($newDir.FullName)`"","-q"

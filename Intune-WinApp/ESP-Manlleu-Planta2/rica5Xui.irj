@@ -1,0 +1,126 @@
+{
+
+	"common" :
+	{
+
+		"root" :
+		{
+                        "SoftwareID"				: [ "0000000700001001",		"REG_SZ" ],
+			"Logging"								: [ "1",					"REG_DWORD" ]
+		},
+
+		"common_scope" :
+		{
+			"DriverProductVersion"		: [ "1.4.0.0",		"REG_SZ" ],
+			"Date"				: [ "03/25/2022",	"REG_SZ" ],
+			"PrinterModelName"		: [ "MP C3004ex",	"REG_SZ" ],
+			"PDL"						: [ "PCLXL",				"REG_SZ" ]
+		},
+
+		"ui_scope" :
+		{
+		},
+
+		"gr_scope" :
+		{
+		},
+
+		"capsdb_scope" :
+		{
+		}
+
+	},
+
+       "Gestetner MP C3004ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3004ex", "REG_SZ" ]
+               }
+       },
+       "Gestetner DSc1230ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "DSc1230ex", "REG_SZ" ]
+               }
+       },
+       "Gestetner MP C3504ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3504ex", "REG_SZ" ]
+               }
+       },
+"infotec MP C3004ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3004ex", "REG_SZ" ]
+               }
+       },
+       "infotec MP C3504ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3504ex", "REG_SZ" ]
+               }
+       },
+"LANIER MP C3004ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3004ex", "REG_SZ" ]
+               }
+       },
+       "LANIER MP C3504ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3504ex", "REG_SZ" ]
+               }
+       },
+"NRG MP C3004ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3004ex", "REG_SZ" ]
+               }
+       },
+       "NRG MP C3504ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3504ex", "REG_SZ" ]
+               }
+       },
+"RICOH MP C3004ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3004ex", "REG_SZ" ]
+               }
+       },
+       "RICOH MP C3504ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3504ex", "REG_SZ" ]
+               }
+       },
+"SAVIN MP C3004ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3004ex", "REG_SZ" ]
+               }
+       },
+       "SAVIN MP C3504ex PCL 6" :
+       {
+               "common_scope" :
+               {
+                       "PrinterModelName"              : [ "MP C3504ex", "REG_SZ" ]
+               }
+       }
+ 
+}
