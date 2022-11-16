@@ -1482,14 +1482,15 @@ $requests = @()
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/clients" -UseWebLogin
 $requests += Get-PnPListItem -List "External Client Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
 if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.ClientName.Label},{$_.FieldValues.Site_x0020_Admin.LookupValue},{$_.FieldValues.Site_x0020_Owners.LookupValue -join ", "},{$_.FieldValues.Site_x0020_Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
-ForEach($item in $requests){Add-Member -InputObject $item -MemberType NoteProperty "siteType" -Value "External" -Force}
+ForEach($item in $selectedRequests){Add-Member -InputObject $item -MemberType NoteProperty "siteClassification" -Value "External" -Force}
 
 
 #subs
+$requests = @()
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/subs" -UseWebLogin
 $requests += Get-PnPListItem -List "External Subcontractor Site Requests" -Query "<View><Query><Where><Eq><FieldRef Name='Status'/><Value Type='String'>Awaiting creation</Value></Eq></Where></Query></View>"
 if($requests){[array]$selectedRequests = $requests | select {$_.FieldValues.Title},{$_.FieldValues.Subcontractor_x002f_Supplier_x00.Label},{$_.FieldValues.Site_x0020_Admin.LookupValue},{$_.FieldValues.Site_x0020_Owners.LookupValue -join ", "},{$_.FieldValues.Site_x0020_Members.LookupValue -join ", "},{$_.FieldValues.GUID.Guid} | Out-GridView -PassThru -Title "Highlight any requests to process and click OK"}
-ForEach($item in $requests){Add-Member -InputObject $item -MemberType NoteProperty "siteType" -Value "External" -Force}
+ForEach($item in $selectedRequests){Add-Member -InputObject $item -MemberType NoteProperty "siteClassification" -Value "External" -Force}
 
 #team sites
 $requests = @()
