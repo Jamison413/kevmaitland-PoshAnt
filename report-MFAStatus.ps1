@@ -236,4 +236,6 @@ Write-Information "Message Sent (maybe)"
 #$body
 
 #>
+
+Disconnect-ExchangeOnline -Confirm:$False
 Stop-Transcript
