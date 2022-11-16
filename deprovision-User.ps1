@@ -200,7 +200,7 @@ foreach($user in $upnsToDeactivate){
 #-InactiveMailbox 
 
 
-
+Disconnect-ExchangeOnline -Confirm:$false
 
 
 
