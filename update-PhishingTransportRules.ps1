@@ -36,6 +36,8 @@ $alphabet | % {
     catch{send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $groupAdmin -toAddresses ITTeamAll-Managers@anthesisgroup.com -subject "Error updating [$("External Senders with matching Display Names beginning with $thisLetter")] in update-PhisingTransportRules.ps1 on [$env:COMPUTERNAME]" -bodyText $(get-errorSummary $_) -priority high}
     }
 
+    Disconnect-ExchangeOnline -Confirm:$False
+
 <#
 $ukRuleName = "External Senders with matching UK Display Names"
 $spainRuleName = "External Senders with matching Spain Display Names"

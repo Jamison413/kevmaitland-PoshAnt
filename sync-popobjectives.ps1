@@ -226,4 +226,6 @@ If($deactivatedUserObjectives){
     }
 }
 
+Disconnect-ExchangeOnline -Confirm:$False
+
 Stop-Transcript

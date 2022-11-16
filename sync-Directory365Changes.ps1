@@ -761,6 +761,8 @@ send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddre
 #Finish run
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype END -logstring "End of run for sync-Directory365Changes"
 
+Disconnect-ExchangeOnline -Confirm:$False
+
 
 Stop-Transcript
 

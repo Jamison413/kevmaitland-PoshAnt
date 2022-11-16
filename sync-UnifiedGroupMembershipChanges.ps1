@@ -106,4 +106,6 @@ $timeForFullCycle = Measure-Command {
     }
 Write-Host "Processing complete at [$(get-date -Format s)] in [$($timeForFullCycle.TotalMinutes)] minutes ([$($timeForFullCycle.TotalSeconds)] seconds)"
 
+Disconnect-ExchangeOnline -Confirm:$False
+
 Stop-Transcript

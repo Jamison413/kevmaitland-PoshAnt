@@ -326,7 +326,7 @@ $unauthorisedDataManagers | ? {$_.mail -ne "groupbot@anthesisgroup.com"} | % {
     }
     
         
-   
+   Disconnect-ExchangeOnline -Confirm:$False
 
 
 

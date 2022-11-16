@@ -473,3 +473,5 @@ send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn $Admin -toAddre
 
 #Finish run
 friendlyLogWrite -friendlyLogname $friendlyLogname -messagetype END -logstring "End of run for sync-DirectoryChangeRequests"
+
+Disconnect-ExchangeOnline -Confirm:$False
