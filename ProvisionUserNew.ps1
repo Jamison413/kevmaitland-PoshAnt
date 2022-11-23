@@ -380,7 +380,7 @@ $thisUser.FieldValues.Title
 $thisUser.FieldValues.Job_x0020_title
 
 #Before we start, check the contract type
-<#write-host "Before we start, what is the contract type?"
+<write-host "Before we start, what is the contract type?"
 write-host "A: Employee"
 write-host "B: Subcontractor"
 $selection = Read-Host "Type A or B"
@@ -388,7 +388,7 @@ Switch($selection){
 "A" {$contracttype = "Employee"}
 "B" {$contracttype = "Subcontractor"}
 }
-#>
+>
 switch($thisUser.FieldValues.Is_x0020_a_x0020_Subcontractor_x){
     {$_ -match "Yes"}  {$contracttype = "Subcontractor"}
     {$_ -match "No"}   {$contracttype = "Employee"}
