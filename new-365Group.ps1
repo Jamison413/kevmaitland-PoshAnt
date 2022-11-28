@@ -1,8 +1,8 @@
 $365creds = set-MsolCredentials
 connect-ToExo -credential $365creds
 
-$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
-$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
+$TeamAndCommunityBotDetails = get-graphAppClientCredentials -appName TeamAndCommunityBot
+$tokenResponse = get-graphTokenResponse -aadAppCreds $TeamAndCommunityBotDetails
 $smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
 $tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
