@@ -19,7 +19,7 @@
 function get-hubSpotApiKey(){
     [cmdletbinding()]
     param()
-    $encryptedCredsFile = "HubSync.txt"
+    $encryptedCredsFile = "AnthesisITBotDetails.txt"
     $placesToLook = @( #Figure out where to look
         "$env:USERPROFILE\Downloads\$encryptedCredsFile"
         "$env:USERPROFILE\Desktop\$encryptedCredsFile"
@@ -365,13 +365,15 @@ function invoke-hubSpotGet(){
             [string]$api = "crm"
         )
     $sanitisedataQuery = $query.Trim("/")
-    if(!$sanitisedataQuery.Contains("?")){$sanitisedataQuery+="?"}
+    $headers = @{Authorization = "Bearer $($apiKey)"}
+
+    #if(!$sanitisedataQuery.Contains("?")){$sanitisedataQuery+="?"}
     $backOff = 1
     #if($sanitisedataQuery -notmatch "limit="){$sanitisedataQuery+="&limit=$pageSize"}
     do{
-        Write-Verbose "https://api.hubapi.com/$api/$apiVersion/$sanitisedataQuery`&hapikey=$apiKey"
+        Write-Verbose "https://api.hubapi.com/$api/$apiVersion/$sanitisedataQuery"
         try{
-            $response = Invoke-RestMethod -Uri "https://api.hubapi.com/$api/$apiVersion/$sanitisedataQuery`&hapikey=$apiKey" -ContentType "application/json; charset=utf-8" -Method GET -Verbose:$VerbosePreference
+            $response = Invoke-RestMethod -Uri "https://api.hubapi.com/$api/$apiVersion/$sanitisedataQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method GET -Verbose:$VerbosePreference
             $results += $response.results
             Write-Verbose "[$($response.results.count)] results returned on this cycle, [$([int]$results.count)] in total"
             }
@@ -414,9 +416,11 @@ function invoke-hubSpotPatch(){
         )
 
     $sanitisedataQuery = $query.Trim("/")
+    $headers = @{Authorization = "Bearer $($apiKey)"}
+
     $bodyJson = ConvertTo-Json -InputObject $bodyHashtable -Depth 10
-    Write-Verbose "[https://api.hubapi.com/crm/v3/$sanitisedataQuery`&hapikey=$apiKey] [$bodyJson]"
-    Invoke-RestMethod -Uri "https://api.hubapi.com/crm/v3/$sanitisedataQuery`&hapikey=$apiKey" -ContentType "application/json; charset=utf-8" -Method PATCH -Body $bodyJson -Verbose:$VerbosePreference
+    Write-Verbose "[https://api.hubapi.com/crm/v3/$sanitisedataQuery] [$bodyJson]"
+    Invoke-RestMethod -Uri "https://api.hubapi.com/crm/v3/$sanitisedataQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method PATCH -Body $bodyJson -Verbose:$VerbosePreference
     }
 function invoke-hubSpotPost(){
     [cmdletbinding()]
@@ -435,13 +439,15 @@ function invoke-hubSpotPost(){
             [switch]$returnEntireResponse
         )
     $sanitisedataQuery = $query.Trim("/")
+    $headers = @{Authorization = "Bearer $($apiKey)"}
+
     if($bodyHashtable.Keys -notcontains "limit" -and $pageSize){$bodyHashtable.Add("limit",$pageSize)}
     $bodyJson = ConvertTo-Json -InputObject $bodyHashtable -Depth 10
 
-    Write-Verbose "[https://api.hubapi.com/crm/v3/$sanitisedataQuery`&hapikey=$apiKey] [$bodyJson]"
+    Write-Verbose "[https://api.hubapi.com/crm/v3/$sanitisedataQuery] [$bodyJson]"
     do{
         try{
-            $response = Invoke-RestMethod -Uri "https://api.hubapi.com/crm/v3/$sanitisedataQuery`&hapikey=$apiKey" -ContentType "application/json; charset=utf-8" -Method POST -Body $bodyJson -Verbose:$VerbosePreference
+            $response = Invoke-RestMethod -Uri "https://api.hubapi.com/crm/v3/$sanitisedataQuery" -ContentType "application/json; charset=utf-8" -Headers $headers -Method POST -Body $bodyJson -Verbose:$VerbosePreference
             $results += $response.results
             Write-Verbose "[$($response.results.count)] results returned on this cycle, [$([int]$results.count)]/[$([int]$response.total)] in total"
             }
