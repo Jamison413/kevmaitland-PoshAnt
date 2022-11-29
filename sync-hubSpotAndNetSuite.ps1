@@ -401,16 +401,74 @@ $hubSpotCompaniesToCheck | % { #Check the remaining HubSpot companies to see whe
 
 #endregion
 
+<#not currently working
 
 #region Process Contacts
 #region Get NetSuite Contacts
 $netContactQuery = "?q=email EMPTY_NOT"
 if($deltaSync -eq $true){
     $dummyFilter = [ordered]@{
-        propertyName="id"
+        propertyName="Id"
         operator="HAS_PROPERTY"
         }
-    $hubspotContactMaxLastModifiedInNetSuite = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType contacts -filterGroup1 @{filters=@($dummyFilter)} -sortPropertyNameAndDirection $hubSortLastModifiedInNetSuite -pageSize 1 -firstPageOnly #Sorting only works alongside a Filter :/
+        $filterGroup2  = [ordered]@{
+        propertyName="lastmodifiedinnetsuite"
+        operator="HAS_PROPERTY" #check if not null - can't work out how today
+        }
+    #$hubspotContactMaxLastModifiedInNetSuite = get-hubSpotObjects -apiKey $apiKey.HubApiKey -objectType contacts -filterGroup1 @{filters=@($dummyFilter)} -sortPropertyNameAndDirection $hubSortLastModifiedInNetSuite -pageSize 1 -firstPageOnly -verbose #Sorting only works alongside a Filter :/ - not currently working, built out raw request below, suspect the filters into the function
+            
+            $propertiesToReturn = @(
+                    "salutation"
+                    ,"firstname"
+                    ,"lastname"
+                    ,"jobtitle"
+                    ,"email"
+                    ,"other_email__c"
+                    ,"phone"
+                    ,"mobilephone"
+                    ,"address"
+                    ,"address2"
+                    ,"city"
+                    ,"state"
+                    ,"zip"
+                    ,"country"
+                    ,"associatedcompanyid"
+                    ,"netsuiteid"
+                    ,"lastmodifiedinnetsuite"
+                    ,"lastmodifiedinhubspot"
+                    ,"hs_analytics_source"
+                    ,"hs_analytics_source_data_1"
+                    ,"hs_analytics_source_data_2"
+                    ,"hs_analytics_first_referrer"
+                    ,"recent_conversion_event_name"
+                    ,"recent_conversion_date"
+                    ,"opted_out_of_some_marketing_emails"
+                    ,"last_webinar_attended_date"
+                    ,"message"
+                    ,"hs_analytics_num_page_views"
+                    ,"hs_analytics_last_visit_timestamp"
+                    ,"first_conversion_event_name"
+                    ,"first_conversion_date"
+                    ,"createdAt"
+                    ,"event_or_webinar"
+                    ,"timezone"
+                    )
+            
+            $query = "/objects/contacts/search?archived=false"
+            $filter = @($dummyFilter)
+            $filter += $filterGroup2
+            $bodyHashTable = @{
+                filterGroups=$filter
+                properties=$propertiesToReturn
+                }
+            if($sortPropertyNameAndDirection){
+                $bodyHashTable.Add("sorts",@($hubSortLastModifiedInNetSuite))
+                }
+            $hubspotContactMaxLastModifiedInNetSuite = invoke-hubSpotPost -apiKey $apiKey.HubApiKey -query $query -bodyHashtable $bodyHashTable -pageSize 1 -firstPageOnly -Verbose
+
+    
+    
+    
     $netContactQuery +=  " AND lastModifiedDate ON_OR_AFTER `"$($(Get-Date $hubspotContactMaxLastModifiedInNetSuite.properties.lastmodifiedinnetsuite -Format g))`"" #Excludes any Contacts that haven't been updated since X
     }
 $netSuiteContactsToCheck = get-netSuiteContactFromNetSuite -netsuiteParameters $netSuiteParameters -query $netContactQuery 
@@ -538,6 +596,11 @@ if($deltaSync -eq $false -and $netSuiteContactsToCheck.Count -gt 0){export-encry
 
 #endregion
 
+
+
+
+
+
 #region Process remaining NetSuite Contacts
 @($netSuiteContactsToCheck | Select-Object) | % {
     #Does this NetSuite Contact have a HubSpotId?
@@ -655,6 +718,10 @@ if($deltaSync -eq $false -and $netSuiteContactsToCheck.Count -gt 0){export-encry
 #endregion
 
 #endregion
+#>
+
+
+
 
    
 #Match company by FK
