@@ -288,7 +288,7 @@ $acsAppCreds = New-Object -TypeName psobject -Property @{TenantId='271df584-ab64
 $acsCert = Get-ChildItem Cert:\CurrentUser\My | Where-Object {$_.Subject -match "acs-mailer@anthesisgroup.com"}
 
 #$acsToken is the authtoken required to interact with the Graph API:
-$acsToken = get-graphTokenResponse -aadAppCreds $acsAppCreds -grant_type certificate -cert $cert
+$acsToken = get-graphTokenResponse -aadAppCreds $acsAppCreds -grant_type certificate -cert $acsCert
 #$acsToken looks like this:
 #token_type         : Bearer
 #expires_in         : 3599
@@ -306,5 +306,81 @@ $acsToken = get-graphTokenResponse -aadAppCreds $acsAppCreds -grant_type certifi
 #                     6jEkb-HeX7kVqtSs2W031pjpA90Ua3MxraAPSm3VA
 #OriginalExpiryTime : 08/09/2022 14:14:28
 
+
+
 #Then we can test sending mail from any of the mailboxes that ACS-Mailer is permitted to send from (https://portal.azure.com/#view/Microsoft_AAD_IAM/GroupDetailsMenuBlade/~/Members/groupId/a307c61f-c5c0-42c1-a68e-76ea35f6cdf3)
 send-graphMailMessage -tokenResponse $acsToken -fromUpn 'acs.demov1@anthesisgroup.com' -toAddresses 'michael.malate@anthesisgroup.com' -subject "Hello Mike" -bodyText "Hurrah!"
+
+
+$acsToken = get-graphTokenResponse -aadAppCreds $acsAppCreds -grant_type certificate -cert $acsCert
+
+$sart = get-graphUsers -tokenResponse $tokenTeams -filterUpns "sartorius.pec@anthesisgroup.com" -selectAllProperties
+$micron = get-graphUsers -tokenResponse $tokenTeams -filterUpns "Micron.pec@anthesisgroup.com" -selectAllProperties
+$atlas = get-graphUsers -tokenResponse $tokenTeams -filterUpns "atlascopco.pec@anthesisgroup.com" -selectAllProperties
+
+
+
+$acsToken = get-graphTokenResponse -aadAppCreds $acsAppCreds -grant_type certificate -cert $acsCert
+$sartFolders = invoke-graphGet -tokenResponse $acsToken -graphQuery "/users/$($sart.id)/mailFolders"
+$micronFolders = invoke-graphGet -tokenResponse $acsToken -graphQuery "/users/$($micron.id)/mailFolders"
+$atlasFolders = invoke-graphGet -tokenResponse $acsToken -graphQuery "/users/$($atlas.id)/mailFolders"
+
+$mailboxes = convertTo-arrayOfEmailAddresses "
+AholdDelhaizeUSA.NPE@anthesisgroup.com
+akm.pec@anthesisgroup.com
+akmstaging.pec@anthesisgroup.com
+Amazon.pec@anthesisgroup.com
+AmazonStaging.pec@anthesisgroup.com
+AmazonUS.pec@anthesisgroup.com
+AmazonUSStaging.pec@anthesisgroup.com
+atlascopco.pec@anthesisgroup.com
+AtlasCopcoStaging.pec@anthesisgroup.com
+AvayaConflictMinerals@anthesisgroup.com
+Avayastagingconflictminerals@anthesisgroup.com
+Burkert.pec@anthesisgroup.com
+burkertstaging.pec@anthesisgroup.com
+Dexcom.PEC@anthesisgroup.com
+DexcomConflictMinerals@anthesisgroup.com
+dexcomstaging.pec@anthesisgroup.com
+DexcomStagingConflictMinerals@anthesisgroup.com
+irobotstaging.pec@anthesisgroup.com
+iRobot.PEC@anthesisgroup.com
+janssenpharmastaging.pec@anthesisgroup.com
+kccstaging.pec@anthesisgroup.com
+kcc.pec@anthesisgroup.com
+Kroger.PEC@anthesisgroup.com
+KrogerStaging.PEC@anthesisgroup.com
+Mattel.pec@anthesisgroup.com
+Mattelstaging.pec@anthesisgroup.com
+Micron.pec@anthesisgroup.com
+micronstaging.pec@anthesisgroup.com
+Sartorius.pec@anthesisgroup.com
+Sartoriusstaging.pec@anthesisgroup.com
+Seagate.pec@anthesisgroup.com
+SeagateStaging.pec@anthesisgroup.com
+VarianConflictMinerals@anthesisgroup.com
+varianstagingconflictminerals@anthesisgroup.com
+wackerneuson.pec@anthesisgroup.com
+wackerneusonstaging.pec@anthesisgroup.com
+Varex.PEC@anthesisgroup.com
+VarexConflictMinerals@anthesisgroup.com
+VarexCC_Staging@anthesisgroup.com
+VarexStaging.pec@anthesisgroup.com
+Varex.ConflictMinerals@anthesisgroup.com"
+
+$acsToken = get-graphTokenResponse -aadAppCreds $acsAppCreds -grant_type certificate -cert $acsCert
+
+
+$mailboxes | % {
+    $thisMailbox = $_
+    Write-Output "Testing [$($thisMailbox)]"
+    $user = get-graphUsers -tokenResponse $tokenTeams -filterUpns $thisMailbox -selectAllProperties
+    $folders = invoke-graphGet -tokenResponse $acsToken -graphQuery "/users/$($user.id)/mailFolders"
+}
+
+$mailboxes | ForEach-Object {
+    #[array]$mailboxObjects += Get-EXOMailbox -Identity $_ 
+    [array]$mailboxObjectsOld += Get-Mailbox -Identity $_ 
+}
+
+$mailboxObjectsOld | select DisplayName, WindowsEmailAddress, MaxSendSize, MaxReceiveSize
