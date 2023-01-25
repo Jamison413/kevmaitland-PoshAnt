@@ -44,9 +44,6 @@ connect-toAAD
 Connect-MsolService 
 
 
-#Graph - with Teamsbot
-$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
-$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 
 #Graph - with userBot
 $userBotDetails = get-graphAppClientCredentials -appName UserBot
@@ -69,7 +66,7 @@ get-available365licensecount -licensetype "all"
 
 <#--------Current Users Check--------#>
 
-$allCurrentUsers = get-graphUsers -tokenResponse $tokenResponse
+$allCurrentUsers = get-graphUsers -tokenResponse $tokenResponse -filterLicensedUsers
 
 <#--------Create Meta-Functions--------#>
 
@@ -165,7 +162,7 @@ if($requests){#Display a subset of Properties to help the user identify the corr
     }
 
 
-
+#Building
 ForEach($thisUser in $selectedRequests){
 
 
@@ -244,7 +241,8 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
 
 If($selection -ne "B"){
     #Add to a regional group - this needs rewriting into a function, bodging for now
-    $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+    #$thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+    $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId "$($officeterm.CustomProperties.'356 Group GUID')" -Verbose
     $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
     If(($regionalmembersgroup | Measure-Object).Count -eq 1){
         add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
@@ -380,7 +378,7 @@ $thisUser.FieldValues.Title
 $thisUser.FieldValues.Job_x0020_title
 
 #Before we start, check the contract type
-<write-host "Before we start, what is the contract type?"
+write-host "Before we start, what is the contract type?"
 write-host "A: Employee"
 write-host "B: Subcontractor"
 $selection = Read-Host "Type A or B"
@@ -442,7 +440,8 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
 
 #Add to a regional group - this needs rewriting into a function, bodging for now
 If($contracttype -ne "Subcontractor"){
-    $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+    #$thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterDisplayName "$($officeterm.CustomProperties.'365 Regional Group')" -Verbose
+    $thisoffice = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterId "$($officeterm.CustomProperties.'356 Group GUID')" -Verbose
     $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
     If(($regionalmembersgroup | Measure-Object).Count -eq 1){
     add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
@@ -452,7 +451,9 @@ If($contracttype -ne "Subcontractor"){
     Else{
     Write-Host "More than 1 group found for regional group. They haven't been added" -ForegroundColor Red
     Write-Error "More than 1 group found for regional group. They haven't been added"
+    }
     
+
     #Add to MDM groups - this is for Intune enrollment
     $BYOD = Read-Host "Add to MDM - BYOD user group? (y/n)"
     If ($BYOD -eq 'y') {
@@ -464,8 +465,8 @@ If($contracttype -ne "Subcontractor"){
     add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName EMS_E3
     add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $upn -licenseFriendlyName MDE
     }    
-    }
 }
+
 Else{
 Write-Host "Subcontractor - not adding to regional groups" -ForegroundColor White
 }
