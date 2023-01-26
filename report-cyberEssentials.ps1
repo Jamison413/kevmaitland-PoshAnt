@@ -12,7 +12,7 @@ $allAadDevices = get-graphDevices -tokenResponse $tokenResponseTeamsBot -include
 
 $allAadDevices | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.registeredOwners[0].id  -Force}
 $ukUsers | ForEach-Object {Add-Member -InputObject $_ -MemberType NoteProperty -Name OwnerId -Value $_.id -Force}
-$thisGeoDevices = $allAadDevices | ? {@($ukUsers.OwnerId) -Contains $_.ownerId -or $([string]::IsNullOrWhiteSpace($_.ownerId) -and $($_.model -eq "Virtual Machine") -and $($_.displayName -match "GBR" -or $_.displayName -match "GBR"))} #AVD VMs do not have an owner
+$thisGeoDevices = $allAadDevices | ? {@($ukUsers.OwnerId) -Contains $_.ownerId -or $([string]::IsNullOrWhiteSpace($_.ownerId) -and $($_.model -eq "Virtual Machine") -and $($_.displayName -match "GBR" -or $_.displayName -match "ALT"))} #AVD VMs do not have an owner
 #$test = Compare-Object -ReferenceObject @($allAadDevices | Select-Object) -DifferenceObject @($thisGeoUsers | Select-Object) -Property OwnerId -IncludeEqual -ExcludeDifferent -PassThru 
 
 $deviceEncryptionStates = get-DeviceEncryptionStates -tokenResponse $tokenResponseIntuneBot -Verbose
@@ -173,9 +173,10 @@ $thisGeoDevices | % {
     $i++
     }
 
-$prettyIntuneDevices = $prettyDevices | ?{![string]::IsNullOrWhiteSpace($_.LastSeenIntune)} | Group-Object {$_.Serial} | % {$_.Group | Sort-Object LastSeenIntune | Select-Object -Last 1} #DeDupe and keep only the most recent
+$prettyIntuneDevices = $prettyDevices | ?{![string]::IsNullOrWhiteSpace($_.LastSeenIntune) -and ![string]::IsNullOrWhiteSpace($_.Serial)} | Group-Object {$_.Serial} | % {$_.Group | Sort-Object LastSeenIntune | Select-Object -Last 1} #DeDupe and keep only the most recent
+$prettyMdeDevices = $prettyDevices | ?{![string]::IsNullOrWhiteSpace($_.LastSeenIntune) -and [string]::IsNullOrWhiteSpace($_.Serial) -and ![string]::IsNullOrWhiteSpace($_.LastSeenMde)} | Group-Object {$_.DeviceName} | % {$_.Group | Sort-Object LastSeenMde | Select-Object -Last 1} #DeDupe and keep only the most recent
 $prettyNonIntuneDevices = $prettyDevices | ?{[string]::IsNullOrWhiteSpace($_.LastSeenIntune)} | Group-Object {$_.DeviceName} | % {$_.Group | Sort-Object LastSeenAAD | Select-Object -Last 1} #DeDupe and keep only the most recent
-$prettyDedupededDevices = $prettyIntuneDevices + $prettyNonIntuneDevices
+$prettyDedupededDevices = $prettyIntuneDevices + $prettyNonIntuneDevices + $prettyMdeDevices
 
 #$prettyDedupededDevices = $prettyDedupededDevices | Group-Object {$_.DeviceName} | % {$_.Group | Sort-Object LastSeenAAD | Select-Object -Last 1} #DeDupe and keep only the most recent
 $prettyDedupededAndPrunedDevices = $prettyDedupededDevices | Where-Object {[string]::IsNullOrWhiteSpace($_.LastSeenAAD) -or (Get-Date ($_.LastSeenAAD)) -gt (Get-Date).AddMonths(-3)} 
@@ -205,20 +206,13 @@ $coboWindows | %{
     Write-Host "$($_.Count)x $($_.Manufacturer) $($_.Model) $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')))"
     }
 Write-Host -ForegroundColor Yellow "BYOD Windows"
-$byodWindows = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -ne "Company" -and @("Windows","macOS","macMDM","Linux") -contains $_.OSType} | Sort-Object OSType, OSVersion | Group-Object OSType, OSVersion | Select-Object Count, Name
+$byodWindows = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -ne "Company" -and @("Windows","macOS","macMDM","Linux") -contains $_.OSType} | Sort-Object Manufacturer, Model, OSType, OSVersion | Group-Object Manufacturer, Model, OSType, OSVersion | Select-Object Count, Name
 $byodWindows | %{
     #Write-Host "$($_.Count)x $($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')"
-    Write-Host "$($_.Count)x $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')))"
+    Write-Host "$($_.Count)x $($_.Manufacturer) $($_.Model) $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')))"
     }
 
 Write-Host -ForegroundColor Yellow "COBO Mobile"
-$coboMobile = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -eq "Company" -and @("Android","AndroidEnterprise","iOS","IPhone") -contains $_.OSType} | Sort-Object Manufacturer, Model, OSVersion | Group-Object Manufacturer, Model, OSVersion | Select-Object Count, Name
-$coboMobile | %{
-    #Write-Host "$($_.Count)x $($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')"
-    Write-Host "$($_.Count)x $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')))"
-    }
-
-Write-Host -ForegroundColor Yellow "BYOD Mobile"
 $bannedAndroid = convertTo-arrayOfStrings "ANE-LX1
 ANE-LX2J
 ASUS_X00TD
@@ -271,6 +265,13 @@ SM-N960U1
 TA-1012
 YAL-L21
 "
+$coboMobile = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -eq "Company" -and @("Android","AndroidEnterprise","iOS","IPhone") -contains $_.OSType -and $($_.Model -notin $bannedAndroid) -and -not $($_.Model -match "iPhone" -and $_.OsVersion -lt 16)} | Sort-Object Manufacturer, Model, OSVersion | Group-Object Manufacturer, Model, OSVersion | Select-Object Count, Name
+$coboMobile | %{
+    #Write-Host "$($_.Count)x $($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')"
+    Write-Host "$($_.Count)x $((Get-Culture).TextInfo.ToTitleCase($($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')))"
+    }
+
+Write-Host -ForegroundColor Yellow "BYOD Mobile"
 $byodMobile = $prettyDedupededAndPrunedDevices | Select-Object | Where-Object {$_.Ownership -eq "Personal" -and @("Android","AndroidEnterprise","iOS","IPhone") -contains $_.OSType -and $($_.Model -notin $bannedAndroid) -and -not $($_.Model -match "iPhone" -and $_.OsVersion -lt 16)} | Sort-Object Manufacturer, Model, OSVersion | Group-Object Manufacturer, Model, OSVersion #| Select-Object Count, Name
 $byodMobile | %{
     #Write-Host "$($_.Count)x $($_.Name -replace "^(?=(?:[^,]*,){2})([^,]*),", '$1')"
