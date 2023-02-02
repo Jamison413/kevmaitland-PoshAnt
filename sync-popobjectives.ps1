@@ -40,6 +40,7 @@ $RawReviewPeriod
 }
 
 
+
 #Connect to the POP processing list
 Connect-PnPOnline -Url "https://anthesisllc.sharepoint.com/teams/People_Services_Team_All_365/" -Credentials $adminCreds
 $unprocessedobjectives = Get-PnPListItem -List "POP Objectives Processing (UK)"
@@ -50,13 +51,13 @@ ForEach($objective in $unprocessedobjectives){
 
 If($objective.FieldValues.Status -eq "Open"){
     #Sort the Review Period First
-    [string]$submitdate = get-date $($objective.FieldValues.Review_x0020_Period) -UFormat "%m"
-    $ReviewPeriod = get-POPReviewPeriod -submitdate $submitdate
+    #[string]$submitdate = get-date $($objective.FieldValues.Review_x0020_Period).Split(":")[1].Trim() -UFormat "%m"
+    $ReviewPeriod = $($objective.FieldValues.Review_x0020_Period).Split(":")[1].Trim()
     #Create item in Live Objectives List
     Try{
     Write-Host "Adding new objective: $($objective.FieldValues.Objective)" -ForegroundColor Yellow
     #Create initial objective with "ignore" as the objective name, PowerApps will filter this out
-    $newobjective = Add-PnPListItem -List "POP Objectives List (UK)" -Values @{"Employee_x0020_Name" = $($objective.FieldValues.Employee_x0020_Name.Email); "Line_x0020_Manager" = $($objective.FieldValues.Line_x0020_Manager.Email); "Review_x0020_Period" = $($ReviewPeriod); "Objective" = "ignore"; "ObjectiveDescription" = $($objective.FieldValues.ObjectiveDescription); "ManagerAssessment" = $($objective.FieldValues.ManagerAssessment); "EmployeeAssessment" = $($objective.FieldValues.ManagerAssessment); "Status" = "Open"; "Cluster" = $($objective.FieldValues.Cluster)}
+    $newobjective = Add-PnPListItem -List "POP Objectives List (UK)" -Values @{"Employee_x0020_Name" = $($objective.FieldValues.Employee_x0020_Name.Email); "Line_x0020_Manager" = $($objective.FieldValues.Line_x0020_Manager.Email); "Review_x0020_Period" = $($ReviewPeriod); "Objective" = "ignore"; "ObjectiveDescription" = $($objective.FieldValues.ObjectiveDescription); "ManagerAssessment" = $($objective.FieldValues.ManagerAssessment); "EmployeeAssessment" = $($objective.FieldValues.ManagerAssessment); "Status" = "Open"; "Cluster" = $($objective.FieldValues.Cluster); "ImpactArea" = $($objective.FieldValues.ImpactArea)}
     }
     Catch{
     $error
@@ -90,7 +91,7 @@ Else{
     Try{
     #Create initial objective with "ignore" as the objective name, PowerApps will filter this out
     Write-Host "Adding complete objective: $($objective.FieldValues.Objective)" -ForegroundColor Yellow
-    $completeobjective = Add-PnPListItem -List "POP Completed Objectives (UK)" -Values @{"Employee_x0020_Name" = $($objective.FieldValues.Employee_x0020_Name.Email); "Line_x0020_Manager" = $($objective.FieldValues.Line_x0020_Manager.Email); "Review_x0020_Period" = $($objective.FieldValues.Review_x0020_Period); "Objective" = "ignore"; "ObjectiveDescription" = $($objective.FieldValues.ObjectiveDescription); "ManagerAssessment" = $($objective.FieldValues.ManagerAssessment); "EmployeeAssessment" = $($objective.FieldValues.ManagerAssessment); "ManagerComments" = $($objective.FieldValues.ManagerComments); "EmployeeComments" = $($objective.FieldValues.EmployeeComments); "Status" = "Closed"; "Cluster" = $($objective.FieldValues.Cluster); "Complete_x0020_Date" = $($($objective.FieldValues.Created_x0020_Date).Split("T")[0])}
+    $completeobjective = Add-PnPListItem -List "POP Completed Objectives (UK)" -Values @{"Employee_x0020_Name" = $($objective.FieldValues.Employee_x0020_Name.Email); "Line_x0020_Manager" = $($objective.FieldValues.Line_x0020_Manager.Email); "Review_x0020_Period" = $($objective.FieldValues.Review_x0020_Period); "Objective" = "ignore"; "ObjectiveDescription" = $($objective.FieldValues.ObjectiveDescription); "ManagerAssessment" = $($objective.FieldValues.ManagerAssessment); "EmployeeAssessment" = $($objective.FieldValues.ManagerAssessment); "ManagerComments" = $($objective.FieldValues.ManagerComments); "EmployeeComments" = $($objective.FieldValues.EmployeeComments); "Status" = "Closed"; "Cluster" = $($objective.FieldValues.Cluster);"ImpactArea" = $($objective.FieldValues.ImpactArea); "Complete_x0020_Date" = $($($objective.FieldValues.Created_x0020_Date).Split("T")[0])}
     }
     Catch{
     $error
@@ -191,7 +192,8 @@ If($deactivatedUserObjectives){
     "ManagerAssessment" = $deactivatedUserObjective.FieldValues.ManagerAssessment;                                                                                                                               
     "EmployeeAssessment" = $deactivatedUserObjective.FieldValues.EmployeeAssessment;                                                                                                                               
     "Status" = $deactivatedUserObjective.FieldValues.Status;                                                                                                                                              
-    "Cluster" = $deactivatedUserObjective.FieldValues.Cluster;                                                                                                                                      
+    "Cluster" = $deactivatedUserObjective.FieldValues.Cluster;  
+    "ImpactArea" = $deactivatedUserObjective.FieldValues.ImpactArea;                                                                                                                                    
     "ManagerComments" = $deactivatedUserObjective.FieldValues.ManagerComments;                                                                                                                                                             
     "EmployeeComments" = $deactivatedUserObjective.FieldValues.EmployeeComments;
         }
@@ -216,7 +218,8 @@ If($deactivatedUserObjectives){
     "ManagerAssessment" = $deactivatedUserObjective.FieldValues.ManagerAssessment;                                                                                                                               
     "EmployeeAssessment" = $deactivatedUserObjective.FieldValues.EmployeeAssessment;                                                                                                                               
     "Status" = $deactivatedUserObjective.FieldValues.Status;                                                                                                                                              
-    "Cluster" = $deactivatedUserObjective.FieldValues.Cluster;                                                                                                                                      
+    "Cluster" = $deactivatedUserObjective.FieldValues.Cluster; 
+    "ImpactArea" = $deactivatedUserObjective.FieldValues.ImpactArea;                                                                                                                                     
     "ManagerComments" = $deactivatedUserObjective.FieldValues.ManagerComments;                                                                                                                                                             
     "EmployeeComments" = $deactivatedUserObjective.FieldValues.EmployeeComments;
     "Complete_x0020_Date" =  $deactivatedUserObjective.FieldValues.EmployeeComments;
