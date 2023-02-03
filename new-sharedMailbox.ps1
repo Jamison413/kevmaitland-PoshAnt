@@ -2,16 +2,16 @@
 Import-Module _PS_Library_GeneralFunctionality
 Import-Module _PS_Library_Groups
 
-$creds = set-MsolCredentials
-connect-msolService -Credential $creds
-connect-ToExo -Credential $creds
+set-MsolCredentials
+connect-msolService
+connect-ToExo
 
 
-$displayName = "Ethics Board Shared Mailbox"
-$primaryEmail = "ethics@anthesisgroup.com"
-$owner = "t0-kevin.maitland@anthesisgroup.com"
-$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "chris.jones@anthesisgroup.com; tanya.lightbody@anthesisgroup.com; mike.thompson@anthesisgroup.com"
-$additionalEmailAddresses = convertTo-arrayOfEmailAddresses "TestBlockSignin@anthesisgroup.com"
+$displayName = "displayName"
+$primaryEmail = "name1.name2@anthesisgroup.com"
+$owner = "firstname.lastname@anthesisgroup.com"
+$arrayOfFullAccessMembers = convertTo-arrayOfEmailAddresses "firstname.lastname@anthesisgroup.com; firstname.lastname@anthesisgroup.com"
+$additionalEmailAddresses = convertTo-arrayOfEmailAddresses ""
 $allEmailAddresses = convertTo-arrayOfEmailAddresses "$primaryEmail , $additionalEmailAddresses"
 $grantSendAsToo = $true
 $hideFromGal = $false
