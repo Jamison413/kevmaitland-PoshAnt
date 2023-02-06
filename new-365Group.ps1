@@ -1468,10 +1468,6 @@ function update-spoTerm($termGroup,$termSet,$oldTerm,$newTerm,$kimbleId,$verbose
 #endregion
 
 
-#Get some useful information
-# -> Internal client doclibs
-$allClientSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/clients" #-filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
-$allSupplierSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/subs" #-filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
 
 # -> Get members of 'Data Managers - Authorised (All) from 365'
 $datamanagers = get-graphUsersFromGroup -tokenResponse $tokenResponse -groupId "daf56fbd-ebce-457e-a10a-4fce50a2f99c" -memberType "Members"
@@ -1591,6 +1587,12 @@ Switch($currentRequest.siteClassification){
     
     }
     "External"{
+
+        #Get some useful information
+        # -> Internal client doclibs
+        $allClientSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/clients" #-filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
+        $allSupplierSiteDocLibs = get-graphDrives -tokenResponse $tokenResponse -siteUrl "https://anthesisllc.sharepoint.com/subs" #-filterDriveName $($fullRequest.FieldValues.ClientName.Label) #$filters aren't currently supported on this endpoint :'(
+
 
         # Site Configuration
         $hideFromGal = $false
@@ -1850,8 +1852,11 @@ Switch($currentRequest.siteClassification){
             }
         }
         If($groupClassification -eq "Internal"){
-            Write-Host "Updating request list item..."
-            update-graphListItem -tokenResponse $tokenResponse -graphSiteId "anthesisllc.sharepoint.com,7ae43073-f384-41ba-ae95-5107eacf17b2,5786d001-5418-4f96-88fc-9e4e9e5922d8" -listId "34cad35a-4710-4fc9-bd53-ec35ae54574f" -listitemId $fullRequest.Id -fieldHash @{"Status"="Created";"URL"="$($newPnpTeam.SiteUrl)"} -Verbose  
+            Write-Host "Updating request list item..." #Graph does not support the hyperlinkOrPictureColumn resource type yet, pnp must be used
+                Write-Host -f DarkYellow "`tUpdating Team Request: Status = [Created],Url=[$($newPnpTeam.SiteUrl)]"
+                test-pnpConnectionMatchesResource -resourceUrl "https://anthesisllc.sharepoint.com/sites/TeamHub" -connectIfDifferent $true -pnpCreds $365creds | Out-Null
+                $dummy = Set-PnPListItem -List "Internal Team Site Requests" -Identity $fullRequest.Id -Values @{Status="Created";URL=$newPnpTeam.SiteUrl}
+
         }
         Write-Verbose "Preparing e-mail"
         #External email code:
@@ -2012,7 +2017,7 @@ Switch($currentRequest.siteClassification){
     if(![string]::IsNullOrWhiteSpace($thisManagerFirstName)){$thisManagerFirstName = ($thisManagerFirstName.Split(" ")[0])}
     try{
         $body = "<HTML><BODY><p>Hi $thisManagerFirstName,</p>
-            <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">[$($newTeam.DisplayName)] Team Site</a> is available for you now. You are probably already 
+            <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">[$($newPnpTeam.DisplayName)] Team Site</a> is available for you now. You are probably already 
             familiar with how these Sites work, but we have <a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/SharePoint-Training-Guides.aspx#data-managers-guides`">
             a good selection of guides for Data Mangers</a> available on the IT Resources Site, and a few of the most popular ones are below if
             you want to do anything fancier that simply sharing files:</p>
@@ -2031,7 +2036,7 @@ Switch($currentRequest.siteClassification){
             <p>The Team Site Robot</p>
             </BODY></HTML>"
         #Send-MailMessage  -BodyAsHtml $body -Subject "[$($newTeam.DisplayName)] Team Site created" -to $thisManager -bcc $((Get-PnPConnection).PSCredential.UserName) -from "TeamSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
-        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn 'teamsiterobot@anthesisgroup.com' -toAddresses $thisManager -subject "[$($newTeam.DisplayName)] Team Site created" -bodyHtml $body -bccAddresses $($365creds.UserName)
+        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn 'teamsiterobot@anthesisgroup.com' -toAddresses $thisManager -subject "[$($newPnpTeam.DisplayName)] Team Site created" -bodyHtml $body -bccAddresses $($365creds.UserName)
 
         Write-Verbose "E-mail sent"
         }
