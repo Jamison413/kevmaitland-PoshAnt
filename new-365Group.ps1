@@ -1,8 +1,8 @@
 $365creds = set-MsolCredentials
 connect-ToExo -credential $365creds
 
-$TeamAndCommunityBotDetails = get-graphAppClientCredentials -appName TeamAndCommunityBot
-$tokenResponse = get-graphTokenResponse -aadAppCreds $TeamAndCommunityBotDetails
+$teamBotDetails = get-graphAppClientCredentials -appName TeamsBot
+$tokenResponse = get-graphTokenResponse -aadAppCreds $teamBotDetails
 $smtpBotDetails = get-graphAppClientCredentials -appName SmtpBot
 $tokenResponseSmtp = get-graphTokenResponse -aadAppCreds $smtpBotDetails
 
@@ -1539,6 +1539,7 @@ Switch($currentRequest.siteClassification){
     
         #region Site Managers & Members
             $managers = convertTo-arrayOfEmailAddresses ($fullRequest.FieldValues.DataManager.Email) | sort | select -Unique
+            $originalManagers = convertTo-arrayOfEmailAddresses $fullRequest.FieldValues.DataManager.Email | sort | select -Unique #for email notification to Data Managers
             #If no available Data Managers - Teams needs a user account with a Teams license as a member of the 365 group 
             $thisITuser = ""
             If(!$managers){
@@ -1641,7 +1642,7 @@ Switch($currentRequest.siteClassification){
                 $members = convertTo-arrayOfEmailAddresses ($managers + "," + $fullRequest.FieldValues.Site_x0020_Members.Email) | sort | select -Unique
                 }
                 Else{
-                $members = convertTo-arrayOfEmailAddresses ($managers + "," + $fullRequest.FieldValues.Site_x0020_Members.Email + $fullRequest.FieldValues.Site_x0020_Admin.Email) | sort | select -Unique
+                $members = convertTo-arrayOfEmailAddresses ($managers + "," + $fullRequest.FieldValues.Site_x0020_Members.Email + "," + $fullRequest.FieldValues.Site_x0020_Admin.Email) | sort | select -Unique
                 }
                 $members | % {
                     $thisEmail = $_
@@ -1823,7 +1824,8 @@ Switch($currentRequest.siteClassification){
             #Remove-UnifiedGroupLinks -Identity $newPnpTeam.GroupId -LinkType Member -Links $((Get-PnPConnection).PSCredential.UserName) -Confirm:$false
             }
 
-
+        #Update list item in Request Form
+        If($groupClassification -eq "External"){    
         switch($fullRequest.FieldValues.FileDirRef.Split("/")[1]){
             "clients" {
                 Write-Host -f DarkYellow "`tUpdating Client Request: Status = [Created],Url=[$($newPnpTeam.SiteUrl)]"
@@ -1846,11 +1848,16 @@ Switch($currentRequest.siteClassification){
                 }
             default   {}
             }
-        
+        }
+        If($groupClassification -eq "Internal"){
+            Write-Host "Updating request list item..."
+            update-graphListItem -tokenResponse $tokenResponse -graphSiteId "anthesisllc.sharepoint.com,7ae43073-f384-41ba-ae95-5107eacf17b2,5786d001-5418-4f96-88fc-9e4e9e5922d8" -listId "34cad35a-4710-4fc9-bd53-ec35ae54574f" -listitemId $fullRequest.Id -fieldHash @{"Status"="Created";"URL"="$($newPnpTeam.SiteUrl)"} -Verbose  
+        }
         Write-Verbose "Preparing e-mail"
-
+        #External email code:
+        If($groupClassification -eq "External"){
         #Admin has training
-        If($thisAdminisAuthorised){
+            If($thisAdminisAuthorised){
         try{
             $body = "<HTML><BODY><p>Hi $($fullRequest.FieldValues.Site_x0020_Admin.LookupValue.Split(" ")[0]),</p>
                 <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">External
@@ -1897,8 +1904,8 @@ Switch($currentRequest.siteClassification){
                 } #Send-MailMessage doesn't support Empty CC option
             }
         catch{$_}
-        }
-        Else{
+            }
+            Else{
         #Admin has no training and there are no other owners
         If((!($fullRequest.FieldValues.Site_x0020_Owners.Email)) -and (!$thisAdminisAuthorised)){
         try{
@@ -1995,6 +2002,41 @@ Switch($currentRequest.siteClassification){
             }
         catch{$_}
         }
+            }
+        }
+        #Internal email code:
+        If($groupClassification -eq "Internal"){
+            $originalManagers | % {
+    $thisManager = $_
+    $thisManagerFirstName = guess-nameFromString -ambiguousString $thisManager
+    if(![string]::IsNullOrWhiteSpace($thisManagerFirstName)){$thisManagerFirstName = ($thisManagerFirstName.Split(" ")[0])}
+    try{
+        $body = "<HTML><BODY><p>Hi $thisManagerFirstName,</p>
+            <p>Your new <a href=`"$($newPnpTeam.siteUrl)`">[$($newTeam.DisplayName)] Team Site</a> is available for you now. You are probably already 
+            familiar with how these Sites work, but we have <a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/SitePages/SharePoint-Training-Guides.aspx#data-managers-guides`">
+            a good selection of guides for Data Mangers</a> available on the IT Resources Site, and a few of the most popular ones are below if
+            you want to do anything fancier that simply sharing files:</p>
+            <UL><LI><a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-62`">Changing
+            the logo for your Site</a></LI>
+            <LI><a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-196`">Creating/editing
+            pages in SharePoint</a></LI>
+            <LI><a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-105`">Creating
+            links in SharePoint</a></LI>
+            <LI><a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-42`">Adding
+            icons to your link</a></LI></UL>
+            <p>You and all the new members of your team will get another e-mail from 365 shortly telling you that the new team has been created, and you can find your way back to the file storage area in SharePoint either <a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-4`">via Outlook</a>, by <a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-32`">bookmarking the Site in Chrome</a>, or <a href=`"https://anthesisllc.sharepoint.com/sites/Resources-IT/_layouts/15/DocIdRedir.aspx?ID=HXX7CE52TSD2-1759992947-209`"><i>ridiculously</i> easily by searching in Chrome</a>.</p>
+            <p>You won't be able to able to share data in this Site with external users or guests (if you want to do this, you'll need to take a look 
+            at <a href=`"https://anthesisllc.sharepoint.com/sites/external/SitePages/External-Sharing-Sites.aspx`">External Sharing Sites</a>).</p>
+            <p>Love,</p>
+            <p>The Team Site Robot</p>
+            </BODY></HTML>"
+        #Send-MailMessage  -BodyAsHtml $body -Subject "[$($newTeam.DisplayName)] Team Site created" -to $thisManager -bcc $((Get-PnPConnection).PSCredential.UserName) -from "TeamSiteRobot@anthesisgroup.com" -SmtpServer "anthesisgroup-com.mail.protection.outlook.com" -Encoding UTF8
+        send-graphMailMessage -tokenResponse $tokenResponseSmtp -fromUpn 'teamsiterobot@anthesisgroup.com' -toAddresses $thisManager -subject "[$($newTeam.DisplayName)] Team Site created" -bodyHtml $body -bccAddresses $($365creds.UserName)
+
+        Write-Verbose "E-mail sent"
+        }
+    catch{$_}
+            }
         }
 
     
