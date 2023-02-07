@@ -14,7 +14,7 @@ $powerBIBotDetails = get-graphAppClientCredentials -appName PowerBIBot
 $powerBIBottokenResponse = get-powerBITokenResponse -aadAppCreds $powerBIBotDetails -Verbose
 
 #for querying
-$powerBIBotAdminDetails = get-graphAppClientCredentials -appName PowerBIAdminBot
+$powerBIBotAdminDetails = get-graphAppClientCredentials -appName PowerBIAdminBot 
 $powerBIBotAdmintokenResponse = get-powerBITokenResponse -aadAppCreds $powerBIBotAdminDetails -Verbose
 
 
@@ -39,13 +39,12 @@ update-powerBIWorkspaceUserPermissions -tokenResponse $powerBIBottokenResponse -
 
 #optional: create a PowerBI Data Managers group to add *Admins* to
 $newPowerBIManagerGroup = new-mailEnabledSecurityGroup -dgDisplayName $($target365Group.displayName + " - PowerBI Managers Subgroup") -description "Mail-enabled Security Group for $($target365Group.displayName) Power BI Managers" -ownersUpns "ITTeamAll@anthesisgroup.com" -fixedSuffix " - PowerBI Managers Subgroup" -blockExternalMail $true -hideFromGal $true ###need to fix group upn to match formatting of the subgroups - currently too many spaces
-set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $target365Group.id -powerBiManagerGroupId $newPowerBIManagerGroup.Id -Verbose
+$newPowerBIManagerGroupAADObject = get-graphGroups -tokenResponse $tokenResponse -filterUpn $newPowerBIManagerGroup.PrimarySmtpAddress
+set-graphGroupUGSyncSchemaExtensions -tokenResponse $tokenResponse -groupId $target365Group.id -powerBiManagerGroupId $newPowerBIManagerGroupAADObject.Id -Verbose
 
 #Add Power BI data managers group as Admin level (change permission level as needed - ideally only IT in this group at the moment for Admins)
 $target365Group = get-graphGroupWithUGSyncExtensions -tokenResponse $tokenResponse -filterUpn $365groupUPN #re-get 365group after update above
 add-userToPowerBIWorkspace -tokenResponse $powerBIBottokenResponse -workspaceID $newWorkspace.id -aadObjectId $target365Group.anthesisgroup_UGSync.powerBiManagerGroupId -groupUserAccessRight Admin -PrincipalType Group -Verbose
-
-
 
 
 

@@ -25,7 +25,7 @@
         "userPrincipalName" {$identifier = $userPrincipalName}
         }
     Try{
-        $result = invoke-powerBIPost -tokenResponse $tokenResponse -powerBIQuery "admin/groups/$($workspaceID)/users" -powerBIBodyHashtable @{"identifier"="$($identifier)";"groupUserAccessRight" = "$($groupUserAccessRight)";"principalType" = $PrincipalType} -Verbose
+        $result = invoke-powerBIPost -tokenResponse $tokenResponse -powerBIQuery "groups/$($workspaceID)/users" -powerBIBodyHashtable @{"identifier"="$($identifier)";"groupUserAccessRight" = "$($groupUserAccessRight)";"principalType" = $PrincipalType} -Verbose
         }
     Catch{
         get-errorSummary $_
