@@ -386,12 +386,12 @@ Switch($selection){
 "A" {$contracttype = "Employee"}
 "B" {$contracttype = "Subcontractor"}
 }
->
-switch($thisUser.FieldValues.Is_x0020_a_x0020_Subcontractor_x){
+
+<#switch($thisUser.FieldValues.Is_x0020_a_x0020_Subcontractor_x){
     {$_ -match "Yes"}  {$contracttype = "Subcontractor"}
     {$_ -match "No"}   {$contracttype = "Employee"}
     default {write-host -f Red "[$($thisUser.FieldValues.Title)] does not have a valid Employment Status set. Will not create account.";break}
-    }
+    }#>
 
 #Use Secondary Office location if homeworker - primary for anything else
 If($thisUser.fieldvalues.Primary_x0020_Workplace.Label -eq "Home worker"){
@@ -436,7 +436,26 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -usagelocation = ($usagelocation = ($officeTerm.CustomProperties.'Usage Location')) `
     -timezone = ($timezone = ($officeterm.CustomProperties.'Timezone')) 
 
+    $graphUser = ""
 
+    while(!$graphUser){$graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn -Verbose}
+    
+    If(($graphuser | Measure-Object).count -eq 1){
+
+    Write-Host "Some requests will not be labelled correctly as a subcontractor, for Spain they have a lot of users that need an account, but should not have acess to internal Teams, `
+and they have their own group called All Educators and Mediators (ESP). `
+If they have a job title 'Educators', have a kiosk license, and if Primary Workplace is in Spain, it's likely that it is one of these users (a Subcontractor)." -ForegroundColor Yellow
+
+    $addToAllEducatorsGroup = read-host "Do you want to add this user to the All Educators and Mediators (ESP) group? Answer Y or N"
+    Switch($addToAllEducatorsGroup){
+        "Y" {
+            add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId "b4a43a31-c282-4859-a038-76960efa2bd9" -memberType members -graphUserIds $graphuser.id -Verbose
+            $contracttype = "Subcontractor"
+                   }
+        "N" {write-host "Not adding to the group"}
+        default{write-host "Error: Please write Y or N" -ForegroundColor Red}
+    }
+    }
 
 #Add to a regional group - this needs rewriting into a function, bodging for now
 If($contracttype -ne "Subcontractor"){
@@ -445,7 +464,6 @@ If($contracttype -ne "Subcontractor"){
     $regionalmembersgroup = get-graphGroups -tokenResponse $tokenResponse -filterId "$($thisoffice.anthesisgroup_UGSync.memberGroupId)"
     If(($regionalmembersgroup | Measure-Object).Count -eq 1){
     add-DistributionGroupMember -Identity $regionalmembersgroup.mail -Member $upn -Confirm:$false -BypassSecurityGroupManagerCheck
-    $graphuser = get-graphUsers -tokenResponse $tokenResponse -filterUpns $upn
     add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId $thisoffice.id -memberType Members -graphUserUpns $graphuser.id -Verbose
     }
     Else{
