@@ -88,7 +88,7 @@ Start-Sleep -Seconds 60 #Let MSOL & EXO Syncronise
 $msoluser = Get-MsolUser -UserPrincipalName $upn #check it can be retrieved
 If($msoluser){
         try{
-        update-msoluserdetails -upn $upn -firstname $firstname -lastname $lastname -displayname $displayname -primaryteam $primaryteam -country $country -jobtitle $jobtitle -DDI $DDI -mobile $mobile -businessunit $businessunit -city $city -streetaddress $streetaddress -office $office -postcode $postcode -usagelocation $usagelocation
+        update-msoluserdetails -upn $upn -firstname $firstname -lastname $lastname -displayname $displayname -country $country -jobtitle $jobtitle -DDI $DDI -mobile $mobile -businessunit $businessunit -city $city -streetaddress $streetaddress -office $office -postcode $postcode -usagelocation $usagelocation
         }
         catch{
         Write-host "Failed to update MSOL account details" -ForegroundColor Red
@@ -96,7 +96,7 @@ If($msoluser){
         log-Error $Error
         }
         try{
-        update-msolMailboxViaUpn -upn $upn -displayname $displayname -businessunit $businessunit -timezone $timezone -linemanager $linemanager -office $office #this seemed to work - potential problem with connect-toexo in remote session
+        update-msolMailboxViaUpn -upn $upn -displayname $displayname -businessunit $businessunit -timezone $timezone -linemanager $linemanager -office $office
         }
         catch{
         Write-host "Failed to update MSOL account mailbox details" -ForegroundColor Red
@@ -220,7 +220,6 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -firstname ($firstname = "$($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ")[0].Trim())") `
     -lastname = ($lastname = "$(($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ")[$thisUser.FieldValues.Employee_x0020_Preferred_x0020_N.Trim().Split(" ").Count-1]).Trim())") `
     -displayname = ($displayname = "$(($thisUser.FieldValues.Employee_x0020_Preferred_x0020_N).Trim())") `
-    -primaryteam = ($primaryteam = "$(($thisUser.FieldValues.Primary_x0020_Team0.Label).Trim())") `
     -regionalgroup = $regionalgroup `
     -office = ($office = "$(($thisUser.FieldValues.Main_x0020_Office0.Label).Trim())") `
     -streetaddress = ($streetaddress = ($officeTerm.CustomProperties.'Street Address')) `
@@ -419,7 +418,6 @@ write-host "Creating MSOL account for $($upn = (remove-diacritics $($thisUser.Fi
     -firstname ($firstname = "$($thisUser.FieldValues.Title.Trim().Split(" ")[0].Trim())") `
     -lastname = ($lastname = "$($thisUser.FieldValues.Title.Trim().Split(" ")[1].Trim())") `
     -displayname = ($displayname = "$(($thisUser.FieldValues.Title).Trim())") `
-    -primaryteam = ($primaryteam = "$(($thisUser.FieldValues.Primary_x0020_Team.Label).Trim())") `
     -regionalgroup = $regionalgroup `
     -office = ($office = "$(($thisUser.FieldValues.Primary_x0020_Workplace.Label).Trim())") `
     -streetaddress = ($streetaddress = ($officeTerm.CustomProperties.'Street Address')) `
@@ -450,6 +448,7 @@ If they have a job title 'Educators', have a kiosk license, and if Primary Workp
     Switch($addToAllEducatorsGroup){
         "Y" {
             add-graphUsersToGroup -tokenResponse $tokenResponse -graphGroupId "b4a43a31-c282-4859-a038-76960efa2bd9" -memberType members -graphUserIds $graphuser.id -Verbose
+            add-graphLicenseToUser -tokenResponse $tokenResponse -userIdOrUpn $graphuser.id -licenseFriendlyName Kiosk_K1 -Verbose
             $contracttype = "Subcontractor"
                    }
         "N" {write-host "Not adding to the group"}

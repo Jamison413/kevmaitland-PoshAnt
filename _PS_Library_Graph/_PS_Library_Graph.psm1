@@ -145,65 +145,78 @@ function add-graphFolderToDrive(){
     invoke-graphPost -tokenResponse $tokenResponse -graphQuery $graphQuery -graphBodyHashtable $folderHash
     }
 function add-graphLicenseToUser(){
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true,ParameterSetName="Friendly")]
-            [parameter(Mandatory = $true,ParameterSetName="Guid")]
-            [parameter(Mandatory = $true,ParameterSetName="Guids")]
-            [psobject]$tokenResponse
-        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [parameter(Mandatory = $true,ParameterSetName="Guid")]
-            [parameter(Mandatory = $true,ParameterSetName="Guids")]
-            [string]$userIdOrUpn
-        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [ValidateSet("Kiosk","Office_E1","Office_E3","Office_E5","EMS_E3","MDE","PowerBIFree","TeamsAudioConferencingSelect","DomesticCalling","InternationalCalling","Project","Visio","Microsoft_E3","Win_E3")]
-            [string]$licenseFriendlyName 
-        ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
-            [string]$licenseGuid
-        ,[parameter(Mandatory = $false,ParameterSetName = "Guid")]
-            [parameter(Mandatory = $false,ParameterSetName = "Friendly")]
-            [string[]]$disabledPlansGuids = @()
-        ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
-            [string[]]$licenseGuids
-        )
-    $specialLicenses = @("Kiosk","80b2d799-d2ba-4d2a-8842-fb0d0f3a4b82","E1","18181a46-0d4e-45cd-891e-60aabd171b4e","E3","6fd2c87f-b296-42f0-b197-1e91e994b900","E5","c7df2760-2c81-4ef7-b578-5b5392b571df","M3","05e9a617-0261-4cee-bb44-138d3ef5d965","M5","06ebc4ee-1bb5-47dd-8120-11324bc54e06")
-    $licensesToRemove = @()
-    if($specialLicenses -contains $licenseFriendlyName -or
-        $specialLicenses -contains $licenseGuid 
-        ){
-        #We have to remove any conflicting licenses at the same time
-        #get user licesnses
-        $userRecord = get-graphUsers -tokenResponse $tokenResponse -filterUpns $userIdOrUpn -selectAllProperties
-        #build appropriate remove hash
-        $matchedLicenses = $(Compare-Object -ReferenceObject $userRecord.assignedLicenses.skuId -DifferenceObject $specialLicenses -IncludeEqual -ExcludeDifferent)
-        @($matchedLicenses.InputObject | Select-Object) | % {
-            $licensesToRemove += $_
-            }
-        }
-
-    switch ($PsCmdlet.ParameterSetName){
-        "Friendly" {
-            [string[]]$licenseGuids = get-microsoftProductInfo -getType GUID -fromType FriendlyName -fromValue $licenseFriendlyName
-            }
-        "Guid" {
-            [string[]]$licenseGuids = $licenseGuid
-            }
-
-        }
-
-    #Iterate through the supplied/derived licenseGuids
-    @($licenseGuids | Select-Object) | % {
-        $thisLicenseDefinition = @{"skuId"=$_}
-        $thisLicenseDefinition.Add("disabledPlans",$disabledPlansGuids) #$disabledPlansGuids is $null if $PsCmdlet.ParameterSetName -eq "Guids", so we don't need to worry about which disabledPlans belong to which licenseGuid
-        [array]$licenseArray += $thisLicenseDefinition
-        }
+        [cmdletbinding()]
+        Param (
+            [parameter(Mandatory = $true,ParameterSetName="Friendly")]
+                [parameter(Mandatory = $true,ParameterSetName="Guid")]
+                [parameter(Mandatory = $true,ParameterSetName="Guids")]
+                [psobject]$tokenResponse
+            ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+                [parameter(Mandatory = $true,ParameterSetName="Guid")]
+                [parameter(Mandatory = $true,ParameterSetName="Guids")]
+                [string]$userIdOrUpn
+            ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+                [ValidateSet("Kiosk_K1","Office_E1","Office_E3","Office_E5","EMS_E3","MDE","PowerBIFree","TeamsAudioConferencingSelect","DomesticCalling","InternationalCalling","Project","Visio","Microsoft_E3","Microsoft_E5","Win_E3")]
+                [string]$licenseFriendlyName 
+            ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
+                [string]$licenseGuid
     
-    $graphBodyHashtable = @{
-        "addLicenses"=$licenseArray
-        "removeLicenses"=$licensesToRemove
+            )
+        
+        $userObject = get-graphUsers -tokenResponse $tokenResponse -filterUpns $userIdOrUpn -selectAllProperties -Verbose
+        If(($userObject.assignedLicenses.skuId | Measure-Object).Count -ge 1){
+        $specialLicenses = @("Kiosk_K1","80b2d799-d2ba-4d2a-8842-fb0d0f3a4b82","Office_E1","18181a46-0d4e-45cd-891e-60aabd171b4e","Office_E3","6fd2c87f-b296-42f0-b197-1e91e994b900","Office_E5","c7df2760-2c81-4ef7-b578-5b5392b571df","Microsoft_E3","05e9a617-0261-4cee-bb44-138d3ef5d965","Microsoft_E5","06ebc4ee-1bb5-47dd-8120-11324bc54e06")
+        $licensesToRemove = @()
+        if($specialLicenses -contains $licenseFriendlyName -or
+            $specialLicenses -contains $licenseGuid 
+            ){
+            #We have to remove any conflicting licenses at the same time
+            #get user licesnses
+            $userRecord = get-graphUsers -tokenResponse $tokenResponse -filterUpns $userIdOrUpn -selectAllProperties
+            #build appropriate remove hash
+            If($userRecord.assignedLicenses.skuId){
+                $matchedLicenses = $(Compare-Object -ReferenceObject $userRecord.assignedLicenses.skuId -DifferenceObject $specialLicenses -IncludeEqual -ExcludeDifferent)
+                    @($matchedLicenses.InputObject | Select-Object) | % {
+                    $licensesToRemove += $_
+                    }
+                }
+            }
+        #remove each conflicting license
+        ForEach($licenseToRemove in $licensesToRemove){
+        Write-Host $licenseToRemove
+        Remove-graphLicenseFromUser -tokenResponse $tokenResponse -userIdOrUpn $userIdOrUpn -licenseGuid $licenseToRemove -Verbose
         }
-
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable 
+        }
+        switch ($PsCmdlet.ParameterSetName){
+            "Friendly" {
+                [string]$licenseGuid = get-microsoftProductInfo -getType GUID -fromType FriendlyName -fromValue $licenseFriendlyName
+                }
+            "Guid" {
+                [string]$licenseGuid = $licenseGuid
+                }
+    
+            }
+    
+            $skuId = [PSCustomObject]@{
+                'skuId'=$licenseGuid
+            }
+    
+            $assignLicenses = [PSCustomObject]@{
+                addLicenses = @(
+                    $skuID
+                    );
+                removeLicenses = @()
+            }
+    
+        $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    
+        $graphBodyJson = ConvertTo-Json -InputObject $assignLicenses -Depth 10
+        Write-Verbose $graphBodyJson
+        $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
+        
+        Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$($userIdOrUpn)/assignLicense" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers $headers -Method Post -Verbose
+    
+    
     }
 function add-graphUsersToGroup(){
     [cmdletbinding()]
@@ -1044,53 +1057,6 @@ function get-graphIntuneDevices(){
         $allIntuneDevices | Sort-Object userPrincipalName,deviceName
         }
     }
-function remove-graphLicense(){
-    [cmdletbinding()]
-    Param (
-        [parameter(Mandatory = $true,ParameterSetName="Friendly")]
-            [parameter(Mandatory = $true,ParameterSetName="Guid")]
-            [parameter(Mandatory = $true,ParameterSetName="Guids")]
-            [psobject]$tokenResponse
-        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [parameter(Mandatory = $true,ParameterSetName="Guid")]
-            [parameter(Mandatory = $true,ParameterSetName="Guids")]
-            [string]$userIdOrUpn
-        ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
-            [ValidateSet("Kiosk","E1","E3","E5","EMS","ATP","PowerBIFree","AudioConferencing","DomesticCalling","InternationalCalling","Project","Visio","M3","WinE3")]
-            [string]$licenseFriendlyName 
-        ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
-            [string]$licenseGuid
-        ,[parameter(Mandatory = $true,ParameterSetName = "Guids")]
-            [string[]]$licenseGuids
-        )
-
-    switch ($PsCmdlet.ParameterSetName){
-        "Friendly" {
-            [string[]]$licenseGuids = get-microsoftProductInfo -getType GUID -fromType FriendlyName -fromValue $licenseFriendlyName
-            }
-        "Guid" {
-            [string[]]$licenseGuids = $licenseGuid
-            }
-
-        }
-
-    #Iterate through the supplied/derived licenseGuids
-    <#@($licenseGuids | Select-Object) | % {
-        $thisLicenseDefinition = @{"skuId"=$_}
-        [array]$licenseArray += $thisLicenseDefinition
-        }
-
-    $graphBodyHashtable = @{
-        "removeLicenses"=$licenseArray
-        }
-    #>
-    $graphBodyHashtable = @{
-        "addLicenses"=@()
-        "removeLicenses"=$licenseGuids
-        }
-
-    invoke-graphPost -tokenResponse $tokenResponse -graphQuery "/users/$userIdOrUpn/assignLicense" -graphBodyHashtable $graphBodyHashtable 
-    }
 function get-graphList(){
     [cmdletbinding()]
     param(
@@ -1859,7 +1825,6 @@ function get-graphUsers(){
             [ValidateSet("AD","AE","CH","CN","CO","DE","ES","FI","FR","GB","IE","IT","KR","LK","PH","SE","US")]
             [string]$filterUsageLocation
         ,[parameter(Mandatory = $false)]
-            [ValidatePattern("@")]
             [string[]]$filterUpns
         ,[parameter(Mandatory = $false)]
             [hashtable]$filterCustomEq = @{}
@@ -2885,6 +2850,52 @@ function remove-graphUsersFromGroup(){
         invoke-graphDelete -tokenResponse $tokenResponse -graphQuery "/groups/$graphGroupId/$memberType/$_/`$ref"
         }
     }
+function Remove-graphLicenseFromUser(){
+        [cmdletbinding()]
+        Param (
+            [parameter(Mandatory = $true,ParameterSetName="Friendly")]
+                [parameter(Mandatory = $true,ParameterSetName="Guid")]
+                [parameter(Mandatory = $true,ParameterSetName="Guids")]
+                [psobject]$tokenResponse
+            ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+                [parameter(Mandatory = $true,ParameterSetName="Guid")]
+                [parameter(Mandatory = $true,ParameterSetName="Guids")]
+                [string]$userIdOrUpn
+            ,[parameter(Mandatory = $true,ParameterSetName = "Friendly")]
+                [ValidateSet("Kiosk_K1","Office_E1","Office_E3","Office_E5","EMS_E3","MDE","PowerBIFree","TeamsAudioConferencingSelect","DomesticCalling","InternationalCalling","Project","Visio","Microsoft_E3","Win_E3")]
+                [string]$licenseFriendlyName 
+            ,[parameter(Mandatory = $true,ParameterSetName = "Guid")]
+                [string]$licenseGuid
+    
+            )
+        switch ($PsCmdlet.ParameterSetName){
+            "Friendly" {
+                [string]$licenseGuid = get-microsoftProductInfo -getType GUID -fromType FriendlyName -fromValue $licenseFriendlyName
+                }
+            "Guid" {
+                [string]$licenseGuid = $licenseGuid
+                }
+    
+            }
+    
+            $assignLicenses = [PSCustomObject]@{
+                addLicenses = @(
+                    );
+                removeLicenses = @(
+                $licenseGuid
+                )
+            }
+    
+        $headers = @{Authorization = "Bearer $($tokenResponse.access_token)"}
+    
+        $graphBodyJson = ConvertTo-Json -InputObject $assignLicenses -Depth 10
+        Write-Verbose $graphBodyJson
+        $graphBodyJsonEncoded = [System.Text.Encoding]::UTF8.GetBytes($graphBodyJson)
+        
+        Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$($userIdOrUpn)/assignLicense" -Body $graphBodyJsonEncoded -ContentType "application/json; charset=utf-8" -Headers $headers -Method Post -Verbose
+    
+    
+}
 function repair-graphGroupUGSyncSchemaExtensions(){
     param(
         [parameter(Mandatory = $true)]
