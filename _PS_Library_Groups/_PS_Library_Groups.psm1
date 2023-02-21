@@ -476,8 +476,8 @@ function new-365Group(){
         if(!$sharedMailbox){
             Write-Verbose "Creating Shared Mailbox [$sharedMailboxDisplayName]: New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName -displayName $sharedMailboxDisplayName) -ErrorAction Continue -WhatIf:$WhatIfPreference "
             try{
-            $sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference 
-            Set-User -Identity $sharedMailbox.UserPrincipalName -AuthenticationPolicy "Allow IMAP"
+            $sharedMailbox = New-Mailbox -Shared -DisplayName $sharedMailboxDisplayName -Name $sharedMailboxDisplayName -Alias $(guess-aliasFromDisplayName ($sharedMailboxDisplayName)) -ErrorAction Continue -WhatIf:$WhatIfPreference -Confirm:$false 
+            Set-User -Identity $sharedMailbox.UserPrincipalName -AuthenticationPolicy "Allow IMAP" -Confirm:$false
             }
             catch{$Error}
             }
@@ -485,7 +485,7 @@ function new-365Group(){
         if($sharedMailbox){
             Write-Verbose "Mailbox [$($sharedMailbox.DisplayName)][$($sharedMailbox.ExternalDirectoryObjectId)] found: Set-Mailbox -Identity $($sharedMailbox.ExternalDirectoryObjectId) -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -ForwardingAddress $($graphGroupExtended.Mail) -DeliverToMailboxAndForward $true -ForwardingSmtpAddress $($graphGroupExtended.Mail) -Confirm:$false -WhatIf:$WhatIfPreference"
             Set-Mailbox -Identity $sharedMailbox.ExternalDirectoryObjectId -HiddenFromAddressListsEnabled $true -RequireSenderAuthenticationEnabled $false -Confirm:$false -WhatIf:$WhatIfPreference #-ForwardingAddress $graphGroupExtended.Mail -DeliverToMailboxAndForward $true  #I don't think we want to forward from the Shared Mailbox to the 365 group. If anything, we want the forwarding to work in reverse, and with the advent of Teams, Shared Mailboxes are liekly to be become less useful.
-            Set-user -Identity $sharedMailbox.ExternalDirectoryObjectId -Manager groupbot -WhatIf:$WhatIfPreference  #For want of someone better....
+            Set-user -Identity $sharedMailbox.ExternalDirectoryObjectId -Manager groupbot -WhatIf:$WhatIfPreference -Confirm:$false  #For want of someone better....
             #Assign the Shared Mailbox as a member of the Security Group
             try{Add-DistributionGroupMember -Identity $combinedSg.ExternalDirectoryObjectId -Member $sharedMailbox.ExternalDirectoryObjectId -BypassSecurityGroupManagerCheck -WhatIf:$WhatIfPreference -ErrorAction Stop}
             catch{
