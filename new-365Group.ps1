@@ -1466,6 +1466,37 @@ function update-spoTerm($termGroup,$termSet,$oldTerm,$newTerm,$kimbleId,$verbose
         }
     }
 #endregion
+function remove-diacritics{
+    #PARAM ([string]$String)
+    #[Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($String))
+    param
+    (
+        [ValidateNotNullOrEmpty()]
+        [Alias('Text')]
+        [System.String]$String,
+        [System.Text.NormalizationForm]$NormalizationForm = "FormD"
+    )
+    
+    BEGIN
+    {
+        $Normalized = $String.Normalize($NormalizationForm)
+        $NewString = New-Object -TypeName System.Text.StringBuilder
+        
+    }
+    PROCESS
+    {
+        $normalized.ToCharArray() | ForEach-Object -Process {
+            if ([Globalization.CharUnicodeInfo]::GetUnicodeCategory($psitem) -ne [Globalization.UnicodeCategory]::NonSpacingMark)
+            {
+                [void]$NewString.Append($psitem)
+            }
+        }
+    }
+    END
+    {
+        Write-Output $($NewString -as [string])
+    }
+}
 
 
 
@@ -1504,14 +1535,17 @@ ForEach($item in $selectedRequests){
 
 
 
-foreach ($currentRequest in $selectedRequests){}
+foreach ($currentRequest in $selectedRequests){
 
 $tokenResponse = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponse -renewTokenExpiringInSeconds 300 -aadAppCreds $teamBotDetails
+$tokenResponseSmtp = test-graphBearerAccessTokenStillValid -tokenResponse $tokenResponseSmtp -renewTokenExpiringInSeconds 300 -aadAppCreds $smtpBotDetails
+
 $fullRequest = $requests | ? {$_.FieldValues.GUID.Guid -eq $currentRequest.'$_.FieldValues.GUID.Guid'}
 write-host -ForegroundColor Yellow "Creating External Sharing Site [$($fullRequest.FieldValues.Title)] for [$($fullRequest.FieldValues.ClientName.Label)]"
 
-
 #region properties - set per site request type
+Try{
+    
 Switch($currentRequest.siteClassification){
     "Internal"{
         
@@ -1709,8 +1743,15 @@ Switch($currentRequest.siteClassification){
     }
     "Geographic"{}
     }
-#endregion    
+    
+}
+Catch{
+    break
+}
+#endregion
 #region create groups and SPO 
+try{
+   
         Write-Host -f DarkYellow "`tCreating Groups"
         $new365Group = new-365Group -displayName $displayName -managerUpns $managers -teamMemberUpns $members -memberOf $null -hideFromGal $hideFromGal -blockExternalMail $blockExternalMail -accessType Private -autoSubscribe $autoSubscribe -groupClassification $groupClassification -membershipManagedBy $managedBy -tokenResponse $tokenResponse -pnpCreds $365creds -ownersAreRealManagers $false -alsoCreateTeam $alsoCreateTeam -Verbose
         
@@ -1721,8 +1762,15 @@ Switch($currentRequest.siteClassification){
         $newPnpTeam = Get-PnPUnifiedGroup -Identity $new365Group.id
         write-host "We found site $($NewPnpTeam.DisplayName)" -ForegroundColor DarkYellow
         
+
+}
+Catch{
+    break
+}
 #endregion
 #region configure SPO
+Try{
+    
 
 
         #Aggrivatingly, you can't manipulate Pages with Graph yet, and Add-PnpFile doesn;t support AccessTokens, so we need to go old-school:
@@ -1780,8 +1828,8 @@ Switch($currentRequest.siteClassification){
                     
                         #Add a Website tab in the General channel linking back to the Client Site 
                         if($alsoCreateTeam){
-                            Write-Host -f DarkYellow "`tCreating Website Tab in General channel to  Clients/Suppliers Site "
-                            add-graphWebsiteTabToChannel -tokenResponse $tokenResponse -teamId $new365Group.id -channelName "General" -tabName "$($fullRequest.FieldValues.ClientName.Label) Client Data" -tabDestinationUrl $clientOrSupplierSiteDocLib.webUrl -Verbose
+                            #Write-Host -f DarkYellow "`tCreating Website Tab in General channel to  Clients/Suppliers Site "
+                            #add-graphWebsiteTabToChannel -tokenResponse $tokenResponse -teamId $new365Group.id -channelName "General" -tabName "$($fullRequest.FieldValues.ClientName.Label) Client Data" -tabDestinationUrl $clientOrSupplierSiteDocLib.webUrl -Verbose
                             }
 
                         Set-Clipboard -Value $fullRequest.FieldValues.Site_x0020_Admin.Email
@@ -1796,8 +1844,18 @@ Switch($currentRequest.siteClassification){
             set-standardSitePermissions -tokenResponse $tokenResponse -graphGroupExtended $new365Group -pnpAppCreds $teamBotDetails -pnpCreds $365creds -Verbose:$VerbosePreference -suppressEmailNotifications -ErrorAction Continue
             }
         catch{$_}
+
+}
+catch{
+    break
+}
 #endregion
 #region cleanup and finalise
+Try{
+
+    write-host "If something has gone wrong with the script, now is the time to stop the operation if you do not want to loop to the next request..." -ForegroundColor Yellow
+    write-host "Ready to finalise?" -ForegroundColor Green
+    Pause
 
         #Remove temp rights - IT normal user as admin - switch with Groupbot now we've processed everything
         if($thisITuser){
@@ -2045,9 +2103,19 @@ Switch($currentRequest.siteClassification){
         }
 
     
-#endregion
-   
-   
+
+}
+Catch{
+    break
+}   
+#endregion   
+}
+
+
+
+
+
+
    
 #catch{get-errorSummary -errorToSummarise $_}
 #$toDo = invoke-graphGet -tokenResponse $tokenResponse -graphQuery "/sites/anthesisllc.sharepoint.com,68fbfc7c-e744-47bb-9e0b-9b9ee057e9b5,faed84bc-70be-4e35-bfbf-cdab31aeeb99/Lists/06365ce6-07a5-41e9-b0aa-a90c9f1edc3f/items?expand=fields(select=ID,ClientName,Title,Site_x0020_Owners,Site_x0020_Members,Status,GuID)&filter=fields/Status eq 'Awaiting creation'"
